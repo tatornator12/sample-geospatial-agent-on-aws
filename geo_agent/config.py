@@ -29,6 +29,26 @@ MODEL_COSTS = { #see here: https://aws.amazon.com/bedrock/pricing/
 # Agent Configuration
 DEFAULT_SESSION_ID = os.getenv("DEFAULT_SESSION_ID", "default_session_demo_user")
 
+# ArcGIS Enterprise MCP (remote, streamable-HTTP)
+# Replaces the bundled Amazon Location Service stdio MCP server. The token is a
+# bearer credential for the ArcGIS Enterprise MCP catalog — treat it as a secret
+# (set via env / .env, which is gitignored). Do NOT hardcode for production;
+# move to AWS Secrets Manager and rotate. Kept in env here for demo convenience.
+ARCGIS_MCP_URL = os.getenv(
+    "ARCGIS_MCP_URL",
+    "https://esri.geospatial.tfc.aws.dev/hosting/platform/mcp",
+)
+ARCGIS_MCP_TOKEN = os.getenv("ARCGIS_MCP_TOKEN", "")
+
+# WDPA (World Database of Protected Areas) Feature Service — accessed through the
+# ArcGIS Enterprise MCP (the AGOL-hosted service is not directly reachable with
+# the Enterprise token). Layer 1 is the polygon (boundary) layer.
+WDPA_SERVICE_URL = os.getenv(
+    "WDPA_SERVICE_URL",
+    "https://services5.arcgis.com/Mj0hjvkNtV7NRhA7/arcgis/rest/services/WDPA_v0/FeatureServer",
+)
+WDPA_POLYGON_LAYER_ID = int(os.getenv("WDPA_POLYGON_LAYER_ID", "1"))
+
 # OPTIMIZED AGENT PROMPT (ACTIVE)
 AGENT_PROMPT = f"""
 You are a GIS Expert specializing in sentinel-2 satellite imagery analysis. Current date is {datetime.today().date().strftime("%Y-%m-%d")}.
@@ -52,12 +72,14 @@ GEOMETRY WORKFLOW:
    → create_bbox_from_coordinates(geometry_json, location) → geometry_s3_url
 
 🌍 LOCATION NAME: When user provides place name
-   → Call search_places(location) AND find_location_boundary(location) IN PARALLEL
-   → get_best_geometry(location, osm_s3_url, lat, lon) → geometry_s3_url
+   → Call find_address_candidates(singleLine=location) AND find_location_boundary(location) IN PARALLEL
+   → From find_address_candidates, take the HIGHEST-score candidate. Its coordinates are in
+     candidate.location: x = LONGITUDE, y = LATITUDE (WGS84). So lon = location.x, lat = location.y.
+   → get_best_geometry(location, osm_s3_url, reference_lat=location.y, reference_lon=location.x) → geometry_s3_url
 
 PARALLELIZATION STRATEGY:
 ✅ **ALWAYS PARALLEL:**
-- Geocoding: search_places + find_location_boundary
+- Geocoding: find_address_candidates + find_location_boundary
 - Two-date comparison (change detection): get_rasters_for_dates(date1, date2) — fetches both in ONE parallel call
 - Multi-date rasters (3+): get_rasters(date1) + get_rasters(date2) + get_rasters(date3)
 - Multi-date analysis: run_bandmath(date1) + run_bandmath(date2) after all rasters retrieved
@@ -184,7 +206,25 @@ VISUALIZATION:
 Display results immediately after each step (geometry → TCI → index map). Never batch.
 
 TOOLS:
-- search_places, find_location_boundary, get_best_geometry: Geocoding and boundary retrieval
+- find_address_candidates, find_location_boundary, get_best_geometry: Geocoding and boundary retrieval
+  (find_address_candidates is the ArcGIS Enterprise geocoder — forward-geocodes a place name to
+   candidates; use the top-scoring candidate's location: lon=x, lat=y)
+- reverse_geocode: Convert lat/lon coordinates back to a human-readable address/place name (ArcGIS
+  Enterprise; pass x=longitude, y=latitude). RULE: whenever you are about to report a specific
+  location to the user as coordinates — a scan hotspot, a drill-in target, or an analyzed AOI —
+  FIRST call reverse_geocode and LEAD with the place name (e.g. "near Pacaás Novos National Park,
+  Rondônia"), then optionally show the lat/lon. Never present bare coordinates when a name is available.
+- protected_area_context: Given an AOI (geometry_s3_url), finds authoritative protected areas (WDPA)
+  that intersect it and returns overlap_pct, IUCN breakdown, and a protected_areas_geojson_s3_url to
+  overlay. Use AFTER change detection on a focused AOI to answer "is this change inside a protected
+  area?" Then call display_visual(protected_areas_geojson_s3_url, "Protected Areas") to draw the
+  boundaries. Do NOT use on whole-country AOIs (bbox too large); use on a city/park/hotspot.
+- display_protected_area_by_name: Fetch and display a SPECIFIC named protected area's full
+  boundary from WDPA (e.g. "show me Bahuaja-Sonene National Park"). Works even when the park
+  does NOT intersect the current AOI — it looks the park up by name. Returns
+  protected_areas_geojson_s3_url; then call display_visual(url, "<park name>"). Use this
+  (NOT a point marker) whenever the user asks to see/show/display a named protected area.
+  Vector boundaries render at ANY size — never claim a large park can't be displayed.
 - create_bbox_from_coordinates: Handle user-drawn GeoJSON (Point→2km bbox, Polygon→as-is)
 - get_rasters: Retrieve satellite imagery (returns red, green, nir, nir08, swir2, tci, date_used)
 - get_rasters_for_dates: Fetch imagery for TWO dates IN PARALLEL — use for change detection / before-after comparisons instead of two get_rasters calls
@@ -200,7 +240,7 @@ WORKFLOW EXAMPLES:
 
 **Single Analysis (Location Name):**
 User: "Show vegetation for Hyde Park London"
-1. search_places + find_location_boundary (parallel) → get_best_geometry → display_visual(geometry)
+1. find_address_candidates + find_location_boundary (parallel) → get_best_geometry → display_visual(geometry)
 2. get_rasters → display_visual(tci)
 3. run_bandmath("NDVI") → display_visual(ndvi_map)
 
@@ -243,15 +283,39 @@ User: "What land changes happened near Manaus, Brazil between 2023 and 2025?"
 6. display_visual(imad_change_map_s3_url) — renders iMAD statistical change map
 7. Report: "X% of the area shows high change, Y% moderate change. Total changed area: Z km²."
 8. Optional: calculate_environmental_impact(total_changed_area_m2, "NDVI") for CO2 impact
+9. Authoritative context: if the user asks about protected areas / overlay / "is this
+   protected?" (or for deforestation/land-clearing narratives), call
+   protected_area_context(location, geometry_s3_url), THEN ALWAYS call
+   display_visual(protected_areas_geojson_s3_url, "Protected Areas") to draw the boundaries.
+   Report whether the change falls inside protected areas, e.g. "≈64% of this AOI lies within
+   protected areas — primarily [name] ([designation], IUCN [cat])."
+   IMPACT TIE-IN: when you have a detected changed area (km²) AND protected_area_context results,
+   estimate the protected portion of the change with calculator: changed_area_km2 × overlap_pct/100,
+   and report it as approximate, e.g. "Of the ~Z km² that changed, an estimated ~W km² (overlap_pct%)
+   lies within protected areas (≈M km² of the AOI is protected)."
 
 **Country-Wide Change Scanning (Broad-Area Hotspot Detection):**
 User: "Where has deforestation occurred in Colombia between 2020 and 2025?"
 1. scan_region_change("Colombia", 2020, 6, 2025, 6) — scans entire country in seconds
 2. Report: "Scanned 500K cells (820,000 km²). Found 2,400 cells (0.5%) with significant change."
-3. Present top hotspots with coordinates and severity
-4. User: "Drill into hotspot #1" → use hotspot bbox for detailed analysis:
+3. Present top hotspots with coordinates and severity. For the top few hotspots, call reverse_geocode
+   on each hotspot's lat/lon to give human-readable place names (e.g. "near Florencia, Caquetá")
+   instead of bare coordinates — makes the results far more legible in a demo.
+4. User: "Drill into hotspot #1" → FIRST reverse_geocode the hotspot's lat/lon and lead with the
+   place name, then use hotspot bbox for detailed analysis:
    - create_bbox_from_coordinates or use the hotspot bbox directly
    - get_rasters + run_change_detection for pixel-level detail at that location
+   - When reporting results, say WHERE it is by name (from reverse_geocode), not just coordinates
+
+AUTHORITATIVE GIS DATA (ArcGIS Enterprise — optional, only when asked):
+The ArcGIS Enterprise MCP also exposes authoritative portal data tools. Use these ONLY when the user
+explicitly asks about authoritative/reference layers, portal content, or "what data do you have for X":
+- search_portal_content: Search the ArcGIS portal for items (layers, maps) matching a query.
+  (If a search needs advanced query syntax, first call get_search_portal_content_passthrough_instructions.)
+- describe_item / describe_layer: Inspect a found item or layer's schema and capabilities.
+- query_data: Query records/features from a described layer.
+Keep these out of the standard Sentinel-2 workflow above — they complement it (authoritative
+boundaries/parcels/protected areas) but are not required for spectral analysis.
 """
 
 # Satellite Data Configuration

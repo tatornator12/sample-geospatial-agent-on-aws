@@ -61,6 +61,8 @@ cdk.context.json
 .aws/
 *.log
 
-# Kiro sessions
-.kiro/
+# Kiro: track specs, hooks, skills and steering; ignore local settings (mcp.json holds credentials)
+.kiro/settings/
 kiro_sessions/
+# Local handoff notes (contain account-specific identifiers)
+pr-drafts/

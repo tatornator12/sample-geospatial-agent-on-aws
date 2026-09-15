@@ -20,7 +20,7 @@ source .env
 set +a
 
 # Validate required variables
-required_vars=("S3_BUCKET_NAME" "AGENTCORE_ARN")
+required_vars=("S3_BUCKET_NAME" "AGENTCORE_ARN" "ARCGIS_MCP_TOKEN")
 for var in "${required_vars[@]}"; do
     if [ -z "${!var}" ]; then
         echo "Error: Required environment variable $var is not set in .env"
@@ -31,6 +31,7 @@ done
 # Set defaults for optional variables
 MODEL_ID="${MODEL_ID:-us.anthropic.claude-sonnet-4-6}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
+ARCGIS_MCP_URL="${ARCGIS_MCP_URL:-https://esri.geospatial.tfc.aws.dev/hosting/platform/mcp}"
 
 # Export region so agentcore CLI deploys to the correct region
 export AWS_REGION
@@ -77,6 +78,9 @@ agentcore launch \
     --env "MODEL_ID=${MODEL_ID}" \
     --env "BEDROCK_MODEL_ID=${MODEL_ID}" \
     --env "LGND_EMBEDDINGS_ENABLED=${LGND_EMBEDDINGS_ENABLED:-false}" \
+    --env "ARCGIS_MCP_URL=${ARCGIS_MCP_URL}" \
+    --env "ARCGIS_MCP_TOKEN=${ARCGIS_MCP_TOKEN}" \
+    --env "DISABLE_ADOT_OBSERVABILITY=${DISABLE_ADOT_OBSERVABILITY:-false}" \
     --auto-update-on-conflict
 
 echo ""

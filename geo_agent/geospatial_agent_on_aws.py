@@ -24,15 +24,19 @@ from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from strands.types.content import SystemContentBlock
-from mcp import stdio_client, StdioServerParameters
+from mcp.client.streamable_http import streamablehttp_client
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.session.s3_session_manager import S3SessionManager
+
+
+from utils.mcp_http import charset_safe_httpx_client_factory
 
 
 from utils.tools import (find_location_boundary, create_bbox_from_coordinates,
                          get_best_geometry, get_rasters, get_rasters_for_dates, run_bandmath,
                          display_visual, calculator, list_session_assets, calculate_environmental_impact,
-                         run_change_detection, scan_region_change)
+                         run_change_detection, scan_region_change, protected_area_context,
+                         display_protected_area_by_name)
 from utils.scenario_loader import load_scenario, build_scenario_context
 import config
 
@@ -50,19 +54,28 @@ bedrock_model = BedrockModel(
 )
     
 mcp_client = MCPClient(
-    lambda: stdio_client(
-        StdioServerParameters(
-            command='python3',
-            args=['-m', 'awslabs.aws_location_server.server'],
-            env={
-                'AWS_REGION': config.AWS_REGION,
-                'FASTMCP_LOG_LEVEL': 'ERROR',
-                **{k: v for k, v in os.environ.items()
-                    if k.startswith('AWS_') and v}
-            }
-        )
+    lambda: streamablehttp_client(
+        url=config.ARCGIS_MCP_URL,
+        headers={"Authorization": f"Bearer {config.ARCGIS_MCP_TOKEN}"},
+        # The ArcGIS Enterprise MCP returns ISO-8859-1 JSON bodies (accented
+        # place names). The default mcp client parses them as UTF-8 and crashes
+        # ("invalid unicode code point"), silently disabling reverse_geocode /
+        # find_address_candidates. This factory transcodes to UTF-8. See
+        # utils/mcp_http.py.
+        httpx_client_factory=charset_safe_httpx_client_factory,
     ),
-    tool_filters={"allowed": ["search_places"]}
+    # Geocoding (find_address_candidates) replaces the former Amazon Location
+    # search_places. reverse_geocode + the portal content/data tools are the
+    # demo stretch additions. Filtering keeps the agent's tool surface focused.
+    tool_filters={"allowed": [
+        "find_address_candidates",
+        "reverse_geocode",
+        "search_portal_content",
+        "get_search_portal_content_passthrough_instructions",
+        "describe_item",
+        "describe_layer",
+        "query_data",
+    ]}
 )
 
 
@@ -148,7 +161,8 @@ async def sat_image_analyzer_agent(payload, context=None):
                                     get_best_geometry, get_rasters, get_rasters_for_dates, run_bandmath, 
                                     display_visual, calculator, list_session_assets, 
                                     calculate_environmental_impact,
-                                   run_change_detection]
+                                   run_change_detection, protected_area_context,
+                                   display_protected_area_by_name]
                                    + ([scan_region_change] if LGND_EMBEDDINGS_ENABLED else []),
                 model=bedrock_model,
                 system_prompt=system_content,

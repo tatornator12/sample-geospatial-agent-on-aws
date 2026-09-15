@@ -4,7 +4,9 @@ Strands tool definitions for geospatial analysis
 import json
 import logging
 import os
+import re
 import tempfile
+import unicodedata
 from datetime import datetime
 from io import BytesIO
 import boto3
@@ -22,6 +24,21 @@ from .aws_utils import download_from_s3, download_geometry_from_s3, list_files_i
 import config
 
 logger = logging.getLogger(__name__)
+
+
+def _slugify(text: str) -> str:
+    """ASCII-safe slug for S3 keys / filenames.
+
+    Strips accents (e.g. "Rondônia" -> "rondonia"), lowercases, and collapses
+    spaces/punctuation to underscores. Non-ASCII characters in S3 keys break the
+    frontend geometry proxy (Unicode normalization mismatch -> HTTP 500), so all
+    geometry filenames must be ASCII.
+    """
+    if not text:
+        return "unnamed"
+    norm = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    norm = re.sub(r"[^a-z0-9]+", "_", norm.lower()).strip("_")
+    return norm or "unnamed"
 
 
 def _log_mem(tag: str) -> None:
@@ -215,7 +232,7 @@ async def create_bbox_from_coordinates(geometry_json: str, location: str = "cust
             
             # Save to S3
             s3_client = boto3.client('s3')
-            clean_location = location.replace(" ", "_").replace(",", "").lower()
+            clean_location = _slugify(location)
             s3_key = f"session_data/{session_id}/geometries/point_bbox_{clean_location}.geojson"
             
             geojson_str = gdf.to_json()
@@ -275,7 +292,7 @@ async def create_bbox_from_coordinates(geometry_json: str, location: str = "cust
             
             # Save to S3
             s3_client = boto3.client('s3')
-            clean_location = location.replace(" ", "_").replace(",", "").lower()
+            clean_location = _slugify(location)
             s3_key = f"session_data/{session_id}/geometries/polygon_{clean_location}.geojson"
             
             geojson_str = gdf.to_json()
@@ -335,7 +352,7 @@ async def find_location_boundary(location: str) -> str:
         s3_client = boto3.client('s3')
 
         # Clean location name for filename
-        clean_location = location.replace(" ", "_").replace(",", "").lower()
+        clean_location = _slugify(location)
         s3_key = f"session_data/{session_id}/geometries/polygon_{clean_location}.geojson"
 
         # Convert to GeoJSON string
@@ -369,13 +386,13 @@ async def get_best_geometry(location: str, osm_s3_url: str, reference_lat: float
     Args:
         location: Place name
         osm_s3_url: OSM polygon from find_location_boundary
-        reference_lat: Lat from search_places
-        reference_lon: Lon from search_places
+        reference_lat: Lat from find_address_candidates (candidate.location.y)
+        reference_lon: Lon from find_address_candidates (candidate.location.x)
         max_area_km2: Max area threshold (default 100)
     
     Returns: JSON with validated geometry_s3_url, source type, validation details
     
-    Workflow: Call search_places + find_location_boundary in parallel → get_best_geometry validates → use returned geometry_s3_url"""
+    Workflow: Call find_address_candidates + find_location_boundary in parallel → get_best_geometry validates → use returned geometry_s3_url"""
     try:
         session_id = os.environ.get('AGENT_SESSION_ID', config.DEFAULT_SESSION_ID)
         bucket_name = config.S3_BUCKET_NAME
@@ -486,7 +503,7 @@ async def _create_fallback_bbox(location: str, lat: float, lon: float, reason: s
 
     # Save to S3 as GeoJSON
     s3_client = boto3.client('s3')
-    clean_location = location.replace(" ", "_").replace(",", "").lower()
+    clean_location = _slugify(location)
     s3_key = f"session_data/{session_id}/geometries/bbox_{clean_location}.geojson"
 
     # Convert to GeoJSON
@@ -1107,7 +1124,7 @@ async def scan_region_change(
         s3_client = boto3.client('s3')
         session_id = os.environ.get('AGENT_SESSION_ID', config.DEFAULT_SESSION_ID)
         bucket_name = config.S3_BUCKET_NAME
-        clean_region = region.replace(" ", "_").replace(",", "").lower()
+        clean_region = _slugify(region)
         s3_key = f"session_data/{session_id}/geometries/scan_hotspots_{clean_region}_{year1}{month1:02d}_to_{year2}{month2:02d}.geojson"
 
         s3_client.put_object(
@@ -1336,7 +1353,7 @@ async def run_change_detection(
         # ===================================================================
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        clean_location = location.replace(" ", "_").replace(",", "").lower()
+        clean_location = _slugify(location)
 
         # Prepare geometry clipping resources once (shared by both tiers)
         aoi_gdf = None
@@ -1555,3 +1572,352 @@ async def run_change_detection(
                 _shutil.rmtree(temp_dir)
         except Exception:
             pass
+
+
+#####################################
+### PROTECTED AREA CONTEXT (ArcGIS Enterprise WDPA via MCP)
+#####################################
+
+def _call_arcgis_mcp(tool_name: str, arguments: dict, timeout: float = 60.0) -> dict:
+    """Call a tool on the ArcGIS Enterprise MCP server and return its structuredContent.
+
+    The Living Atlas WDPA service is hosted on ArcGIS Online and is NOT directly
+    reachable with the Enterprise token (returns 498 Invalid Token). The Enterprise
+    MCP brokers access server-side, so we query through it instead of hitting the
+    service URL directly. Auth is the Bearer header (verified against the live
+    endpoint). The server handles tools/call statelessly, so a single POST works.
+    """
+    import httpx
+
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": tool_name, "arguments": arguments},
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+        "Authorization": f"Bearer {config.ARCGIS_MCP_TOKEN}",
+    }
+    resp = httpx.post(config.ARCGIS_MCP_URL, json=payload, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+
+    # Response may be plain JSON or an SSE event stream depending on server mode.
+    # NOTE: the server returns ISO-8859-1 (accented WDPA names), and httpx's
+    # resp.json() force-decodes as UTF-8 and would crash. Parse resp.text, which
+    # honors the charset from the Content-Type header.
+    if "text/event-stream" in resp.headers.get("content-type", ""):
+        data = None
+        for line in resp.text.splitlines():
+            if line.startswith("data:"):
+                data = json.loads(line[len("data:"):].strip())
+                break
+        if data is None:
+            raise RuntimeError("No data event in MCP SSE response")
+    else:
+        data = json.loads(resp.text)
+
+    if data.get("error"):
+        raise RuntimeError(f"MCP error: {data['error']}")
+    result = data.get("result", {})
+    if result.get("isError"):
+        raise RuntimeError(f"MCP tool '{tool_name}' returned an error: {result}")
+    return result.get("structuredContent", {}) or {}
+
+
+def _esri_rings_to_shapely(rings):
+    """Convert Esri polygon 'rings' (coords already in lon/lat) to a shapely geometry.
+
+    Honors Esri ring orientation: clockwise (negative signed area) rings are
+    exteriors, counter-clockwise (positive) rings are holes. Returns a
+    (Multi)Polygon or None if nothing usable.
+    """
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+
+    def signed_area(ring):
+        s = 0.0
+        for i in range(len(ring) - 1):
+            x1, y1 = ring[i][0], ring[i][1]
+            x2, y2 = ring[i + 1][0], ring[i + 1][1]
+            s += (x1 * y2 - x2 * y1)
+        return s / 2.0
+
+    exteriors, holes = [], []
+    for ring in rings:
+        if len(ring) < 4:
+            continue
+        (holes if signed_area(ring) > 0 else exteriors).append(ring)
+    if not exteriors:
+        exteriors = [r for r in rings if len(r) >= 4]
+        holes = []
+    if not exteriors:
+        return None
+
+    geom = unary_union([Polygon(r) for r in exteriors])
+    if holes:
+        hole_union = unary_union([Polygon(h) for h in holes])
+        if not hole_union.is_empty:
+            geom = geom.difference(hole_union)
+    return None if geom.is_empty else geom
+
+
+@tool
+async def protected_area_context(location: str, geometry_s3_url: str) -> str:
+    """Find protected areas (WDPA) intersecting the analysis AOI and summarize protection status.
+
+    Pulls authoritative World Database of Protected Areas polygons from ArcGIS
+    Enterprise (via MCP) for the AOI's bounding box, then returns:
+      - protected_areas_geojson_s3_url: boundaries to overlay (pass to display_visual)
+      - protected_areas_found + names/designations/IUCN categories
+      - overlap_pct: approximate % of the AOI that falls inside protected areas
+      - iucn_breakdown + total reported area
+
+    Args:
+        location: Place name (used for labeling and the output filename)
+        geometry_s3_url: AOI geometry from get_best_geometry / create_bbox_from_coordinates
+
+    Returns: JSON summary. After calling, overlay the boundaries with
+    display_visual(protected_areas_geojson_s3_url, "Protected Areas").
+
+    Use to answer "is this change inside a protected area?" and to overlay reserve
+    boundaries on a focused AOI (a city/park/hotspot, not a whole country)."""
+    try:
+        import geopandas as gpd
+        from shapely.geometry import mapping
+        from shapely.ops import unary_union
+        from pyproj import Transformer
+
+        session_id = os.environ.get('AGENT_SESSION_ID', config.DEFAULT_SESSION_ID)
+        bucket_name = config.S3_BUCKET_NAME
+
+        # 1. Load AOI, compute its 4326 bounding box
+        aoi_gdf = download_geometry_from_s3(geometry_s3_url)
+        if aoi_gdf is None or aoi_gdf.empty:
+            return json.dumps({"error": f"Could not load AOI geometry from {geometry_s3_url}"})
+        aoi_gdf = aoi_gdf.to_crs(epsg=4326)
+        minx, miny, maxx, maxy = (float(v) for v in aoi_gdf.total_bounds)
+
+        # 2. Query WDPA polygons intersecting the AOI bbox, through the MCP
+        layer_url = f"{config.WDPA_SERVICE_URL}/{config.WDPA_POLYGON_LAYER_ID}"
+        envelope = json.dumps({
+            "xmin": minx, "ymin": miny, "xmax": maxx, "ymax": maxy,
+            "spatialReference": {"wkid": 4326},
+        })
+        sc = _call_arcgis_mcp("query_data", {
+            "layerOrTableUrl": layer_url,
+            "geometry": envelope,
+            "geometryType": "esriGeometryEnvelope",
+            "spatialRelationship": "esriSpatialRelIntersects",
+            "returnGeometry": True,
+            "pageSize": 200,
+        })
+        records = sc.get("resultRecords", []) or []
+        total_matching = sc.get("totalMatchingRecords", len(records))
+
+        if not records:
+            return json.dumps({
+                "location": location,
+                "protected_areas_found": 0,
+                "overlap_pct": 0.0,
+                "message": f"No protected areas intersect the AOI for {location}.",
+            })
+
+        # 3. Reproject 3857 -> 4326 (service returns Web Mercator), build GeoJSON + shapes
+        to_wgs84 = Transformer.from_crs(3857, 4326, always_xy=True)
+        features, shapes_4326, iucn_counts = [], [], {}
+        for rec in records:
+            rings = (rec.get("geometry") or {}).get("rings")
+            if not rings:
+                continue
+            rings_wgs = [[list(to_wgs84.transform(x, y)) for x, y in ring] for ring in rings]
+            shp = _esri_rings_to_shapely(rings_wgs)
+            if shp is None:
+                continue
+            attrs = rec.get("attributes", {})
+            iucn = attrs.get("iucn_cat") or "Unknown"
+            iucn_counts[iucn] = iucn_counts.get(iucn, 0) + 1
+            features.append({
+                "type": "Feature",
+                "properties": {
+                    "name": attrs.get("name_eng") or attrs.get("name") or "Protected Area",
+                    "designation": attrs.get("desig_eng"),
+                    "iucn_cat": iucn,
+                    "status_yr": attrs.get("status_yr"),
+                    "rep_area_km2": attrs.get("rep_area"),
+                    "gov_type": attrs.get("gov_type"),
+                    "__layer_type": "protected_area",
+                },
+                "geometry": mapping(shp),
+            })
+            shapes_4326.append(shp)
+
+        if not features:
+            return json.dumps({
+                "location": location, "protected_areas_found": 0, "overlap_pct": 0.0,
+                "message": "Protected areas matched but no usable geometry was returned.",
+            })
+
+        # 4. Overlap: intersect AOI with PA union in equal-area CRS (EPSG:6933, meters)
+        pa_ea = gpd.GeoDataFrame(geometry=shapes_4326, crs="EPSG:4326").to_crs("EPSG:6933")
+        aoi_ea = aoi_gdf.to_crs("EPSG:6933")
+        aoi_geom = unary_union(list(aoi_ea.geometry))
+        pa_geom = unary_union(list(pa_ea.geometry))
+        aoi_area = aoi_geom.area
+        inter_area_m2 = aoi_geom.intersection(pa_geom).area if aoi_area > 0 else 0.0
+        overlap_pct = round((inter_area_m2 / aoi_area) * 100, 1) if aoi_area > 0 else 0.0
+        protected_area_within_aoi_km2 = round(inter_area_m2 / 1_000_000, 2)
+
+        # 5. Save overlay GeoJSON to S3 (rendered through the existing display path)
+        fc = {"type": "FeatureCollection", "features": features,
+              "locationName": f"Protected Areas near {location}"}
+        clean = _slugify(location)
+        s3_key = f"session_data/{session_id}/geometries/protected_areas_{clean}.geojson"
+        boto3.client('s3').put_object(
+            Bucket=bucket_name, Key=s3_key,
+            Body=json.dumps(fc).encode('utf-8'), ContentType='application/geo+json')
+        s3_url = f"s3://{bucket_name}/{s3_key}"
+
+        # 6. Summaries
+        areas = [{
+            "name": f["properties"]["name"],
+            "designation": f["properties"]["designation"],
+            "iucn_cat": f["properties"]["iucn_cat"],
+            "status_yr": f["properties"]["status_yr"],
+        } for f in features[:15]]
+        total_rep_area = round(sum((f["properties"].get("rep_area_km2") or 0) for f in features), 1)
+
+        result = {
+            "location": location,
+            "protected_areas_geojson_s3_url": s3_url,
+            "protected_areas_found": int(total_matching),
+            "protected_areas_returned": len(features),
+            "overlap_pct": overlap_pct,
+            "protected_area_within_aoi_km2": protected_area_within_aoi_km2,
+            "total_reported_area_km2": total_rep_area,
+            "iucn_breakdown": iucn_counts,
+            "areas": areas,
+            "note": ("overlap_pct and protected_area_within_aoi_km2 measure how much of the AOI "
+                     "falls inside protected-area boundaries. To estimate how much of the DETECTED "
+                     "CHANGE is protected, multiply the changed area by overlap_pct/100."),
+        }
+        result_json = json.dumps(result, indent=2)
+        print(f"\n<tool_result_output>\n{result_json}\n</tool_result_output>\n")
+        return result_json
+
+    except Exception as e:
+        error_msg = f"❌ Error fetching protected-area context for {location}: {str(e)}"
+        logger.error(error_msg)
+        logger.exception("protected_area_context error")
+        return json.dumps({"error": error_msg})
+
+
+@tool
+async def display_protected_area_by_name(name: str, country_iso3: str = None) -> str:
+    """Fetch a named protected area's FULL boundary from WDPA and return GeoJSON to display.
+
+    Unlike protected_area_context (which only returns protected areas that INTERSECT an
+    AOI), this looks a protected area up BY NAME and returns its complete boundary polygon
+    — so it works even when the park is nowhere near the current analysis area. Use when the
+    user asks to "show" / "display" a specific named protected area (e.g. "show me
+    Bahuaja-Sonene National Park").
+
+    Args:
+        name: Protected area name or fragment (e.g. "Bahuaja-Sonene", "Tambopata").
+        country_iso3: Optional ISO3 country code (e.g. "PER", "BRA") to disambiguate.
+
+    Returns: JSON with protected_areas_geojson_s3_url (pass to
+    display_visual(url, "<name>")), plus the matched name, designation, IUCN category and
+    reported area. If several match, the largest by reported area is returned."""
+    try:
+        from shapely.geometry import mapping
+        from pyproj import Transformer
+
+        session_id = os.environ.get('AGENT_SESSION_ID', config.DEFAULT_SESSION_ID)
+        bucket_name = config.S3_BUCKET_NAME
+
+        safe_name = name.replace("'", "''")
+        where = f"name_eng LIKE '%{safe_name}%'"
+        if country_iso3:
+            where += f" AND iso3 = '{country_iso3.strip().upper()}'"
+
+        layer_url = f"{config.WDPA_SERVICE_URL}/{config.WDPA_POLYGON_LAYER_ID}"
+        sc = _call_arcgis_mcp("query_data", {
+            "layerOrTableUrl": layer_url,
+            "where": where,
+            "returnGeometry": True,
+            "pageSize": 10,
+            "orderByFields": [{"fieldName": "rep_area", "order": "DESC"}],
+        })
+        records = sc.get("resultRecords", []) or []
+        if not records:
+            return json.dumps({
+                "error": f"No protected area found matching '{name}'"
+                         + (f" in {country_iso3}" if country_iso3 else "")
+                         + ". Try a shorter name fragment or a different spelling.",
+            })
+
+        # Pick the record with the largest reported area (the main park, not a
+        # small private reserve that shares the name).
+        best = max(records, key=lambda r: (r.get("attributes", {}).get("rep_area") or 0))
+        rings = (best.get("geometry") or {}).get("rings")
+        if not rings:
+            return json.dumps({"error": f"Matched '{name}' but it returned no boundary geometry."})
+
+        to_wgs84 = Transformer.from_crs(3857, 4326, always_xy=True)
+        rings_wgs = [[list(to_wgs84.transform(x, y)) for x, y in ring] for ring in rings]
+        shp = _esri_rings_to_shapely(rings_wgs)
+        if shp is None:
+            return json.dumps({"error": f"Matched '{name}' but its geometry could not be built."})
+
+        # Generalize for display — large parks can have 10k+ vertices. ~0.001° (~100m)
+        # keeps the shape faithful while keeping the GeoJSON payload light.
+        simplified = shp.simplify(0.001, preserve_topology=True)
+        if not simplified.is_empty:
+            shp = simplified
+
+        attrs = best.get("attributes", {})
+        matched_name = attrs.get("name_eng") or attrs.get("name") or name
+        feature = {
+            "type": "Feature",
+            "properties": {
+                "name": matched_name,
+                "designation": attrs.get("desig_eng"),
+                "iucn_cat": attrs.get("iucn_cat"),
+                "status_yr": attrs.get("status_yr"),
+                "rep_area_km2": attrs.get("rep_area"),
+                "gov_type": attrs.get("gov_type"),
+                "__layer_type": "protected_area",
+            },
+            "geometry": mapping(shp),
+        }
+        fc = {"type": "FeatureCollection", "features": [feature],
+              "locationName": matched_name}
+
+        clean = _slugify(matched_name)
+        s3_key = f"session_data/{session_id}/geometries/protected_area_named_{clean}.geojson"
+        boto3.client('s3').put_object(
+            Bucket=bucket_name, Key=s3_key,
+            Body=json.dumps(fc).encode('utf-8'), ContentType='application/geo+json')
+        s3_url = f"s3://{bucket_name}/{s3_key}"
+
+        result = {
+            "protected_areas_geojson_s3_url": s3_url,
+            "name": matched_name,
+            "designation": attrs.get("desig_eng"),
+            "iucn_cat": attrs.get("iucn_cat"),
+            "status_yr": attrs.get("status_yr"),
+            "reported_area_km2": attrs.get("rep_area"),
+            "matches_found": int(sc.get("totalMatchingRecords", len(records))),
+            "note": "Display with display_visual(protected_areas_geojson_s3_url, name).",
+        }
+        result_json = json.dumps(result, indent=2)
+        print(f"\n<tool_result_output>\n{result_json}\n</tool_result_output>\n")
+        return result_json
+
+    except Exception as e:
+        error_msg = f"❌ Error fetching protected area '{name}': {str(e)}"
+        logger.error(error_msg)
+        logger.exception("display_protected_area_by_name error")
+        return json.dumps({"error": error_msg})

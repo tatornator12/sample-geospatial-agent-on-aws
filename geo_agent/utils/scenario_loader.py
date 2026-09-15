@@ -143,7 +143,7 @@ def build_scenario_context(scenario: Dict) -> str:
    - Include context from the narrative (weather conditions, terrain, etc.)
 
 2. **DO NOT run normal workflows**:
-   - DO NOT call search_places or find_location_boundary (location already known)
+   - DO NOT call find_address_candidates or find_location_boundary (location already known)
    - DO NOT call get_rasters (imagery already available if needed)
    - You CAN call display_visual() to show pre-loaded assets if requested
 

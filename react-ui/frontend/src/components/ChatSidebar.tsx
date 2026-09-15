@@ -199,7 +199,38 @@ export function ChatSidebar({
       clearMapLayers();
     }
 
-    let geometryLoaded = false;
+    // Track which geometry URLs have already been loaded so we can load ALL
+    // geometries from a turn (AOI boundary, protected-area overlay, etc.) — not
+    // just the first — while de-duping across streaming updates. Each loaded
+    // geometry is pushed separately and stacks as its own layer on the map.
+    const loadedGeometryUrls = new Set<string>();
+    const loadNewGeometries = async (
+      list: Array<{ url: string; title: string }>
+    ) => {
+      for (const g of list) {
+        if (loadedGeometryUrls.has(g.url)) continue;
+        loadedGeometryUrls.add(g.url); // mark first so rapid stream updates don't double-load
+        try {
+          const geometry = await Promise.race([
+            loadGeometry(g.url),
+            new Promise<null>((_, reject) =>
+              setTimeout(() => reject(new Error('Geometry loading timeout')), 15000)
+            ),
+          ]);
+          if (geometry) {
+            geometry.locationName = g.title;
+            console.log(`✅ Geometry loaded:`, geometry.locationName);
+            onGeometryUpdate(geometry);
+          } else {
+            loadedGeometryUrls.delete(g.url);
+            console.error(`❌ Failed to load geometry (null) for:`, g.url);
+          }
+        } catch (error) {
+          loadedGeometryUrls.delete(g.url);
+          console.error(`❌ Exception loading geometry from ${g.url}:`, error);
+        }
+      }
+    };
     let lastRasterCount = 0;
     let fullResponse = '';
     let accumulatedTools: ToolCall[] = [];
@@ -236,36 +267,10 @@ export function ChatSidebar({
             const { rasters: allRasterData, geometries: allGeometryData } =
               extractAllVisualizationData(accumulatedTools);
 
-            // Handle geometry loading with better error handling
-            if (!geometryLoaded && allGeometryData.length > 0) {
-              const geometryData = allGeometryData[0];
-              console.log(`📍 Loading geometry:`, geometryData.title);
-              
-              // Use a timeout to prevent hanging on geometry loading
-              const geometryPromise = loadGeometry(geometryData.url);
-              const timeoutPromise = new Promise<null>((_, reject) => 
-                setTimeout(() => reject(new Error('Geometry loading timeout')), 10000)
-              );
-              
-              try {
-                const geometry = await Promise.race([geometryPromise, timeoutPromise]);
-                if (geometry) {
-                  geometry.locationName = geometryData.title;
-                  console.log(`✅ Geometry loaded:`, geometry.locationName);
-                  onGeometryUpdate(geometry);
-                  geometryLoaded = true;
-                } else {
-                  console.error(`❌ Failed to load geometry - returned null/undefined for:`, geometryData.url);
-                }
-              } catch (error) {
-                console.error(`❌ Exception loading geometry from ${geometryData.url}:`, error);
-                console.error('❌ Geometry error details:', {
-                  url: geometryData.url,
-                  title: geometryData.title,
-                  error: error instanceof Error ? error.message : String(error),
-                });
-                // Don't fail the entire stream for geometry loading issues
-              }
+            // Load any geometries not yet loaded (AOI boundary, protected-area
+            // overlays, ...). Multiple geometries stack as separate map layers.
+            if (allGeometryData.length > 0) {
+              await loadNewGeometries(allGeometryData);
             }
 
             // Handle raster updates with debouncing to prevent excessive updates
@@ -340,30 +345,9 @@ export function ChatSidebar({
         console.error('❌ Tools at time of failure:', accumulatedTools.map(t => ({ name: t.name, id: t.id })));
       }
 
-      // Handle final geometry loading with timeout and better error handling
-      if (finalGeometryData.length > 0 && !geometryLoaded) {
-        const geometryData = finalGeometryData[0];
-        console.log(`📍 [Final] Loading geometry:`, geometryData.title);
-        
-        const geometryPromise = loadGeometry(geometryData.url);
-        const timeoutPromise = new Promise<null>((_, reject) => 
-          setTimeout(() => reject(new Error('Final geometry loading timeout')), 15000)
-        );
-        
-        try {
-          const geometry = await Promise.race([geometryPromise, timeoutPromise]);
-          if (geometry) {
-            geometry.locationName = geometryData.title;
-            console.log(`✅ [Final] Geometry loaded:`, geometry.locationName);
-            onGeometryUpdate(geometry);
-            geometryLoaded = true;
-          } else {
-            console.error(`❌ [Final] Failed to load geometry - returned null/undefined for:`, geometryData.url);
-          }
-        } catch (error) {
-          console.error(`❌ [Final] Exception loading geometry from ${geometryData.url}:`, error);
-          // Don't fail the entire response for geometry loading issues
-        }
+      // Final pass: load any geometries the streaming loop didn't get to.
+      if (finalGeometryData.length > 0) {
+        await loadNewGeometries(finalGeometryData);
       }
 
       // Handle final raster updates

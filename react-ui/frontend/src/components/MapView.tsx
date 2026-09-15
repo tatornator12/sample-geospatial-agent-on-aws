@@ -285,6 +285,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
             geometry.features.some((f: any) =>
               f?.properties && typeof f.properties.change_score === 'number');
 
+          // Detect a protected-area overlay (WDPA) emitted by protected_area_context.
+          // These render as translucent purple polygons with a clickable info popup.
+          const isProtectedArea = Array.isArray(geometry.features) &&
+            geometry.features.some((f: any) =>
+              f?.properties && f.properties.__layer_type === 'protected_area');
+
           if (isChangeScan) {
             currentMap.addLayer({
               id: fillLayerId,
@@ -311,6 +317,38 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
               filter: ['==', ['get', 'tier'], 'top'],
               paint: { 'line-color': '#00e5ff', 'line-width': 3 },
               layout: { visibility: 'visible' },
+            });
+          } else if (isProtectedArea) {
+            // Protected areas (WDPA): translucent purple fill + purple outline
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'fill',
+              source: geometryId,
+              paint: { 'fill-color': '#8e44ad', 'fill-opacity': 0.25 },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'line',
+              source: geometryId,
+              paint: { 'line-color': '#8e44ad', 'line-width': 2 },
+              layout: { visibility: 'visible' },
+            });
+            // Clickable popup showing the protected area's attributes
+            currentMap.on('click', fillLayerId, (e: any) => {
+              const p = (e.features && e.features[0] && e.features[0].properties) || {};
+              const html =
+                `<strong>${p.name || 'Protected Area'}</strong><br/>` +
+                (p.designation ? `${p.designation}<br/>` : '') +
+                (p.iucn_cat ? `IUCN: ${p.iucn_cat}<br/>` : '') +
+                (p.status_yr ? `Designated: ${p.status_yr}` : '');
+              new maplibregl.Popup().setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
+            });
+            currentMap.on('mouseenter', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = 'pointer';
+            });
+            currentMap.on('mouseleave', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = '';
             });
           } else {
             // Boundary geometry: transparent fill + cyan outline (default)

@@ -20,7 +20,7 @@ source .env
 set +a  # stop automatically exporting
 
 # Validate required variables
-required_vars=("S3_BUCKET_NAME" "LANGFUSE_SECRET_KEY" "LANGFUSE_PUBLIC_KEY" "LANGFUSE_BASE_URL" "AGENTCORE_ARN")
+required_vars=("S3_BUCKET_NAME" "LANGFUSE_SECRET_KEY" "LANGFUSE_PUBLIC_KEY" "LANGFUSE_BASE_URL" "AGENTCORE_ARN" "ARCGIS_MCP_TOKEN")
 for var in "${required_vars[@]}"; do
     if [ -z "${!var}" ]; then
         echo "❌ Error: Required environment variable $var is not set in .env"
@@ -33,6 +33,7 @@ echo "🚀 Deploying AgentCore agent with Langfuse observability..."
 # Set defaults for optional variables
 BEDROCK_MODEL_ID="${MODEL_ID:-us.anthropic.claude-sonnet-4-6}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
+ARCGIS_MCP_URL="${ARCGIS_MCP_URL:-https://esri.geospatial.tfc.aws.dev/hosting/platform/mcp}"
 
 # Build Basic Auth header for OTEL
 LANGFUSE_AUTH=$(echo -n "${LANGFUSE_PUBLIC_KEY}:${LANGFUSE_SECRET_KEY}" | base64)
@@ -81,6 +82,8 @@ agentcore launch \
   --env "MODEL_ID=${BEDROCK_MODEL_ID}" \
   --env "BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID}" \
   --env "LGND_EMBEDDINGS_ENABLED=${LGND_EMBEDDINGS_ENABLED:-false}" \
+  --env "ARCGIS_MCP_URL=${ARCGIS_MCP_URL}" \
+  --env "ARCGIS_MCP_TOKEN=${ARCGIS_MCP_TOKEN}" \
   --env "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_ENDPOINT}" \
   --env "LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}" \
   --env "LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}" \
