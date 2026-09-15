@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Impeccable design check after UI edits",
+      "trigger": "PostToolUse",
+      "description": "After the agent edits a file, if that file is part of the React frontend (react-ui/frontend/src), run the Impeccable anti-slop detector on the frontend and fix any findings before finishing the task.",
+      "matcher": "fs_write|str_replace|fs_append",
+      "action": {
+        "type": "agent",
+        "prompt": "Design check: if the file you just edited is under react-ui/frontend/src (a .tsx, .ts or .css file), run `.kiro/skills/impeccable/scripts/impeccable detect --json react-ui/frontend/src` from the workspace root before you finish the current task. Exit code 2 means findings. Fix every finding in files you touched (overused fonts, side-tab accent borders, layout-property transitions, contrast, cramped padding, etc.) so the detector reports 0 findings for those files, then re-run it. Do not add detector ignores to make findings go away. If the edited file is not under react-ui/frontend/src, ignore this message."
+      }
+    }
+  ]
+}
