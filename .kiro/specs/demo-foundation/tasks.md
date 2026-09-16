@@ -21,7 +21,8 @@ spike notes exist under `docs/spikes/`.
   - [x] 3.1 `npx impeccable install --providers=kiro --scope=project --no-hooks` (skill v4.3.1, engine v0.1.5)
   - [x] 3.2 Add `npm run design:check` to `react-ui/frontend/package.json`
   - [x] 3.3 Create Kiro hook `impeccable-design-check` (PostToolUse on edit tools) and record the 6-finding baseline in `ROADMAP.md`
-  - [ ] 3.4 Run `/impeccable init` (audience: technical decision-makers on a projector; mode: Operate; direction from `.kiro/steering/demo-program.md`) and `/impeccable document`; commit `PRODUCT.md` and `DESIGN.md`
+  - [x] 3.4 Run `/impeccable init`: `PRODUCT.md` written (audience: AWS customer technical leaders and architects, presenter-driven, no hands-on; headline: one map, many agents on AgentCore; demo name "Agentic AI for Earth"); live mode configured (`.impeccable/live/config.json`, no CSP)
+  - [ ] 3.5 Run `/impeccable document` to record the incumbent visual system (`theme.ts`, inline styles) in `DESIGN.md`; commit
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
 - [ ] 4. Stand up the dev runtime
