@@ -207,7 +207,7 @@ The stage is a fixed frame with one live window. The map fills the viewport belo
 
 - **Exhibit rail** (top, 56px): title left, sections centre, quiet sign-out right. The active section is lit amber with an underline.
 - **Step column** (left, 296px wide, 360px above 2200px): appears only while or after the agent works. Grows downward to `calc(100% - 300px)` and scrolls inside itself.
-- **Caption band and console** (bottom centre, `min(1040px, 100% - 144px)`): the docent's sentence, the presenter's single input line with Send / Stop, transcript toggle and new-session, then prepared prompts as label plates with the session id in mono at the right.
+- **Caption band and console** (bottom centre, `min(1040px, 100% - 480px)`): the docent's sentence, the presenter's single input line with Send / Stop, transcript toggle and new-session, then prepared prompts as label plates with the session id in mono at the right.
 - **Layers plate** (top right, 320px): groups in a fixed order (change detection, satellite imagery, spectral indices, boundaries), each row a checkbox, a name that flies the map to the layer, and a remove control.
 - **Draw rail** (bottom left, 40px icon buttons in a column) and **Basemap plate** (bottom right).
 - **Transcript drawer** (right, `min(520px, 100% - 360px)`): slides over the layers plate when opened; closes with the same control. Rails never reflow; only the map and its plates change.
