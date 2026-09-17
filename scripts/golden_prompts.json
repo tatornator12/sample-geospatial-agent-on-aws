@@ -1,0 +1,41 @@
+{
+  "_comment": "Golden prompts for scripts/eval.py. expected_tools is a SUBSEQUENCE match against the tool calls streamed by the agent (extra tools in between are fine); forbidden_text must not appear anywhere in the stream. Calibrated against the dev runtime 2026-09-17 (task 9.4). ArcGIS MCP tools (find_address_candidates, reverse_geocode) are deliberately NOT expected: the agent drops them gracefully when the MCP is unreachable and the gate must not fail on a third-party outage.",
+  "prompts": [
+    {
+      "name": "vegetation-central-park",
+      "prompt": "Show vegetation health for Central Park, New York",
+      "expected_tools": ["find_location_boundary", "get_best_geometry", "get_rasters", "run_bandmath", "display_visual"],
+      "forbidden_text": ["Error:"]
+    },
+    {
+      "name": "wildfire-palisades",
+      "prompt": "Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025",
+      "expected_tools": ["get_rasters_for_dates", "run_bandmath", "display_visual"],
+      "forbidden_text": ["Error:"]
+    },
+    {
+      "name": "water-folsom-lake",
+      "prompt": "Compare water levels for Folsom Lake, California 2021 vs 2022",
+      "expected_tools": ["get_rasters_for_dates", "run_bandmath", "run_bandmath", "display_visual"],
+      "forbidden_text": ["Error:"]
+    },
+    {
+      "name": "vegetation-hyde-park",
+      "prompt": "Show vegetation status for Hyde Park, London",
+      "expected_tools": ["find_location_boundary", "get_best_geometry", "get_rasters", "run_bandmath", "display_visual"],
+      "forbidden_text": ["Error:"]
+    },
+    {
+      "name": "scan-colorado",
+      "prompt": "Scan Colorado for land change between 2019 and 2024",
+      "expected_tools": ["scan_region_change", "display_visual"],
+      "forbidden_text": ["Error:"]
+    },
+    {
+      "name": "drawn-polygon-ndvi",
+      "prompt": "Analyze this area:\n```json\n{\"type\": \"Feature\", \"geometry\": {\"type\": \"Polygon\", \"coordinates\": [[[-0.1655, 51.5030], [-0.1655, 51.5120], [-0.1510, 51.5120], [-0.1510, 51.5030], [-0.1655, 51.5030]]]}, \"properties\": {}}\n```",
+      "expected_tools": ["create_bbox_from_coordinates", "get_rasters", "run_bandmath", "display_visual"],
+      "forbidden_text": ["Error:"]
+    }
+  ]
+}

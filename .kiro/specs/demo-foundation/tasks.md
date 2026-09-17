@@ -73,11 +73,15 @@ spike notes exist under `docs/spikes/`.
     - 15 tests green in <1 s; covers the truncated-outer-JSON tail trim, the regex fallback for a truncated `input` field, stream-order preservation, markdown heading spacing, uppercase extensions, URL de-dupe, incomplete-call skipping, and listAgents normalization (missing/malformed fields, HTTP error). `npm run build` type-checks the test files
   - _Requirements: 5.2_
 
-- [ ] 9. Golden prompts and promotion script
-  - [ ] 9.1 `scripts/golden_prompts.json`: the five README prompts plus one drawn-polygon prompt, each with `expected_tools` and `forbidden_text`
-  - [ ] 9.2 `scripts/eval.py --target dev|stable [--dry-run]`: resolve ARN by agent name from `.bedrock_agentcore.yaml`, stream `InvokeAgentRuntime`, brace-match tool JSON, subsequence-check tool order, fail on `Error:`
-  - [ ] 9.3 `scripts/promote.sh`: eval → checklist → explicit `yes` → `git switch demo-stable && git merge --ff-only develop && git tag deployed-$(date +%F)` → `DEPLOY_TARGET=stable CONFIRM_STABLE=yes ./deploy.sh` → back to `develop`
-  - [ ] 9.4 Run `eval.py --target dev` for real once the dev runtime exists; fix golden expectations to match actual tool order
+- [x] 9. Golden prompts and promotion script
+  - [x] 9.1 `scripts/golden_prompts.json`: the five README prompts plus one drawn-polygon prompt, each with `expected_tools` and `forbidden_text`
+    - MCP tools (find_address_candidates, reverse_geocode) deliberately excluded from expectations so a third-party MCP outage cannot fail the gate
+  - [x] 9.2 `scripts/eval.py --target dev|stable [--dry-run]`: resolve ARN by agent name from `.bedrock_agentcore.yaml`, stream `InvokeAgentRuntime`, brace-match tool JSON, subsequence-check tool order, fail on `Error:`
+    - Also `--only NAME` for single-prompt calibration and `--timeout`; `--dry-run` never imports boto3 (no credentials needed); fresh ≥33-char session id per prompt; prints the stream tail on failure
+  - [x] 9.3 `scripts/promote.sh`: eval → checklist → explicit `yes` → `git switch demo-stable && git merge --ff-only develop && git tag deployed-$(date +%F)` → `DEPLOY_TARGET=stable CONFIRM_STABLE=yes ./deploy.sh` → back to `develop`
+    - Guards: must be on develop, clean tree, tag-collision suffix; `DRY_RUN=1` prints the whole plan and runs eval --dry-run only (verified end to end)
+  - [x] 9.4 Run `eval.py --target dev` for real once the dev runtime exists; fix golden expectations to match actual tool order
+    - First real run 5/6 (wildfire used `get_rasters_for_dates`, not `get_rasters`); expectations calibrated against the recorded streams, wildfire re-run live → PASS (43 s). All six green against dev, 2026-09-17
   - _Requirements: 5.3, 5.4_
 
 - [ ] 10. Data spikes (2 hours each, stop at the timebox)
