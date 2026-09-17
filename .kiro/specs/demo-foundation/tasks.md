@@ -44,11 +44,15 @@ spike notes exist under `docs/spikes/`.
     - CDK validates the JSON at synth, passes it to the task and grants every listed ARN (+`/*`) on the task role; synth checked with and without it. Not deployed
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 6. Add the agent switcher (frontend)
-  - [ ] 6.1 `/impeccable shape` the header agent picker (label, one-line description, keyboard accessible, projector legible)
-  - [ ] 6.2 `services/api.ts`: `listAgents()`; pass `agentId` on invoke/stop; `Chat.tsx`: `selectedAgentId` in `localStorage`, switching triggers `handleSessionReset()`
-  - [ ] 6.3 `Navigation.tsx`: render the picker; run `npm run design:check` and fix findings in touched files
-  - [ ] 6.4 Local UI round-trip against both runtimes (`AGENT_RUNTIMES` with `default` and `dev`)
+- [x] 6. Add the agent switcher (frontend)
+  - [x] 6.1 `/impeccable shape` the header agent picker (label, one-line description, keyboard accessible, projector legible)
+    - Form approved in conversation: quiet trigger (caps "Agent" + label + chevron) right of the rail, floating-plate listbox with label + one-line description, arrow/Home/End/Enter/Escape keyboard model; AWS logo removed from the rail. Hidden entirely when fewer than two agents are configured
+  - [x] 6.2 `services/api.ts`: `listAgents()`; pass `agentId` on invoke/stop; `Chat.tsx`: `selectedAgentId` in `localStorage`, switching triggers `handleSessionReset()`
+    - `AgentProvider` (src/agentContext.tsx) loads the list once, persists the choice, falls back to the backend default; a stream superseded by a switch is stopped on its own runtime and its late events are dropped
+  - [x] 6.3 `Navigation.tsx`: render the picker; run `npm run design:check` and fix findings in touched files
+    - Detector at 0 app-wide; the docent's speaker label now names the selected agent
+  - [x] 6.4 Local UI round-trip against both runtimes (`AGENT_RUNTIMES` with `default` and `dev`)
+    - Headless round-trip: dev answered cleanly; stable answered `Error: the client initialization failed` because the ArcGIS MCP bearer token is dead (endpoint 401s; confirmed with curl). Dev runtime (v3) now degrades to local tools when the MCP is unreachable; stable needs a fresh token and picks the fix up at the next promotion
   - _Requirements: 3.2, 4.3_
 
 - [ ] 7. Test scaffolding: Python

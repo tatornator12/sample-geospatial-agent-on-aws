@@ -6,6 +6,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { theme } from '../theme';
 import { logout } from '../utils/auth';
+import { AgentPicker } from './AgentPicker';
 
 const RAIL_HEIGHT = 56;
 
@@ -113,7 +114,8 @@ export function Navigation() {
         })}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.lg }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md }}>
+        <AgentPicker />
         <button
           onClick={handleLogout}
           style={{
@@ -134,11 +136,6 @@ export function Navigation() {
         >
           Sign out
         </button>
-        <img
-          src="/AWS_logo_RGB_1c_White.png"
-          alt="AWS"
-          style={{ height: '22px', width: 'auto', opacity: 0.85 }}
-        />
       </div>
     </nav>
   );

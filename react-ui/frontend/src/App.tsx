@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { AgentProvider } from './agentContext';
 import { Navigation } from './components/Navigation';
 import { Chat } from './pages/Chat';
 import { UseCaseGallery } from './pages/UseCaseGallery';
@@ -29,17 +30,19 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-                <Navigation />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                  <Routes>
-                    <Route path="/" element={<Chat />} />
-                    <Route path="/use-cases" element={<UseCaseGallery />} />
-                    <Route path="/chat/:scenarioId" element={<Chat />} />
-                    <Route path="/technology" element={<Technology />} />
-                  </Routes>
+              <AgentProvider>
+                <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+                  <Navigation />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <Routes>
+                      <Route path="/" element={<Chat />} />
+                      <Route path="/use-cases" element={<UseCaseGallery />} />
+                      <Route path="/chat/:scenarioId" element={<Chat />} />
+                      <Route path="/technology" element={<Technology />} />
+                    </Routes>
+                  </div>
                 </div>
-              </div>
+              </AgentProvider>
             </ProtectedRoute>
           }
         />

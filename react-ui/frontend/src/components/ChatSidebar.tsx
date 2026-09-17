@@ -76,6 +76,10 @@ const PREPARED_PROMPTS = [
 
 interface ChatSidebarProps {
   sessionId: string;
+  /** Which agent runtime owns this session; omitted means the backend default. */
+  agentId?: string;
+  /** The selected agent's display name, shown as the docent's speaker label. */
+  agentLabel?: string;
   scenarioId?: string;
   scenarioConfig?: ScenarioConfig | null;
   isLoadingScenario?: boolean;
@@ -90,6 +94,8 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({
   sessionId,
+  agentId,
+  agentLabel,
   scenarioId,
   scenarioConfig,
   isLoadingScenario,
@@ -111,8 +117,24 @@ export function ChatSidebar({
   const scenarioDisplayedRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
+  // The live session id, readable from inside a stream loop that closed over an older one.
+  const liveSessionRef = useRef(sessionId);
+  // The session and agent behind the stream in flight, if any.
+  const streamOwnerRef = useRef<{ sessionId: string; agentId?: string; processing: boolean }>({
+    sessionId,
+    agentId,
+    processing: false,
+  });
 
   useEffect(() => {
+    // A new session while an agent is still streaming (act switched, New session pressed):
+    // stop that runtime; the old loop sees liveSessionRef move on and drops its events.
+    const owner = streamOwnerRef.current;
+    if (owner.processing && owner.sessionId !== sessionId) {
+      owner.processing = false;
+      void stopRuntimeSession(owner.sessionId, owner.agentId);
+    }
+    liveSessionRef.current = sessionId;
     setMessages([]);
     setUserInput('');
     setStreamingText('');
@@ -210,7 +232,7 @@ export function ChatSidebar({
     setIsCancelling(true);
     console.log('Cancelling session:', sessionId);
 
-    const success = await stopRuntimeSession(sessionId);
+    const success = await stopRuntimeSession(sessionId, agentId);
 
     if (success) {
       setIsStreaming(false);
@@ -231,6 +253,7 @@ export function ChatSidebar({
 
     setUserInput('');
     setIsProcessing(true);
+    streamOwnerRef.current = { sessionId, agentId, processing: true };
 
     setMessages((prev) => [...prev, { role: 'user', content: prompt }]);
 
@@ -279,7 +302,11 @@ export function ChatSidebar({
     let streamCompletedNormally = false;
 
     try {
-      for await (const event of streamAgentInvoke(prompt, sessionId, scenarioId)) {
+      for await (const event of streamAgentInvoke(prompt, sessionId, scenarioId, agentId)) {
+        // Superseded by a newer session (act switched mid-run): drop the rest of this stream.
+        if (liveSessionRef.current !== sessionId) {
+          return;
+        }
         if (event.type === 'chunk' && event.content) {
           const cleaned = cleanStreamingText(event.content);
           if (cleaned) {
@@ -420,12 +447,21 @@ export function ChatSidebar({
     } catch (error) {
       console.error('Exception while calling agent:', error);
 
-      // Show user-friendly error message
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errorMessage}` }]);
+      // Show user-friendly error message, unless a newer session owns the stage now.
+      if (liveSessionRef.current === sessionId) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errorMessage}` }]);
+      }
     } finally {
-      setIsStreaming(false);
-      setIsProcessing(false);
+      // Only the stream that still owns the stage may clear the working state; a superseded
+      // stream finishing late must not stomp on a session that is already running again.
+      if (liveSessionRef.current === sessionId) {
+        setIsStreaming(false);
+        setIsProcessing(false);
+      }
+      if (streamOwnerRef.current.sessionId === sessionId) {
+        streamOwnerRef.current.processing = false;
+      }
 
       if (!streamCompletedNormally) {
         console.warn('Stream did not complete normally. Check logs above for errors.');
@@ -473,7 +509,7 @@ export function ChatSidebar({
           aria-live="polite"
           aria-atomic="true"
         >
-          <span className="docent-caption__who">{isStreaming ? 'Agent' : idle ? 'Ready' : 'Agent'}</span>
+          <span className="docent-caption__who">{idle ? 'Ready' : agentLabel ?? 'Agent'}</span>
           <div className="docent-caption__text">
             {caption ? (
               <span className="markdown-content">

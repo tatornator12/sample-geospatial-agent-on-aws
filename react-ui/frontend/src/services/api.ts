@@ -42,6 +42,34 @@ interface AgentInvokePayload {
   prompt: string;
   sessionId: string;
   scenario_id?: string;
+  agentId?: string;
+}
+
+/** One agent the backend can route to. Public fields only; the ARN never leaves the server. */
+export interface AgentSummary {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface AgentList {
+  defaultAgentId: string | null;
+  agents: AgentSummary[];
+}
+
+/**
+ * List the agents the presenter can switch between (GET /api/agents).
+ */
+export async function listAgents(): Promise<AgentList> {
+  const response = await fetch(`${API_URL}/api/agents`, { headers: getAuthHeaders() });
+  if (!response.ok) {
+    throw new Error(`Could not list agents (HTTP ${response.status})`);
+  }
+  const data = (await response.json()) as Partial<AgentList>;
+  return {
+    defaultAgentId: data.defaultAgentId ?? null,
+    agents: Array.isArray(data.agents) ? data.agents : [],
+  };
 }
 
 /**
@@ -50,12 +78,16 @@ interface AgentInvokePayload {
 export async function* streamAgentInvoke(
   prompt: string,
   sessionId: string,
-  scenarioId?: string
+  scenarioId?: string,
+  agentId?: string
 ): AsyncGenerator<StreamEvent> {
   const payload: AgentInvokePayload = { prompt, sessionId };
   if (scenarioId) {
     payload.scenario_id = scenarioId;
     console.log('🔥 Sending request with scenario_id:', scenarioId);
+  }
+  if (agentId) {
+    payload.agentId = agentId;
   }
   console.log('📤 Agent payload:', payload);
 
@@ -212,12 +244,12 @@ export async function loadGeometry(s3Url: string): Promise<GeometryData | null> 
 /**
  * Stop an active AgentCore runtime session
  */
-export async function stopRuntimeSession(sessionId: string): Promise<boolean> {
+export async function stopRuntimeSession(sessionId: string, agentId?: string): Promise<boolean> {
   try {
     const response = await fetch(`${API_URL}/api/agent/stop-session`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ sessionId }),
+      body: JSON.stringify(agentId ? { sessionId, agentId } : { sessionId }),
     });
 
     if (!response.ok) {

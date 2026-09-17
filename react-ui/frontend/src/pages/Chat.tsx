@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
+import { useAgents } from '../agentContext';
 import { MapView } from '../components/MapView';
 import { ChatSidebar } from '../components/ChatSidebar';
 import type { GeometryData, RasterData } from '../types';
@@ -250,6 +251,20 @@ export function Chat() {
     setIsLoadingScenario(false);
   };
 
+  // Switching acts on the rail starts a fresh session: new id, cleared map, empty transcript.
+  // The first non-null value is the initial selection, not a switch, so it does not reset.
+  const { selectedAgentId, selectedAgent } = useAgents();
+  const previousAgentId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedAgentId) return;
+    if (previousAgentId.current && previousAgentId.current !== selectedAgentId) {
+      handleSessionReset();
+    }
+    previousAgentId.current = selectedAgentId;
+    // handleSessionReset is recreated every render; the effect only needs to fire on a switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAgentId]);
+
   const handleDrawnGeometry = (geojson: any) => {
     // Format the GeoJSON as a message to send to chat
     const message = `Analyze this area:\n\`\`\`json\n${JSON.stringify(geojson, null, 2)}\n\`\`\``;
@@ -272,6 +287,8 @@ export function Chat() {
       <div className="stage__overlay">
         <ChatSidebar
           sessionId={sessionId}
+          agentId={selectedAgentId ?? undefined}
+          agentLabel={selectedAgent?.label}
           scenarioId={scenarioId || undefined}
           scenarioConfig={scenarioConfig}
           isLoadingScenario={isLoadingScenario}
