@@ -1,6 +1,13 @@
+/**
+ * The exhibit rail: a 56px strip across the top of the stage.
+ * Title at left, sections (routes) centre, quiet sign-out at right.
+ * The active section is lit amber with an underline; nothing else on the rail carries colour.
+ */
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { theme } from '../theme';
 import { logout } from '../utils/auth';
+
+const RAIL_HEIGHT = 56;
 
 export function Navigation() {
   const location = useLocation();
@@ -11,130 +18,127 @@ export function Navigation() {
     navigate('/login');
   };
 
-  const navItems = [
-    { path: '/', label: 'Chat' },
-    { path: '/use-cases', label: 'Use Case Gallery' },
-    { path: '/technology', label: 'Technology' },
+  const sections = [
+    { path: '/', label: 'Stage' },
+    { path: '/use-cases', label: 'Replay cases' },
+    { path: '/technology', label: 'How it works' },
   ];
 
   return (
     <nav
+      aria-label="Primary"
       style={{
-        backgroundColor: theme.colors.primary,
-        color: theme.colors.onPrimary,
-        boxShadow: theme.elevation.level2,
+        height: `${RAIL_HEIGHT}px`,
+        flex: `0 0 ${RAIL_HEIGHT}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: `0 ${theme.spacing.lg}`,
+        backgroundColor: theme.colors.background,
+        borderBottom: `1px solid ${theme.colors.outline}`,
         position: 'relative',
         zIndex: 100,
       }}
     >
-      <div
+      <Link
+        to="/"
         style={{
-          padding: `0 ${theme.spacing.lg}`,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          height: '64px',
+          alignItems: 'baseline',
+          gap: theme.spacing.sm,
+          textDecoration: 'none',
         }}
       >
-        <h1
+        <span
           style={{
-            margin: 0,
+            ...theme.typography.titleLarge,
             fontSize: '20px',
-            fontWeight: 500,
-            letterSpacing: '0.15px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: theme.spacing.sm,
+            color: theme.colors.onBackground,
           }}
         >
-          Geospatial Agent on AWS
-        </h1>
+          Agentic AI for Earth
+        </span>
+        <span
+          style={{
+            ...theme.typography.labelCaps,
+            color: theme.colors.secondary,
+          }}
+        >
+          on AgentCore
+        </span>
+      </Link>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xl }}>
-          <div style={{ display: 'flex', gap: theme.spacing.sm }}>
-            {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                style={{
-                  position: 'relative',
-                  padding: `${theme.spacing.md} ${theme.spacing.lg}`,
-                  color: theme.colors.onPrimary,
-                  textDecoration: 'none',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  letterSpacing: '0.1px',
-                  transition: theme.transitions.short,
-                  backgroundColor: isActive
-                    ? 'rgba(255, 255, 255, 0.12)'
-                    : 'transparent',
-                  borderRadius: theme.borderRadius.md,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                {item.label}
-                {isActive && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: theme.spacing.lg,
-                      right: theme.spacing.lg,
-                      height: '3px',
-                      backgroundColor: theme.colors.onPrimary,
-                      borderRadius: '3px 3px 0 0',
-                    }}
-                  />
-                )}
-              </Link>
-            );
-          })}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md }}>
-            <button
-              onClick={handleLogout}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: theme.spacing.xs, height: '100%' }}>
+        {sections.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              aria-current={isActive ? 'page' : undefined}
               style={{
-                padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                color: theme.colors.onPrimary,
-                border: 'none',
-                borderRadius: theme.borderRadius.md,
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                padding: `0 ${theme.spacing.md}`,
+                color: isActive ? theme.colors.primary : theme.colors.secondary,
+                textDecoration: 'none',
+                ...theme.typography.labelLarge,
                 transition: theme.transitions.short,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                if (!isActive) e.currentTarget.style.color = theme.colors.onBackground;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                if (!isActive) e.currentTarget.style.color = theme.colors.secondary;
               }}
             >
-              Sign Out
-            </button>
-            <img
-              src="/AWS_logo_RGB_1c_White.png"
-              alt="AWS Logo"
-              style={{
-                height: '32px',
-                width: 'auto',
-              }}
-            />
-          </div>
-        </div>
+              {item.label}
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  left: theme.spacing.md,
+                  right: theme.spacing.md,
+                  bottom: 0,
+                  height: '2px',
+                  backgroundColor: theme.colors.primary,
+                  transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
+                  transformOrigin: 'left center',
+                  transition: `transform ${theme.transitions.medium}`,
+                }}
+              />
+            </Link>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.lg }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: `6px ${theme.spacing.md}`,
+            color: theme.colors.secondary,
+            border: `1px solid ${theme.colors.outline}`,
+            borderRadius: theme.borderRadius.md,
+            ...theme.typography.labelLarge,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = theme.colors.onBackground;
+            e.currentTarget.style.borderColor = theme.colors.outlineVariant;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = theme.colors.secondary;
+            e.currentTarget.style.borderColor = theme.colors.outline;
+          }}
+        >
+          Sign out
+        </button>
+        <img
+          src="/AWS_logo_RGB_1c_White.png"
+          alt="AWS"
+          style={{ height: '22px', width: 'auto', opacity: 0.85 }}
+        />
       </div>
     </nav>
   );

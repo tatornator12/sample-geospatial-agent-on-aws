@@ -1,6 +1,11 @@
+/**
+ * Tool calls inside the transcript: a numbered list of steps with one lit marker for the
+ * running step. Expands to show inputs and output in the numeric register.
+ */
 import { useState } from 'react';
 import type { ToolCall } from '../types.ts';
 import { theme } from '../theme';
+import { Icon } from './Icons';
 
 interface ToolCallDisplayProps {
   tools: ToolCall[];
@@ -8,38 +13,32 @@ interface ToolCallDisplayProps {
 
 interface ToolCallItemProps {
   tool: ToolCall;
+  index: number;
 }
 
-function ToolCallItem({ tool }: ToolCallItemProps) {
+function ToolCallItem({ tool, index }: ToolCallItemProps) {
   const [expanded, setExpanded] = useState(false);
-
-  const statusColor = tool.status === 'executing' ? theme.colors.secondary : theme.colors.success;
-  const statusText = tool.status === 'executing' ? 'Running' : 'Completed';
+  const running = tool.status === 'executing';
+  const markerColor = running ? theme.colors.primary : theme.colors.success;
 
   return (
-    <div 
-      style={{ 
-        marginBottom: theme.spacing.xs,
-        borderLeft: `3px solid ${statusColor}`,
-        paddingLeft: theme.spacing.sm,
-      }}
-    >
+    <div style={{ marginBottom: theme.spacing.xs }}>
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         style={{
           width: '100%',
           textAlign: 'left',
-          padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
+          padding: `6px ${theme.spacing.sm}`,
           background: 'transparent',
           border: 'none',
-          cursor: 'pointer',
+          borderRadius: theme.borderRadius.sm,
+          display: 'grid',
+          gridTemplateColumns: '28px 1fr auto 16px',
+          alignItems: 'center',
+          gap: theme.spacing.sm,
           ...theme.typography.bodyMedium,
           color: theme.colors.onSurface,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          transition: theme.transitions.short,
-          borderRadius: theme.borderRadius.sm,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = theme.states.hover;
@@ -48,31 +47,51 @@ function ToolCallItem({ tool }: ToolCallItemProps) {
           e.currentTarget.style.backgroundColor = 'transparent';
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-          <span style={{ ...theme.typography.labelLarge, fontWeight: 500 }}>{tool.name}</span>
-          <span 
-            style={{ 
-              fontSize: '12px',
-              fontWeight: 500,
-              color: statusColor,
-              backgroundColor: `${statusColor}20`,
-              padding: `2px ${theme.spacing.xs}`,
-              borderRadius: theme.borderRadius.sm,
-            }}
-          >
-            {statusText}
-          </span>
-        </div>
-        <span 
-          style={{ 
-            fontSize: '10px', 
-            color: theme.colors.secondary,
-            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: theme.transitions.short,
-            display: 'inline-block',
+        <span
+          style={{
+            ...theme.typography.mono,
+            fontSize: '13px',
+            color: markerColor,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
           }}
         >
-          ▼
+          <span
+            aria-hidden="true"
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: markerColor,
+              boxShadow: running ? `0 0 0 4px ${theme.colors.primaryContainer}` : 'none',
+              display: 'inline-block',
+            }}
+          />
+          {String(index + 1).padStart(2, '0')}
+        </span>
+        <span style={{ ...theme.typography.mono, fontSize: '14px', color: theme.colors.onSurface }}>
+          {tool.name}
+        </span>
+        <span
+          style={{
+            ...theme.typography.labelCaps,
+            fontSize: '11px',
+            color: markerColor,
+          }}
+        >
+          {running ? 'Running' : 'Done'}
+        </span>
+        <span
+          aria-hidden="true"
+          style={{
+            color: theme.colors.secondary,
+            display: 'inline-flex',
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: `transform ${theme.transitions.short}`,
+          }}
+        >
+          <Icon name="chevron-down" size={14} />
         </span>
       </button>
 
@@ -80,7 +99,7 @@ function ToolCallItem({ tool }: ToolCallItemProps) {
         <div
           style={{
             marginTop: theme.spacing.xs,
-            marginLeft: theme.spacing.sm,
+            marginLeft: '36px',
             padding: theme.spacing.md,
             backgroundColor: theme.colors.surfaceVariant,
             borderRadius: theme.borderRadius.sm,
@@ -88,58 +107,73 @@ function ToolCallItem({ tool }: ToolCallItemProps) {
           }}
         >
           {tool.params && Object.keys(tool.params).length > 0 && (
-            <div style={{ marginBottom: theme.spacing.md }}>
-              <div style={{ 
-                ...theme.typography.labelLarge, 
-                color: theme.colors.secondary,
-                marginBottom: theme.spacing.xs 
-              }}>
-                Input Parameters
+            <div style={{ marginBottom: tool.result ? theme.spacing.md : 0 }}>
+              <div
+                style={{
+                  ...theme.typography.labelCaps,
+                  color: theme.colors.secondary,
+                  marginBottom: theme.spacing.sm,
+                }}
+              >
+                Inputs
               </div>
-              <div style={{ 
-                padding: theme.spacing.sm,
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.borderRadius.sm,
-                border: `1px solid ${theme.colors.outlineVariant}`,
-              }}>
+              <dl
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'max-content 1fr',
+                  columnGap: theme.spacing.md,
+                  rowGap: '6px',
+                  margin: 0,
+                }}
+              >
                 {Object.entries(tool.params).map(([key, value]) => (
-                  <div key={key} style={{ marginBottom: theme.spacing.xs }}>
-                    <span style={{ color: theme.colors.secondary, fontWeight: 500 }}>{key}:</span>{' '}
-                    <span style={{ color: theme.colors.onSurface }}>{String(value)}</span>
+                  <div key={key} style={{ display: 'contents' }}>
+                    <dt style={{ ...theme.typography.mono, fontSize: '13px', color: theme.colors.secondary }}>{key}</dt>
+                    <dd
+                      style={{
+                        ...theme.typography.mono,
+                        fontSize: '13px',
+                        color: theme.colors.onSurface,
+                        margin: 0,
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {String(value)}
+                    </dd>
                   </div>
                 ))}
-              </div>
+              </dl>
             </div>
           )}
 
           {tool.result && (
             <div>
-              <div style={{ 
-                ...theme.typography.labelLarge, 
-                color: theme.colors.secondary,
-                marginBottom: theme.spacing.xs 
-              }}>
+              <div
+                style={{
+                  ...theme.typography.labelCaps,
+                  color: theme.colors.secondary,
+                  marginBottom: theme.spacing.sm,
+                }}
+              >
                 Output
               </div>
               <pre
                 style={{
                   padding: theme.spacing.sm,
-                  backgroundColor: theme.colors.surface,
+                  backgroundColor: theme.colors.background,
                   borderRadius: theme.borderRadius.sm,
-                  fontSize: '11px',
+                  ...theme.typography.mono,
+                  fontSize: '12.5px',
                   overflow: 'auto',
                   maxHeight: '300px',
-                  fontFamily: 'monospace',
                   whiteSpace: 'pre-wrap',
                   wordWrap: 'break-word',
-                  border: `1px solid ${theme.colors.outlineVariant}`,
+                  border: `1px solid ${theme.colors.outline}`,
                   margin: 0,
                   color: theme.colors.onSurface,
                 }}
               >
-                {typeof tool.result === 'string'
-                  ? tool.result
-                  : JSON.stringify(tool.result, null, 2)}
+                {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
               </pre>
             </div>
           )}
@@ -167,58 +201,53 @@ export function ToolCallDisplay({ tools }: ToolCallDisplayProps) {
   return (
     <div
       style={{
-        backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.md,
-        border: `1px solid ${theme.colors.outlineVariant}`,
+        border: `1px solid ${theme.colors.outline}`,
         overflow: 'hidden',
-        boxShadow: theme.elevation.level1,
       }}
     >
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         style={{
           width: '100%',
           textAlign: 'left',
           padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-          background: theme.colors.surfaceVariant,
+          background: 'transparent',
           border: 'none',
-          cursor: 'pointer',
-          ...theme.typography.labelLarge,
+          borderRadius: 0,
+          ...theme.typography.labelCaps,
           color: theme.colors.secondary,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          transition: theme.transitions.short,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = theme.colors.surfaceVariant;
-          e.currentTarget.style.filter = 'brightness(0.95)';
+          e.currentTarget.style.backgroundColor = theme.states.hover;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = theme.colors.surfaceVariant;
-          e.currentTarget.style.filter = 'none';
+          e.currentTarget.style.backgroundColor = 'transparent';
         }}
       >
         <span>
-          {uniqueToolList.length} tool{uniqueToolList.length !== 1 ? 's' : ''} executed
+          {uniqueToolList.length} step{uniqueToolList.length !== 1 ? 's' : ''}
         </span>
-        <span 
-          style={{ 
-            fontSize: '12px', 
-            color: theme.colors.secondary,
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-flex',
             transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: theme.transitions.short,
-            display: 'inline-block',
+            transition: `transform ${theme.transitions.short}`,
           }}
         >
-          ▼
+          <Icon name="chevron-down" size={14} />
         </span>
       </button>
 
       {expanded && (
-        <div style={{ padding: theme.spacing.md, paddingTop: theme.spacing.sm }}>
+        <div style={{ padding: `${theme.spacing.sm} ${theme.spacing.sm} ${theme.spacing.sm}` }}>
           {uniqueToolList.map((tool, index) => (
-            <ToolCallItem key={tool.id || index} tool={tool} />
+            <ToolCallItem key={tool.id || index} tool={tool} index={index} />
           ))}
         </div>
       )}

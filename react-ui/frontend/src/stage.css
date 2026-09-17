@@ -1,0 +1,596 @@
+/* The Stage: map edge to edge, rails that never reflow, one live window.
+   Layout only; colours and type come from index.css variables and theme.ts. */
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dome);
+}
+
+.stage__map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Overlay layer: lets the map receive every pointer event except where a plate sits. */
+.stage__overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.stage__overlay > * {
+  pointer-events: auto;
+}
+
+/* Left: the step column, a plate that grows downward and never pushes anything. */
+.stage-steps {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 296px;
+  max-height: calc(100% - 300px); /* stops short of the draw rail at bottom left */
+  overflow: hidden auto;
+  padding: 14px 16px 10px;
+  background: color-mix(in srgb, var(--plate) 92%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+.stage-steps__title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin: 0 0 6px;
+}
+
+/* Bottom: the docent's caption band and the presenter's single input line. */
+.stage-docent {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(1040px, calc(100% - 144px)); /* leaves room for the draw rail and the basemap plate */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.docent-caption {
+  min-height: 44px;
+  padding: 14px 20px;
+  background: color-mix(in srgb, var(--dome) 88%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 24px;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  color: var(--fog);
+  text-wrap: pretty;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 14px;
+  align-items: start;
+}
+.docent-caption--idle {
+  color: var(--label);
+}
+.docent-caption__who {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
+  padding-top: 8px;
+  white-space: nowrap;
+}
+.docent-caption__text {
+  min-width: 0;
+  max-height: calc(1.35em * 3);
+  overflow: hidden;
+}
+
+/* The working indicator: three dots that breathe, never a spinner alone. */
+.docent-working {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  vertical-align: middle;
+  margin-left: 10px;
+}
+.docent-working i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  opacity: 0.35;
+  animation: docent-breathe 1.4s var(--ease-out) infinite;
+}
+.docent-working i:nth-child(2) { animation-delay: 0.18s; }
+.docent-working i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes docent-breathe {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+.docent-console {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  background: color-mix(in srgb, var(--plate) 94%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.docent-console:focus-within {
+  border-color: var(--hairline-strong);
+}
+.docent-input {
+  width: 100%;
+  min-height: 40px;
+  max-height: 120px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--fog);
+  font-size: 17px;
+  line-height: 1.4;
+  padding: 8px 0;
+  field-sizing: content;
+}
+.docent-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Buttons on the stage */
+.stage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fog);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.stage-btn:hover:not(:disabled) {
+  background: rgba(233, 238, 243, 0.06);
+}
+.stage-btn:disabled {
+  opacity: 0.45;
+}
+.stage-btn--primary {
+  background: var(--amber);
+  color: var(--dome);
+  font-weight: 600;
+}
+.stage-btn--primary:hover:not(:disabled) {
+  background: var(--amber-hover);
+}
+.stage-btn--quiet {
+  color: var(--label);
+}
+.stage-btn--quiet:hover:not(:disabled) {
+  color: var(--fog);
+}
+.stage-btn--danger {
+  color: var(--error);
+}
+.stage-btn--icon {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+.stage-btn--on {
+  background: var(--amber-wash);
+  color: var(--amber);
+}
+
+/* Prepared prompts: small label plates under the console. */
+.docent-prepared {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 0 4px;
+}
+.docent-prepared__label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin-right: 4px;
+}
+.docent-plate {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--plate) 88%, transparent);
+  color: var(--fog);
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.docent-plate:hover:not(:disabled) {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.docent-plate:disabled {
+  opacity: 0.45;
+}
+.docent-session {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Right: the transcript drawer, a sheet that slides over the map when the presenter needs it. */
+.stage-transcript {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  bottom: 176px;
+  width: min(520px, calc(100% - 360px));
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--plate) 96%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: stage-slide-in 360ms var(--ease-out) both;
+  z-index: 6;
+}
+.stage-transcript__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 12px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+.stage-transcript__title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.stage-transcript__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.transcript-turn {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  column-gap: 12px;
+  align-items: start;
+}
+.transcript-turn__who {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+  padding-top: 4px;
+}
+.transcript-turn--user .transcript-turn__who {
+  color: var(--amber);
+}
+.transcript-turn__body {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--fog);
+}
+.transcript-turn--user .transcript-turn__body {
+  color: var(--fog);
+  font-weight: 500;
+}
+.transcript-turn__tools {
+  margin-top: 10px;
+}
+.transcript-empty {
+  color: var(--label);
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 44ch;
+}
+
+@keyframes stage-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes stage-slide-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Big screens: the caption grows with the room. */
+@media (min-width: 2200px) {
+  .docent-caption { font-size: 32px; }
+  .stage-steps { width: 360px; }
+}
+
+/* ---------------------------------------------------------------------------
+   Map furniture: the plates MapView floats over the canvas. Same plate language
+   as the docent's overlays so the map reads as one stage, not two products.
+   --------------------------------------------------------------------------- */
+
+.map-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.map-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.map-plate {
+  background: color-mix(in srgb, var(--plate) 92%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.map-plate__title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+/* Top right: the layers plate. The transcript drawer slides over it when open. */
+.map-layers {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 320px;
+  max-height: calc(100% - 300px);
+  display: flex;
+  flex-direction: column;
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+.map-layers__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 10px;
+}
+.map-layers__head--open {
+  border-bottom: 1px solid var(--hairline);
+}
+.map-layers__toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--label);
+}
+.map-layers__toggle:hover {
+  background: rgba(233, 238, 243, 0.06);
+}
+.map-layers__count {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--fog);
+  font-variant-numeric: tabular-nums;
+}
+.map-layers__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.map-group__title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin: 0 0 4px 8px;
+}
+.map-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 4px 4px 4px 8px;
+  border-radius: 6px;
+}
+.map-row:hover {
+  background: rgba(233, 238, 243, 0.06);
+}
+.map-row__check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
+  cursor: pointer;
+}
+.map-row__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--fog);
+  text-align: left;
+  padding: 4px 0;
+  border-radius: 4px;
+}
+.map-row__name:hover {
+  color: var(--amber);
+}
+.map-row--off .map-row__name {
+  color: var(--label);
+}
+.map-row__remove {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--label);
+  flex: none;
+}
+.map-row__remove:hover {
+  color: var(--fog);
+  background: rgba(233, 238, 243, 0.06);
+}
+.map-group__action {
+  width: 100%;
+  justify-content: center;
+  margin-top: 6px;
+  height: 36px;
+  border: 1px solid var(--hairline-strong);
+}
+.map-group__action:hover:not(:disabled) {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+/* Bottom left: the draw rail. Icon buttons in a column; the active mode wears amber. */
+.map-rail {
+  position: absolute;
+  left: 16px;
+  bottom: 20px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+}
+.map-rail__rule {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--hairline-strong);
+}
+
+/* Bottom right: the basemap plate. */
+.map-basemap {
+  position: absolute;
+  right: 16px;
+  bottom: 20px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 0 14px;
+  height: 44px;
+}
+.map-select {
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fog);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%238fa3b8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='m4 6.5 4 4 4-4'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+.map-select:hover {
+  background-color: rgba(233, 238, 243, 0.06);
+}
+.map-select option {
+  background: var(--plate-raised);
+  color: var(--fog);
+}
+
+/* MapLibre chrome takes the dome as well. */
+.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--dome) 78%, transparent) !important;
+  color: var(--label) !important;
+  font-family: var(--font-body) !important;
+  font-size: 11px !important;
+  border-radius: 6px 0 0 0 !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--fog) !important;
+}
+.maplibregl-popup-content {
+  background: var(--plate-raised);
+  color: var(--fog);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: var(--shadow-3);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 12px 28px 12px 14px;
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--plate-raised);
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--plate-raised);
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--plate-raised);
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--plate-raised);
+}
+.maplibregl-popup-close-button {
+  color: var(--label);
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.maplibregl-popup-close-button:hover {
+  color: var(--fog);
+  background: rgba(233, 238, 243, 0.06);
+}

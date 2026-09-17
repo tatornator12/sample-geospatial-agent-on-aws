@@ -267,7 +267,7 @@ CHANGE DETECTION:
               style={{
                 padding: theme.spacing.md,
                 backgroundColor: theme.colors.surface,
-                borderLeft: `4px solid ${theme.colors.primary}`,
+                border: `1px solid ${theme.colors.outline}`,
                 borderRadius: theme.borderRadius.sm,
               }}
             >
@@ -595,7 +595,7 @@ CHANGE DETECTION:
               style={{
                 padding: theme.spacing.md,
                 backgroundColor: theme.colors.surface,
-                borderLeft: `4px solid ${theme.colors.primary}`,
+                border: `1px solid ${theme.colors.outline}`,
                 borderRadius: theme.borderRadius.sm,
               }}
             >

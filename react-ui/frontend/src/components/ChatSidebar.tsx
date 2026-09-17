@@ -1,5 +1,8 @@
 /**
- * ChatSidebar Component - Material Design 3
+ * The Docent. Owns the conversation with the agent (streaming, tool parsing, map updates)
+ * and renders it as three overlays on the stage: a caption band with the presenter's input
+ * at the bottom, a step column at the left while the agent works, and a transcript drawer
+ * at the right when the presenter wants the full record.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -7,6 +10,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message, ToolCall, GeometryData, RasterData } from '../types.ts';
 import { ToolCallDisplay } from './ToolCallDisplay.tsx';
+import { StepColumn } from './StepColumn.tsx';
+import { Icon } from './Icons.tsx';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
   cleanStreamingText,
@@ -14,7 +19,6 @@ import {
   extractAllVisualizationData,
   extractLocationChanged,
 } from '../utils/parsing.ts';
-import { theme } from '../theme';
 import { formatScenarioAnalysis, type ScenarioConfig } from '../utils/formatScenario';
 
 /**
@@ -23,7 +27,7 @@ import { formatScenarioAnalysis, type ScenarioConfig } from '../utils/formatScen
 function loadToolCallsFromConfig(config: ScenarioConfig): ToolCall[] {
   // Check if config has tool_calls defined
   const configToolCalls = (config as any).tool_calls;
-  
+
   if (!configToolCalls || !Array.isArray(configToolCalls)) {
     console.warn('No tool_calls found in scenario config, returning empty array');
     return [];
@@ -35,9 +39,40 @@ function loadToolCallsFromConfig(config: ScenarioConfig): ToolCall[] {
     id: `tool_${Date.now()}_${index}`,
     params: tool.params || {},
     status: 'completed' as const,
-    result: tool.result || `Completed ${tool.name}`
+    result: tool.result || `Completed ${tool.name}`,
   }));
 }
+
+/**
+ * Reduce a markdown response to the one thing the docent would say out loud right now:
+ * the last paragraph, headings stripped, capped so it fits three caption lines.
+ */
+function docentCaption(text: string): string {
+  const cleaned = text.replace(/\r/g, '').trim();
+  if (!cleaned) return '';
+  const paragraphs = cleaned
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  let last = paragraphs[paragraphs.length - 1] || cleaned;
+  last = last.replace(/^#{1,6}\s+/gm, '').replace(/^[-*]\s+/gm, '');
+  if (last.length > 320) {
+    const tail = last.slice(-320);
+    const cut = tail.search(/[.!?]\s+[A-Z]/);
+    last = cut >= 0 ? tail.slice(cut + 2) : `…${tail}`;
+  }
+  return last;
+}
+
+const PREPARED_PROMPTS = [
+  { label: 'Vegetation, Central Park', prompt: 'Show vegetation health for Central Park, New York' },
+  {
+    label: 'Wildfire, Pacific Palisades',
+    prompt: 'Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025',
+  },
+  { label: 'Water, Folsom Lake', prompt: 'Compare water levels for Folsom Lake, California 2021 vs 2022' },
+  { label: 'Scan Colorado', prompt: 'Scan Colorado for land change between 2019 and 2024' },
+];
 
 interface ChatSidebarProps {
   sessionId: string;
@@ -64,7 +99,6 @@ export function ChatSidebar({
   onRastersUpdate,
   drawnGeometryMessage,
   onDrawnGeometryMessageSent,
-  onToggleSidebar,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -73,7 +107,10 @@ export function ChatSidebar({
   const [isStreaming, setIsStreaming] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const scenarioDisplayedRef = useRef(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMessages([]);
@@ -91,11 +128,14 @@ export function ChatSidebar({
     // friendly notice so the user knows what happened and that they can resend.
     if ((window as any).__runtimeCrashRecovery) {
       (window as any).__runtimeCrashRecovery = false;
-      setMessages([{
-        role: 'assistant',
-        content: '⚠️ The previous analysis session hit a runtime error and was ' +
-          'automatically reset. Please re-enter your request — it should work now.',
-      }]);
+      setMessages([
+        {
+          role: 'assistant',
+          content:
+            'The previous analysis session hit a runtime error and was automatically reset. ' +
+            'Please re-enter your request.',
+        },
+      ]);
     }
   }, [sessionId]);
 
@@ -103,6 +143,7 @@ export function ChatSidebar({
   useEffect(() => {
     if (drawnGeometryMessage) {
       setUserInput(drawnGeometryMessage);
+      inputRef.current?.focus();
       // Notify parent that message has been received
       if (onDrawnGeometryMessageSent) {
         onDrawnGeometryMessageSent();
@@ -114,18 +155,20 @@ export function ChatSidebar({
   useEffect(() => {
     // Show loading message while scenario is loading
     if (isLoadingScenario && messages.length === 0) {
-      setMessages([
-        { role: 'assistant', content: '🔥 Loading scenario data from S3...', tools: [] },
-      ]);
+      setMessages([{ role: 'assistant', content: 'Loading the replay case…', tools: [] }]);
       scenarioDisplayedRef.current = false;
       return;
     }
 
     // Show error message if scenario failed to load
     if (scenarioError && !scenarioDisplayedRef.current) {
-      console.error('📊 Displaying scenario error');
+      console.error('Displaying scenario error');
       setMessages([
-        { role: 'assistant', content: `❌ **Error loading scenario**\n\n${scenarioError}\n\nPlease try refreshing the page or contact support if the issue persists.`, tools: [] },
+        {
+          role: 'assistant',
+          content: `**The replay case could not be loaded.**\n\n${scenarioError}\n\nRefresh the page, or pick another case.`,
+          tools: [],
+        },
       ]);
       scenarioDisplayedRef.current = true;
       return;
@@ -133,8 +176,6 @@ export function ChatSidebar({
 
     // Display scenario analysis once when config is loaded
     if (scenarioConfig && !scenarioDisplayedRef.current) {
-      console.log('📊 Displaying scenario analysis');
-
       const analysisText = formatScenarioAnalysis(scenarioConfig);
 
       // Load tool calls from scenario config
@@ -151,6 +192,13 @@ export function ChatSidebar({
     }
   }, [scenarioConfig, scenarioError, isLoadingScenario, messages.length]);
 
+  // Keep the transcript pinned to the latest turn while it is open
+  useEffect(() => {
+    if (transcriptOpen) {
+      transcriptEndRef.current?.scrollIntoView({ block: 'end' });
+    }
+  }, [transcriptOpen, messages, streamingText]);
+
   const clearMapLayers = () => {
     onGeometryUpdate(null);
     onRastersUpdate([]);
@@ -160,17 +208,14 @@ export function ChatSidebar({
     if (!isProcessing) return;
 
     setIsCancelling(true);
-    console.log('🛑 Cancelling session:', sessionId);
+    console.log('Cancelling session:', sessionId);
 
     const success = await stopRuntimeSession(sessionId);
-    
+
     if (success) {
       setIsStreaming(false);
       setIsProcessing(false);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: '⚠️ Session cancelled by user.' },
-      ]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Stopped by the presenter.' }]);
     } else {
       console.error('Failed to cancel session');
     }
@@ -178,12 +223,12 @@ export function ChatSidebar({
     setIsCancelling(false);
   };
 
-  const sendMessage = async () => {
-    if (!userInput.trim() || isProcessing) {
+  const sendMessage = async (override?: string) => {
+    const prompt = (override ?? userInput).trim();
+    if (!prompt || isProcessing) {
       return;
     }
 
-    const prompt = userInput;
     setUserInput('');
     setIsProcessing(true);
 
@@ -204,9 +249,7 @@ export function ChatSidebar({
     // just the first — while de-duping across streaming updates. Each loaded
     // geometry is pushed separately and stacks as its own layer on the map.
     const loadedGeometryUrls = new Set<string>();
-    const loadNewGeometries = async (
-      list: Array<{ url: string; title: string }>
-    ) => {
+    const loadNewGeometries = async (list: Array<{ url: string; title: string }>) => {
       for (const g of list) {
         if (loadedGeometryUrls.has(g.url)) continue;
         loadedGeometryUrls.add(g.url); // mark first so rapid stream updates don't double-load
@@ -219,15 +262,14 @@ export function ChatSidebar({
           ]);
           if (geometry) {
             geometry.locationName = g.title;
-            console.log(`✅ Geometry loaded:`, geometry.locationName);
             onGeometryUpdate(geometry);
           } else {
             loadedGeometryUrls.delete(g.url);
-            console.error(`❌ Failed to load geometry (null) for:`, g.url);
+            console.error('Failed to load geometry (null) for:', g.url);
           }
         } catch (error) {
           loadedGeometryUrls.delete(g.url);
-          console.error(`❌ Exception loading geometry from ${g.url}:`, error);
+          console.error(`Exception loading geometry from ${g.url}:`, error);
         }
       }
     };
@@ -251,16 +293,15 @@ export function ChatSidebar({
               tools = parsed.tools;
               cleanText = parsed.cleanText;
             } catch (parseError) {
-              console.error('❌ Failed to parse tools from response:', parseError);
-              console.error('❌ Response text:', fullResponse.substring(0, 500));
+              console.error('Failed to parse tools from response:', parseError);
               cleanText = fullResponse; // Fallback to showing raw response
             }
 
             setStreamingText(cleanText);
 
             // Update accumulated tools (merge with existing to avoid duplicates)
-            const existingIds = new Set(accumulatedTools.map(t => t.id));
-            const newTools = tools.filter(t => !existingIds.has(t.id));
+            const existingIds = new Set(accumulatedTools.map((t) => t.id));
+            const newTools = tools.filter((t) => !existingIds.has(t.id));
             accumulatedTools = [...accumulatedTools, ...newTools];
             setStreamingTools(accumulatedTools);
 
@@ -276,8 +317,7 @@ export function ChatSidebar({
             // Handle raster updates with debouncing to prevent excessive updates
             if (allRasterData.length > 0) {
               const currentUrls = allRasterData.map((r) => r.url).sort().join('|');
-              const lastUrls =
-                lastRasterCount > 0 ? (window as any).__lastRasterUrls || '' : '';
+              const lastUrls = lastRasterCount > 0 ? (window as any).__lastRasterUrls || '' : '';
 
               if (currentUrls !== lastUrls) {
                 const rasters: RasterData[] = allRasterData.map((r) => ({
@@ -287,23 +327,18 @@ export function ChatSidebar({
                   cloudCoverage: r.cloudCoverage,
                 }));
 
-                console.log(
-                  `📊 Sending ${allRasterData.length} rasters to map:`,
-                  rasters.map((r) => r.name)
-                );
-                
                 // Use setTimeout to defer raster updates and prevent blocking the stream
                 setTimeout(() => {
                   onRastersUpdate(rasters);
                 }, 0);
-                
+
                 lastRasterCount = allRasterData.length;
                 (window as any).__lastRasterUrls = currentUrls;
               }
             }
           }
         } else if (event.type === 'error') {
-          console.error('❌ Stream error from backend:', event.message);
+          console.error('Stream error from backend:', event.message);
 
           // A RUNTIME_CRASH means the AgentCore container died and this session
           // is now permanently poisoned — every further message on it returns the
@@ -314,23 +349,19 @@ export function ChatSidebar({
             /starting the runtime|RuntimeClientError/i.test(event.message || '');
 
           if (isRuntimeCrash) {
-            console.warn('♻️ Runtime crash detected — rotating to a fresh session');
+            console.warn('Runtime crash detected, rotating to a fresh session');
             (window as any).__runtimeCrashRecovery = true;
             onSessionReset();
             return; // session reset; useEffect will seed a recovery notice
           }
 
-          setMessages((prev) => [
-            ...prev,
-            { role: 'assistant', content: `Error: ${event.message}` },
-          ]);
+          setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${event.message}` }]);
           return; // Exit early on error
         }
       }
 
       // Mark stream as completed normally
       streamCompletedNormally = true;
-      console.log(`✅ Stream completed successfully. Total response length: ${fullResponse.length}, Tools: ${accumulatedTools.length}`);
 
       // Final extraction with error handling
       let finalRasterData: any[] = [];
@@ -339,10 +370,8 @@ export function ChatSidebar({
         const extracted = extractAllVisualizationData(accumulatedTools);
         finalRasterData = extracted.rasters;
         finalGeometryData = extracted.geometries;
-        console.log(`📊 Final extraction: ${finalRasterData.length} rasters, ${finalGeometryData.length} geometries`);
       } catch (error) {
-        console.error('❌ Failed to extract visualization data:', error);
-        console.error('❌ Tools at time of failure:', accumulatedTools.map(t => ({ name: t.name, id: t.id })));
+        console.error('Failed to extract visualization data:', error);
       }
 
       // Final pass: load any geometries the streaming loop didn't get to.
@@ -363,16 +392,11 @@ export function ChatSidebar({
             cloudCoverage: r.cloudCoverage,
           }));
 
-          console.log(
-            `📊 [Final] Sending ${finalRasterData.length} rasters to map:`,
-            rasters.map((r) => r.name)
-          );
-          
           // Defer final raster update to prevent blocking
           setTimeout(() => {
             onRastersUpdate(rasters);
           }, 0);
-          
+
           lastRasterCount = finalRasterData.length;
           (window as any).__lastRasterUrls = currentUrls;
         }
@@ -385,473 +409,224 @@ export function ChatSidebar({
         status: 'completed' as const,
       }));
 
-      setMessages((prev) => [...prev, { 
-        role: 'assistant', 
-        content: cleanText,
-        tools: completedTools.length > 0 ? completedTools : undefined
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: cleanText,
+          tools: completedTools.length > 0 ? completedTools : undefined,
+        },
+      ]);
     } catch (error) {
-      console.error('❌ Exception while calling agent:', error);
-      console.error('❌ Error details:', {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        streamCompletedNormally,
-        responseLength: fullResponse.length,
-        toolsCollected: accumulatedTools.length,
-      });
+      console.error('Exception while calling agent:', error);
 
       // Show user-friendly error message
       const errorMessage = error instanceof Error ? error.message : String(error);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: `Error: ${errorMessage}` },
-      ]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errorMessage}` }]);
     } finally {
       setIsStreaming(false);
       setIsProcessing(false);
 
       if (!streamCompletedNormally) {
-        console.warn('⚠️ Stream did not complete normally. Check logs above for errors.');
+        console.warn('Stream did not complete normally. Check logs above for errors.');
       }
     }
   };
 
-  const quickAction = (promptText: string) => {
-    if (!isProcessing) {
-      setUserInput(promptText);
-      setTimeout(() => {
-        sendMessage();
-      }, 0);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      void sendMessage();
+    }
+    if (e.key === 'Escape' && isProcessing) {
+      e.preventDefault();
+      void handleCancelSession();
     }
   };
 
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        padding: theme.spacing.md,
-        backgroundColor: theme.colors.surfaceVariant,
-      }}
-    >
-      {/* Scrollable area */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          marginBottom: theme.spacing.md,
-          paddingRight: theme.spacing.sm,
-        }}
-      >
-        {/* Chat messages */}
-        <div
-          style={{
-            padding: theme.spacing.md,
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.md,
-            boxShadow: theme.elevation.level1,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: theme.spacing.md,
-            }}
-          >
-            <h3
-              style={{
-                ...theme.typography.titleLarge,
-                marginTop: 0,
-                marginBottom: 0,
-                color: theme.colors.onSurface,
-              }}
-            >
-              Conversation
-            </h3>
+  // What the room reads: the current streaming sentence, or the last thing the agent said.
+  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+  const captionSource = isStreaming ? streamingText : lastAssistant?.content || '';
+  const caption = docentCaption(captionSource);
+  const idle = !isStreaming && !caption;
 
-            {onToggleSidebar && (
-              <button
-                onClick={onToggleSidebar}
-                style={{
-                  padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                  backgroundColor: 'transparent',
-                  color: theme.colors.secondary,
-                  border: `1px solid ${theme.colors.outline}`,
-                  borderRadius: theme.borderRadius.md,
-                  cursor: 'pointer',
-                  ...theme.typography.labelLarge,
-                  transition: theme.transitions.short,
-                  fontSize: '18px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.states.hover;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                title="Hide chat"
-              >
-                ☰
-              </button>
+  // Where the agent is: this turn's tools while working, the last turn's when finished.
+  const stepTools = isStreaming ? streamingTools : lastAssistant?.tools || [];
+
+  const canSend = !isProcessing && userInput.trim().length > 0;
+
+  return (
+    <>
+      {/* Left: the step column */}
+      {stepTools.length > 0 && (
+        <section className="stage-steps" aria-label="Agent steps">
+          <h2 className="stage-steps__title">{isStreaming ? 'The agent is working' : 'What the agent did'}</h2>
+          <StepColumn steps={stepTools} live={isStreaming} />
+        </section>
+      )}
+
+      {/* Bottom: the docent's caption and the presenter's console */}
+      <div className="stage-docent">
+        <div
+          className={`docent-caption${idle ? ' docent-caption--idle' : ''}`}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span className="docent-caption__who">{isStreaming ? 'Agent' : idle ? 'Ready' : 'Agent'}</span>
+          <div className="docent-caption__text">
+            {caption ? (
+              <span className="markdown-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{caption}</ReactMarkdown>
+              </span>
+            ) : isStreaming ? (
+              <span>Reading the request</span>
+            ) : (
+              <span>Name a place and a question. The agent finds the imagery, runs the analysis, and puts the result on the map.</span>
+            )}
+            {isStreaming && (
+              <span className="docent-working" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
             )}
           </div>
+        </div>
 
-          {messages.length === 0 ? (
-            <div
-              style={{
-                padding: theme.spacing.md,
-                backgroundColor: theme.colors.surfaceVariant,
-                borderRadius: theme.borderRadius.sm,
-                ...theme.typography.bodyMedium,
-                color: theme.colors.secondary,
-                lineHeight: '1.6',
-              }}
+        <form
+          className="docent-console"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void sendMessage();
+          }}
+        >
+          <textarea
+            ref={inputRef}
+            className="docent-input"
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isProcessing ? 'Working… press Esc to stop' : 'Ask about any place on Earth'}
+            disabled={isProcessing}
+            rows={1}
+            aria-label="Prompt for the agent"
+          />
+          <div className="docent-actions">
+            {isProcessing ? (
+              <button
+                type="button"
+                className="stage-btn stage-btn--danger"
+                onClick={handleCancelSession}
+                disabled={isCancelling}
+              >
+                <Icon name="stop" size={14} />
+                {isCancelling ? 'Stopping' : 'Stop'}
+              </button>
+            ) : (
+              <button type="submit" className="stage-btn stage-btn--primary" disabled={!canSend}>
+                <Icon name="send" size={16} />
+                Send
+              </button>
+            )}
+            <button
+              type="button"
+              className={`stage-btn stage-btn--icon stage-btn--quiet${transcriptOpen ? ' stage-btn--on' : ''}`}
+              onClick={() => setTranscriptOpen((o) => !o)}
+              aria-pressed={transcriptOpen}
+              aria-label={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
+              title={transcriptOpen ? 'Hide transcript' : 'Show transcript'}
             >
-              <div style={{ marginBottom: theme.spacing.sm }}>
-                Analyze any location on Earth using Sentinel-2 satellite imagery. I can assess <strong>vegetation health</strong>, <strong>wildfire damage</strong>, <strong>water levels</strong>, and <strong>track changes over time</strong>.
-              </div>
-              <div style={{ fontSize: '12px', color: theme.colors.onSurface }}>
-                Try a <strong>location name</strong>, <strong>coordinates</strong> (lat/lon), or <strong>draw a polygon</strong> on the map.
-              </div>
-            </div>
-          ) : (
-            <div>
-              {messages.map((msg, index) => (
-                <div key={index} style={{ marginBottom: theme.spacing.md }}>
-                  <div
-                    style={{
-                      ...theme.typography.labelLarge,
-                      marginBottom: theme.spacing.xs,
-                      color: theme.colors.onSurface,
-                    }}
-                  >
-                    {msg.role === 'user' ? 'User' : 'Assistant'}
-                  </div>
-                  <div
-                    style={{
-                      padding: theme.spacing.md,
-                      backgroundColor:
-                        msg.role === 'user'
-                          ? theme.colors.primaryContainer
-                          : theme.colors.surfaceVariant,
-                      borderRadius: theme.borderRadius.sm,
-                      ...theme.typography.bodyMedium,
-                    }}
-                    className="markdown-content"
-                  >
+              <Icon name="transcript" size={16} />
+            </button>
+            <button
+              type="button"
+              className="stage-btn stage-btn--icon stage-btn--quiet"
+              onClick={onSessionReset}
+              aria-label="New session"
+              title="New session: clears the map and starts a fresh conversation"
+            >
+              <Icon name="reset" size={16} />
+            </button>
+          </div>
+        </form>
+
+        <div className="docent-prepared">
+          <span className="docent-prepared__label">Prepared</span>
+          {PREPARED_PROMPTS.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              className="docent-plate"
+              disabled={isProcessing}
+              onClick={() => void sendMessage(p.prompt)}
+              title={p.prompt}
+            >
+              {p.label}
+            </button>
+          ))}
+          <span className="docent-session" title={sessionId}>
+            session {sessionId.substring(0, 8)}
+          </span>
+        </div>
+      </div>
+
+      {/* Right: the transcript drawer */}
+      {transcriptOpen && (
+        <aside className="stage-transcript" aria-label="Transcript">
+          <div className="stage-transcript__head">
+            <span className="stage-transcript__title">Transcript</span>
+            <button
+              type="button"
+              className="stage-btn stage-btn--icon stage-btn--quiet"
+              onClick={() => setTranscriptOpen(false)}
+              aria-label="Hide transcript"
+            >
+              <Icon name="close" size={16} />
+            </button>
+          </div>
+          <div className="stage-transcript__body">
+            {messages.length === 0 && !isStreaming && (
+              <p className="transcript-empty">
+                Nothing yet. Every prompt and every answer, with the agent's steps, collects here.
+              </p>
+            )}
+            {messages.map((msg, index) => (
+              <div key={index} className={`transcript-turn transcript-turn--${msg.role}`}>
+                <span className="transcript-turn__who">{msg.role === 'user' ? 'You' : 'Agent'}</span>
+                <div className="transcript-turn__body">
+                  <div className="markdown-content">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                   </div>
-                  
-                  {/* Inline tool calls for this message */}
                   {msg.tools && msg.tools.length > 0 && (
-                    <div style={{ marginTop: theme.spacing.sm, marginLeft: theme.spacing.md }}>
+                    <div className="transcript-turn__tools">
                       <ToolCallDisplay tools={msg.tools} />
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Streaming message */}
-          {isStreaming && (
-            <div style={{ marginTop: theme.spacing.md, minHeight: '60px' }}>
-              <div
-                style={{
-                  ...theme.typography.labelLarge,
-                  marginBottom: theme.spacing.xs,
-                  color: theme.colors.onSurface,
-                }}
-              >
-                Assistant (streaming...)
               </div>
-              
-              <div
-                style={{
-                  padding: theme.spacing.md,
-                  backgroundColor: theme.colors.surfaceVariant,
-                  borderRadius: theme.borderRadius.sm,
-                  ...theme.typography.bodyMedium,
-                }}
-                className="markdown-content"
-              >
-                {streamingText ? (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {parseToolCalls(streamingText).cleanText}
-                  </ReactMarkdown>
-                ) : (
-                  'Thinking...'
-                )}
-              </div>
-              
-              {/* Streaming tools - below the response */}
-              {streamingTools.length > 0 && (
-                <div style={{ marginTop: theme.spacing.sm, marginLeft: theme.spacing.md }}>
-                  <ToolCallDisplay tools={streamingTools} />
+            ))}
+            {isStreaming && (
+              <div className="transcript-turn transcript-turn--assistant">
+                <span className="transcript-turn__who">Agent</span>
+                <div className="transcript-turn__body">
+                  <div className="markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {streamingText ? parseToolCalls(streamingText).cleanText : 'Working…'}
+                    </ReactMarkdown>
+                  </div>
+                  {streamingTools.length > 0 && (
+                    <div className="transcript-turn__tools">
+                      <ToolCallDisplay tools={streamingTools} />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Quick actions */}
-          <div style={{ marginTop: theme.spacing.lg }}>
-            <h4
-              style={{
-                ...theme.typography.titleMedium,
-                marginBottom: theme.spacing.sm,
-                color: theme.colors.onSurface,
-              }}
-            >
-              Quick Actions
-            </h4>
-            <div style={{ display: 'flex', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-              <button
-                onClick={() => quickAction('Show vegetation health for Central Park, New York')}
-                disabled={isProcessing}
-                style={{
-                  padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                  backgroundColor: isProcessing ? theme.colors.outline : theme.colors.primary,
-                  color: theme.colors.onPrimary,
-                  border: 'none',
-                  borderRadius: theme.borderRadius.md,
-                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  ...theme.typography.labelLarge,
-                  opacity: isProcessing ? theme.states.disabled : 1,
-                  transition: theme.transitions.short,
-                  boxShadow: isProcessing ? 'none' : theme.elevation.level1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.boxShadow = theme.elevation.level2;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.boxShadow = theme.elevation.level1;
-                  }
-                }}
-              >
-                Vegetation
-              </button>
-              <button
-                onClick={() => quickAction('Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025')}
-                disabled={isProcessing}
-                style={{
-                  padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                  backgroundColor: isProcessing ? theme.colors.outline : theme.colors.primary,
-                  color: theme.colors.onPrimary,
-                  border: 'none',
-                  borderRadius: theme.borderRadius.md,
-                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  ...theme.typography.labelLarge,
-                  opacity: isProcessing ? theme.states.disabled : 1,
-                  transition: theme.transitions.short,
-                  boxShadow: isProcessing ? 'none' : theme.elevation.level1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.boxShadow = theme.elevation.level2;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.boxShadow = theme.elevation.level1;
-                  }
-                }}
-              >
-                Wildfire
-              </button>
-              <button
-                onClick={() =>
-                  quickAction('Compare water levels for Folsom Lake, California 2021 vs 2022')
-                }
-                disabled={isProcessing}
-                style={{
-                  padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                  backgroundColor: isProcessing ? theme.colors.outline : theme.colors.primary,
-                  color: theme.colors.onPrimary,
-                  border: 'none',
-                  borderRadius: theme.borderRadius.md,
-                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  ...theme.typography.labelLarge,
-                  opacity: isProcessing ? theme.states.disabled : 1,
-                  transition: theme.transitions.short,
-                  boxShadow: isProcessing ? 'none' : theme.elevation.level1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.boxShadow = theme.elevation.level2;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isProcessing) {
-                    e.currentTarget.style.boxShadow = theme.elevation.level1;
-                  }
-                }}
-              >
-                Drought
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Input area */}
-      <div>
-        <textarea
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Run earth analyses..."
-          disabled={isProcessing}
-          style={{
-            width: '100%',
-            minHeight: '60px',
-            padding: theme.spacing.md,
-            ...theme.typography.bodyMedium,
-            borderRadius: theme.borderRadius.sm,
-            border: `1px solid ${theme.colors.outline}`,
-            marginBottom: theme.spacing.sm,
-            resize: 'vertical',
-            backgroundColor: theme.colors.surface,
-            color: theme.colors.onSurface,
-            transition: theme.transitions.short,
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = theme.colors.primary;
-            e.currentTarget.style.outline = `2px solid ${theme.colors.primary}`;
-            e.currentTarget.style.outlineOffset = '0';
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = theme.colors.outline;
-            e.currentTarget.style.outline = 'none';
-          }}
-        />
-
-        <div style={{ display: 'flex', gap: theme.spacing.sm, alignItems: 'center' }}>
-          <button
-            onClick={sendMessage}
-            disabled={isProcessing || !userInput.trim()}
-            style={{
-              padding: `${theme.spacing.md} ${theme.spacing.lg}`,
-              backgroundColor:
-                isProcessing || !userInput.trim() ? theme.colors.outline : theme.colors.primary,
-              color: theme.colors.onPrimary,
-              border: 'none',
-              borderRadius: theme.borderRadius.md,
-              cursor: isProcessing || !userInput.trim() ? 'not-allowed' : 'pointer',
-              ...theme.typography.labelLarge,
-              opacity: isProcessing || !userInput.trim() ? theme.states.disabled : 1,
-              transition: theme.transitions.short,
-              boxShadow:
-                isProcessing || !userInput.trim() ? 'none' : theme.elevation.level2,
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-            }}
-            onMouseEnter={(e) => {
-              if (!isProcessing && userInput.trim()) {
-                e.currentTarget.style.boxShadow = theme.elevation.level3;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isProcessing && userInput.trim()) {
-                e.currentTarget.style.boxShadow = theme.elevation.level2;
-              }
-            }}
-          >
-            {isProcessing ? (
-              <>
-                Sending
-                <div
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    border: '3px solid rgba(255, 255, 255, 0.5)',
-                    borderTopColor: '#FFFFFF',
-                    borderBottomColor: '#FFFFFF',
-                    borderRadius: '50%',
-                    animation: 'spin 0.8s linear infinite',
-                  }}
-                />
-              </>
-            ) : (
-              'Send'
+              </div>
             )}
-          </button>
-
-          <div
-            style={{
-              flex: 1,
-              ...theme.typography.bodyMedium,
-              color: theme.colors.secondary,
-              fontSize: '12px',
-            }}
-          >
-            Session: {sessionId.substring(0, 8)}...
+            <div ref={transcriptEndRef} />
           </div>
-
-          <button
-            onClick={handleCancelSession}
-            disabled={!isProcessing || isCancelling}
-            style={{
-              padding: `${theme.spacing.md} ${theme.spacing.md}`,
-              backgroundColor: 'transparent',
-              color: isProcessing && !isCancelling ? theme.colors.error : theme.colors.secondary,
-              border: `1px solid ${isProcessing && !isCancelling ? theme.colors.error : theme.colors.outline}`,
-              borderRadius: theme.borderRadius.md,
-              cursor: isProcessing && !isCancelling ? 'pointer' : 'not-allowed',
-              ...theme.typography.labelLarge,
-              opacity: !isProcessing || isCancelling ? theme.states.disabled : 1,
-              transition: theme.transitions.short,
-            }}
-            onMouseEnter={(e) => {
-              if (isProcessing && !isCancelling) {
-                e.currentTarget.style.backgroundColor = theme.states.hover;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (isProcessing && !isCancelling) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }
-            }}
-          >
-            {isCancelling ? 'Cancelling...' : 'Cancel'}
-          </button>
-
-          <button
-            onClick={onSessionReset}
-            style={{
-              padding: `${theme.spacing.md} ${theme.spacing.md}`,
-              backgroundColor: 'transparent',
-              color: theme.colors.secondary,
-              border: `1px solid ${theme.colors.outline}`,
-              borderRadius: theme.borderRadius.md,
-              cursor: 'pointer',
-              ...theme.typography.labelLarge,
-              transition: theme.transitions.short,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = theme.states.hover;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-    </div>
+        </aside>
+      )}
+    </>
   );
 }

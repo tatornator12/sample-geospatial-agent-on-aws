@@ -12,6 +12,9 @@ import {
   type LayerMetadata,
 } from '../utils/layerFormatting';
 import { CompareView } from './CompareView';
+import { Icon } from './Icons.tsx';
+import { theme } from '../theme';
+import '../stage.css';
 
 interface MapViewProps {
   geometry: GeometryData | null;
@@ -194,8 +197,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           type: 'fill',
           filter: ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
           paint: {
-            'fill-color': '#FFA500',
-            'fill-opacity': 0.3
+            'fill-color': theme.colors.primary,
+            'fill-opacity': 0.25
           }
         },
         // Polygon outline
@@ -204,7 +207,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           type: 'line',
           filter: ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
           paint: {
-            'line-color': '#FFA500',
+            'line-color': theme.colors.primary,
             'line-width': 3
           }
         },
@@ -215,7 +218,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           filter: ['all', ['==', '$type', 'Point'], ['!=', 'mode', 'static']],
           paint: {
             'circle-radius': 8,
-            'circle-color': '#FFA500'
+            'circle-color': theme.colors.primary,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': theme.colors.onPrimary
           }
         },
         // Vertex points
@@ -225,7 +230,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           filter: ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point']],
           paint: {
             'circle-radius': 5,
-            'circle-color': '#FFF'
+            'circle-color': theme.colors.onSurface
           }
         }
       ]
@@ -918,8 +923,53 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     }
   }, [geometry, rasters, allLayers]);
 
+
+  // One row per layer: visibility toggle, name (click to fly there), remove.
+  const renderLayerRow = (layer: LayerMetadata, label: string) => {
+    const isVisible = rasterVisibility[layer.id] !== false;
+    return (
+      <div key={layer.id} className={`map-row${isVisible ? '' : ' map-row--off'}`}>
+        <input
+          type="checkbox"
+          className="map-row__check"
+          checked={isVisible}
+          onChange={(e) => {
+            e.stopPropagation();
+            setRasterVisibility((prev) => ({ ...prev, [layer.id]: e.target.checked }));
+          }}
+          aria-label={`${isVisible ? 'Hide' : 'Show'} ${label}`}
+        />
+        <button
+          type="button"
+          className="map-row__name"
+          onClick={() => flyToLayer(layer.id)}
+          title="Fly to this layer"
+        >
+          {label}
+        </button>
+        <button
+          type="button"
+          className="map-row__remove"
+          onClick={() => removeLayer(layer.id)}
+          aria-label={`Remove ${label}`}
+          title="Remove layer"
+        >
+          <Icon name="close" size={14} />
+        </button>
+      </div>
+    );
+  };
+
+  const openCompare = () => {
+    const sorted = [...layerGroups.tci].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const currentMap = map.current;
+    const center = currentMap ? currentMap.getCenter() : { lng: 0, lat: 20 };
+    const zoom = currentMap ? currentMap.getZoom() : 2;
+    setCompareMode({ left: sorted[0], right: sorted[sorted.length - 1], center: [center.lng, center.lat], zoom });
+  };
+
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div className="map-frame">
       {/* Compare overlay */}
       {compareMode && (
         <CompareView
@@ -931,622 +981,153 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           onClose={() => setCompareMode(null)}
         />
       )}
-      <div
-        ref={mapContainer}
-        style={{
-          width: '100%',
-          height: '100%',
-          minHeight: '600px',
-        }}
-      />
+      <div ref={mapContainer} className="map-canvas" />
 
-      {/* Layer control panel */}
+      {/* Top right: the layers plate */}
       {allLayers.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            backgroundColor: '#FFFFFF',
-            borderRadius: '8px',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.16)',
-            zIndex: 1,
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          }}
-        >
-          {/* Header with toggle and clear button */}
-          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #E0E0E0' }}>
+        <section className="map-plate map-layers" aria-label="Map layers">
+          <div className={`map-layers__head${isLayerControlOpen ? ' map-layers__head--open' : ''}`}>
             <button
+              type="button"
+              className="map-layers__toggle"
               onClick={() => setIsLayerControlOpen(!isLayerControlOpen)}
-              style={{
-                flex: 1,
-                padding: '16px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontWeight: 500,
-                fontSize: '16px',
-                color: '#1C1B1F',
-                transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
+              aria-expanded={isLayerControlOpen}
             >
-              <span>Layers ({allLayers.length})</span>
-              <span style={{ fontSize: '12px', color: '#424242' }}>
-                {isLayerControlOpen ? '▼' : '▶'}
-              </span>
+              <Icon name={isLayerControlOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+              <span className="map-plate__title">Layers</span>
+              <span className="map-layers__count">{allLayers.length}</span>
             </button>
-            {allLayers.length > 0 && (
-              <button
-                onClick={clearAllLayers}
-                style={{
-                  padding: '12px 16px',
-                  backgroundColor: '#000000',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  marginRight: '8px',
-                  transition: 'all 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#424242';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#000000';
-                }}
-                title="Clear all layers"
-              >
-                Clear
-              </button>
-            )}
+            <button
+              type="button"
+              className="stage-btn stage-btn--quiet"
+              onClick={clearAllLayers}
+              title="Remove every layer from the map"
+            >
+              Clear
+            </button>
           </div>
 
-            {/* Layer controls (collapsible) */}
-            {isLayerControlOpen && (
-              <div
-                style={{
-                  padding: '0 12px 12px 12px',
-                  minWidth: '250px',
-                }}
-              >
-                {/* Change Detection - always at the top */}
-                {layerGroups.changeDetection.length > 0 && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '8px', color: '#424242', marginTop: '12px' }}>
-                      Change Detection
-                    </div>
-                    {layerGroups.changeDetection.map((layer) => {
-                      const isVisible = rasterVisibility[layer.id] !== false;
-                      const displayText = formatLayerDisplayText(layer, 'spectral');
+          {isLayerControlOpen && (
+            <div className="map-layers__body">
+              {/* Change detection always leads: it is the finding. */}
+              {layerGroups.changeDetection.length > 0 && (
+                <div>
+                  <h3 className="map-group__title">Change detection</h3>
+                  {layerGroups.changeDetection.map((layer) =>
+                    renderLayerRow(layer, formatLayerDisplayText(layer, 'spectral'))
+                  )}
+                </div>
+              )}
 
-                      return (
-                        <div
-                          key={layer.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '12px',
-                            marginBottom: '6px',
-                            paddingLeft: '6px',
-                            padding: '6px 8px',
-                            borderRadius: '4px',
-                            transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isVisible}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setRasterVisibility(prev => ({ ...prev, [layer.id]: e.target.checked }));
-                            }}
-                            style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                          />
-                          <span 
-                            style={{ flex: 1, fontWeight: 400, cursor: 'pointer', color: '#1C1B1F' }} 
-                            onClick={() => flyToLayer(layer.id)}
-                            title="Click to zoom to this layer"
-                          >
-                            {displayText}
-                          </span>
-                          <button
-                            onClick={() => removeLayer(layer.id)}
-                            style={{
-                              padding: '4px 8px',
-                              backgroundColor: '#000000',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#424242';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#000000';
-                            }}
-                            title="Remove layer"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+              {layerGroups.tci.length > 0 && (
+                <div>
+                  <h3 className="map-group__title">Satellite imagery</h3>
+                  {layerGroups.tci.map((layer) => renderLayerRow(layer, formatLayerDisplayText(layer, 'tci')))}
+                  {layerGroups.tci.length >= 2 && (
+                    <button type="button" className="stage-btn map-group__action" onClick={openCompare}>
+                      <Icon name="compare" size={16} />
+                      Compare before and after
+                    </button>
+                  )}
+                </div>
+              )}
 
-                {/* Satellite Images (TCI) - All rasters except basemap and spectral indices */}
-                {layerGroups.tci.length > 0 && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '8px', color: '#424242', marginTop: '12px' }}>
-                      Satellite Images (TCI)
-                    </div>
-                    {layerGroups.tci.map((layer) => {
-                      const isVisible = rasterVisibility[layer.id] !== false;
-                      const displayText = formatLayerDisplayText(layer, 'tci');
+              {layerGroups.spectralIndices.length > 0 && (
+                <div>
+                  <h3 className="map-group__title">Spectral indices</h3>
+                  {layerGroups.spectralIndices.map((layer) =>
+                    renderLayerRow(layer, formatLayerDisplayText(layer, 'spectral'))
+                  )}
+                </div>
+              )}
 
-                      return (
-                        <div
-                          key={layer.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '12px',
-                            marginBottom: '6px',
-                            paddingLeft: '6px',
-                            padding: '6px 8px',
-                            borderRadius: '4px',
-                            transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isVisible}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setRasterVisibility(prev => ({ ...prev, [layer.id]: e.target.checked }));
-                            }}
-                            style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                          />
-                          <span 
-                            style={{ flex: 1, fontWeight: 400, cursor: 'pointer', color: '#1C1B1F' }} 
-                            onClick={() => flyToLayer(layer.id)}
-                            title="Click to zoom to this layer"
-                          >
-                            {displayText}
-                          </span>
-                          <button
-                            onClick={() => removeLayer(layer.id)}
-                            style={{
-                              padding: '4px 8px',
-                              backgroundColor: '#000000',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#424242';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#000000';
-                            }}
-                            title="Remove layer"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {layerGroups.tci.length >= 2 && (
-                      <button
-                        onClick={() => {
-                          const sorted = [...layerGroups.tci].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-                          const currentMap = map.current;
-                          const center = currentMap ? currentMap.getCenter() : { lng: 0, lat: 20 };
-                          const zoom = currentMap ? currentMap.getZoom() : 2;
-                          setCompareMode({ left: sorted[0], right: sorted[sorted.length - 1], center: [center.lng, center.lat], zoom });
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          marginTop: '4px',
-                          backgroundColor: '#1a73e8',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          transition: 'background-color 200ms',
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1557b0'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#1a73e8'; }}
-                      >
-                        Compare Imagery
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Spectral Indices (NDVI, NBR, NDWI) */}
-                {layerGroups.spectralIndices.length > 0 && (
-                  <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '8px', color: '#424242' }}>
-                      Spectral Indices
-                    </div>
-                    {layerGroups.spectralIndices.map((layer) => {
-                      const isVisible = rasterVisibility[layer.id] !== false;
-                      const displayText = formatLayerDisplayText(layer, 'spectral');
-
-                      return (
-                        <div
-                          key={layer.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '12px',
-                            marginBottom: '6px',
-                            paddingLeft: '6px',
-                            padding: '6px 8px',
-                            borderRadius: '4px',
-                            transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isVisible}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setRasterVisibility(prev => ({ ...prev, [layer.id]: e.target.checked }));
-                            }}
-                            style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                          />
-                          <span
-                            style={{ flex: 1, fontWeight: 400, cursor: 'pointer', color: '#1C1B1F' }}
-                            onClick={() => flyToLayer(layer.id)}
-                            title="Click to zoom to this layer"
-                          >
-                            {displayText}
-                          </span>
-                          <button
-                            onClick={() => removeLayer(layer.id)}
-                            style={{
-                              padding: '4px 8px',
-                              backgroundColor: '#000000',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#424242';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#000000';
-                            }}
-                            title="Remove layer"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Geometry Layers */}
-                {layerGroups.geometries.length > 0 && (
-                  <div>
-                    <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '8px', color: '#424242' }}>
-                      Geometries
-                    </div>
-                    {layerGroups.geometries.map((layer) => {
-                      const isVisible = rasterVisibility[layer.id] !== false;
-
-                      return (
-                        <div
-                          key={layer.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            fontSize: '12px',
-                            marginBottom: '6px',
-                            padding: '8px',
-                            borderRadius: '4px',
-                            transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isVisible}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setRasterVisibility(prev => ({ ...prev, [layer.id]: e.target.checked }));
-                            }}
-                            style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                          />
-                          <span 
-                            style={{ flex: 1, fontWeight: 400, cursor: 'pointer', color: '#1C1B1F' }} 
-                            onClick={() => flyToLayer(layer.id)}
-                            title="Click to zoom to this layer"
-                          >
-                            {layer.name}
-                          </span>
-                          <button
-                            onClick={() => removeLayer(layer.id)}
-                            style={{
-                              padding: '4px 8px',
-                              backgroundColor: '#000000',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              transition: 'background-color 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#424242';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#000000';
-                            }}
-                            title="Remove layer"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-        </div>
+              {layerGroups.geometries.length > 0 && (
+                <div>
+                  <h3 className="map-group__title">Boundaries</h3>
+                  {layerGroups.geometries.map((layer) => renderLayerRow(layer, layer.name))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       )}
 
-      {/* Drawing controls panel */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '16px',
-          left: '16px',
-          backgroundColor: '#FFFFFF',
-          borderRadius: '8px',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.16)',
-          zIndex: 1,
-          fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          padding: '10px',
-          minWidth: '160px',
-        }}
-      >
-        <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '8px', color: '#1C1B1F', textAlign: 'center' }}>
-          Draw
-        </div>
-
-        {/* Drawing mode buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: hasDrawnFeatures ? '8px' : '0' }}>
+      {/* Bottom left: the draw rail */}
+      <nav className="map-plate map-rail" aria-label="Draw an area">
+        <button
+          type="button"
+          className={`stage-btn stage-btn--icon ${drawMode === 'point' ? 'stage-btn--on' : 'stage-btn--quiet'}`}
+          onClick={() => handleDrawMode('point')}
+          aria-pressed={drawMode === 'point'}
+          aria-label="Drop a point"
+          title="Drop a point"
+        >
+          <Icon name="point" size={18} />
+        </button>
+        <button
+          type="button"
+          className={`stage-btn stage-btn--icon ${drawMode === 'polygon' ? 'stage-btn--on' : 'stage-btn--quiet'}`}
+          onClick={() => handleDrawMode('polygon')}
+          aria-pressed={drawMode === 'polygon'}
+          aria-label="Draw a polygon"
+          title="Draw a polygon"
+        >
+          <Icon name="polygon" size={18} />
+        </button>
+        {drawMode !== 'none' && (
           <button
-            onClick={() => handleDrawMode('point')}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: drawMode === 'point' ? '#FFA500' : '#F5F5F5',
-              color: drawMode === 'point' ? '#FFFFFF' : '#1C1B1F',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500,
-              transition: 'all 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-            }}
-            onMouseEnter={(e) => {
-              if (drawMode !== 'point') {
-                e.currentTarget.style.backgroundColor = '#E0E0E0';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (drawMode !== 'point') {
-                e.currentTarget.style.backgroundColor = '#F5F5F5';
-              }
-            }}
+            type="button"
+            className="stage-btn stage-btn--icon stage-btn--quiet"
+            onClick={() => handleDrawMode('none')}
+            aria-label="Stop drawing"
+            title="Stop drawing"
           >
-            📍 Point
+            <Icon name="close" size={16} />
           </button>
-
-          <button
-            onClick={() => handleDrawMode('polygon')}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: drawMode === 'polygon' ? '#FFA500' : '#F5F5F5',
-              color: drawMode === 'polygon' ? '#FFFFFF' : '#1C1B1F',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500,
-              transition: 'all 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-            }}
-            onMouseEnter={(e) => {
-              if (drawMode !== 'polygon') {
-                e.currentTarget.style.backgroundColor = '#E0E0E0';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (drawMode !== 'polygon') {
-                e.currentTarget.style.backgroundColor = '#F5F5F5';
-              }
-            }}
-          >
-            ⬟ Polygon
-          </button>
-
-          {drawMode !== 'none' && (
-            <button
-              onClick={() => handleDrawMode('none')}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#F5F5F5',
-                color: '#1C1B1F',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: 400,
-                transition: 'all 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#E0E0E0';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#F5F5F5';
-              }}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-
-        {/* Action buttons */}
+        )}
         {hasDrawnFeatures && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #E0E0E0', paddingTop: '8px' }}>
+          <>
+            <span className="map-rail__rule" aria-hidden="true" />
             <button
+              type="button"
+              className="stage-btn stage-btn--icon stage-btn--primary"
               onClick={sendDrawnGeometryToChat}
               disabled={!onDrawnGeometry}
-              style={{
-                padding: '8px 12px',
-                backgroundColor: onDrawnGeometry ? '#000000' : '#CCCCCC',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: onDrawnGeometry ? 'pointer' : 'not-allowed',
-                fontSize: '13px',
-                fontWeight: 500,
-                transition: 'all 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-              }}
-              onMouseEnter={(e) => {
-                if (onDrawnGeometry) {
-                  e.currentTarget.style.backgroundColor = '#424242';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (onDrawnGeometry) {
-                  e.currentTarget.style.backgroundColor = '#000000';
-                }
-              }}
+              aria-label="Send the drawn area to the agent"
+              title="Send the drawn area to the agent"
             >
-              ✉️ Send
+              <Icon name="send" size={16} />
             </button>
-
             <button
+              type="button"
+              className="stage-btn stage-btn--icon stage-btn--danger"
               onClick={clearDrawnFeatures}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#F5F5F5',
-                color: '#D32F2F',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: 400,
-                transition: 'all 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#FFEBEE';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#F5F5F5';
-              }}
+              aria-label="Clear the drawing"
+              title="Clear the drawing"
             >
-              🗑️ Clear
+              <Icon name="trash" size={16} />
             </button>
-          </div>
+          </>
         )}
-      </div>
+      </nav>
 
-      {/* Basemap Switcher - Bottom Right */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '40px',
-          right: '16px',
-          backgroundColor: '#FFFFFF',
-          borderRadius: '6px',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-          zIndex: 1,
-          fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}
-      >
+      {/* Bottom right: the basemap plate */}
+      <div className="map-plate map-basemap">
+        <label className="map-plate__title" htmlFor="basemap-select">
+          Base
+        </label>
         <select
+          id="basemap-select"
+          className="map-select"
           value={baseMapStyle}
-          onChange={(e) => setBaseMapStyle(e.target.value as 'dark' | 'google-roads' | 'google-satellite' | 'esri-satellite')}
-          style={{
-            padding: '6px 10px',
-            fontSize: '12px',
-            fontWeight: 500,
-            color: '#1C1B1F',
-            backgroundColor: '#FFFFFF',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            outline: 'none',
-            fontFamily: 'inherit',
-          }}
+          onChange={(e) =>
+            setBaseMapStyle(e.target.value as 'dark' | 'google-roads' | 'google-satellite' | 'esri-satellite')
+          }
         >
-          <option value="dark">Dark</option>
+          <option value="esri-satellite">Esri satellite</option>
+          <option value="google-satellite">Google satellite</option>
           <option value="google-roads">Roads</option>
-          <option value="google-satellite">Google Satellite</option>
-          <option value="esri-satellite">Esri Satellite</option>
+          <option value="dark">Dark</option>
         </select>
       </div>
     </div>

@@ -1,11 +1,15 @@
+/**
+ * The Stage. The map fills the frame edge to edge; the docent's overlays (step column,
+ * caption band, transcript drawer) float over it and never reflow the map.
+ */
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { MapView } from '../components/MapView';
 import { ChatSidebar } from '../components/ChatSidebar';
 import type { GeometryData, RasterData } from '../types';
-import { theme } from '../theme';
 import { getIdToken } from '../utils/auth';
+import '../stage.css';
 
 interface ScenarioToolCall {
   name: string;
@@ -57,7 +61,6 @@ export function Chat() {
   const [scenarioConfig, setScenarioConfig] = useState<ScenarioConfig | null>(null);
   const [isLoadingScenario, setIsLoadingScenario] = useState(false);
   const [scenarioError, setScenarioError] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [mapReady, setMapReady] = useState(true); // Controls MapView render delay on scenario switch
 
   // Track if this is the first run of the scenario effect
@@ -254,20 +257,19 @@ export function Chat() {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-      {/* Left sidebar - Chat */}
-      <div
-        style={{
-          width: isSidebarCollapsed ? '0' : '30%',
-          minWidth: isSidebarCollapsed ? '0' : '350px',
-          maxWidth: isSidebarCollapsed ? '0' : '500px',
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRight: isSidebarCollapsed ? 'none' : `1px solid ${theme.colors.outline}`,
-          overflow: 'hidden',
-          transition: 'width 300ms ease-in-out, min-width 300ms ease-in-out',
-          display: isSidebarCollapsed ? 'none' : 'block',
-        }}
-      >
+    <div className="stage">
+      <div className="stage__map">
+        {mapReady && (
+          <MapView
+            key={sessionId}
+            geometry={currentGeometry}
+            rasters={currentRasters}
+            onDrawnGeometry={handleDrawnGeometry}
+          />
+        )}
+      </div>
+
+      <div className="stage__overlay">
         <ChatSidebar
           sessionId={sessionId}
           scenarioId={scenarioId || undefined}
@@ -279,57 +281,7 @@ export function Chat() {
           onRastersUpdate={setCurrentRasters}
           drawnGeometryMessage={drawnGeometryMessage}
           onDrawnGeometryMessageSent={() => setDrawnGeometryMessage(null)}
-          onToggleSidebar={() => setIsSidebarCollapsed(true)}
         />
-      </div>
-
-      {/* Right area - Map */}
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {/* Toggle sidebar button - only show when collapsed */}
-        {isSidebarCollapsed && (
-          <button
-            onClick={() => setIsSidebarCollapsed(false)}
-            style={{
-              position: 'absolute',
-              top: '16px',
-              left: '16px',
-              zIndex: 1000,
-              width: '40px',
-              height: '40px',
-              backgroundColor: '#FFFFFF',
-              border: 'none',
-              borderRadius: '8px',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.16)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '22px',
-              transition: 'all 200ms cubic-bezier(0.4, 0.0, 0.2, 1)',
-              fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F5F5F5';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#FFFFFF';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            title="Show chat"
-          >
-            ☰
-          </button>
-        )}
-
-        {mapReady && (
-          <MapView
-            key={sessionId}
-            geometry={currentGeometry}
-            rasters={currentRasters}
-            onDrawnGeometry={handleDrawnGeometry}
-          />
-        )}
       </div>
     </div>
   );
