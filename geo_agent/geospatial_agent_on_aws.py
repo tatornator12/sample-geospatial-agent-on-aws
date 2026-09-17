@@ -2,6 +2,7 @@
 Geospatial Agent on AWS - Amazon Bedrock AgentCore with observability
 (AgentCore/CloudWatch via ADOT, optional Langfuse)
 """
+import contextlib
 import logging
 import os
 
@@ -110,9 +111,20 @@ async def sat_image_analyzer_agent(payload, context=None):
         logger.info("ℹ️ Using ADOT global TracerProvider for AgentCore Observability")
 
     try:
-        with mcp_client:
-            # Get the tools from the MCP server
-            mcp_tools = mcp_client.list_tools_sync()
+        with contextlib.ExitStack() as stack:
+            # The ArcGIS MCP tools are additive (geocoding, portal search). When the server
+            # is unreachable — expired bearer token (it answers 401), network trouble, an
+            # outage — the turn runs with the local tools instead of failing the whole show.
+            # strands' MCPClient resets itself after a failed start, so the next turn simply
+            # retries.
+            mcp_tools = []
+            try:
+                stack.enter_context(mcp_client)
+                mcp_tools = mcp_client.list_tools_sync()
+            except Exception as mcp_error:
+                logger.warning(
+                    f"⚠️ ArcGIS MCP unavailable, continuing with local tools only: {mcp_error}"
+                )
 
             # Check if this is a scenario mode request
             scenario_id = payload.get('scenario_id', None)
