@@ -35,6 +35,7 @@ env/
 .env.dev
 .env.stable
 .env.local
+.env.spikes
 .env.development
 .env.production
 .env.*.local
