@@ -48,9 +48,17 @@ fi
 ECR_SHORT_NAME="bedrock-agentcore-${AGENT_NAME}"
 ECR_REPO_NAME="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_SHORT_NAME}"
 
-# Ensure ECR repo exists (first deploy needs this)
-run aws ecr describe-repositories --repository-names "${ECR_SHORT_NAME}" --region "${AWS_REGION}" >/dev/null 2>&1 || \
-  run aws ecr create-repository --repository-name "${ECR_SHORT_NAME}" --region "${AWS_REGION}" >/dev/null 2>&1
+# Ensure ECR repo exists (first deploy needs this). Kept out of `run` so the dry run
+# still shows the step instead of losing it in the redirects.
+if [ "${DRY_RUN:-0}" = "1" ]; then
+    echo "[dry-run] aws ecr describe-repositories --repository-names ${ECR_SHORT_NAME} --region ${AWS_REGION} || aws ecr create-repository --repository-name ${ECR_SHORT_NAME} --region ${AWS_REGION}"
+elif aws ecr describe-repositories --repository-names "${ECR_SHORT_NAME}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+    echo "ECR repo ${ECR_SHORT_NAME} exists"
+else
+    echo "Creating ECR repo ${ECR_SHORT_NAME}..."
+    aws ecr create-repository --repository-name "${ECR_SHORT_NAME}" --region "${AWS_REGION}" \
+        --image-scanning-configuration scanOnPush=true >/dev/null
+fi
 
 echo "Configuration:"
 echo "   Target: ${DEPLOY_TARGET} (${AGENT_NAME})"
