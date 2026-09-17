@@ -1,0 +1,15 @@
+# Test/dev dependencies for geo_agent. Install into the repo venv and run:
+#
+#   ../.venv/bin/pip install -r requirements-dev.txt
+#   cd geo_agent && ../.venv/bin/python -m pytest -q
+#
+# The geo libraries below are runtime deps that normally come from conda inside the
+# container image (see Dockerfile_geospatial_agent_on_aws); tests exercise the same
+# code paths locally, so they are pinned here to the image's versions where they exist.
+pytest==8.4.2
+pytest-cov==7.1.0
+rasterio==1.5.0
+shapely==2.1.2
+geopandas==1.1.4
+duckdb==1.5.3
+numpy>=2.0.0,<2.8

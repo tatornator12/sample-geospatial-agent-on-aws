@@ -52,14 +52,18 @@ spike notes exist under `docs/spikes/`.
   - [x] 6.3 `Navigation.tsx`: render the picker; run `npm run design:check` and fix findings in touched files
     - Detector at 0 app-wide; the docent's speaker label now names the selected agent
   - [x] 6.4 Local UI round-trip against both runtimes (`AGENT_RUNTIMES` with `default` and `dev`)
-    - Headless round-trip: dev answered cleanly; stable answered `Error: the client initialization failed` because the ArcGIS MCP bearer token is dead (endpoint 401s; confirmed with curl). Dev runtime (v3) now degrades to local tools when the MCP is unreachable; stable needs a fresh token and picks the fix up at the next promotion
+    - Headless round-trip: dev answered cleanly; stable initially answered `Error: the client initialization failed` because the ArcGIS MCP bearer token had expired (endpoint 401s; confirmed with curl). Dev runtime now degrades to local tools when the MCP is unreachable. Resolved Sep 17: token refreshed in `.env`/`.env.dev`, dev redeployed (v4), stable runtime env-only update to v69 (same image); geocoding smoke through `find_address_candidates` passed on both
   - _Requirements: 3.2, 4.3_
 
-- [ ] 7. Test scaffolding: Python
-  - [ ] 7.1 `geo_agent/tests/conftest.py` fixtures built on the fly: 256×256 float32 COG, 2 km AOI GeoJSON, 50-row synthetic LGND parquet (256-dim embeddings)
-  - [ ] 7.2 `test_geometry.py` (`_slugify` accents/punctuation, `bbox_around_point` closure and centre), `test_raster_utils.py` (`clip_raster_v2` keeps CRS, output is a COG)
-  - [ ] 7.3 `test_lgnd_handler.py`: run the handler's similarity SQL against the synthetic partition via a local path
-  - [ ] 7.4 Add `pytest` and `pytest-cov` (pinned) to a `geo_agent/requirements-dev.txt`; document `cd geo_agent && ../.venv/bin/python -m pytest -q`
+- [x] 7. Test scaffolding: Python
+  - [x] 7.1 `geo_agent/tests/conftest.py` fixtures built on the fly: 256×256 float32 COG, 2 km AOI GeoJSON, 50-row synthetic LGND parquet (256-dim embeddings)
+    - Embeddings constructed with exact cosine control (30 unchanged / 10 at cos 0.6 / 10 artifact at cos 0.1); parquet written by duckdb in the handler's exact hive layout. conftest stubs runtime-only deps (strands, osmnx, geopy, rasterstats, pystac_client) and loads `utils.tools` via a synthetic package so utils/__init__'s import cascade never runs
+  - [x] 7.2 `test_geometry.py` (`_slugify` accents/punctuation, `bbox_around_point` closure and centre), `test_raster_utils.py` (`clip_raster_v2` keeps CRS, output is a COG)
+    - Known quirk, deliberately untested: `bbox_around_point` at lat ±90 returns a degenerate bbox (cos(90°) is 6e-17, not 0) instead of an error
+  - [x] 7.3 `test_lgnd_handler.py`: run the handler's similarity SQL against the synthetic partition via a local path
+    - Calls the real `handler()`: MONTHLY_PATH monkeypatched to the local dir, Lambda-only SET/LOAD statements no-oped. Covers exact changed-cell set, artifact floor, threshold, bbox filter, and the graceful error envelope
+  - [x] 7.4 Add `pytest` and `pytest-cov` (pinned) to a `geo_agent/requirements-dev.txt`; document `cd geo_agent && ../.venv/bin/python -m pytest -q`
+    - 23 tests, all passing in ~1.4 s with S3_BUCKET_NAME unset (hermetic); `tests/` is excluded from the deploy zip by the toolkit's dockerignore template
   - _Requirements: 5.1_
 
 - [ ] 8. Test scaffolding: frontend
