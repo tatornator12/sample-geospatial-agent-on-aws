@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-17T00:00:00Z",
+  "title": "Design System: Agentic AI for Earth",
+  "extensions": {
+    "colorMeta": {
+      "dome": { "role": "neutral", "displayName": "Dome", "canonical": "#0f141b", "tonalRamp": ["#0f141b", "#161c25", "#1d2530", "#2a3542", "#3d4a5a", "#5a6a7c", "#8fa3b8", "#e9eef3"] },
+      "plate": { "role": "neutral", "displayName": "Plate", "canonical": "#161c25", "tonalRamp": ["#0f141b", "#161c25", "#1d2530", "#2a3542", "#3d4a5a", "#5a6a7c", "#8fa3b8", "#e9eef3"] },
+      "plate-raised": { "role": "neutral", "displayName": "Raised Plate", "canonical": "#1d2530", "tonalRamp": ["#0f141b", "#161c25", "#1d2530", "#2a3542", "#3d4a5a", "#5a6a7c", "#8fa3b8", "#e9eef3"] },
+      "fog": { "role": "neutral", "displayName": "Fog", "canonical": "#e9eef3", "tonalRamp": ["#0f141b", "#1d2530", "#3d4a5a", "#5a6a7c", "#8fa3b8", "#b9c6d3", "#d6dee6", "#e9eef3"] },
+      "label-grey": { "role": "neutral", "displayName": "Label Grey", "canonical": "#8fa3b8", "tonalRamp": ["#1a222c", "#2a3542", "#3d4a5a", "#5a6a7c", "#748699", "#8fa3b8", "#b9c6d3", "#e9eef3"] },
+      "spotlight-amber": { "role": "primary", "displayName": "Spotlight Amber", "canonical": "#f5a524", "tonalRamp": ["#3b2604", "#66430a", "#8f5f0e", "#b87c12", "#dc9419", "#f5a524", "#ffbd4f", "#ffe0a8"] },
+      "spotlight-amber-hover": { "role": "primary", "displayName": "Warm Amber", "canonical": "#ffbd4f", "tonalRamp": ["#3b2604", "#66430a", "#8f5f0e", "#b87c12", "#dc9419", "#f5a524", "#ffbd4f", "#ffe0a8"] },
+      "amber-wash": { "role": "primary", "displayName": "Amber Wash", "canonical": "rgba(245, 165, 36, 0.16)" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "rgba(233, 238, 243, 0.14)" },
+      "hairline-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "rgba(233, 238, 243, 0.24)" },
+      "hover-wash": { "role": "neutral", "displayName": "Hover Wash", "canonical": "rgba(233, 238, 243, 0.06)" },
+      "signal-error": { "role": "error", "displayName": "Signal Red", "canonical": "#ff7a70", "tonalRamp": ["#3d1512", "#6b241f", "#99352e", "#c7473e", "#e8635a", "#ff7a70", "#ffa39c", "#ffd1cd"] },
+      "signal-success": { "role": "success", "displayName": "Signal Green", "canonical": "#7bd88f", "tonalRamp": ["#12301a", "#1f4f2c", "#2e6f3f", "#3f9054", "#5cb46f", "#7bd88f", "#a5e6b2", "#d2f3d8"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles on the gallery and technology pages; never on the stage." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings on secondary pages." },
+      "caption": { "displayName": "Caption", "purpose": "The docent's current sentence in the caption band; 32px above 2200px wide." },
+      "title": { "displayName": "Title", "purpose": "Dense headings inside plates and on secondary pages." },
+      "body": { "displayName": "Body", "purpose": "Running text. 15px is the floor for anything on the stage." },
+      "label": { "displayName": "Label", "purpose": "Tracked uppercase plate titles, speaker labels and group titles." },
+      "mono": { "displayName": "Mono", "purpose": "Coordinates, dates, areas, counts, ids and tool parameters, always tabular." }
+    },
+    "shadows": [
+      { "name": "level-1", "value": "0 1px 2px rgba(3, 6, 10, 0.5)", "purpose": "Hairline-adjacent lift for inline chips." },
+      { "name": "level-2", "value": "0 4px 12px rgba(3, 6, 10, 0.45)", "purpose": "The console and basemap plate." },
+      { "name": "level-3", "value": "0 10px 28px rgba(3, 6, 10, 0.5)", "purpose": "Step column, caption band, layers plate, transcript drawer, popups." },
+      { "name": "level-4", "value": "0 18px 44px rgba(3, 6, 10, 0.55)", "purpose": "Modal overlays such as the compare view." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The single easing curve; exponential ease-out from a visible default." },
+      { "name": "short", "value": "200ms", "purpose": "Colour, wash and opacity changes on controls." },
+      { "name": "medium", "value": "360ms", "purpose": "Plates rising or sliding into place; step markers lighting." },
+      { "name": "spotlight", "value": "900ms", "purpose": "The spotlight sweep to a new finding on the map." }
+    ],
+    "breakpoints": [
+      { "name": "stage", "value": "1920px" },
+      { "name": "big-screen", "value": "2200px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one lit action in a plate: Send. Amber fill, dome text.",
+      "html": "<button class=\"ds-btn ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M2.5 8 13.5 3l-3 10-2.6-4.2L2.5 8Zm5.4.8L13.5 3\"/></svg>Send</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 1px solid transparent; border-radius: 8px; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; background: transparent; color: #e9eef3; transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1), color 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn:focus-visible { outline: 2px solid #f5a524; outline-offset: 2px; } .ds-btn-primary { background: #f5a524; color: #0f141b; font-weight: 600; } .ds-btn-primary:hover { background: #ffbd4f; } .ds-btn:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Every secondary control: label grey at rest, fog on a hover wash.",
+      "html": "<button class=\"ds-btn ds-btn-quiet\">Clear</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 1px solid transparent; border-radius: 8px; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 15px; font-weight: 500; letter-spacing: 0.01em; cursor: pointer; background: transparent; color: #e9eef3; transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1), color 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn:focus-visible { outline: 2px solid #f5a524; outline-offset: 2px; } .ds-btn-quiet { color: #8fa3b8; } .ds-btn-quiet:hover { color: #e9eef3; background: rgba(233, 238, 243, 0.06); }"
+    },
+    {
+      "name": "Toggled Icon Button",
+      "kind": "button",
+      "refersTo": "button-on",
+      "description": "An icon-only control in its on state: amber text on an amber wash.",
+      "html": "<button class=\"ds-btn ds-btn-icon ds-btn-on\" aria-pressed=\"true\" aria-label=\"Draw a polygon\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 5.5 8 2.5l5 3v5l-5 3-5-3v-5Z\"/><circle cx=\"3\" cy=\"5.5\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"13\" cy=\"5.5\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"8\" cy=\"13.5\" r=\"1\" fill=\"currentColor\" stroke=\"none\"/></svg></button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; background: transparent; color: #e9eef3; transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1), color 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-icon { width: 40px; padding: 0; } .ds-btn-on { background: rgba(245, 165, 36, 0.16); color: #f5a524; } .ds-btn-on:hover { background: rgba(245, 165, 36, 0.24); } .ds-btn:focus-visible { outline: 2px solid #f5a524; outline-offset: 2px; }"
+    },
+    {
+      "name": "Label Plate",
+      "kind": "chip",
+      "refersTo": "label-plate",
+      "description": "A prepared prompt or small metadata plate; hover turns it amber.",
+      "html": "<button class=\"ds-label-plate\">Wildfire, Pacific Palisades</button>",
+      "css": ".ds-label-plate { height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid rgba(233, 238, 243, 0.14); background: rgba(22, 28, 37, 0.88); color: #e9eef3; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; backdrop-filter: blur(6px); transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1), color 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-label-plate:hover { border-color: #f5a524; color: #f5a524; } .ds-label-plate:focus-visible { outline: 2px solid #f5a524; outline-offset: 2px; }"
+    },
+    {
+      "name": "Plate",
+      "kind": "card",
+      "refersTo": "plate",
+      "description": "A panel floating over the map: blur, hairline, real shadow, tracked title.",
+      "html": "<section class=\"ds-plate\"><h3 class=\"ds-plate-title\">Layers <span class=\"ds-plate-count\">4</span></h3><div class=\"ds-plate-row\"><span class=\"ds-plate-check\"></span><span class=\"ds-plate-name\">TCI after, 2025-01-19</span></div><div class=\"ds-plate-row ds-plate-row-off\"><span class=\"ds-plate-check ds-plate-check-off\"></span><span class=\"ds-plate-name\">NBR before, 2024-12-28</span></div></section>",
+      "css": ".ds-plate { width: 300px; padding: 12px 12px 10px; background: rgba(22, 28, 37, 0.92); border: 1px solid rgba(233, 238, 243, 0.14); border-radius: 10px; box-shadow: 0 10px 28px rgba(3, 6, 10, 0.5); backdrop-filter: blur(6px); color: #e9eef3; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; } .ds-plate-title { margin: 0 0 8px 6px; font-family: 'Bricolage Grotesque', 'Atkinson Hyperlegible Next', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8fa3b8; display: flex; align-items: center; gap: 8px; } .ds-plate-count { font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; font-size: 13px; color: #e9eef3; letter-spacing: 0; } .ds-plate-row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 8px; border-radius: 6px; font-size: 15px; } .ds-plate-row:hover { background: rgba(233, 238, 243, 0.06); } .ds-plate-row-off { color: #8fa3b8; } .ds-plate-check { width: 14px; height: 14px; border-radius: 3px; background: #f5a524; box-shadow: inset 0 0 0 2px #0f141b, inset 0 0 0 3px #f5a524; } .ds-plate-check-off { background: transparent; border: 1px solid rgba(233, 238, 243, 0.24); box-shadow: none; }"
+    },
+    {
+      "name": "Caption Band",
+      "kind": "custom",
+      "refersTo": "caption-band",
+      "description": "The docent's sentence at 24px on a dome-tinted plate, with the amber speaker label and breathing dots.",
+      "html": "<div class=\"ds-caption\"><span class=\"ds-caption-who\">Agent</span><span class=\"ds-caption-text\">9.3 km² of the 10.2 km² area burned, 91% of the Palisades footprint.<span class=\"ds-caption-dots\" aria-hidden=\"true\"><i></i><i></i><i></i></span></span></div>",
+      "css": ".ds-caption { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; align-items: start; width: 640px; padding: 14px 20px; background: rgba(15, 20, 27, 0.88); border: 1px solid rgba(233, 238, 243, 0.14); border-radius: 12px; box-shadow: 0 10px 28px rgba(3, 6, 10, 0.5); backdrop-filter: blur(8px); color: #e9eef3; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 24px; line-height: 1.35; letter-spacing: -0.005em; } .ds-caption-who { padding-top: 8px; font-family: 'Bricolage Grotesque', 'Atkinson Hyperlegible Next', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #f5a524; white-space: nowrap; } .ds-caption-dots { display: inline-flex; gap: 5px; align-items: center; vertical-align: middle; margin-left: 10px; } .ds-caption-dots i { width: 6px; height: 6px; border-radius: 50%; background: #f5a524; opacity: 0.35; animation: ds-breathe 1.4s cubic-bezier(0.16, 1, 0.3, 1) infinite; } .ds-caption-dots i:nth-child(2) { animation-delay: 0.18s; } .ds-caption-dots i:nth-child(3) { animation-delay: 0.36s; } @keyframes ds-breathe { 0%, 100% { opacity: 0.3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }"
+    },
+    {
+      "name": "Console Input",
+      "kind": "input",
+      "refersTo": "input-console",
+      "description": "The presenter's single line: a borderless field inside a plate, with the primary Send at its end.",
+      "html": "<form class=\"ds-console\"><textarea class=\"ds-console-input\" rows=\"1\" placeholder=\"Ask about any place on Earth\" aria-label=\"Prompt for the agent\"></textarea><button class=\"ds-btn ds-btn-primary\" type=\"button\">Send</button></form>",
+      "css": ".ds-console { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; width: 640px; padding: 8px 8px 8px 16px; background: rgba(22, 28, 37, 0.94); border: 1px solid rgba(233, 238, 243, 0.14); border-radius: 12px; box-shadow: 0 4px 12px rgba(3, 6, 10, 0.45); backdrop-filter: blur(8px); } .ds-console:focus-within { border-color: rgba(233, 238, 243, 0.24); } .ds-console-input { width: 100%; min-height: 40px; resize: none; border: none; outline: none; background: transparent; color: #e9eef3; caret-color: #f5a524; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 17px; line-height: 1.4; padding: 8px 0; } .ds-console-input::placeholder { color: #8fa3b8; opacity: 1; } .ds-btn { display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border: none; border-radius: 8px; font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; font-size: 15px; cursor: pointer; } .ds-btn-primary { background: #f5a524; color: #0f141b; font-weight: 600; } .ds-btn-primary:hover { background: #ffbd4f; }"
+    },
+    {
+      "name": "Exhibit Rail",
+      "kind": "nav",
+      "refersTo": "nav-rail",
+      "description": "The 56px rail: title left, sections centre with the active one lit amber, quiet sign-out right.",
+      "html": "<nav class=\"ds-rail\" aria-label=\"Primary\"><span class=\"ds-rail-title\">Agentic AI for Earth</span><div class=\"ds-rail-sections\"><a class=\"ds-rail-link ds-rail-link-active\" href=\"#\" aria-current=\"page\">Stage</a><a class=\"ds-rail-link\" href=\"#\">Replay cases</a><a class=\"ds-rail-link\" href=\"#\">How it works</a></div><button class=\"ds-rail-quiet\">Sign out</button></nav>",
+      "css": ".ds-rail { display: flex; align-items: center; justify-content: space-between; height: 56px; width: 760px; padding: 0 24px; background: #0f141b; border-bottom: 1px solid rgba(233, 238, 243, 0.14); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; color: #e9eef3; } .ds-rail-title { font-family: 'Bricolage Grotesque', 'Atkinson Hyperlegible Next', sans-serif; font-size: 20px; font-weight: 500; letter-spacing: -0.01em; } .ds-rail-sections { display: flex; gap: 4px; } .ds-rail-link { position: relative; display: inline-flex; align-items: center; height: 56px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #8fa3b8; text-decoration: none; transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-rail-link:hover { color: #e9eef3; } .ds-rail-link-active { color: #f5a524; } .ds-rail-link-active::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; background: #f5a524; border-radius: 2px 2px 0 0; } .ds-rail-quiet { height: 36px; padding: 0 12px; border: none; border-radius: 8px; background: transparent; color: #8fa3b8; font: inherit; font-size: 15px; cursor: pointer; } .ds-rail-quiet:hover { color: #e9eef3; background: rgba(233, 238, 243, 0.06); }"
+    },
+    {
+      "name": "Step Column",
+      "kind": "custom",
+      "refersTo": "plate",
+      "description": "Numbered tool steps with one lit marker; where the agent is right now.",
+      "html": "<ol class=\"ds-steps\"><li class=\"ds-step ds-step-done\"><span class=\"ds-step-n\"><i></i>01</span><span class=\"ds-step-name\">geocode location</span></li><li class=\"ds-step ds-step-done\"><span class=\"ds-step-n\"><i></i>02</span><span class=\"ds-step-name\">search satellite imagery</span></li><li class=\"ds-step ds-step-lit\" aria-current=\"step\"><span class=\"ds-step-n\"><i></i>03</span><span class=\"ds-step-name\">calculate nbr <em>working</em></span></li></ol>",
+      "css": ".ds-steps { width: 296px; margin: 0; padding: 14px 16px 10px; list-style: none; background: rgba(22, 28, 37, 0.92); border: 1px solid rgba(233, 238, 243, 0.14); border-radius: 10px; box-shadow: 0 10px 28px rgba(3, 6, 10, 0.5); backdrop-filter: blur(6px); font-family: 'Atkinson Hyperlegible Next', system-ui, sans-serif; } .ds-step { display: grid; grid-template-columns: 28px 1fr; align-items: center; column-gap: 8px; padding: 6px 0; color: #8fa3b8; } .ds-step-lit { color: #e9eef3; } .ds-step-n { display: inline-flex; align-items: center; gap: 6px; font-family: 'Atkinson Hyperlegible Mono', ui-monospace, monospace; font-size: 13px; font-variant-numeric: tabular-nums; } .ds-step-n i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: rgba(233, 238, 243, 0.24); } .ds-step-done .ds-step-n { color: #7bd88f; } .ds-step-done .ds-step-n i { background: #7bd88f; } .ds-step-lit .ds-step-n { color: #f5a524; } .ds-step-lit .ds-step-n i { background: #f5a524; box-shadow: 0 0 0 5px rgba(245, 165, 36, 0.16); } .ds-step-name { font-size: 15px; line-height: 1.25; } .ds-step-lit .ds-step-name { font-size: 17px; font-weight: 600; } .ds-step-name em { margin-left: 8px; font-style: normal; font-family: 'Bricolage Grotesque', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #f5a524; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Planetarium Show",
+    "overview": "An exhibit hall after hours. One luminous Earth fills the room, and the agent is the docent whose captions appear only when they add meaning. The screen is a stage read by an audience of technical leaders from the back of a room, not a workstation read by its operator: the map runs edge to edge, the rails around it never reflow, and everything the agent does lands as a numbered step or a spotlit finding pinned to the place it belongs. The presenter types one line or picks a prepared prompt; the room never needs the transcript.\n\nThe world refuses the two default arrangements of the category. It is not a dark dashboard of panels with a chat column, and it is not a light SaaS chat with a map in a card. It is also, by the presenter's own words, never a hacker console: no phosphor green, no monospace walls, no blinking cursors. Materials are a matte deep blue-grey surround, soft spotlight falloff, and exhibit label plates framed by hairlines. Colour is spent with discipline: one amber accent marks whatever is active, and data colour lives only on the layer being looked at.\n\nDensity is low and sizes are large. Nothing on the stage sits below 15px, the docent's caption sits at 24px (32px on very large screens), and numerics are tabular so columns of coordinates and dates align. Motion follows one grammar: an exponential ease-out from a visible default, used where it shows the agent working and nowhere else.",
+    "keyCharacteristics": [
+      "Map-first: the canvas fills the frame; every control is a plate floating over it.",
+      "One accent: spotlight amber marks the active act, step, layer, finding or primary action.",
+      "Exhibit plates: mid-dark panels with hairline frames, blur, and a real shadow.",
+      "Hyperlegible type at projector sizes; Bricolage Grotesque only for titles and labels.",
+      "Tabular mono for every number, coordinate and identifier.",
+      "Motion only where it shows work happening (steps arriving, plates rising, the working dots)."
+    ],
+    "rules": [
+      { "name": "The One Spotlight Rule", "body": "Amber marks exactly what is active. If two things on the same screen are amber, one of them is wrong.", "section": "colors" },
+      { "name": "The No Black Rule", "body": "The darkest value is the dome (#0f141b). Pure black and pure white never appear in the interface; text is fog, ground is dome.", "section": "colors" },
+      { "name": "The Hairline Rule", "body": "Panels are framed by 1px hairlines at 14–24% alpha and a real shadow. No 4px accent side-tabs, no coloured borders.", "section": "colors" },
+      { "name": "The Back Row Rule", "body": "Nothing on the stage is set below 15px except tracked uppercase labels. If it must be read from the room, it is 24px or larger.", "section": "typography" },
+      { "name": "The Tabular Rule", "body": "Every numeric value is set in Atkinson Hyperlegible Mono with tabular figures, including inside prose captions when a number is the point.", "section": "typography" },
+      { "name": "The Two Voices Rule", "body": "Bricolage Grotesque names; Atkinson Hyperlegible speaks. The display face never sets a sentence.", "section": "typography" },
+      { "name": "The Floating Plate Rule", "body": "Anything over the map is a plate: blur, hairline, Level 2 or 3 shadow. Never an opaque box with a hard edge, never a card inside a card.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the map edge to edge and float every control over it as a plate with blur, a 1px hairline and a Level 2–3 shadow.",
+      "Do spend amber on exactly one active thing per region: the lit act, the current step, the primary button, the active draw mode.",
+      "Do set every number in Atkinson Hyperlegible Mono with tabular figures, and every stage text at 15px or larger.",
+      "Do use the label style (Bricolage Grotesque 12px, 0.12em, uppercase, label grey) for plate titles and speaker labels, and only for those.",
+      "Do animate with the exponential ease-out (cubic-bezier(0.16, 1, 0.3, 1)) on opacity, transform, colour and shadow, and only where it shows the agent working.",
+      "Do draw icons from the single 16px stroke set in currentColor.",
+      "Do keep scientific palettes on map data (RdYlGn change ramp, cyan boundaries, purple protected areas) and never restyle evidence to the accent."
+    ],
+    "donts": [
+      "Don't lay the page out as a chat column beside a map, or put the map inside a card.",
+      "Don't use pure black or pure white, neutral greys, Roboto or system fonts, or any second accent colour.",
+      "Don't add accent side-tabs, coloured borders, cards inside cards, or opaque hard-edged boxes over the map.",
+      "Don't use emoji or unicode glyphs as icons, spinners as the only progress signal, or anything that blinks.",
+      "Don't transition layout properties (width, height, left, top, margin, padding); move with transform and fade with opacity.",
+      "Don't let anything read as a hacker console: no phosphor green, no monospace paragraphs, no scanlines, no cursor blink."
+    ]
+  }
+}

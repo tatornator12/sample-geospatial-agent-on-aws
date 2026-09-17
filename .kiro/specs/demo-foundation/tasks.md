@@ -22,7 +22,8 @@ spike notes exist under `docs/spikes/`.
   - [x] 3.2 Add `npm run design:check` to `react-ui/frontend/package.json`
   - [x] 3.3 Create Kiro hook `impeccable-design-check` (PostToolUse on edit tools) and record the 6-finding baseline in `ROADMAP.md`
   - [x] 3.4 Run `/impeccable init`: `PRODUCT.md` written (audience: AWS customer technical leaders and architects, presenter-driven, no hands-on; headline: one map, many agents on AgentCore; demo name "Agentic AI for Earth"); live mode configured (`.impeccable/live/config.json`, no CSP)
-  - [ ] 3.5 Run `/impeccable document` to record the incumbent visual system (`theme.ts`, inline styles) in `DESIGN.md`; commit
+  - [x] 3.5 Redesign instead of document-the-incumbent: `/impeccable document` became a new-work round (the presenter rejected the Material 3 UI). Direction roll chose "The Planetarium Show" (seed key `8e283055`); first build of the Stage landed (`stage.css`, `Icons.tsx`, `StepColumn.tsx`, rewritten `Chat.tsx`, `ChatSidebar.tsx`, `MapView.tsx`, `Navigation.tsx`, `ToolCallDisplay.tsx`, `theme.ts`, `index.css`); detector at 0 findings; `DESIGN.md` and `.impeccable/design.json` written from the built world
+  - [ ] 3.6 Visual pass on the live UI (`npm run dev` in `react-ui/backend` and `react-ui/frontend`): check the caption band, step column and layers plate against a real run; `/impeccable polish` the Stage; then the spotlight sweep (transform-based) and active-layer desaturation raises
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
 - [ ] 4. Stand up the dev runtime
