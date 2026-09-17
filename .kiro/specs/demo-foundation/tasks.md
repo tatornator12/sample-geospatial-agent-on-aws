@@ -35,10 +35,13 @@ spike notes exist under `docs/spikes/`.
     - 8 env vars present; Hyde Park NDVI prompt returned mean NDVI 0.47 with 3 `display_visual` calls, runtime logs show only the usual COG/Langfuse warnings
   - _Requirements: 3.1, 3.3_
 
-- [ ] 5. Add the agent switcher (backend)
-  - [ ] 5.1 Parse `AGENT_RUNTIMES` JSON with fallback to `AGENT_RUNTIME_ARN` as agent `default`; one AgentCore client per region
-  - [ ] 5.2 Add `GET /api/agents`; accept `agentId` on `/api/agent/invoke` and `/api/agent/stop-session`; 400 on unknown id
-  - [ ] 5.3 Update `react-ui/backend/.env.example` and `frontend-cdk` task environment to pass `AGENT_RUNTIMES` (leave the stable stack undeployed this week)
+- [x] 5. Add the agent switcher (backend)
+  - [x] 5.1 Parse `AGENT_RUNTIMES` JSON with fallback to `AGENT_RUNTIME_ARN` as agent `default`; one AgentCore client per region
+    - Invalid JSON, a non-object, a bad ARN or an empty map fail at startup with a named error; no agent at all only warns (invoke answers 503)
+  - [x] 5.2 Add `GET /api/agents`; accept `agentId` on `/api/agent/invoke` and `/api/agent/stop-session`; 400 on unknown id
+    - `GET /api/agents` returns `{ defaultAgentId, agents: [{ id, label, description }] }`; unknown id is a plain 400 before SSE headers are sent. Verified locally with two agents and a real invoke through the backend to the dev runtime (59 chunks, `done`)
+  - [x] 5.3 Update `react-ui/backend/.env.example` and `frontend-cdk` task environment to pass `AGENT_RUNTIMES` (leave the stable stack undeployed this week)
+    - CDK validates the JSON at synth, passes it to the task and grants every listed ARN (+`/*`) on the task role; synth checked with and without it. Not deployed
   - _Requirements: 4.1, 4.2, 4.4_
 
 - [ ] 6. Add the agent switcher (frontend)

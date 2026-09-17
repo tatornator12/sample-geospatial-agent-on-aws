@@ -15,21 +15,131 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ========================================
+// Agent runtime registry
+// ========================================
+// The UI can switch between several AgentCore runtimes (stable demo agent, dev runtime,
+// domain agents). They are configured with AGENT_RUNTIMES, a JSON object keyed by agentId:
+//
+//   { "default": { "arn": "arn:aws:bedrock-agentcore:...", "label": "Earth Analyst",
+//                  "description": "Sentinel-2 analysis, change detection, protected areas" } }
+//
+// When AGENT_RUNTIMES is absent the single AGENT_RUNTIME_ARN becomes agent `default`, so an
+// existing deployment keeps working unchanged. Requests that omit agentId use `default`, or
+// the first configured agent when no `default` entry exists.
+interface AgentRuntime {
+  id: string;
+  arn: string;
+  label: string;
+  description: string;
+  region: string;
+}
+
+const AGENT_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const AGENT_ARN_PREFIX = 'arn:aws:bedrock-agentcore:';
+
+// Region is the fourth ARN field (arn:aws:bedrock-agentcore:us-east-1:...), so each client
+// targets the runtime's own region even when the frontend is deployed elsewhere.
+function regionFromArn(arn: string): string {
+  return arn.split(':')[3] || process.env.AWS_REGION || 'us-east-1';
+}
+
+function loadAgentRuntimes(): Map<string, AgentRuntime> {
+  const agents = new Map<string, AgentRuntime>();
+  const raw = process.env.AGENT_RUNTIMES;
+
+  if (!raw) {
+    const arn = process.env.AGENT_RUNTIME_ARN;
+    if (arn) {
+      agents.set('default', {
+        id: 'default',
+        arn,
+        label: 'Earth Analyst',
+        description: '',
+        region: regionFromArn(arn),
+      });
+    }
+    return agents;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`AGENT_RUNTIMES is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('AGENT_RUNTIMES must be a JSON object keyed by agentId');
+  }
+
+  for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!AGENT_ID_PATTERN.test(id)) {
+      throw new Error(`AGENT_RUNTIMES: agentId "${id}" must be lowercase letters, digits, "-" or "_" (max 64 chars)`);
+    }
+    const entry = (value ?? {}) as { arn?: unknown; label?: unknown; description?: unknown };
+    if (typeof entry.arn !== 'string' || !entry.arn.startsWith(AGENT_ARN_PREFIX)) {
+      throw new Error(`AGENT_RUNTIMES: agent "${id}" needs an "arn" starting with ${AGENT_ARN_PREFIX}`);
+    }
+    agents.set(id, {
+      id,
+      arn: entry.arn,
+      label: typeof entry.label === 'string' && entry.label.trim() ? entry.label.trim() : id,
+      description: typeof entry.description === 'string' ? entry.description.trim() : '',
+      region: regionFromArn(entry.arn),
+    });
+  }
+
+  if (agents.size === 0) {
+    throw new Error('AGENT_RUNTIMES is set but contains no agents');
+  }
+  return agents;
+}
+
+const agentRuntimes = loadAgentRuntimes();
+const defaultAgent = agentRuntimes.get('default') ?? agentRuntimes.values().next().value;
+
+if (!defaultAgent) {
+  console.warn('⚠️ No agent runtime configured. Set AGENT_RUNTIMES or AGENT_RUNTIME_ARN; /api/agent/invoke will fail until one is set.');
+}
+
+// Resolve the runtime for a request. `undefined` means "not found" and the caller answers 400;
+// an omitted agentId picks the default agent.
+function resolveAgent(agentId: unknown): AgentRuntime | undefined {
+  if (agentId === undefined || agentId === null || agentId === '') {
+    return defaultAgent;
+  }
+  return typeof agentId === 'string' ? agentRuntimes.get(agentId) : undefined;
+}
+
+function unknownAgentResponse(res: Response, agentId: unknown) {
+  return res.status(400).json({
+    error: 'Unknown agentId',
+    agentId: typeof agentId === 'string' ? agentId : String(agentId),
+    available: Array.from(agentRuntimes.keys()),
+  });
+}
+
 // AWS Clients
-// Extract region from AGENT_RUNTIME_ARN (e.g. arn:aws:bedrock-agentcore:us-east-1:...)
-// so the client targets the correct region even when the frontend deploys elsewhere.
-const agentRegion = process.env.AGENT_RUNTIME_ARN?.split(':')[3] || process.env.AWS_REGION || 'us-east-1';
-const bedrockClient = new BedrockAgentCoreClient({
-  region: agentRegion,
-  requestHandler: new NodeHttpHandler({
-    requestTimeout: 300000,       // 5 min - total request timeout
-    connectionTimeout: 10000,     // 10s connection timeout
-    socketTimeout: 300000,        // 5 min - socket idle timeout (key for streaming)
-  }),
-});
+// One BedrockAgentCoreClient per region, created on first use.
+const bedrockClients = new Map<string, BedrockAgentCoreClient>();
+function bedrockClientFor(region: string): BedrockAgentCoreClient {
+  let client = bedrockClients.get(region);
+  if (!client) {
+    client = new BedrockAgentCoreClient({
+      region,
+      requestHandler: new NodeHttpHandler({
+        requestTimeout: 300000,       // 5 min - total request timeout
+        connectionTimeout: 10000,     // 10s connection timeout
+        socketTimeout: 300000,        // 5 min - socket idle timeout (key for streaming)
+      }),
+    });
+    bedrockClients.set(region, client);
+  }
+  return client;
+}
 
 const s3Client = new S3Client({
-  region: agentRegion,
+  region: defaultAgent?.region || process.env.AWS_REGION || 'us-east-1',
 });
 
 // Middleware
@@ -86,12 +196,30 @@ interface AgentPayload {
   scenario_id?: string;
 }
 
+// List the agents the UI can switch between. Public fields only: no ARNs or regions.
+app.get('/api/agents', (req: Request, res: Response) => {
+  res.json({
+    defaultAgentId: defaultAgent?.id ?? null,
+    agents: Array.from(agentRuntimes.values()).map(({ id, label, description }) => ({ id, label, description })),
+  });
+});
+
 // Stream agent response using Server-Sent Events
 app.post('/api/agent/invoke', async (req: Request, res: Response) => {
-  const { prompt, sessionId, scenario_id } = req.body;
+  const { prompt, sessionId, scenario_id, agentId } = req.body;
 
   if (!prompt || !sessionId) {
     return res.status(400).json({ error: 'prompt and sessionId are required' });
+  }
+
+  // Resolve the runtime before the response turns into an SSE stream, so a bad agentId is a
+  // plain 400 the client can handle instead of an error event.
+  const agent = resolveAgent(agentId);
+  if (!agent) {
+    if (agentId !== undefined && agentId !== null && agentId !== '') {
+      return unknownAgentResponse(res, agentId);
+    }
+    return res.status(503).json({ error: 'No agent runtime configured. Set AGENT_RUNTIMES or AGENT_RUNTIME_ARN.' });
   }
 
   if (scenario_id) {
@@ -123,12 +251,8 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
   }, 10000);
 
   try {
-    const agentRuntimeArn = process.env.AGENT_RUNTIME_ARN;
-    if (!agentRuntimeArn) {
-      throw new Error('AGENT_RUNTIME_ARN environment variable is not set');
-    }
-
-    console.log(`Invoking agent with session: ${sessionId}`);
+    const bedrockClient = bedrockClientFor(agent.region);
+    console.log(`Invoking agent "${agent.id}" (${agent.region}) with session: ${sessionId}`);
 
     // Build agent payload with proper typing
     const payloadData: AgentPayload = { prompt: prompt };
@@ -138,7 +262,7 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
 
     const input = {
       runtimeSessionId: sessionId,  // AgentCore requires the session ID to be at least 33 characters
-      agentRuntimeArn: agentRuntimeArn,  // Full AgentCore runtime ARN
+      agentRuntimeArn: agent.arn,  // Full AgentCore runtime ARN
       qualifier: 'DEFAULT',
       payload: new TextEncoder().encode(JSON.stringify(payloadData)),
     };
@@ -303,27 +427,31 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
 
 // Stop agent runtime session
 app.post('/api/agent/stop-session', async (req: Request, res: Response) => {
-  const { sessionId } = req.body;
+  const { sessionId, agentId } = req.body;
 
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId is required' });
   }
 
-  try {
-    const agentRuntimeArn = process.env.AGENT_RUNTIME_ARN;
-    if (!agentRuntimeArn) {
-      throw new Error('AGENT_RUNTIME_ARN environment variable is not set');
+  // Sessions belong to a runtime, so the stop must go to the same agent that was invoked.
+  const agent = resolveAgent(agentId);
+  if (!agent) {
+    if (agentId !== undefined && agentId !== null && agentId !== '') {
+      return unknownAgentResponse(res, agentId);
     }
+    return res.status(503).json({ error: 'No agent runtime configured. Set AGENT_RUNTIMES or AGENT_RUNTIME_ARN.' });
+  }
 
-    console.log(`Stopping runtime session: ${sessionId}`);
+  try {
+    console.log(`Stopping runtime session: ${sessionId} on agent "${agent.id}"`);
 
     const command = new StopRuntimeSessionCommand({
       runtimeSessionId: sessionId,
-      agentRuntimeArn: agentRuntimeArn,
+      agentRuntimeArn: agent.arn,
       qualifier: 'DEFAULT',
     });
 
-    await bedrockClient.send(command);
+    await bedrockClientFor(agent.region).send(command);
 
     console.log(`✅ Successfully stopped session: ${sessionId}`);
     res.json({ success: true, message: 'Session stopped successfully' });
@@ -574,6 +702,10 @@ if (process.env.NODE_ENV === 'production') {
 app.listen(PORT, () => {
   console.log(`Backend server running on http://localhost:${PORT}`);
   console.log(`CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(
+    `Agents: ${Array.from(agentRuntimes.values()).map(a => `${a.id} (${a.region})`).join(', ') || 'none'}` +
+    (defaultAgent ? `; default = ${defaultAgent.id}` : '')
+  );
   if (process.env.NODE_ENV === 'production') {
     console.log(`Frontend static files enabled`);
   }

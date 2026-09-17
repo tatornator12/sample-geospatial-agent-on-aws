@@ -34,6 +34,10 @@ export class GeospatialAgentStack extends cdk.Stack {
       // Required: Bedrock AgentCore Runtime ARN (deployed separately)
       agentRuntimeArn: this.node.tryGetContext('agentRuntimeArn') || process.env.AGENT_RUNTIME_ARN,
 
+      // Optional: JSON map of agentId -> { arn, label, description } for the UI agent switcher.
+      // Passed through to the backend as AGENT_RUNTIMES; every ARN in it is granted to the task role.
+      agentRuntimes: (this.node.tryGetContext('agentRuntimes') || process.env.AGENT_RUNTIMES) as string | undefined,
+
       // S3 bucket for satellite data
       s3BucketName: this.node.tryGetContext('s3BucketName') || process.env.S3_BUCKET_NAME,
 
@@ -62,6 +66,28 @@ export class GeospatialAgentStack extends cdk.Stack {
     }
     if (!config.adminEmail) {
       throw new Error('adminEmail is required. Set via context or environment variable ADMIN_EMAIL');
+    }
+
+    // Every runtime the backend may invoke: the primary ARN plus any listed in AGENT_RUNTIMES.
+    // Validated here so a typo fails at synth time rather than as an AccessDenied in production.
+    const agentRuntimeArns = new Set<string>([config.agentRuntimeArn]);
+    if (config.agentRuntimes) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(config.agentRuntimes);
+      } catch (error) {
+        throw new Error(`AGENT_RUNTIMES is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('AGENT_RUNTIMES must be a JSON object keyed by agentId');
+      }
+      for (const [agentId, entry] of Object.entries(parsed as Record<string, { arn?: unknown }>)) {
+        const arn = entry?.arn;
+        if (typeof arn !== 'string' || !arn.startsWith('arn:aws:bedrock-agentcore:')) {
+          throw new Error(`AGENT_RUNTIMES: agent "${agentId}" needs an "arn" starting with arn:aws:bedrock-agentcore:`);
+        }
+        agentRuntimeArns.add(arn);
+      }
     }
 
     // ========================================
@@ -257,10 +283,10 @@ export class GeospatialAgentStack extends cdk.Stack {
         'bedrock-agentcore:InvokeAgentRuntime',
         'bedrock-agentcore:StopRuntimeSession',
       ],
-      resources: [
-        config.agentRuntimeArn,
-        `${config.agentRuntimeArn}/*`, // Include runtime endpoints
-      ],
+      resources: Array.from(agentRuntimeArns).flatMap(arn => [
+        arn,
+        `${arn}/*`, // Include runtime endpoints
+      ]),
     }));
 
     // ========================================
@@ -331,6 +357,7 @@ export class GeospatialAgentStack extends cdk.Stack {
           PORT: '3001',
           AWS_REGION: config.awsRegion,
           AGENT_RUNTIME_ARN: config.agentRuntimeArn,
+          ...(config.agentRuntimes ? { AGENT_RUNTIMES: config.agentRuntimes } : {}),
           S3_BUCKET_NAME: config.s3BucketName,
           COGNITO_USER_POOL_ID: userPool.userPoolId,
           COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
@@ -701,7 +728,7 @@ export class GeospatialAgentStack extends cdk.Stack {
           reason: 'Wildcard is scoped to specific S3 bucket objects and specific Bedrock AgentCore runtime endpoints. This is the minimum scope needed for the application.',
           appliesTo: [
             `Resource::arn:aws:s3:::${config.s3BucketName}/*`,
-            `Resource::${config.agentRuntimeArn}/*`,
+            ...Array.from(agentRuntimeArns).map(arn => `Resource::${arn}/*`),
           ],
         },
       ],
