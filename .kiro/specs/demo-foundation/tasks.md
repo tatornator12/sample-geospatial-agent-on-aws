@@ -66,9 +66,11 @@ spike notes exist under `docs/spikes/`.
     - 23 tests, all passing in ~1.4 s with S3_BUCKET_NAME unset (hermetic); `tests/` is excluded from the deploy zip by the toolkit's dockerignore template
   - _Requirements: 5.1_
 
-- [ ] 8. Test scaffolding: frontend
-  - [ ] 8.1 Add pinned `vitest`, `@testing-library/react`, `jsdom` dev deps and a `test` script
-  - [ ] 8.2 `src/utils/parsing.test.ts`: complete JSON, truncated `input`, duplicate ids, `.geojson` vs `.tif`, date and cloud-cover extraction; `src/services/api.test.ts`: `listAgents` parsing
+- [x] 8. Test scaffolding: frontend
+  - [x] 8.1 Add pinned `vitest`, `@testing-library/react`, `jsdom` dev deps and a `test` script
+    - vitest 5.0.1, jsdom 30.1.0, @testing-library/react 16.3.3 (+ @testing-library/dom), exact pins; `npm test` = `vitest --run`; vitest.config.ts sets the jsdom environment (api.ts reads window.location at module load)
+  - [x] 8.2 `src/utils/parsing.test.ts`: complete JSON, truncated `input`, duplicate ids, `.geojson` vs `.tif`, date and cloud-cover extraction; `src/services/api.test.ts`: `listAgents` parsing
+    - 15 tests green in <1 s; covers the truncated-outer-JSON tail trim, the regex fallback for a truncated `input` field, stream-order preservation, markdown heading spacing, uppercase extensions, URL de-dupe, incomplete-call skipping, and listAgents normalization (missing/malformed fields, HTTP error). `npm run build` type-checks the test files
   - _Requirements: 5.2_
 
 - [ ] 9. Golden prompts and promotion script
