@@ -147,6 +147,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
       },
       center: [0, 20],
       zoom: 2,
+      // Compact attribution: a small info button in the corner instead of a white bar under the plates.
+      attributionControl: { compact: true },
       preserveDrawingBuffer: true,
       failIfMajorPerformanceCaveat: false,
       transformRequest: (url) => {

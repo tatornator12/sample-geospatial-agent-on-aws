@@ -514,10 +514,10 @@
   background: var(--hairline-strong);
 }
 
-/* Bottom right: the basemap plate. */
+/* Bottom right: the basemap plate. Leaves the corner to MapLibre's compact attribution button. */
 .map-basemap {
   position: absolute;
-  right: 16px;
+  right: 56px;
   bottom: 20px;
   z-index: 2;
   display: flex;
@@ -560,6 +560,12 @@
 }
 .maplibregl-ctrl-attrib a {
   color: var(--fog) !important;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  border-radius: 12px !important;
+}
+.maplibregl-ctrl-attrib-button {
+  filter: invert(0.9); /* the stock "i" glyph is black; lift it to fog on the dome */
 }
 .maplibregl-popup-content {
   background: var(--plate-raised);
