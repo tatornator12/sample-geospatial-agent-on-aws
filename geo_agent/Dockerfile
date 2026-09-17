@@ -9,25 +9,33 @@ RUN --mount=type=cache,target=/var/cache/apt \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install miniconda with Python 3.12 support (ARM64 required for AgentCore)
+# Install Miniforge (conda-forge-only base, ships mamba + Python 3.12; ARM64 required for
+# AgentCore). Pinned to a specific release and checksum so the base never drifts.
+#
+# Why Miniforge and not Miniconda: Miniconda's base is built from Anaconda's `defaults`
+# channel. Installing the conda-forge geo stack on top of it mixes the two channels, and
+# they ship overlapping shared libraries (libxml2 in particular). During the geo install
+# conda-forge's libxml2-16 clobbered defaults' libxml2 and the later unlink deleted the
+# shared libxml2.so.16 - libgdal then failed to load at runtime ("libxml2.so.16: cannot
+# open shared object file") and the container crash-looped. A single-channel base with
+# strict channel priority removes that class of failure entirely.
+ARG MINIFORGE_VERSION=25.11.0-1
+ARG MINIFORGE_SHA256=43a3783f9e121088f1c92b131b4305b9ebf159424ad2543dfcfc0f1952b5e127
 RUN --mount=type=cache,target=/tmp/conda_cache \
-    if [ ! -f /tmp/conda_cache/miniconda.sh ]; then \
-        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/conda_cache/miniconda.sh; \
+    INSTALLER=/tmp/conda_cache/Miniforge3-${MINIFORGE_VERSION}-Linux-aarch64.sh && \
+    if [ ! -f "$INSTALLER" ]; then \
+        wget -q "https://github.com/conda-forge/miniforge/releases/download/${MINIFORGE_VERSION}/Miniforge3-${MINIFORGE_VERSION}-Linux-aarch64.sh" -O "$INSTALLER"; \
     fi && \
-    bash /tmp/conda_cache/miniconda.sh -b -p /opt/conda && \
+    echo "${MINIFORGE_SHA256}  $INSTALLER" | sha256sum -c - && \
+    bash "$INSTALLER" -b -p /opt/conda && \
     /opt/conda/bin/conda clean -afy
 
-# Add conda to PATH and accept TOS via environment
+# Add conda to PATH. Strict channel priority means every package resolves from conda-forge;
+# nothing can be silently satisfied from another channel.
 ENV PATH="/opt/conda/bin:$PATH"
 ENV CONDA_ALWAYS_YES=true
 ENV CONDA_AUTO_UPDATE_CONDA=false
-ENV CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
-ENV CONDA_CHANNEL_PRIORITY=flexible
-
-# Accept conda Terms of Service and install mamba for faster dependency resolution
-# Mamba is 10-20x faster than conda (148s → ~10-15s for geospatial packages)
-RUN conda install -n base -c conda-forge mamba python=3.12 -y && \
-    conda clean -afy
+ENV CONDA_CHANNEL_PRIORITY=strict
 
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt requirements.txt
@@ -35,9 +43,18 @@ COPY requirements.txt requirements.txt
 # Install geospatial packages via conda-forge (handles all C dependencies)
 # Updated package versions compatible with Python 3.12
 # Ultra-optimized: Use mamba for 10-20x faster dependency resolution (~130s saved!)
+#
+# sqlite/libsqlite are pinned on purpose. proj and libspatialite depend on the `sqlite` CLI
+# package; its current linux-aarch64 builds need readline 8.3 + icu 78, which the solver would
+# rather not upgrade in the base, so left to itself it "satisfies" the dependency with the
+# ancient monolithic sqlite 3.32.3 build. That package ships its own lib/libsqlite3.so.0 and
+# clobbers the real libsqlite, and libgdal then fails to load (undefined symbol
+# sqlite3_total_changes64). Pinning both to one modern version forces a coherent solve.
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.conda/pkgs \
     mamba install -c conda-forge -y \
+    libsqlite=3.52.0 \
+    sqlite=3.52.0 \
     gdal=3.12.1 \
     fiona=1.10.1 \
     shapely=2.1.2 \
@@ -59,6 +76,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
     pip install -r requirements.txt && \
     pip install aws-opentelemetry-distro>=0.10.0
+# Fail the build, not the runtime, if the native geo stack cannot load. Importing rasterio
+# pulls libgdal and every shared library behind it; a broken environment surfaces here in
+# seconds instead of as a crash loop on AgentCore.
+RUN python -c "import rasterio, fiona, geopandas, shapely, pyproj, osmnx, rasterstats; print('geo stack ok', rasterio.__version__, geopandas.__version__)"
 
 # Set AWS environment variables
 ENV AWS_REGION=us-east-1

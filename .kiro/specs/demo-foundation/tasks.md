@@ -26,10 +26,13 @@ spike notes exist under `docs/spikes/`.
   - [ ] 3.6 Visual pass on the live UI (`npm run dev` in `react-ui/backend` and `react-ui/frontend`): check the caption band, step column and layers plate against a real run; `/impeccable polish` the Stage; then the spotlight sweep (transform-based) and active-layer desaturation raises
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 4. Stand up the dev runtime
-  - [ ] 4.1 Review `.env.dev` (created as a copy of `.env`; same bucket and role are fine), then `DRY_RUN=1 DEPLOY_TARGET=dev ./deploy.sh` and inspect
-  - [ ] 4.2 `DEPLOY_TARGET=dev ./deploy.sh`; record the new runtime ARN from `.bedrock_agentcore.yaml` under `geospatial_agent_dev`
-  - [ ] 4.3 Verify env vars persisted on the runtime and run one smoke invoke (`invoke --agent geospatial_agent_dev`); expect a `display_visual` call and no `Error:`
+- [x] 4. Stand up the dev runtime
+  - [x] 4.1 Review `.env.dev` (created as a copy of `.env`; same bucket and role are fine), then `DRY_RUN=1 DEPLOY_TARGET=dev ./deploy.sh` and inspect
+  - [x] 4.2 `DEPLOY_TARGET=dev ./deploy.sh`; record the new runtime ARN from `.bedrock_agentcore.yaml` under `geospatial_agent_dev`
+    - Runtime: `arn:aws:bedrock-agentcore:us-east-1:419324627248:runtime/geospatial_agent_dev-oSBUFd3SUQ` (version 2, image tag `20260917-150237-595`)
+    - First image crash-looped at import (`libxml2.so.16` missing: Miniconda `defaults` base mixed with conda-forge). Dockerfile now uses pinned Miniforge, strict channel priority, pinned `sqlite`/`libsqlite`, and a build-time `import rasterio, geopandas, ...` assertion so a broken native stack fails the CodeBuild step instead of the runtime
+  - [x] 4.3 Verify env vars persisted on the runtime and run one smoke invoke (`invoke --agent geospatial_agent_dev`); expect a `display_visual` call and no `Error:`
+    - 8 env vars present; Hyde Park NDVI prompt returned mean NDVI 0.47 with 3 `display_visual` calls, runtime logs show only the usual COG/Langfuse warnings
   - _Requirements: 3.1, 3.3_
 
 - [ ] 5. Add the agent switcher (backend)
