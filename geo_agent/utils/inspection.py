@@ -144,7 +144,7 @@ def render_preview(path: str, max_edge: int = MAX_EDGE_DEFAULT, style_hint: str 
             buf = io.BytesIO()
             Image.fromarray(img).save(buf, format="JPEG", quality=85, optimize=True)
             meta = {"rendered_as": "jpeg", "bands": int(src.count), "dtype": src.dtypes[0],
-                    "nodata_treatment": "flat grey"}
+                    "nodata_treatment": "flat grey = outside the area of interest or missing data, not land cover"}
         elif src.count >= 1:
             band = src.read(1, out_shape=(h, w), resampling=Resampling.average).astype(np.float64)
             valid = np.isfinite(band)

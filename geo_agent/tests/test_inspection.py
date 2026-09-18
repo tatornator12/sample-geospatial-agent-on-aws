@@ -46,7 +46,7 @@ def test_rgb_scene_renders_to_capped_jpeg_with_grey_nodata(tmp_path, inspection)
     assert img.format == "JPEG"
     assert max(img.size) == 1024 and img.size == (1024, 512)
     assert out.meta["nodata_pct"] == pytest.approx(50.0, abs=0.5)
-    assert out.meta["nodata_treatment"] == "flat grey"
+    assert out.meta["nodata_treatment"].startswith("flat grey")
     # Left (nodata) side is grey, right side carries the land colour.
     left, right = img.getpixel((100, 256)), img.getpixel((900, 256))
     assert all(abs(c - 128) < 8 for c in left)
