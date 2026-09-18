@@ -112,6 +112,17 @@ async def display_visual(s3_url: str, title: str, description: str = "") -> str:
     return result_json
 
 
+_bucket_regions: dict = {}
+
+
+def _bucket_region(bucket: str) -> str:
+    """The bucket's real region (cached). A presigned URL signed for any other region is a 400."""
+    if bucket not in _bucket_regions:
+        loc = boto3.client("s3").get_bucket_location(Bucket=bucket).get("LocationConstraint")
+        _bucket_regions[bucket] = loc or "us-east-1"
+    return _bucket_regions[bucket]
+
+
 def _presigned_vsicurl(s3_url: str, expires: int = 600) -> str:
     """A GDAL-readable HTTPS path for a private session raster.
 
@@ -119,7 +130,7 @@ def _presigned_vsicurl(s3_url: str, expires: int = 600) -> str:
     instead of downloading the whole file — the same path TiTiler uses for the map.
     """
     bucket, key = s3_url[len("s3://"):].split("/", 1)
-    url = boto3.client("s3").generate_presigned_url(
+    url = boto3.client("s3", region_name=_bucket_region(bucket)).generate_presigned_url(
         "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires
     )
     return f"/vsicurl/{url}"
@@ -162,7 +173,11 @@ async def inspect_image(s3_url: str, title: str, question: str = "") -> dict:
 
     try:
         started = datetime.now()
-        rendered = render_preview(_presigned_vsicurl(s3_url), style_hint=s3_url)
+        # Presigned URLs carry a query string: tell GDAL not to list the "directory" or HEAD
+        # the object (both come back as S3 400s) and to trust the .tif extension before the '?'.
+        with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", CPL_VSIL_CURL_USE_HEAD="NO",
+                          CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif,.tiff,.TIF,.TIFF"):
+            rendered = render_preview(_presigned_vsicurl(s3_url), style_hint=s3_url)
         key = _inspection_key(session_id, s3_url, rendered.fmt)
         boto3.client("s3").put_object(
             Bucket=config.S3_BUCKET_NAME, Key=key, Body=rendered.data,

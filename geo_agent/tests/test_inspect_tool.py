@@ -13,6 +13,11 @@ import rasterio.errors
 class FakeS3:
     def __init__(self):
         self.puts = []
+        self.location_calls = 0
+
+    def get_bucket_location(self, Bucket):
+        self.location_calls += 1
+        return {"LocationConstraint": None}  # how S3 reports us-east-1
 
     def generate_presigned_url(self, op, Params, ExpiresIn):
         return f"https://signed.example/{Params['Bucket']}/{Params['Key']}?sig=1"
@@ -43,8 +48,13 @@ def test_inspection_key_mirrors_raster_basename(tools_module):
 
 
 def test_presigned_vsicurl_wraps_a_signed_https_url(tools_module, tool_env):
+    tools_module._bucket_regions.clear()
     path = tools_module._presigned_vsicurl("s3://test-bucket/session_data/s/rasters/tci.tif")
     assert path.startswith("/vsicurl/https://signed.example/test-bucket/session_data/s/rasters/tci.tif")
+    # Signing uses the bucket's real region (looked up once, then cached).
+    tools_module._presigned_vsicurl("s3://test-bucket/session_data/s/rasters/red.tif")
+    assert tool_env.location_calls == 1
+    assert tools_module._bucket_regions["test-bucket"] == "us-east-1"
 
 
 def test_inspect_image_returns_image_block_and_saves_preview(tools_module, tool_env, monkeypatch):
