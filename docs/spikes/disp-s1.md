@@ -4,7 +4,38 @@ Date: 2026-11 (timeboxed 2 h; actual ~5 min). Run from laptop (not us-west-2 com
 Goal: open one DISP-S1 frame from the ASF Earthdata Cloud bucket (us-west-2) with an
 Earthdata token and time a one-pixel displacement time-series extraction.
 
-## Verdict
+## Verdict (updated 2026-09-18 after ASF app approval)
+
+**Unblocked and proven from the laptop.** The account owner approved ASF's Cumulus app; the
+re-run checklist below then passed end to end. Measured:
+
+| Step | Result |
+|---|---|
+| `s3credentials` on both ASF hosts with Bearer token | HTTP 200 in 1.3–1.6 s; temp creds valid ~1 h |
+| HTTPS range-GET bytes 0–1023 of one granule | HTTP 206 via one redirect to CloudFront; valid HDF5 magic |
+| Full granule download (newest F11116, 2026-01-26) | **381.7 MB in 9.2 s (41.7 MB/s)** |
+| `h5py` open + one-pixel read of `/displacement` | 0.01 s; centre pixel = 0.0282 m, `recommended_mask` = 1; array 6898×9618 float64, chunks 256×256, 135 datasets |
+| Temp S3 creds from the laptop (`boto3`, us-west-2 endpoint) | **403 / AccessDenied** on both a `head_object` and a ranged `get_object`: the credentials are in-region only, as expected |
+| Frame stack Zarr reference (`short_wavelength_displacement.zarr.json.gz`) | HTTP 200, 17.8 MB gzipped → 536 MB JSON, 1.64 M chunk refs, all `s3://`; array `[389, 6898, 9618]`, chunks `[1, 256, 256]`, codecs shuffle + zlib-4 |
+| One-pixel time series through the reference **over HTTPS** (rewrite `s3://…/<id>` → `https://cumulus.asf.earthdatacloud.nasa.gov/OPERA/…/<id>.nc`, ranged GET per chunk with the Bearer token) | HTTP 206 for every chunk, median chunk 13 KB; 32 chunks at 16-way parallel in 5.8 s → **~70 s projected for all 389 epochs** |
+
+Ramifications for a "Ground Motion Sentinel" act:
+
+- **The AgentCore runtime is in us-east-1, so direct S3 is out** (in-region-only creds). The
+  HTTPS path is the one to build on and it supports ranged reads, so the chunked Zarr
+  approach works from anywhere with only the bearer token: ~13 KB per epoch per pixel instead
+  of 380 MB granules. Decoding needs `numcodecs` (shuffle + zlib); not installed, not tested.
+- ~70 s for a full 9.6-year series is too slow live on stage but fine as a demo-prep step;
+  the live act should read a pre-computed series (or fetch only the last ~40 epochs, ~7 s)
+  and spend the stage time on the map. Fewer, larger parallel batches would also help.
+- A whole-frame displacement map for one epoch (for the map layer) is a 380 MB download +
+  reprojection; that is a prep step or a TiTiler COG built offline, not a live tool call.
+- Token lifetime: Earthdata bearer tokens expire (60 days by default); the demo runbook must
+  include refreshing `EARTHDATA_TOKEN` in the week before Nov 9.
+
+The original (pre-approval) verdict and evidence are kept below for the record.
+
+## Original verdict (2026-09-17, before approval)
 
 **Blocked pending one-time Earthdata/ASF application approval.** The token is valid
 (LPDAAC `s3credentials` returned 200 earlier the same day) but every ASF endpoint —
