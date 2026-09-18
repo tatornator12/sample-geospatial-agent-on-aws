@@ -111,6 +111,84 @@ async def display_visual(s3_url: str, title: str, description: str = "") -> str:
     
     return result_json
 
+
+def _presigned_vsicurl(s3_url: str, expires: int = 600) -> str:
+    """A GDAL-readable HTTPS path for a private session raster.
+
+    GDAL then serves downsampled reads from the COG's overviews with HTTP range requests
+    instead of downloading the whole file — the same path TiTiler uses for the map.
+    """
+    bucket, key = s3_url[len("s3://"):].split("/", 1)
+    url = boto3.client("s3").generate_presigned_url(
+        "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires
+    )
+    return f"/vsicurl/{url}"
+
+
+def _inspection_key(session_id: str, s3_url: str, fmt: str) -> str:
+    """session_data/<sid>/inspections/<raster basename>.<jpg|png> — the UI derives the same key."""
+    basename = s3_url.rsplit("/", 1)[-1]
+    stem = basename.rsplit(".", 1)[0] if "." in basename else basename
+    return f"session_data/{session_id}/inspections/{stem}.{'jpg' if fmt == 'jpeg' else 'png'}"
+
+
+@tool
+async def inspect_image(s3_url: str, title: str, question: str = "") -> dict:
+    """LOOK at a raster before you use it. Returns the actual image so you can see clouds,
+    haze, snow, nodata gaps, and the land cover over the area of interest.
+
+    Args:
+        s3_url: A session raster: the tci_s3_url from get_rasters (true colour), or an index /
+            change map from run_bandmath / run_change_detection
+        title: Short caption shown with the image (e.g. "Sentinel-2 true colour, Hyde Park, 2026-08-21")
+        question: Optional: what you want to check (e.g. "is the park obscured by cloud?")
+
+    Returns: the image plus JSON facts: width/height, nodata_pct, the value range and colour
+    ramp used (indices), bounds, and preview_s3_url (where exactly what you saw is saved).
+
+    Call it on the TCI right after get_rasters and BEFORE display_visual or any analysis, then
+    say in ONE sentence what you see. Reject the scene (get_rasters again with exclude_dates)
+    when the area is obscured or aoi_cloud_pct + aoi_nodata_pct exceeds 30."""
+    from .inspection import render_preview
+
+    session_id = os.environ.get('AGENT_SESSION_ID', config.DEFAULT_SESSION_ID)
+
+    def _error(message: str) -> dict:
+        logger.warning(f"👁️ inspect_image failed for {s3_url}: {message}")
+        return {"status": "error", "content": [{"text": json.dumps({"error": message, "s3_url": s3_url})}]}
+
+    if not isinstance(s3_url, str) or not s3_url.startswith("s3://") or "/" not in s3_url[5:]:
+        return _error("s3_url must be a session raster of the form s3://bucket/key")
+
+    try:
+        started = datetime.now()
+        rendered = render_preview(_presigned_vsicurl(s3_url), style_hint=s3_url)
+        key = _inspection_key(session_id, s3_url, rendered.fmt)
+        boto3.client("s3").put_object(
+            Bucket=config.S3_BUCKET_NAME, Key=key, Body=rendered.data,
+            ContentType="image/jpeg" if rendered.fmt == "jpeg" else "image/png",
+        )
+        preview_s3_url = f"s3://{config.S3_BUCKET_NAME}/{key}"
+        elapsed = (datetime.now() - started).total_seconds()
+        logger.info(f"👁️ inspect_image: {title} → {rendered.meta['width']}x{rendered.meta['height']} "
+                    f"{rendered.fmt} {len(rendered.data) // 1024} KB in {elapsed:.1f}s → {preview_s3_url}")
+    except ValueError as e:
+        return _error(str(e))
+    except Exception as e:
+        return _error(f"{type(e).__name__}: {str(e)[:200]}")
+
+    facts = rendered.summary_json(
+        title=title, question=question, source_s3_url=s3_url, preview_s3_url=preview_s3_url,
+        render_seconds=round(elapsed, 1),
+    )
+    return {
+        "status": "success",
+        "content": [
+            {"image": {"format": rendered.fmt, "source": {"bytes": rendered.data}}},
+            {"text": facts},
+        ],
+    }
+
 #####################################
 # GEOCODING TOOLS
 #####################################
@@ -532,8 +610,36 @@ async def _create_fallback_bbox(location: str, lat: float, lon: float, reason: s
 ### SATELLITE IMAGERY RETRIEVAL TOOLS
 #####################################
 
+def _raster_result_json(result: dict, location: str) -> dict:
+    """The JSON the imagery tools return for one scene (shared by get_rasters and the
+    two-date fetch). aoi_* fields come from the Sentinel-2 scene-classification layer over the
+    AOI polygon (null when the scene has no SCL asset); candidates are the other ranked
+    scenes in the window so the agent knows whether a better one exists."""
+    quality = result.get("aoi_quality") or {}
+    return {
+        "location": str(location),
+        "date_used": result['date'][:10],
+        "tci_s3_url": result.get('tci_s3_url', ''),
+        "red_s3_url": result.get('red_s3_url', ''),
+        "green_s3_url": result.get('green_s3_url', ''),
+        "blue_s3_url": result.get('blue_s3_url', ''),
+        "nir_s3_url": result.get('nir_s3_url', ''),
+        "nir08_s3_url": result.get('nir08_s3_url', ''),
+        "swir2_s3_url": result.get('swir2_s3_url', ''),
+        "cloud_pct": result.get('cloud_pct'),
+        "tile_id": result.get('tile_id', ''),
+        "coverage_pct": result.get('coverage_pct', ''),
+        "aoi_clear_pct": quality.get("clear_pct"),
+        "aoi_cloud_pct": None if not quality else round(quality.get("cloud_pct", 0) + quality.get("shadow_pct", 0), 1),
+        "aoi_snow_pct": quality.get("snow_pct"),
+        "aoi_nodata_pct": quality.get("nodata_pct"),
+        "candidates": result.get("candidates", []),
+    }
+
+
 @tool
-async def get_rasters(location: str, geometry_s3_url: str = None, current_date_str: str = None, max_cloud: float = 30) -> str:
+async def get_rasters(location: str, geometry_s3_url: str = None, current_date_str: str = None,
+                      max_cloud: float = 30, exclude_dates: str = "") -> str:
     """Get Sentinel-2 satellite imagery bands. Searches BACKWARDS 60 days from current_date_str.
 
     Args:
@@ -543,14 +649,24 @@ async def get_rasters(location: str, geometry_s3_url: str = None, current_date_s
             For PRE-event imagery: use a date BEFORE the event (e.g., "2024-12-31" for Jan 2025 fire).
             For POST-event imagery: use a date 1-2 months AFTER the event (e.g., "2025-03-01" for Jan 2025 fire).
         max_cloud: Max cloud % (default 30, retries at 80 if no results)
+        exclude_dates: Comma-separated YYYY-MM-DD dates of scenes you inspected and rejected;
+            the next-ranked scene in the same window is returned instead
 
-    Returns: JSON with tci_s3_url, red_s3_url, green_s3_url, nir_s3_url, nir08_s3_url, swir2_s3_url, date_used, cloud_pct
+    Returns: JSON with tci_s3_url, red_s3_url, green_s3_url, nir_s3_url, nir08_s3_url, swir2_s3_url,
+    date_used, cloud_pct (whole tile), aoi_clear_pct / aoi_cloud_pct (clouds+shadow) / aoi_snow_pct /
+    aoi_nodata_pct (measured over YOUR area from the scene classification; null if unavailable),
+    and candidates (other scenes in the window as date, cloud_pct, coverage_pct).
 
-    Use date_used in subsequent analysis calls. For comparisons, call this twice with different dates that bracket the event."""
+    Use date_used in subsequent analysis calls. For comparisons, call this twice with different dates that bracket the event.
+    Then inspect_image(tci_s3_url) before displaying or analysing."""
     if not current_date_str:
         current_date_str = datetime.today().strftime("%Y-%m-%d")
+    from .inspection import parse_exclude_dates
+    excluded = parse_exclude_dates(exclude_dates)
     
     status_msg = f"🔍 STEP 1: Searching for satellite images 📅 Date: {current_date_str}\n☁️ Max cloud: {max_cloud}%"
+    if excluded:
+        status_msg += f"\n🚫 Excluding rejected scenes: {', '.join(excluded)}"
     logger.info(status_msg)
     _log_mem("get_rasters:start")
 
@@ -564,46 +680,38 @@ async def get_rasters(location: str, geometry_s3_url: str = None, current_date_s
         geocode_result = json.loads(geocode_result) #cast as a json
         aoi_gdf = download_geometry_from_s3(geocode_result["geometry_s3_url"])
         
-    images = get_filtered_images(aoi_gdf, bands=["red", "green", "blue", "nir", "nir08", "swir2"], max_cloud=max_cloud, current_date_str=current_date_str, location=location)
-    print(images)
+    bands = ["red", "green", "blue", "nir", "nir08", "swir2"]
+    images = get_filtered_images(aoi_gdf, bands=bands, max_cloud=max_cloud, current_date_str=current_date_str,
+                                 location=location, exclude_dates=excluded)
 
     logger.info(f"✅ STEP 1 RESULT: Found {len(images)} images")
 
     if not images:
         logger.info("⚠️ STEP 1 RETRY: No images found, trying with higher cloud coverage (80%)")
-        images = get_filtered_images(aoi_gdf, bands=["red", "green", "blue", "nir", "nir08", "swir2"], max_cloud=80, current_date_str=current_date_str, location=location)
+        images = get_filtered_images(aoi_gdf, bands=bands, max_cloud=80, current_date_str=current_date_str,
+                                     location=location, exclude_dates=excluded)
         logger.info(f"✅ STEP 1 RETRY RESULT: Found {len(images)} images")
         
     if not images:
         error_msg = f"❌ STEP 1 FAILED: No satellite images found for {location} on {current_date_str}"
+        if excluded:
+            error_msg += f" (after excluding {', '.join(excluded)})"
         logger.error(error_msg)
         return error_msg
     
     result = images[0]
-    success_msg = f"✅ STEP 1 SUCCESS: Image found with {result.get('cloud_pct', 'N/A')}% cloud coverage\n🛰️ Date: {result.get('date', 'Unknown')}\n📊 Bands available: red, nir, tci"
+    quality = result.get("aoi_quality") or {}
+    success_msg = (f"✅ STEP 1 SUCCESS: Image found with {result.get('cloud_pct', 'N/A')}% tile cloud, "
+                   f"AOI clear {quality.get('clear_pct', 'n/a')}%\n🛰️ Date: {result.get('date', 'Unknown')}")
     logger.info(success_msg)
     
-    # Return S3 URLs for all saved rasters
-    out = json.dumps({
-        "location" : str(location),
-        "date_used": result['date'][:10],
-        "tci_s3_url": result.get('tci_s3_url', ''),
-        "red_s3_url": result.get('red_s3_url', ''),
-        "green_s3_url": result.get('green_s3_url', ''),
-        "blue_s3_url": result.get('blue_s3_url', ''),
-        "nir_s3_url": result.get('nir_s3_url', ''),
-        "nir08_s3_url": result.get('nir08_s3_url', ''),
-        "swir2_s3_url": result.get('swir2_s3_url', ''),
-        "cloud_pct": result.get('cloud_pct'),
-        "tile_id": result.get('tile_id', ''),
-        "coverage_pct": result.get('coverage_pct', '')
-    })
+    out = json.dumps(_raster_result_json(result, location))
     
     _log_mem("get_rasters:end")
     return out
 
 
-def _fetch_and_map_rasters(aoi_gdf, location, current_date_str, max_cloud):
+def _fetch_and_map_rasters(aoi_gdf, location, current_date_str, max_cloud, exclude_dates=()):
     """Synchronous worker: search + clip + upload Sentinel-2 bands for ONE date.
 
     Returns a dict matching get_rasters' output shape, or None if no image found.
@@ -611,32 +719,21 @@ def _fetch_and_map_rasters(aoi_gdf, location, current_date_str, max_cloud):
     """
     bands = ["red", "green", "blue", "nir", "nir08", "swir2"]
     images = get_filtered_images(aoi_gdf, bands=bands, max_cloud=max_cloud,
-                                 current_date_str=current_date_str, location=location)
+                                 current_date_str=current_date_str, location=location,
+                                 exclude_dates=exclude_dates)
     if not images:
         images = get_filtered_images(aoi_gdf, bands=bands, max_cloud=80,
-                                     current_date_str=current_date_str, location=location)
+                                     current_date_str=current_date_str, location=location,
+                                     exclude_dates=exclude_dates)
     if not images:
         return None
-    r = images[0]
-    return {
-        "location": str(location),
-        "date_used": r['date'][:10],
-        "tci_s3_url": r.get('tci_s3_url', ''),
-        "red_s3_url": r.get('red_s3_url', ''),
-        "green_s3_url": r.get('green_s3_url', ''),
-        "blue_s3_url": r.get('blue_s3_url', ''),
-        "nir_s3_url": r.get('nir_s3_url', ''),
-        "nir08_s3_url": r.get('nir08_s3_url', ''),
-        "swir2_s3_url": r.get('swir2_s3_url', ''),
-        "cloud_pct": r.get('cloud_pct'),
-        "tile_id": r.get('tile_id', ''),
-        "coverage_pct": r.get('coverage_pct', ''),
-    }
+    return _raster_result_json(images[0], location)
 
 
 @tool
 async def get_rasters_for_dates(location: str, date1_str: str, date2_str: str,
-                                geometry_s3_url: str = None, max_cloud: float = 30) -> str:
+                                geometry_s3_url: str = None, max_cloud: float = 30,
+                                exclude_dates: str = "") -> str:
     """Fetch Sentinel-2 imagery for TWO dates IN PARALLEL. Use this for change
     detection / before-after comparisons instead of calling get_rasters twice — it
     resolves the geometry once and fetches both dates concurrently (~2x faster).
@@ -647,14 +744,19 @@ async def get_rasters_for_dates(location: str, date1_str: str, date2_str: str,
         date2_str: Second date YYYY-MM-DD (END of 60-day search window, e.g. POST-event)
         geometry_s3_url: Boundary from find_location_boundary / get_best_geometry / create_bbox_from_coordinates
         max_cloud: Max cloud % (default 30, retries at 80)
+        exclude_dates: Comma-separated YYYY-MM-DD dates of scenes you inspected and rejected
+            (applies to both windows; a date only ever falls in one of them)
 
     Returns: JSON {"date1": {...}, "date2": {...}} where each object has the same
-    fields as get_rasters (tci_s3_url, red_s3_url, green_s3_url, blue_s3_url,
-    nir_s3_url, nir08_s3_url, swir2_s3_url, date_used, cloud_pct). Feed the band URLs
-    straight into run_change_detection."""
+    fields as get_rasters (tci_s3_url, band URLs, date_used, cloud_pct, aoi_clear_pct,
+    aoi_cloud_pct, aoi_nodata_pct, candidates). Feed the band URLs straight into
+    run_change_detection after inspecting both TCIs."""
     from concurrent.futures import ThreadPoolExecutor
+    from .inspection import parse_exclude_dates
+    excluded = parse_exclude_dates(exclude_dates)
 
-    logger.info(f"🔍 Fetching rasters for TWO dates in parallel: {date1_str} + {date2_str}")
+    logger.info(f"🔍 Fetching rasters for TWO dates in parallel: {date1_str} + {date2_str}"
+                + (f" (excluding {', '.join(excluded)})" if excluded else ""))
     _log_mem("get_rasters_for_dates:start")
 
     # Resolve geometry once (shared, read-only, by both date fetches)
@@ -666,8 +768,8 @@ async def get_rasters_for_dates(location: str, date1_str: str, date2_str: str,
 
     # Fetch both dates concurrently; each fetch also clips/uploads its bands in parallel.
     with ThreadPoolExecutor(max_workers=2) as ex:
-        f1 = ex.submit(_fetch_and_map_rasters, aoi_gdf, location, date1_str, max_cloud)
-        f2 = ex.submit(_fetch_and_map_rasters, aoi_gdf, location, date2_str, max_cloud)
+        f1 = ex.submit(_fetch_and_map_rasters, aoi_gdf, location, date1_str, max_cloud, excluded)
+        f2 = ex.submit(_fetch_and_map_rasters, aoi_gdf, location, date2_str, max_cloud, excluded)
         r1, r2 = f1.result(), f2.result()
 
     missing = [d for d, r in ((date1_str, r1), (date2_str, r2)) if not r]

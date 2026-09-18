@@ -17,6 +17,7 @@ from shapely.geometry import shape as shapely_shape
 
 from .geocode_utils import get_polygon_of_aoi, convert_geometry_of_geojson
 from .raster_utils import get_raster_crs, clip_raster_v2
+from .inspection import rank_candidates, scl_quality
 
 logger = logging.getLogger(__name__)
 
@@ -162,17 +163,20 @@ def check_raster_quality(scl_path, max_nodata_pct=30):
         return False, 100, 0
 
 
-def get_filtered_images(aoi_gdf, bands=["red", "nir"], max_cloud=30, current_date_str=None, days_delta=60, location=None):
+def get_filtered_images(aoi_gdf, bands=["red", "nir"], max_cloud=30, current_date_str=None, days_delta=60,
+                        location=None, exclude_dates=()):
     """
     Get filtered Sentinel-2 images for an AOI
     
     Strategy:
     - Filter tiles that fully cover the AOI (if multiple tiles exist)
-    - Sort by cloud coverage
-    - Return the best image
+    - Sort by cloud coverage, skipping excluded dates (scenes the agent rejected on inspection)
+    - Return the best image, with the AOI-level scene-classification quality and the other
+      ranked candidates so the agent can decide whether a better scene exists
     
     Args:
         location: Location name for filename (e.g., "Hyde Park London")
+        exclude_dates: YYYY-MM-DD strings to skip (already-inspected, rejected scenes)
     
     Returns:
         list: List with one image dict, or empty list if none found
@@ -226,9 +230,12 @@ def get_filtered_images(aoi_gdf, bands=["red", "nir"], max_cloud=30, current_dat
         logger.error(f"Failed to convert geometry: {e}")
         return []
 
-    # Sort by cloud coverage (primary), then AOI coverage as tiebreaker (secondary)
-    all_images_sorted = sorted(all_images, key=lambda x: (x.get('cloud_pct', 100), -x.get('coverage_pct', 0)))
-    best_image = all_images_sorted[0]
+    # Sort by cloud coverage (primary), then AOI coverage as tiebreaker (secondary), skipping
+    # scenes the agent has already inspected and rejected.
+    best_image, other_candidates = rank_candidates(all_images, exclude_dates)
+    if best_image is None:
+        logger.warning(f"All {len(all_images)} candidate scenes are excluded: {sorted(set(exclude_dates))}")
+        return []
 
     print(f"📊 Best image: {best_image.get('date', 'unknown')[:10]} with {best_image.get('cloud_pct', 'N/A')}% cloud, {best_image.get('coverage_pct', 'N/A')}% AOI coverage")
 
@@ -266,12 +273,25 @@ def get_filtered_images(aoi_gdf, bands=["red", "nir"], max_cloud=30, current_dat
             s3_client.upload_file(local, bucket_name, key)
             return name, f"s3://{bucket_name}/{key}"
 
+        # AOI-level quality from the 20 m scene-classification layer, read in the same pool
+        # (one small windowed read; never blocks the band clips and never fails the fetch).
+        def _aoi_quality():
+            if not best_image.get("scl"):
+                return None
+            try:
+                return scl_quality(f"/vsicurl/{best_image['scl']}", aoi_gdf)
+            except Exception as e:
+                logger.warning(f"SCL quality unavailable for {image_date}: {e}")
+                return None
+
         uploaded = {}
-        with ThreadPoolExecutor(max_workers=min(len(layers), 8)) as ex:
+        with ThreadPoolExecutor(max_workers=min(len(layers) + 1, 8)) as ex:
+            quality_future = ex.submit(_aoi_quality)
             futures = {ex.submit(_clip_and_upload, n, h): n for n, h in layers}
             for fut in as_completed(futures):
                 name, url = fut.result()
                 uploaded[name] = url
+            aoi_quality = quality_future.result()
 
         result = {
             "tci": best_image['tci'],
@@ -280,7 +300,9 @@ def get_filtered_images(aoi_gdf, bands=["red", "nir"], max_cloud=30, current_dat
             "cloud_pct": best_image.get('cloud_pct', 'N/A'),
             "date": best_image.get('date', 'Unknown date'),
             "tile_id": best_image.get('tile_id', 'Unknown tile ID'),
-            "coverage_pct": best_image.get('coverage_pct', 'N/A')
+            "coverage_pct": best_image.get('coverage_pct', 'N/A'),
+            "aoi_quality": aoi_quality,
+            "candidates": other_candidates,
         }
 
         if bands:

@@ -35,7 +35,8 @@ from utils.mcp_http import charset_safe_httpx_client_factory
 
 from utils.tools import (find_location_boundary, create_bbox_from_coordinates,
                          get_best_geometry, get_rasters, get_rasters_for_dates, run_bandmath,
-                         display_visual, calculator, list_session_assets, calculate_environmental_impact,
+                         display_visual, inspect_image, calculator, list_session_assets,
+                         calculate_environmental_impact,
                          run_change_detection, scan_region_change, protected_area_context,
                          display_protected_area_by_name)
 from utils.scenario_loader import load_scenario, build_scenario_context
@@ -171,7 +172,7 @@ async def sat_image_analyzer_agent(payload, context=None):
             agent = Agent(
                 tools=mcp_tools + [find_location_boundary, create_bbox_from_coordinates,
                                     get_best_geometry, get_rasters, get_rasters_for_dates, run_bandmath, 
-                                    display_visual, calculator, list_session_assets, 
+                                    display_visual, inspect_image, calculator, list_session_assets, 
                                     calculate_environmental_impact,
                                    run_change_detection, protected_area_context,
                                    display_protected_area_by_name]
