@@ -19,8 +19,8 @@ not all up front, so requirements reflect what the data spikes actually showed.
 
 | # | Spec folder | Week | Gate (Friday) | Status |
 |---|---|---|---|---|
-| 1 | `demo-foundation` | Sep 15–19 | G1: dev runtime reachable from local UI via switcher; eval script runs; 4 spike notes | in progress |
-| 2 | `eyes-inspect-image` | Sep 22–26 | tool + gallery + cloudy-scene golden prompt pass | not started |
+| 1 | `demo-foundation` | Sep 15–19 | G1: dev runtime reachable from local UI via switcher; eval script runs; 4 spike notes | **G1 passed Sep 18** |
+| 2 | `eyes-inspect-image` | Sep 22–26 | tool + gallery + cloudy-scene golden prompt pass | spec drafted, awaiting approval |
 | 3 | `similarity-search` | Sep 29–Oct 3 | G2: Release 1 promoted to `demo-stable`; Act 1 rehearsed (7 min) | not started |
 | 4 | `methane-hunter` | Oct 6–17 | G3: Release 2; two agents in switcher; Acts 1–2 rehearsed | not started |
 | 5 | `ai-archaeologist` | Oct 20–24 | closer works on a public site; **Act 3 decision written down Oct 24** | not started |
