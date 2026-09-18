@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Pre-warm AgentCore sessions before an act so the first prompt on stage skips the cold start.
 
-Each pre-warmed session gets a trivial, tool-free prompt. The script prints the session id
-and a stage URL that adopts it (`/?session=<id>&agent=<agentId>`); open that URL on the
-presenter machine and the first real prompt runs in an already-booted session.
+The stage UI does this by itself for every new session (see /api/agent/prewarm); this script is
+the manual/scripted path: after a deploy, or to warm a runtime that has sat idle before the
+show. Each pre-warmed session gets the {"prewarm": true} payload. The script prints the
+session id and a stage URL that adopts it (`/?session=<id>&agent=<agentId>`); open that URL
+on the presenter machine and the first real prompt runs in an already-booted session.
 
 Usage:
     python scripts/prewarm.py --target dev [--count 2] [--agent dev] [--ui http://localhost:5173]
@@ -25,15 +27,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from eval import TARGET_AGENTS, resolve_agent_arn  # noqa: E402
 
-WARM_PROMPT = "Reply with exactly the word ready. Do not call any tools."
+# The agent answers {"prewarm": true} with "warm" as soon as its container is up: no model call,
+# nothing written to the session history (see the entrypoint in geospatial_agent_on_aws.py).
+WARM_PAYLOAD = {"prewarm": True}
 
 
 def invoke(client, arn: str, session_id: str) -> tuple[float, float, str]:
-    """Returns (seconds to first byte, seconds total, text) for one trivial prompt."""
+    """Returns (seconds to first byte, seconds total, text) for one pre-warm call."""
     t0 = time.monotonic()
     resp = client.invoke_agent_runtime(
         agentRuntimeArn=arn, runtimeSessionId=session_id, qualifier="DEFAULT",
-        payload=json.dumps({"prompt": WARM_PROMPT}).encode(),
+        payload=json.dumps(WARM_PAYLOAD).encode(),
     )
     first = None
     chunks = []
@@ -68,9 +72,9 @@ def main() -> int:
     for _ in range(args.count):
         session_id = str(uuid.uuid4())
         ttfb, total, text = invoke(client, arn, session_id)
-        ok = "Error:" not in text
+        ok = text == "warm"
         print(f"  session {session_id}: first byte {ttfb:4.1f}s, done {total:4.1f}s, reply {text[:40]!r}"
-              + ("" if ok else "  <- ERROR"))
+              + ("" if ok else "  <- UNEXPECTED (runtime without the prewarm path, or an error)"))
         if args.verify:
             ttfb2, total2, _ = invoke(client, arn, session_id)
             print(f"      warm re-invoke:      first byte {ttfb2:4.1f}s, done {total2:4.1f}s")

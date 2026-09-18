@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
+import { prewarmSession } from '../services/api';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { MapView } from '../components/MapView';
@@ -271,6 +272,15 @@ export function Chat() {
     // handleSessionReset is recreated every render; the effect only needs to fire on a switch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgentId]);
+
+  // Every new session boots its runtime in the background the moment it exists, so the first
+  // prompt on stage never pays the cold start. Once per session id.
+  const prewarmedSessions = useRef(new Set<string>());
+  useEffect(() => {
+    if (!selectedAgentId || prewarmedSessions.current.has(sessionId)) return;
+    prewarmedSessions.current.add(sessionId);
+    void prewarmSession(sessionId, selectedAgentId);
+  }, [sessionId, selectedAgentId]);
 
   const handleDrawnGeometry = (geojson: any) => {
     // Format the GeoJSON as a message to send to chat

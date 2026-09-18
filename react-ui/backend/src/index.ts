@@ -196,6 +196,54 @@ interface AgentPayload {
   scenario_id?: string;
 }
 
+// ========================================
+// Pre-warm
+// ========================================
+// The UI calls this the moment a session id exists (page load, New session, agent switch).
+// The agent answers {"prewarm": true} with "warm" as soon as its container is up, so the
+// ~30 s cold start is paid while the presenter is still talking, not after the first prompt.
+// A prompt that arrives while its session is still warming waits for the warm-up instead of
+// racing it on the same session id.
+const prewarmsInFlight = new Map<string, Promise<void>>();
+
+async function prewarmSession(agent: AgentRuntime, sessionId: string): Promise<void> {
+  const started = Date.now();
+  const response = await bedrockClientFor(agent.region).send(new InvokeAgentRuntimeCommand({
+    runtimeSessionId: sessionId,
+    agentRuntimeArn: agent.arn,
+    qualifier: 'DEFAULT',
+    payload: new TextEncoder().encode(JSON.stringify({ prewarm: true })),
+  }));
+  // Drain the (tiny) stream so the invocation completes.
+  if (response.response) {
+    for await (const _chunk of response.response as any) { /* "warm" */ }
+  }
+  console.log(`🔥 Pre-warmed session ${sessionId} on "${agent.id}" in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+}
+
+app.post('/api/agent/prewarm', async (req: Request, res: Response) => {
+  const { sessionId, agentId } = req.body;
+  if (!sessionId || typeof sessionId !== 'string' || sessionId.length < 33) {
+    return res.status(400).json({ error: 'sessionId (33+ characters) is required' });
+  }
+  const agent = resolveAgent(agentId);
+  if (!agent) {
+    if (agentId !== undefined && agentId !== null && agentId !== '') {
+      return unknownAgentResponse(res, agentId);
+    }
+    return res.status(503).json({ error: 'No agent runtime configured. Set AGENT_RUNTIMES or AGENT_RUNTIME_ARN.' });
+  }
+
+  if (!prewarmsInFlight.has(sessionId)) {
+    const task = prewarmSession(agent, sessionId)
+      .catch((error) => console.warn(`Pre-warm failed for ${sessionId}:`, error?.message || error))
+      .finally(() => prewarmsInFlight.delete(sessionId));
+    prewarmsInFlight.set(sessionId, task);
+  }
+  // Respond immediately; the warm-up continues in the background.
+  res.status(202).json({ warming: true, sessionId, agentId: agent.id });
+});
+
 // List the agents the UI can switch between. Public fields only: no ARNs or regions.
 app.get('/api/agents', (req: Request, res: Response) => {
   res.json({
@@ -252,6 +300,11 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
 
   try {
     const bedrockClient = bedrockClientFor(agent.region);
+    const warming = prewarmsInFlight.get(sessionId);
+    if (warming) {
+      console.log(`⏳ Session ${sessionId} is still warming; waiting before invoking`);
+      await warming;
+    }
     console.log(`Invoking agent "${agent.id}" (${agent.region}) with session: ${sessionId}`);
 
     // Build agent payload with proper typing

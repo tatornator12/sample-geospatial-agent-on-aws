@@ -242,6 +242,23 @@ export async function loadGeometry(s3Url: string): Promise<GeometryData | null> 
 }
 
 /**
+ * Ask the backend to boot the runtime for a session before the first prompt (fire and forget).
+ * Returns true when the backend accepted the request; never throws.
+ */
+export async function prewarmSession(sessionId: string, agentId?: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_URL}/api/agent/prewarm`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(agentId ? { sessionId, agentId } : { sessionId }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Stop an active AgentCore runtime session
  */
 export async function stopRuntimeSession(sessionId: string, agentId?: string): Promise<boolean> {

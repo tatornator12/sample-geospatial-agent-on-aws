@@ -3,7 +3,7 @@
  * module-level API URL resolves to http://localhost:3001.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { listAgents } from './api.ts';
+import { listAgents, prewarmSession } from './api.ts';
 
 function fetchResponding(status: number, payload: unknown) {
   return vi.fn().mockResolvedValue({
@@ -60,5 +60,29 @@ describe('listAgents', () => {
     vi.stubGlobal('fetch', fetchResponding(500, { error: 'boom' }));
 
     await expect(listAgents()).rejects.toThrow(/HTTP 500/);
+  });
+});
+
+describe('prewarmSession', () => {
+  it('posts the session and agent and reports acceptance', async () => {
+    const fetchMock = fetchResponding(202, { warming: true });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await prewarmSession('0123456789abcdef0123456789abcdef0123', 'dev')).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/api/agent/prewarm',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ sessionId: '0123456789abcdef0123456789abcdef0123', agentId: 'dev' }),
+      })
+    );
+  });
+
+  it('never throws: a network failure or error status is just false', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network error')));
+    expect(await prewarmSession('0123456789abcdef0123456789abcdef0123')).toBe(false);
+
+    vi.stubGlobal('fetch', fetchResponding(503, { error: 'no runtime' }));
+    expect(await prewarmSession('0123456789abcdef0123456789abcdef0123')).toBe(false);
   });
 });

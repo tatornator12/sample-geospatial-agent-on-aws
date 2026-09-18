@@ -93,6 +93,15 @@ async def sat_image_analyzer_agent(payload, context=None):
     os.environ['AGENT_USER_ID'] = user_id
     logger.info(f"📊 Session ID: {session_id}, User ID: {user_id}")
 
+    # Pre-warm: the UI (and scripts/prewarm.py) invoke a fresh session with {"prewarm": true}
+    # as soon as the session id exists. Reaching this line means the microVM has booted and the
+    # geo stack is imported, which is the ~30 s cold-start cost; the first real prompt on the
+    # same session then starts warm. No model call, nothing written to the session history.
+    if payload.get("prewarm"):
+        logger.info("🔥 prewarm: runtime is up for this session")
+        yield "warm"
+        return
+
     # Telemetry setup:
     # - If Langfuse is configured: use StrandsTelemetry to export to Langfuse endpoint
     # - Otherwise: do NOT create StrandsTelemetry — let ADOT (aws-opentelemetry-distro)
