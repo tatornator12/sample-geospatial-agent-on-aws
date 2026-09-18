@@ -64,9 +64,15 @@ Speed, if wanted, comes from the agent, not the model. Measured the same afterno
   geometry-display fold did not take in that trace. Across the seven golden prompts the
   totals were 322 s before and 323 s after: one round trip per prompt is inside the ±10 s
   run-to-run noise, so this is a real but small win.
-- **Geocoding is the fattest remaining target:** 8.6 → 21.8 s of the Hyde Park trace. The
+- **Geocoding was the fattest remaining target:** 8.6 → 21.8 s of the Hyde Park trace. The
   ArcGIS geocoder returned London, Ontario for "Hyde Park, London" and the model spent an
-  extra round trip re-geocoding; the prompt now asks for the country in the first call for
-  ambiguous names. The OSM boundary lookup itself (~4–5 s) is network-bound.
+  extra round trip re-geocoding. The prompt now asks for the country in the first call for
+  ambiguous names; the next trace geocoded "Hyde Park, London, United Kingdom" once (9 tool
+  calls instead of 10). The OSM boundary lookup itself (~4–5 s) is network-bound.
+- **Net effect on the same warm prompt, same model, same afternoon: 43.5 s → 31.2 s** (fold +
+  first-call geocoding), a 28 % shorter turn with identical results on the map.
+- **A genuinely cold runtime is ~30 s to the first tool call.** The first invoke after the
+  version-18 deploy took 32.2 s to reach the first tool (vs 6.5 s warm a minute later). That
+  is the case `scripts/prewarm.py` exists for: run it after every deploy and before each act.
 - Still unmeasured: a shorter final report (the last 7–8 s of a turn is the model writing a
   table the caption band never shows) — a copy decision for the presenter, not a code change.
