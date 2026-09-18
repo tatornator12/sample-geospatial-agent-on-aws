@@ -28,3 +28,16 @@ FIRST VIEWPORT (1920×1080): the map edge to edge. Top: a slim exhibit rail, 56p
 FORM: The Planetarium Show, candidate 5 of 7 on the grounded list (assigned by the roll), seed key 8e283055. Raised by the hand it beat: numbered step column with one lit marker (orizuru), leader-line callouts pinned to features (tensegrity), one tabular monospace register for numerics (datamatics), keyboard-first presenter shortcuts (phosphor), fixed frame with one live window (cd-rom), only the active item wears colour (saville).
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+
+## Addendum (Sep 18): evidence chips and the enlarged evidence plate
+
+Job: the room sees the image the agent looked at, at the moment it looked, pinned to the step
+that looked. Operate mode; the presenter opens one with click or Enter to make a point.
+Form: a 228×128 thumbnail plate (hairline, raised plate at 88 %, Level 2 shadow) under the
+`inspect image` step in the step column, caption at 15 px beneath; born as the working dots,
+resolves when the saved rendering exists in S3, settles quietly to "not saved" after 60 s.
+Enlarged: one figure over the stage at ≤ 72 vw, plate at 96 % over blur, strong hairline,
+Level 4 shadow, title 18 px with the acquisition date in mono, close control top right;
+Escape, the control, or a click outside closes; focus returns to the chip.
+Spotlight discipline: the lit step stays the only amber; the ready chip borrows amber only on
+hover/focus for its frame. Anti-goals: no gallery block, no kicker, no caption over the image.

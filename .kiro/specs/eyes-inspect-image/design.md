@@ -139,6 +139,29 @@ run_bandmath → display_visual(index)`.
   `["get_rasters", "inspect_image", "run_bandmath", "display_visual"]`, forbidden `Error:`.
   The rejection loop is unit-tested, not gated on live weather.
 
+## Deviations recorded during the build (Sep 18)
+
+- **AOI quality is measured at fetch time, not by a sibling SCL file.** `get_filtered_images`
+  reads the SCL asset with a masked read over the AOI polygon (so pixels outside the polygon
+  are excluded rather than counted as nodata) in the same thread pool as the band clips, and
+  returns the percentages in the `get_rasters` JSON. No `scl_clipped_*.tif` is uploaded and
+  `inspect_image` does not look one up — one fewer S3 round trip, and the model already holds
+  the numbers when it inspects. `aoi_cloud_pct` = clouds + cirrus + shadow; snow reported
+  separately as `aoi_snow_pct`.
+- **JPEG cannot carry alpha**, so true-colour previews paint nodata flat grey and say so in the
+  metadata (`nodata_treatment`) and in the prompt ("flat grey is outside the AOI or missing,
+  never land cover"). Index PNGs stay transparent as designed.
+- **Presigned reads are signed for the bucket's real region** (`get_bucket_location`, cached);
+  signing with the process default region produced S3 400s on a laptop whose default region
+  differed from the bucket's.
+- **Chips live inside the step column**, one under each `inspect_image` step (228×128), rather
+  than as a separate gallery block — the room reads the image at the moment the step happens.
+- **The plate has no kicker line** (the craft floor bans eyebrows); the title carries itself,
+  and the mono date is only added when the title does not already contain it.
+- **Bergen was clear on calibration day** (AOI 97.9 % clear), so the `cloudy-scene` golden
+  prompt asserts the inspect-then-analyse sequence as planned and the rejection loop remains
+  unit-tested (`exclude_dates` ranking), exactly per Requirement 3.4.
+
 ## Data models
 
 `inspect_image` text block:

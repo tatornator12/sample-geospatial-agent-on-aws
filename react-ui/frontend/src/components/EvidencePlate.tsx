@@ -40,7 +40,9 @@ export function EvidencePlate({ item, imageUrl, onClose }: EvidencePlateProps) {
     };
   }, [onClose]);
 
-  const date = dateOf(item);
+  // Titles usually name the date already; only add the mono date when they do not.
+  const rawDate = dateOf(item);
+  const date = rawDate && !item.title.includes(rawDate) ? rawDate : null;
 
   return (
     <div className="evidence-plate__backdrop" onMouseDown={onClose}>
