@@ -84,11 +84,15 @@ spike notes exist under `docs/spikes/`.
     - First real run 5/6 (wildfire used `get_rasters_for_dates`, not `get_rasters`); expectations calibrated against the recorded streams, wildfire re-run live → PASS (43 s). All six green against dev, 2026-09-17
   - _Requirements: 5.3, 5.4_
 
-- [ ] 10. Data spikes (2 hours each, stop at the timebox)
-  - [ ] 10.1 EMIT: fetch the plume GeoJSON, render one `CH4PLM` COG via TiTiler → `docs/spikes/emit.md`
-  - [ ] 10.2 3DEP: one 1 m DEM tile over Newark Earthworks or Poverty Point, hillshade + local relief → `docs/spikes/lidar.md`
-  - [ ] 10.3 OPERA DISP-S1: Earthdata token → `us-west-2` S3 read of one frame, one pixel time series, timing → `docs/spikes/disp-s1.md`
-  - [ ] 10.4 Dark Vessels: one month of Channel Islands AIS into DuckDB; one Sentinel-1 GRD scene (requester-pays, `eu-central-1`); CFAR on VV; count targets and AIS matches → `docs/spikes/dark-vessels.md` with the unmatched count that drives the Oct 24 decision
+- [x] 10. Data spikes (2 hours each, stop at the timebox)
+  - [x] 10.1 EMIT: fetch the plume GeoJSON, render one `CH4PLM` COG via TiTiler → `docs/spikes/emit.md`
+    - PROVEN in ~3 min: 1,686 CH4PLM granules via public CMR; Permian Basin plume COG downloaded with the Earthdata token, staged to our bucket, rendered by TiTiler (plasma, 6.7 KB PNG). Gotcha: API Gateway returns base64 unless the client sends `Accept: image/png`
+  - [x] 10.2 3DEP: one 1 m DEM tile over Newark Earthworks or Poverty Point, hillshade + local relief → `docs/spikes/lidar.md`
+    - PROVEN in ~9 min: OH statewide 1 m tile (312 MB, public prd-tnm), Great Circle + Octagon unambiguous in hillshade and LRM (wall relief +1.9…+2.7 m, ring diameter 363 m vs documented ~366 m); rendered through TiTiler. Seed coordinate was ~1.6 km off — derive coordinates from data
+  - [x] 10.3 OPERA DISP-S1: Earthdata token → `us-west-2` S3 read of one frame, one pixel time series, timing → `docs/spikes/disp-s1.md`
+    - BLOCKED pending a one-time browser approval: every ASF endpoint answers 403 "EULA Acceptance Failure" with resolution URL https://urs.earthdata.nasa.gov/approve_app?client_id=BO_n7nTIlMljdvU6kRRB3g (token itself is valid). Without auth: frame F11116 has 389 acquisitions over 9.6 years, mean 378 MB/granule, and ASF ships frame-level kerchunk/zarr references — the likely live-demo path. Re-run checklist is in the note
+  - [x] 10.4 Dark Vessels: one month of Channel Islands AIS into DuckDB; one Sentinel-1 GRD scene (requester-pays, `eu-central-1`); CFAR on VV; count targets and AIS matches → `docs/spikes/dark-vessels.md` with the unmatched count that drives the Oct 24 decision
+    - DECISION RULE SATISFIED: 19 CFAR targets over ~3,000 km²; 5 = oil platforms, 7 inside a proven AIS receiver gap (no pings west of −119.9° for 11 h around the scene — not evidence), 7 credible dark candidates in covered water (nearest AIS 3.3–3.7 km; likely AIS-exempt squid fleet). eu-central-1 S3 is blackholed from this network → radar read via Planetary Computer's COG mirror (windowed reads, ~30 MB). MarineCadastre AIS moved to `noaaocm.blob.core.windows.net/ais/csv2/` (.csv.zst); DuckDB ingests 1 s/day, month is download-bound (~1.8 h) — 3 days proven in the timebox
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ] 11. Friday gate G1
