@@ -76,3 +76,15 @@ Speed, if wanted, comes from the agent, not the model. Measured the same afterno
   is the case `scripts/prewarm.py` exists for: run it after every deploy and before each act.
 - Still unmeasured: a shorter final report (the last 7–8 s of a turn is the model writing a
   table the caption band never shows) — a copy decision for the presenter, not a code change.
+
+## Addendum: pre-warm is now automatic
+
+The stage fires `POST /api/agent/prewarm` for every new session id (page load, New session,
+agent switch). The agent answers `{"prewarm": true}` with `warm` once its container is up, no
+model call, nothing in the session history; a prompt that lands mid-warm waits for the boot
+instead of colliding with it. Measured on a just-deployed (cold) runtime: the warm-up absorbed
+a 23.7 s boot and the real prompt on that session reached its first tool call in 6.1 s.
+`scripts/prewarm.py` remains for the two cases the UI cannot cover: right after a deploy (warm
+the new image before anyone opens the stage) and a runtime that has sat idle for hours before
+the show. Runtimes also expose `lifecycleConfiguration.idleRuntimeSessionTimeout` (currently
+900 s); raising it for show day would keep warmed sessions alive across an act. Not changed yet.
