@@ -95,12 +95,34 @@ spike notes exist under `docs/spikes/`.
     - DECISION RULE SATISFIED: 19 CFAR targets over ~3,000 km²; 5 = oil platforms, 7 inside a proven AIS receiver gap (no pings west of −119.9° for 11 h around the scene — not evidence), 7 credible dark candidates in covered water (nearest AIS 3.3–3.7 km; likely AIS-exempt squid fleet). eu-central-1 S3 is blackholed from this network → radar read via Planetary Computer's COG mirror (windowed reads, ~30 MB). MarineCadastre AIS moved to `noaaocm.blob.core.windows.net/ais/csv2/` (.csv.zst); DuckDB ingests 1 s/day, month is download-bound (~1.8 h) — 3 days proven in the timebox
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 11. Friday gate G1
-  - [ ] 11.1 Run `pytest -q`, `npm test`, `npm run design:check`, `python scripts/eval.py --target dev --dry-run`; all green
-  - [ ] 11.2 Commit `develop`, push `develop` and `demo-stable` (with tag) to `fork`
-  - [ ] 11.3 Record the gate result and spike verdicts at the bottom of this file; create `.kiro/specs/eyes-inspect-image/` for Week 2
+- [x] 11. Friday gate G1
+  - [x] 11.1 Run `pytest -q`, `npm test`, `npm run design:check`, `python scripts/eval.py --target dev --dry-run`; all green
+  - [x] 11.2 Commit `develop`, push `develop` and `demo-stable` (with tag) to `fork`
+  - [x] 11.3 Record the gate result and spike verdicts at the bottom of this file; create `.kiro/specs/eyes-inspect-image/` for Week 2
   - _Requirements: all_
 
 ## Gate log
 
-- (append Friday results here)
+### G1 — Friday 2026-09-18: PASS
+
+Commands (all exit 0, run this day):
+- `pytest -q` in geo_agent/: 23 passed (~1.4 s, hermetic, S3_BUCKET_NAME unset)
+- `npm test` in react-ui/frontend: 15 passed (2 files)
+- `npm run design:check`: detector clean, exit 0
+- `python scripts/eval.py --target dev --dry-run`: 6 cases planned, exit 0
+  (full live eval ran 6/6 against dev on 2026-09-17 after calibration)
+
+Gate condition met: dev runtime (`geospatial_agent_dev`, v4) reachable from the local UI via
+the agent switcher (headless round-trip verified); eval script runs; four spike notes exist.
+
+Spike verdicts:
+- EMIT: PROVEN (~3 min) — CMR plume list public, CH4PLM COG rendered through TiTiler.
+- 3DEP: PROVEN (~9 min) — Newark Great Circle/Octagon unambiguous in 1 m hillshade + LRM.
+- OPERA DISP-S1: BLOCKED on a one-time ASF app approval (urs.earthdata.nasa.gov
+  approve_app?client_id=BO_n7nTIlMljdvU6kRRB3g); inventory + re-run checklist in the note.
+- Dark Vessels: DECISION RULE SATISFIED — 7 credible dark candidates in AIS-covered water
+  (plus 5 platforms and 7 coverage-gap artifacts, both correctly discounted).
+
+Also this week (unplanned but gate-relevant): ArcGIS MCP token expired mid-week — the agent
+now degrades to local tools when the MCP is unreachable (dev v3+); token refreshed, stable
+runtime env-updated to v69 (same image), both runtimes smoke-tested through geocoding.
