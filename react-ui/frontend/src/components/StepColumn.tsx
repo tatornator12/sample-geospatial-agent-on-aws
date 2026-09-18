@@ -5,11 +5,16 @@
  */
 import type { ToolCall } from '../types.ts';
 import { theme } from '../theme';
+import type { EvidenceItem } from '../utils/evidence.ts';
+import { EvidenceChip } from './EvidenceChip.tsx';
 
 interface StepColumnProps {
   steps: ToolCall[];
   /** True while the agent is still streaming; the last step is the lit one. */
   live: boolean;
+  /** Images the agent looked at this turn, keyed to the inspect_image step by tool id. */
+  evidence?: EvidenceItem[];
+  onOpenEvidence?: (item: EvidenceItem, imageUrl: string) => void;
 }
 
 const MAX_VISIBLE = 9;
@@ -18,12 +23,13 @@ function shortToolName(name: string): string {
   return name.replace(/_/g, ' ');
 }
 
-export function StepColumn({ steps, live }: StepColumnProps) {
+export function StepColumn({ steps, live, evidence = [], onOpenEvidence }: StepColumnProps) {
   if (steps.length === 0) return null;
 
   const visible = steps.slice(-MAX_VISIBLE);
   const offset = steps.length - visible.length;
   const litIndex = live ? visible.length - 1 : -1;
+  const evidenceByTool = new Map(evidence.map((item) => [item.toolId, item]));
 
   return (
     <ol
@@ -48,6 +54,7 @@ export function StepColumn({ steps, live }: StepColumnProps) {
         const lit = i === litIndex;
         const done = !lit;
         const n = offset + i + 1;
+        const item = evidenceByTool.get(step.id);
         return (
           <li
             key={step.id || `${step.name}-${n}`}
@@ -109,6 +116,11 @@ export function StepColumn({ steps, live }: StepColumnProps) {
                 </span>
               )}
             </span>
+            {item && onOpenEvidence && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <EvidenceChip item={item} onOpen={onOpenEvidence} />
+              </div>
+            )}
           </li>
         );
       })}

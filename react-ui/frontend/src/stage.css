@@ -52,6 +52,135 @@
   margin: 0 0 6px;
 }
 
+/* Evidence chips: the image the agent looked at, pinned under the step that looked. */
+.evidence-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  margin: 4px 0 8px 36px;
+  padding: 0;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--fog);
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+.evidence-chip:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.evidence-chip__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 228px;
+  height: 128px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--plate-raised) 88%, transparent);
+  box-shadow: var(--shadow-2);
+  transition: border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+.evidence-chip--ready:hover .evidence-chip__frame,
+.evidence-chip--ready:focus-visible .evidence-chip__frame {
+  border-color: var(--amber);
+  box-shadow: var(--shadow-3);
+}
+.evidence-chip__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.evidence-chip__placeholder {
+  font-size: 15px;
+  color: var(--label);
+}
+.evidence-chip__title {
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--label);
+}
+.evidence-chip--ready .evidence-chip__title {
+  color: var(--fog);
+}
+
+/* Enlarged evidence: one image floated over the stage, readable from the back row. */
+.evidence-plate__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--dome) 60%, transparent);
+  animation: evidence-fade 200ms var(--ease-out) both;
+}
+.evidence-plate {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: min(72vw, 1400px);
+  max-height: calc(100% - 120px);
+  margin: 0;
+  padding: 16px 16px 18px;
+  background: color-mix(in srgb, var(--plate) 96%, transparent);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 12px;
+  box-shadow: 0 18px 44px rgba(3, 6, 10, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+.evidence-plate__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.evidence-plate__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--fog);
+}
+.evidence-plate__date {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+.evidence-plate__image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 300px);
+  min-height: 0;
+  object-fit: contain;
+  border-radius: 6px;
+  background: var(--dome);
+}
+.evidence-plate__question {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--label);
+}
+@keyframes evidence-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Bottom: the docent's caption band and the presenter's single input line. */
 .stage-docent {
   position: absolute;

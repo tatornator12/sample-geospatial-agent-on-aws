@@ -5,13 +5,15 @@
  * at the right when the presenter wants the full record.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message, ToolCall, GeometryData, RasterData } from '../types.ts';
 import { ToolCallDisplay } from './ToolCallDisplay.tsx';
 import { StepColumn } from './StepColumn.tsx';
+import { EvidencePlate } from './EvidencePlate.tsx';
 import { Icon } from './Icons.tsx';
+import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
   cleanStreamingText,
@@ -114,6 +116,8 @@ export function ChatSidebar({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [openEvidence, setOpenEvidence] = useState<{ item: EvidenceItem; imageUrl: string } | null>(null);
+  const closeEvidence = useCallback(() => setOpenEvidence(null), []);
   const scenarioDisplayedRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -135,6 +139,7 @@ export function ChatSidebar({
       void stopRuntimeSession(owner.sessionId, owner.agentId);
     }
     liveSessionRef.current = sessionId;
+    setOpenEvidence(null);
     setMessages([]);
     setUserInput('');
     setStreamingText('');
@@ -488,6 +493,8 @@ export function ChatSidebar({
 
   // Where the agent is: this turn's tools while working, the last turn's when finished.
   const stepTools = isStreaming ? streamingTools : lastAssistant?.tools || [];
+  // What the agent looked at: the inspect_image steps of the same turn.
+  const evidence = extractEvidence(stepTools);
 
   const canSend = !isProcessing && userInput.trim().length > 0;
 
@@ -497,8 +504,22 @@ export function ChatSidebar({
       {stepTools.length > 0 && (
         <section className="stage-steps" aria-label="Agent steps">
           <h2 className="stage-steps__title">{isStreaming ? 'The agent is working' : 'What the agent did'}</h2>
-          <StepColumn steps={stepTools} live={isStreaming} />
+          <StepColumn
+            steps={stepTools}
+            live={isStreaming}
+            evidence={evidence}
+            onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
+          />
         </section>
+      )}
+
+      {/* Enlarged evidence, over everything on the stage */}
+      {openEvidence && (
+        <EvidencePlate
+          item={openEvidence.item}
+          imageUrl={openEvidence.imageUrl}
+          onClose={closeEvidence}
+        />
       )}
 
       {/* Bottom: the docent's caption and the presenter's console */}
