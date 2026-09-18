@@ -50,10 +50,8 @@ LGND_EMBEDDINGS_ENABLED = os.environ.get("LGND_EMBEDDINGS_ENABLED", "false").low
 
 app = BedrockAgentCoreApp()
 
-bedrock_model = BedrockModel(
-    model_id=config.MODEL_ID,
-    temperature=config.MODEL_TEMPERATURE,
-)
+bedrock_model = BedrockModel(**config.model_kwargs())
+logger.info(f"Model: {config.model_kwargs()}")
     
 mcp_client = MCPClient(
     lambda: streamablehttp_client(

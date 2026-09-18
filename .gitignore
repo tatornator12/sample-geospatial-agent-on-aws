@@ -97,3 +97,4 @@ pr-drafts/
 .impeccable/live/*.png
 # impeccable-ignore-end
 .coverage*
+docs/bakeoff/*.json

@@ -18,7 +18,20 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 # Bedrock Model Configuration
 MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-6")
-MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.1"))
+# MODEL_TEMPERATURE="none" (or empty) sends no temperature at all. Claude Sonnet 5, Opus 5 and
+# Fable reject the parameter ("`temperature` is deprecated for this model"); see
+# MODELS_WITHOUT_TEMPERATURE below, which omits it for those families automatically.
+_temperature_raw = os.getenv("MODEL_TEMPERATURE", "0.1").strip().lower()
+MODEL_TEMPERATURE = None if _temperature_raw in ("", "none") else float(_temperature_raw)
+MODELS_WITHOUT_TEMPERATURE = ("claude-sonnet-5", "claude-opus-5", "claude-fable")
+
+
+def model_kwargs() -> dict:
+    """Keyword arguments for strands' BedrockModel for the configured model."""
+    kwargs = {"model_id": MODEL_ID}
+    if MODEL_TEMPERATURE is not None and not any(m in MODEL_ID for m in MODELS_WITHOUT_TEMPERATURE):
+        kwargs["temperature"] = MODEL_TEMPERATURE
+    return kwargs
 MODEL_COSTS = { #see here: https://aws.amazon.com/bedrock/pricing/
             "input": 0.003/1000,
             "cache_read_input_tokens": 0.0003/1000,
