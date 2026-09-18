@@ -47,6 +47,26 @@ and would need the Bedrock data-retention enablement first. Re-run with
 `python scripts/bakeoff.py` after any prompt change that alters round-trip count; freeze the
 model at the Nov 3 feature freeze.
 
-Speed, if wanted, comes from the agent, not the model: pre-warming sessions before each act
-(startup is ~8–10 s of every fresh session), folding `display_visual` into the following tool
-turn (~2 round trips per prompt), and a shorter final report.
+Speed, if wanted, comes from the agent, not the model. Measured the same afternoon:
+
+- **Pre-warming buys less than expected while the runtime is warm.** `scripts/prewarm.py`
+  timed a trivial prompt on a fresh session at 2.7–3.3 s and on the same session again at
+  1.7 s, so a new session costs ~1.5 s once the runtime is serving. Its real value is
+  insurance against a fully cold runtime (first call after a deploy or a long idle), which is
+  what PRODUCT.md's ">30 s" refers to. The stage adopts `/?session=<uuid>&agent=<id>` so a
+  warmed session can be used on stage.
+- **Where the first 8 s go:** not container boot but per-request work plus the first model
+  turn (ArcGIS MCP tool listing, session manager, agent build, then the model writing its
+  opening sentence and first tool calls).
+- **Display rides along** (prompt: `display_visual` in the same response as the next tool call)
+  took hold at the TCI step — `display_visual` and `run_bandmath` now arrive 0.3 s apart
+  instead of a round trip apart — and saved ~5 s on a Hyde Park trace (43.5 → 38.5 s). The
+  geometry-display fold did not take in that trace. Across the seven golden prompts the
+  totals were 322 s before and 323 s after: one round trip per prompt is inside the ±10 s
+  run-to-run noise, so this is a real but small win.
+- **Geocoding is the fattest remaining target:** 8.6 → 21.8 s of the Hyde Park trace. The
+  ArcGIS geocoder returned London, Ontario for "Hyde Park, London" and the model spent an
+  extra round trip re-geocoding; the prompt now asks for the country in the first call for
+  ambiguous names. The OSM boundary lookup itself (~4–5 s) is network-bound.
+- Still unmeasured: a shorter final report (the last 7–8 s of a turn is the model writing a
+  table the caption band never shows) — a copy decision for the presenter, not a code change.

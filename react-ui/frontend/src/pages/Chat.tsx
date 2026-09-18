@@ -6,6 +6,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { MapView } from '../components/MapView';
 import { ChatSidebar } from '../components/ChatSidebar';
 import type { GeometryData, RasterData } from '../types';
@@ -55,7 +57,12 @@ export function Chat() {
   const [searchParams] = useSearchParams();
   const scenarioId = searchParams.get('scenario');
 
-  const [sessionId, setSessionId] = useState(uuidv4());
+  // A pre-warmed session (scripts/prewarm.py prints `/?session=<uuid>`) is adopted on load so
+  // the first prompt on stage skips the runtime cold start. Anything else gets a fresh id.
+  const [sessionId, setSessionId] = useState(() => {
+    const warmed = searchParams.get('session');
+    return warmed && UUID_PATTERN.test(warmed) ? warmed : uuidv4();
+  });
   const [currentGeometry, setCurrentGeometry] = useState<GeometryData | null>(null);
   const [currentRasters, setCurrentRasters] = useState<RasterData[]>([]);
   const [drawnGeometryMessage, setDrawnGeometryMessage] = useState<string | null>(null);

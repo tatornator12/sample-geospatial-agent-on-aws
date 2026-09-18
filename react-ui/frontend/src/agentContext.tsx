@@ -52,12 +52,17 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       .then(({ agents: list, defaultAgentId }) => {
         if (cancelled) return;
         setAgents(list);
+        // `?agent=<id>` (printed by scripts/prewarm.py) wins over the remembered choice, so a
+        // pre-warmed session is opened on the agent that was warmed.
+        const fromUrl = new URLSearchParams(window.location.search).get('agent');
         const stored = readStoredAgentId();
         const initial =
+          (fromUrl && list.some((a) => a.id === fromUrl) && fromUrl) ||
           (stored && list.some((a) => a.id === stored) && stored) ||
           (defaultAgentId && list.some((a) => a.id === defaultAgentId) && defaultAgentId) ||
           list[0]?.id ||
           null;
+        if (initial) storeAgentId(initial);
         setSelectedAgentId(initial);
         setStatus('ready');
       })
