@@ -14,6 +14,7 @@ import { StepColumn } from './StepColumn.tsx';
 import { EvidencePlate } from './EvidencePlate.tsx';
 import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
+import { docentCaption } from '../utils/caption.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
   cleanStreamingText,
@@ -43,27 +44,6 @@ function loadToolCallsFromConfig(config: ScenarioConfig): ToolCall[] {
     status: 'completed' as const,
     result: tool.result || `Completed ${tool.name}`,
   }));
-}
-
-/**
- * Reduce a markdown response to the one thing the docent would say out loud right now:
- * the last paragraph, headings stripped, capped so it fits three caption lines.
- */
-function docentCaption(text: string): string {
-  const cleaned = text.replace(/\r/g, '').trim();
-  if (!cleaned) return '';
-  const paragraphs = cleaned
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  let last = paragraphs[paragraphs.length - 1] || cleaned;
-  last = last.replace(/^#{1,6}\s+/gm, '').replace(/^[-*]\s+/gm, '');
-  if (last.length > 320) {
-    const tail = last.slice(-320);
-    const cut = tail.search(/[.!?]\s+[A-Z]/);
-    last = cut >= 0 ? tail.slice(cut + 2) : `…${tail}`;
-  }
-  return last;
 }
 
 const PREPARED_PROMPTS = [

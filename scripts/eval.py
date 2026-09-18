@@ -113,9 +113,10 @@ def is_subsequence(expected: list[str], actual: list[str]) -> bool:
     return all(name in it for name in expected)
 
 
-def stream_invoke(client, arn: str, prompt: str, timeout: int) -> str:
-    """Invoke the runtime and return the full decoded stream text."""
+def stream_invoke(client, arn: str, prompt: str, timeout: int) -> tuple[str, list[tuple[int, float]]]:
+    """Invoke the runtime; return the full decoded stream text and, per chunk, (char offset, seconds)."""
     session_id = f"eval-{uuid.uuid4()}-{uuid.uuid4().hex[:8]}"  # >= 33 chars
+    started = time.monotonic()
     response = client.invoke_agent_runtime(
         agentRuntimeArn=arn,
         runtimeSessionId=session_id,
@@ -124,6 +125,8 @@ def stream_invoke(client, arn: str, prompt: str, timeout: int) -> str:
     )
     body = response["response"]
     chunks: list[str] = []
+    marks: list[tuple[int, float]] = []  # where each chunk starts in the text, and when it arrived
+    length = 0
     deadline = time.monotonic() + timeout
     for raw_line in body.iter_lines():
         if time.monotonic() > deadline:
@@ -141,7 +144,22 @@ def stream_invoke(client, arn: str, prompt: str, timeout: int) -> str:
             except json.JSONDecodeError:
                 data = data[1:-1]
         chunks.append(data)
-    return "".join(chunks)
+        marks.append((length, time.monotonic() - started))
+        length += len(data)
+    return "".join(chunks), marks
+
+
+def final_report(text: str, marks: list[tuple[int, float]], elapsed: float) -> tuple[int, float]:
+    """(chars, seconds) of the prose after the last tool call: what the room waits on at the end."""
+    spans = tool_spans(text)
+    start = spans[-1][1] if spans else 0
+    tail = text[start:]
+    chars = len(tail.strip())
+    if not chars:
+        return 0, 0.0
+    first = start + (len(tail) - len(tail.lstrip()))
+    began = next((t for offset, t in reversed(marks) if offset <= first), 0.0)
+    return chars, round(elapsed - began, 1)
 
 
 def tool_spans(text: str) -> list[tuple[int, int, str]]:
@@ -202,7 +220,7 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     """Run one golden prompt; returns (passed, detail, record)."""
     started = time.monotonic()
     try:
-        text = stream_invoke(client, arn, case["prompt"], timeout)
+        text, marks = stream_invoke(client, arn, case["prompt"], timeout)
     except Exception as e:  # RuntimeClientError, timeout, throttling ...
         record = {"name": case["name"], "passed": False, "seconds": round(time.monotonic() - started, 1),
                   "tools": [], "observations": [], "detail": f"invoke failed: {type(e).__name__}: {e}"}
@@ -224,15 +242,19 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     # the model wrote, which is what the room waits on at the end of a turn.
     spans = tool_spans(text)
     prose_chars = len(text) - sum(end - start for start, end, _ in spans)
+    report_chars, report_seconds = final_report(text, marks, elapsed)
     record = {
         "name": case["name"], "passed": not problems, "seconds": round(elapsed, 1),
         "tools": tool_names, "observations": observations(text),
-        "prose_chars": prose_chars, "detail": "; ".join(problems),
+        "prose_chars": prose_chars, "report_chars": report_chars, "report_seconds": report_seconds,
+        "report_text": text[spans[-1][1]:].strip()[:1500] if spans else text.strip()[:1500],
+        "detail": "; ".join(problems),
     }
     if problems:
         tail = text[-500:].replace("\n", " ")
         return False, "; ".join(problems) + f"\n      stream tail: ...{tail}", record
-    return True, f"{elapsed:.0f}s, tools: {tool_names}", record
+    return True, (f"{elapsed:.0f}s (final report {report_seconds:.1f}s, {report_chars} chars), "
+                  f"tools: {tool_names}"), record
 
 
 def main() -> int:

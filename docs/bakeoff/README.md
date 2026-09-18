@@ -74,8 +74,33 @@ Speed, if wanted, comes from the agent, not the model. Measured the same afterno
 - **A genuinely cold runtime is ~30 s to the first tool call.** The first invoke after the
   version-18 deploy took 32.2 s to reach the first tool (vs 6.5 s warm a minute later). That
   is the case `scripts/prewarm.py` exists for: run it after every deploy and before each act.
-- Still unmeasured: a shorter final report (the last 7–8 s of a turn is the model writing a
-  table the caption band never shows) — a copy decision for the presenter, not a code change.
+- A shorter final report: measured and shipped the same evening, see the addendum below.
+
+## Addendum: the final report is now spoken, not written (2026-09-18, dev v20)
+
+`scripts/eval.py` now records `report_seconds` / `report_chars` (the prose after the last tool
+call, i.e. what the room waits on) and keeps `report_text` in the JSON for review. Same model,
+same seven prompts, same afternoon, one pass each:
+
+| | v19 (headings + table + bullets) | v20 (2–3 sentences, list exception for scans) |
+|---|---|---|
+| passed | 7/7 | 7/7 |
+| total | 288 s | **254 s (−12 %)** |
+| final report, all prompts | 39.6 s / 8,562 chars | **15.6 s / 2,940 chars** |
+| per prompt | 2.5–8.0 s | 0–4.7 s |
+
+The earlier "7–8 s per turn" estimate was the upper end; the honest range on the long report was
+2.5–8 s (8–14 % of a turn). The cut saves 2–5 s per prompt and the caption band now shows the
+whole answer, e.g. *"Hyde Park on 2026-07-29: mean NDVI 0.47, with 45% of the park in dense or
+very dense vegetation and 54% in light vegetation, and only 0.6% bare. The park is in healthy
+mid-summer condition; …"* The two reports read in full (Hyde Park, Colorado scan) quoted the
+tool figures exactly; `report_text` is stored from now on so every run can be checked. Detail is
+still one question away because the tool results stay in the session history.
+
+Frontend insurance shipped with it: `docentCaption` (`src/utils/caption.ts`) never speaks table
+rows, separators or horizontal rules and strips blockquote markers, so if a model ever writes a
+table again the band keeps showing the sentence before it instead of assembling fragments
+mid-stream.
 
 ## Addendum: pre-warm is now automatic
 
