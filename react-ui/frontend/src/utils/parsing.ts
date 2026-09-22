@@ -240,10 +240,12 @@ export function parseToolCalls(text: string): { cleanText: string; tools: ToolCa
     }
   }
 
-  // Remove in reverse order to preserve indices
+  // Remove in reverse order to preserve indices. Each removed call is replaced by a paragraph
+  // break: the model's prose before and after a tool call are separate utterances, and joining
+  // them directly glues sentences together ("…the scene.The NDVI map…").
   for (let i = toRemove.length - 1; i >= 0; i--) {
     const { start, end } = toRemove[i];
-    cleanText = cleanText.substring(0, start) + cleanText.substring(end);
+    cleanText = `${cleanText.substring(0, start)}\n\n${cleanText.substring(end)}`;
   }
 
   // Also remove any INCOMPLETE JSON objects (streaming but not yet closed)
@@ -256,6 +258,9 @@ export function parseToolCalls(text: string): { cleanText: string; tools: ToolCa
 
   // Fix markdown spacing: ensure ## headings are on their own line
   cleanText = cleanText.replace(/([^\n])(##\s)/g, '$1\n\n$2');
+
+  // Collapse the whitespace runs left by removed tool calls into single paragraph breaks.
+  cleanText = cleanText.replace(/[ \t]*\n\s*\n[ \t\n]*/g, '\n\n');
 
   return { cleanText: cleanText.trim(), tools: jsonTools };
 

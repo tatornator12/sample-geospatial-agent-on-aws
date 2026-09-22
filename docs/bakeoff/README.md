@@ -102,6 +102,19 @@ rows, separators or horizontal rules and strips blockquote markers, so if a mode
 table again the band keeps showing the sentence before it instead of assembling fragments
 mid-stream.
 
+### Follow-up 2026-09-22 (dev v21): the record came back
+
+Presenter feedback after testing v20: the transcript drawer lost the detailed breakdown, and the
+caption band clipped the longer spoken answers. The format is now two-part — a compact table or
+tight bullet list for the transcript (≤ ~120 words, exact tool values), then ONE plain 1–2
+sentence paragraph that the caption band shows. Same seven prompts: **278 s total, 7/7, final
+report 24.9 s / 6,025 chars** (v19: 288 s / 39.6 s; v20: 254 s / 15.6 s). ~10 s of report time
+bought the record back; the caption still speaks only the closing sentences. Shipped alongside:
+the caption speaks only complete sentences while streaming, removed tool calls leave a paragraph
+break instead of gluing sentences ("…the scene.The NDVI…"), and event footprints (burn scars)
+get a right-sized AOI via `create_bbox_from_coordinates(radius_meters=…)` — the Palisades run
+now inspects 1024×1019 px over a 14×14 km box in one call instead of starting at 95×113 px.
+
 ## Addendum: pre-warm is now automatic
 
 The stage fires `POST /api/agent/prewarm` for every new session id (page load, New session,

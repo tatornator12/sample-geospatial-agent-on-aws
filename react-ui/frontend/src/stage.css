@@ -227,7 +227,7 @@
 }
 .docent-caption__text {
   min-width: 0;
-  max-height: calc(1.35em * 3);
+  max-height: calc(1.35em * 4);
   overflow: hidden;
 }
 

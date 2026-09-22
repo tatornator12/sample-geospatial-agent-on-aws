@@ -263,17 +263,21 @@ def bbox_around_point(lon: float, lat: float, distance_offset_meters: int = 2000
         return json.dumps({"error": error_msg})
 
 @tool
-async def create_bbox_from_coordinates(geometry_json: str, location: str = "custom_area") -> str:
+async def create_bbox_from_coordinates(geometry_json: str, location: str = "custom_area",
+                                        radius_meters: int = 2000) -> str:
     """Create geometry file from user-drawn coordinates, Point, or Polygon GeoJSON.
     
     Args:
         geometry_json: GeoJSON string containing Point or Polygon features
         location: Name for the geometry (default: "custom_area")
+        radius_meters: Half-width of the bbox created around a Point (default 2000 = 4x4 km).
+            Size it to what is being analysed: a neighbourhood fits the default, an event
+            footprint (burn scar, flood extent) needs 5000-8000. Ignored for Polygons.
     
     Returns: JSON with geometry_s3_url and coordinates
     
     Handles:
-    - Single Point: Creates 2km bbox around point
+    - Single Point: Creates a bbox of radius_meters around the point
     - Polygon: Saves as-is (if within size limit)
     - FeatureCollection: Extracts first feature
     
@@ -315,8 +319,9 @@ async def create_bbox_from_coordinates(geometry_json: str, location: str = "cust
             
             logger.info(f"   Point coordinates: ({lat:.6f}, {lon:.6f})")
             
-            # Create 2km bounding box using existing function
-            bbox_geojson_str = bbox_around_point(lon, lat, 2000)
+            # Create bounding box sized by the caller (default 2 km half-width)
+            radius = max(500, min(int(radius_meters), 15000))  # keep within sane/tile limits
+            bbox_geojson_str = bbox_around_point(lon, lat, radius)
             
             # Convert to GeoDataFrame
             gdf = geojson_str_to_gdf(bbox_geojson_str)
@@ -345,7 +350,7 @@ async def create_bbox_from_coordinates(geometry_json: str, location: str = "cust
                 "location": clean_location,
                 "type": "point_bbox",
                 "center": {"lat": round(lat, 6), "lon": round(lon, 6)},
-                "radius_meters": 2000
+                "radius_meters": radius
             })
         
         # Handle Polygon or MultiPolygon - save as-is

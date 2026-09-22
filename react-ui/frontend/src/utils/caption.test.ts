@@ -42,12 +42,38 @@ describe('docentCaption', () => {
   it('caps long paragraphs at a sentence boundary', () => {
     const sentence = 'This sentence is exactly long enough to matter for the caption band. ';
     const caption = docentCaption(sentence.repeat(8).trim());
-    expect(caption.length).toBeLessThanOrEqual(320);
+    expect(caption.length).toBeLessThanOrEqual(280);
     expect(caption.startsWith('This sentence')).toBe(true);
   });
 
   it('is empty for empty or table-only input', () => {
     expect(docentCaption('')).toBe('');
     expect(docentCaption('| a | b |\n|---|---|\n| 1 | 2 |')).toBe('');
+  });
+
+  describe('partial (while the agent is typing)', () => {
+    it('trims the newest paragraph to its last complete sentence', () => {
+      const streaming = 'The scene from 2026-08-21 is clear. Now computing NDVI for the';
+      expect(docentCaption(streaming, { partial: true })).toBe('The scene from 2026-08-21 is clear.');
+    });
+
+    it('holds the previous paragraph until the new one finishes a sentence', () => {
+      const streaming = 'Geometry saved for Hyde Park.\n\nFetching Sentinel-2 imagery and';
+      expect(docentCaption(streaming, { partial: true })).toBe('Geometry saved for Hyde Park.');
+    });
+
+    it('says nothing until the first sentence completes', () => {
+      expect(docentCaption('Looking at the request for', { partial: true })).toBe('');
+    });
+
+    it('does not treat a decimal point as the end of a sentence', () => {
+      const streaming = 'Mean NDVI 0.47 with 45';
+      expect(docentCaption(streaming, { partial: true })).toBe('');
+    });
+
+    it('accepts sentences ending inside bold or quotes', () => {
+      const streaming = 'The change is **significant.** And the next';
+      expect(docentCaption(streaming, { partial: true })).toBe('The change is **significant.**');
+    });
   });
 });

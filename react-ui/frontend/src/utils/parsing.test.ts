@@ -88,6 +88,28 @@ describe('parseToolCalls', () => {
     const { cleanText } = parseToolCalls('Results below:## Analysis');
     expect(cleanText).toBe('Results below:\n\n## Analysis');
   });
+
+  it('replaces a removed tool call with a paragraph break so sentences never glue together', () => {
+    const text = `Looking at the scene first.${toolJson('t7', 'inspect_image', {
+      s3_url: 's3://b/tci.tif',
+    })}The scene is clear over the park.`;
+
+    const { cleanText } = parseToolCalls(text);
+
+    expect(cleanText).toBe('Looking at the scene first.\n\nThe scene is clear over the park.');
+  });
+
+  it('collapses consecutive tool calls into a single paragraph break', () => {
+    const text = `Done with both.${toolJson('t8', 'display_visual', { s3_url: 's3://b/a.tif' })}${toolJson(
+      't9',
+      'display_visual',
+      { s3_url: 's3://b/b.tif' },
+    )}Maps are on screen.`;
+
+    const { cleanText } = parseToolCalls(text);
+
+    expect(cleanText).toBe('Done with both.\n\nMaps are on screen.');
+  });
 });
 
 describe('extractAllVisualizationData', () => {

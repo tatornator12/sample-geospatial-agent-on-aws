@@ -468,7 +468,7 @@ export function ChatSidebar({
   // What the room reads: the current streaming sentence, or the last thing the agent said.
   const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
   const captionSource = isStreaming ? streamingText : lastAssistant?.content || '';
-  const caption = docentCaption(captionSource);
+  const caption = docentCaption(captionSource, { partial: isStreaming });
   const idle = !isStreaming && !caption;
 
   // Where the agent is: this turn's tools while working, the last turn's when finished.
