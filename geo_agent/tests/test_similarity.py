@@ -216,6 +216,21 @@ def test_search_errors_when_every_partition_fails(two_partitions):
         _search(FakeLambda(fail_partitions={"dq", "dr"}))
 
 
+def test_search_clips_matches_to_a_region_polygon(two_partitions):
+    """A polygon covering New York City and the Hudson Valley but not the Adirondacks or the
+    Finger Lakes keeps only the matches inside it and counts the rest."""
+    region = box(-74.30, 40.45, -73.60, 41.80)
+    result = _search(FakeLambda(), clip_geometry=region)
+    ids = [m["cell_id"] for m in result["matches"]]
+    assert ids == ["prospect", "van_cortlandt", "pelham", "bear_mtn", "hudson_valley"]
+    assert result["clipped_out"] == 2                      # finger_lakes, adirondack
+    assert [m["rank"] for m in result["matches"]] == [1, 2, 3, 4, 5]
+
+
+def test_search_without_clip_reports_zero_clipped(two_partitions):
+    assert _search(FakeLambda())["clipped_out"] == 0
+
+
 def test_search_refuses_too_many_partitions(monkeypatch):
     monkeypatch.setattr(sim, "_get_geohashes_for_bbox", lambda *a: [f"g{i}" for i in range(21)])
     with pytest.raises(sim.SimilarityError, match="max 20"):
@@ -247,6 +262,9 @@ class FakeS3:
         self.puts.append(kwargs)
 
 
+NYC_REGION = box(-74.30, 40.45, -73.60, 41.80)
+
+
 @pytest.fixture()
 def tool_env(tools_module, monkeypatch, two_partitions):
     import geopandas as gpd
@@ -254,8 +272,12 @@ def tool_env(tools_module, monkeypatch, two_partitions):
     lam = FakeLambda()
     monkeypatch.setattr(tools_module.boto3, "client", lambda *_a, **_k: s3)
     monkeypatch.setattr(sim, "lambda_client", lambda: lam)
-    monkeypatch.setattr(tools_module, "download_geometry_from_s3",
-                        lambda url: gpd.GeoDataFrame(geometry=[PARK], crs="EPSG:4326"))
+
+    def fake_download(url):
+        geom = NYC_REGION if "region" in url else PARK
+        return gpd.GeoDataFrame(geometry=[geom], crs="EPSG:4326")
+
+    monkeypatch.setattr(tools_module, "download_geometry_from_s3", fake_download)
     monkeypatch.setenv("AGENT_SESSION_ID", "sess-1234")
     monkeypatch.setattr(tools_module.config, "S3_BUCKET_NAME", "test-bucket")
     return s3, lam
@@ -282,6 +304,35 @@ def test_tool_result_shape_and_file_name(tools_module, tool_env):
     assert out["query"]["cell_ids"] == ["park_a", "park_b", "park_c"]
     assert out["matches"][0]["cell_id"] == "prospect"
     assert "Clay v1.5" in out["method"] and "display_visual" in out["next_steps"]
+
+
+def test_tool_clips_to_the_region_geometry_when_given(tools_module, tool_env):
+    out = json.loads(_run(tools_module.find_similar_places(
+        "Central Park", "s3://b/g.geojson", "New York",
+        search_geometry_s3_url="s3://b/session_data/s/geometries/polygon_new_york_region.geojson")))
+    assert "error" not in out, out.get("error")
+    assert out["summary"]["clipped_to_region"] is True and out["summary"]["clipped_out"] == 2
+    assert [m["cell_id"] for m in out["matches"]] == ["prospect", "van_cortlandt", "pelham", "bear_mtn", "hudson_valley"]
+    assert "inside the New York boundary" in out["interpretation"]
+    # A supported name keeps the table's extent; the polygon only clips.
+    assert out["summary"]["bbox"] == [float(v) for v in sim.COUNTRY_BBOXES["new york"]]
+
+
+def test_tool_uses_the_region_geometry_as_extent_for_unsupported_names(tools_module, tool_env):
+    out = json.loads(_run(tools_module.find_similar_places(
+        "Central Park", "s3://b/g.geojson", "Hudson Valley",
+        search_geometry_s3_url="s3://b/session_data/s/geometries/polygon_hudson_region.geojson")))
+    assert "error" not in out, out.get("error")
+    assert out["summary"]["bbox"] == [-74.30, 40.45, -73.60, 41.80]
+    assert out["summary"]["search_region"] == "Hudson Valley"
+    assert out["similar_geometry_s3_url"].endswith("similar_central_park_hudson_valley_202507.geojson")
+
+
+def test_tool_rejects_a_non_s3_region_geometry(tools_module, tool_env):
+    out = json.loads(_run(tools_module.find_similar_places(
+        "Central Park", "s3://b/g.geojson", "New York", search_geometry_s3_url="https://x/y.geojson")))
+    assert "search_geometry_s3_url must be an s3://" in out["error"]
+    assert tool_env[0].puts == []
 
 
 def test_tool_slugifies_names_in_the_key(tools_module, tool_env):

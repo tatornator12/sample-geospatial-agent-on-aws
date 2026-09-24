@@ -261,9 +261,14 @@ def search_similar(
     exclude_radius_km: float,
     min_separation_km: float,
     client,
+    clip_geometry=None,
 ) -> dict:
     """Rank the search extent's cells against the query vector. Returns
-    {"matches": [...], "cells_compared", "partitions", "errors", "seconds"}."""
+    {"matches": [...], "cells_compared", "partitions", "errors", "seconds", "clipped_out"}.
+
+    `clip_geometry` (shapely, EPSG:4326) keeps only cells whose centre lies inside it: the
+    extent is a bounding box, so without it a New York search returns Connecticut and New
+    Jersey too."""
     started = time.time()
     geohashes = _partitions(search_bbox)
     payload_base = {
@@ -302,6 +307,13 @@ def search_similar(
 
     query_ids = {c["cell_id"] for c in query_cells}
     qlat, qlon = query_center
+    inside_region = None
+    if clip_geometry is not None and not clip_geometry.is_empty:
+        from shapely.geometry import Point
+        from shapely.prepared import prep
+        prepared = prep(clip_geometry)
+        inside_region = lambda lon, lat: prepared.contains(Point(lon, lat))  # noqa: E731
+    clipped_out = 0
     candidates = []
     for c in raw:
         b = c.get("bbox")
@@ -311,6 +323,9 @@ def search_similar(
         if _haversine_km(qlat, qlon, lat, lon) < exclude_radius_km:
             continue
         if not _is_on_land(lon, lat):
+            continue
+        if inside_region is not None and not inside_region(lon, lat):
+            clipped_out += 1
             continue
         candidates.append({"cell_id": c["cell_id"], "similarity": float(c["similarity"]), "bbox": b,
                            "center_lat": lat, "center_lon": lon})
@@ -344,6 +359,7 @@ def search_similar(
         "partitions": len(geohashes),
         "errors": errors,
         "seconds": round(time.time() - started, 1),
+        "clipped_out": clipped_out,
     }
 
 

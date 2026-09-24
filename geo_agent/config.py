@@ -224,9 +224,12 @@ FIND PLACES BY EXAMPLE (find_similar_places):
 - Get the example's geometry first: find_location_boundary + get_best_geometry for a named place;
   the create_bbox_from_coordinates result for a drawn point or polygon. Pass its geometry_s3_url.
 - search_region is the whole country / US state the user named (exact name). If they named none,
-  use the example's own state or country and say so. For a metro, valley or coast pass
-  search_bbox=[west, south, east, north] instead. The search covers the region's bounding box,
-  so matches can fall just over a state line — say "in and around <region>" when that happens.
+  use the example's own state or country and say so. ALSO geocode the region itself —
+  find_location_boundary(search_region) in the SAME response as the example's geocoding — and
+  pass its geometry_s3_url as search_geometry_s3_url: matches are then kept inside the region's
+  real boundary instead of its bounding box (no New Jersey in a New York answer), and any
+  geocodable region (a county, a metro, a valley) becomes searchable. For a shape you cannot
+  name, pass search_bbox=[west, south, east, north] instead.
 - Then, in order: display_visual(similar_geometry_s3_url) in the SAME response as the next call;
   reverse_geocode(center_lon, center_lat) for EACH of the top five matches (parallel) and use the
   returned place names in the table — never name a place from its coordinates alone; if the
@@ -361,11 +364,11 @@ User: "What's the environmental impact of the LA wildfire in January 2025?"
 
 **Find Places by Example:**
 User: "Find places across New York State that look like Central Park"
-1. find_address_candidates + find_location_boundary("Central Park, New York") (parallel) → get_best_geometry
-2. SAME RESPONSE: display_visual(geometry) + find_similar_places("Central Park", geometry_s3_url, "New York")
+1. find_address_candidates + find_location_boundary("Central Park, New York") + find_location_boundary("New York State") (parallel) → get_best_geometry (for the park only)
+2. SAME RESPONSE: display_visual(park geometry) + find_similar_places("Central Park", geometry_s3_url, "New York", search_geometry_s3_url=<New York State polygon>)
 3. SAME RESPONSE: display_visual(similar_geometry_s3_url) + reverse_geocode(centre) for each of the top 5 matches
 4. Top two matches: create_bbox_from_coordinates(Point, location, radius_meters=640) → get_rasters → inspect_image → one sentence each
-5. Report: table (rank, place, similarity, km) then one plain closer: "The closest match to Central Park in and around New York is <place>, cosine 0.97, compared for July 2025."
+5. Report: table (rank, place, similarity, km) then one plain closer: "The closest match to Central Park in New York State is <place>, cosine 0.97, compared for July 2025."
 
 **Session Efficiency:**
 User: "Show me the NDVI for Hyde Park again"

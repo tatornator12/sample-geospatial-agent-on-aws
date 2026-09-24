@@ -1295,6 +1295,12 @@ async def scan_region_change(
         return json.dumps({"error": error_msg})
 
 
+def _union_geometry(gdf):
+    """One shapely geometry for a GeoDataFrame (geopandas >= 1.0 union_all, else unary_union)."""
+    geoms = gdf.geometry
+    return geoms.union_all() if hasattr(geoms, "union_all") else geoms.unary_union
+
+
 @tool
 async def find_similar_places(
     location: str,
@@ -1304,6 +1310,7 @@ async def find_similar_places(
     month: int = None,
     top_k: int = 10,
     search_bbox: list = None,
+    search_geometry_s3_url: str = None,
     min_similarity: float = 0.90,
     min_separation_km: float = 5.0,
     exclude_radius_km: float = 5.0,
@@ -1331,6 +1338,11 @@ async def find_similar_places(
         top_k: How many matches to return (default 10, max 50).
         search_bbox: OPTIONAL [west, south, east, north] in degrees; overrides search_region for a
             custom extent (a metro, a valley, a coast).
+        search_geometry_s3_url: RECOMMENDED for a named state/country/region: its boundary from
+            find_location_boundary(search_region). Matches are kept only INSIDE this polygon (the
+            search extent alone is a bounding box, so "New York" would otherwise return New Jersey
+            and Connecticut too). Its bounds also serve as the extent when search_region is not a
+            supported name, so any geocodable region becomes searchable.
         min_similarity: Cosine floor for a match (default 0.90; same-place month-to-month sits near
             0.86-0.98, so 0.90 means "reads like the same kind of place").
         min_separation_km: Thin matches so no two are closer than this (default 5 km; 0 disables).
@@ -1360,10 +1372,22 @@ async def find_similar_places(
         if not isinstance(geometry_s3_url, str) or not geometry_s3_url.startswith("s3://"):
             return json.dumps({"error": "geometry_s3_url must be an s3:// URL from a geometry tool."})
 
+        clip_geometry = None
+        if search_geometry_s3_url is not None:
+            if not isinstance(search_geometry_s3_url, str) or not search_geometry_s3_url.startswith("s3://"):
+                return json.dumps({"error": "search_geometry_s3_url must be an s3:// URL from find_location_boundary."})
+            region_gdf = download_geometry_from_s3(search_geometry_s3_url).to_crs("EPSG:4326")
+            clip_geometry = _union_geometry(region_gdf)
+            if clip_geometry.is_empty:
+                return json.dumps({"error": f"The region geometry at {search_geometry_s3_url} is empty."})
+            if search_bbox is None and (search_region or "").lower().strip() not in sim.COUNTRY_BBOXES:
+                # Any geocoded region is searchable: its bounds are the extent, its polygon the clip.
+                search_bbox = [float(v) for v in clip_geometry.bounds]
+
         extent, region_label = sim.resolve_search_extent(search_region, search_bbox)
 
         geom_gdf = download_geometry_from_s3(geometry_s3_url).to_crs("EPSG:4326")
-        geometry = geom_gdf.geometry.union_all() if hasattr(geom_gdf.geometry, "union_all") else geom_gdf.geometry.unary_union
+        geometry = _union_geometry(geom_gdf)
         if geometry.is_empty:
             return json.dumps({"error": f"The geometry at {geometry_s3_url} is empty."})
         centroid = geometry.centroid
@@ -1380,7 +1404,7 @@ async def find_similar_places(
             query_vec, query_cells, query_center, extent, year, month,
             top_k=top_k, min_similarity=min_similarity,
             exclude_radius_km=exclude_radius_km, min_separation_km=min_separation_km,
-            client=client,
+            client=client, clip_geometry=clip_geometry,
         )
 
         geojson = sim.to_geojson(query_cells, result["matches"], location)
@@ -1407,6 +1431,8 @@ async def find_similar_places(
                 "min_similarity": min_similarity,
                 "top_k": top_k,
                 "matches_returned": n,
+                "clipped_to_region": clip_geometry is not None,
+                "clipped_out": result["clipped_out"],
                 "seconds": result["seconds"],
                 "errors": result["errors"],
             },
@@ -1423,7 +1449,11 @@ async def find_similar_places(
                 f"Compared {result['cells_compared']:,} cells across {region_label} for "
                 f"{sim.MONTH_NAMES[month]} {year} with the example's {len(query_cells)}-cell embedding; "
                 f"{n} match{'es' if n != 1 else ''} at or above cosine {min_similarity:.2f}, at least "
-                f"{min_separation_km:g} km apart and more than {exclude_radius_km:g} km from the example."
+                f"{min_separation_km:g} km apart and more than {exclude_radius_km:g} km from the example"
+                + (f", all inside the {region_label} boundary ({result['clipped_out']} candidates outside it dropped)."
+                   if clip_geometry is not None else
+                   f". The extent is {region_label}'s bounding box, so matches may sit just over its border; "
+                   f"pass search_geometry_s3_url to keep them inside.")
                 + (" No match cleared the floor; lower min_similarity (e.g. 0.85) or widen the search." if n == 0 else "")
             ),
             "next_steps": (
