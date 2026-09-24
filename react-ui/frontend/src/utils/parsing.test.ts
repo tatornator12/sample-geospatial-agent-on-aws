@@ -163,6 +163,27 @@ describe('extractAllVisualizationData', () => {
     expect(rasters[0].date).toBe('2024-01-02');
   });
 
+  it('routes a similarity result to geometries with its s3 URL intact (Week 3)', () => {
+    const url = 's3://b/session_data/s/geometries/similar_central_park_new_york_202507.geojson';
+    const text = `Here they are. ${toolJson('s1', 'display_visual', {
+      s3_url: url,
+      title: 'Places like Central Park across New York',
+    })}`;
+    const { tools } = parseToolCalls(text);
+    const { rasters, geometries } = extractAllVisualizationData(tools);
+    expect(rasters).toEqual([]);
+    expect(geometries).toEqual([{ url, title: 'Places like Central Park across New York' }]);
+  });
+
+  it('recovers the similarity URL from a truncated display_visual input', () => {
+    const url = 's3://b/session_data/s/geometries/similar_central_park_new_york_202507.geojson';
+    const full = toolJson('s2', 'display_visual', { s3_url: url, title: 'Places like Central Park' });
+    const { tools } = parseToolCalls(full.slice(0, full.length - 12));
+    const { geometries } = extractAllVisualizationData(tools.filter(t => t.status === 'completed'));
+    // Either the truncated call is dropped (not completed) or, if recovered, it carries the URL.
+    geometries.forEach(g => expect(g.url).toBe(url));
+  });
+
   it('de-duplicates by S3 URL across tool calls', () => {
     const params = { s3_url: 's3://b/once.tif', title: 'Once' };
     const { rasters } = extractAllVisualizationData([

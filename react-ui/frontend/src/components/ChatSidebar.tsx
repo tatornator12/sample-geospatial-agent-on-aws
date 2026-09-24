@@ -54,6 +54,7 @@ const PREPARED_PROMPTS = [
   },
   { label: 'Water, Folsom Lake', prompt: 'Compare water levels for Folsom Lake, California 2021 vs 2022' },
   { label: 'Scan Colorado', prompt: 'Scan Colorado for land change between 2019 and 2024' },
+  { label: 'Places like Central Park', prompt: 'Find places across New York State that look like Central Park' },
 ];
 
 interface ChatSidebarProps {
@@ -270,6 +271,7 @@ export function ChatSidebar({
           ]);
           if (geometry) {
             geometry.locationName = g.title;
+            geometry.sourceUrl = g.url;
             onGeometryUpdate(geometry);
           } else {
             loadedGeometryUrls.delete(g.url);

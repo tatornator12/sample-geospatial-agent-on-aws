@@ -42,6 +42,12 @@
       "prompt": "Show vegetation health for Bergen, Norway as of 2025-11-15",
       "expected_tools": ["get_rasters", "inspect_image", "run_bandmath", "display_visual"],
       "forbidden_text": ["Error:"]
+    },
+    {
+      "name": "similar-central-park",
+      "prompt": "Find places across New York State that look like Central Park",
+      "expected_tools": ["find_similar_places", "display_visual", "get_rasters", "inspect_image"],
+      "forbidden_text": ["Error:"]
     }
   ]
 }

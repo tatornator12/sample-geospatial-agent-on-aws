@@ -614,6 +614,47 @@
   color: var(--fog);
   background: rgba(233, 238, 243, 0.06);
 }
+/* Similar places: the one legend on the stage. Evidence colour (violet ramp), not the accent. */
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 8px 0 8px;
+}
+.map-legend__ramp {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--hairline);
+  background: linear-gradient(90deg, #e8dcf5 0%, #a678d6 50%, #5b2a86 100%);
+}
+.map-legend__label {
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--label);
+  white-space: nowrap;
+}
+
+/* Match popup rows: label left, number right in the mono face with tabular figures. */
+.similar-popup .maplibregl-popup-content {
+  min-width: 220px;
+  font-size: 15px;
+}
+.similar-popup__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 4px;
+}
+.similar-popup__row span {
+  color: var(--label);
+}
+.similar-popup__row code {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fog);
+}
+
 .map-group__action {
   width: 100%;
   justify-content: center;

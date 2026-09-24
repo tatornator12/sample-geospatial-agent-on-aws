@@ -305,7 +305,100 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
             geometry.features.some((f: any) =>
               f?.properties && f.properties.__layer_type === 'protected_area');
 
-          if (isChangeScan) {
+          // Detect a similarity result from find_similar_places: match cells carry a numeric
+          // `similarity` and `tier: 'match'`; the example is `tier: 'query'`. Evidence colour:
+          // a single-hue violet ramp (light = less alike, deep = more alike), never the accent.
+          const isSimilarity = Array.isArray(geometry.features) &&
+            geometry.features.some((f) =>
+              f?.properties && f.properties.tier === 'match' && typeof f.properties.similarity === 'number');
+
+          if (isSimilarity) {
+            const sims = geometry.features
+              .map((f) => f?.properties?.similarity)
+              .filter((s: unknown): s is number => typeof s === 'number');
+            const lo = Math.min(...sims);
+            const hi = Math.max(...sims);
+            // Spread the ramp over the actual range so ten matches within 0.03 of each other
+            // still read as a gradient; collapse to a flat colour when there is no range.
+            const rampLo = hi - lo > 0.005 ? lo : hi - 0.01;
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'fill',
+              source: geometryId,
+              filter: ['==', ['get', 'tier'], 'match'],
+              paint: {
+                'fill-color': [
+                  'interpolate', ['linear'], ['get', 'similarity'],
+                  rampLo, '#e8dcf5',
+                  (rampLo + hi) / 2, '#a678d6',
+                  hi, '#5b2a86',
+                ],
+                'fill-opacity': 0.55,
+              },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'line',
+              source: geometryId,
+              filter: ['==', ['get', 'tier'], 'match'],
+              paint: { 'line-color': '#5b2a86', 'line-width': 2 },
+              layout: { visibility: 'visible' },
+            });
+            // The example itself: dashed cyan outline, no fill, so it reads as "the question".
+            currentMap.addLayer({
+              id: `${geometryId}-query`,
+              type: 'line',
+              source: geometryId,
+              filter: ['==', ['get', 'tier'], 'query'],
+              paint: { 'line-color': '#0FF', 'line-width': 2, 'line-dasharray': [2, 1.5] },
+              layout: { visibility: 'visible' },
+            });
+            // Rank labels at the cell centres (Back Row rule: 24 px, mono, halo). The style has
+            // no glyphs server; maplibre >= 5.11 renders text-font with local fonts.
+            currentMap.addLayer({
+              id: `${geometryId}-labels`,
+              type: 'symbol',
+              source: geometryId,
+              filter: ['==', ['get', 'tier'], 'match'],
+              layout: {
+                'symbol-placement': 'point',
+                'text-field': ['to-string', ['get', 'rank']],
+                'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+                'text-size': 24,
+                'text-allow-overlap': true,
+                'text-ignore-placement': true,
+                visibility: 'visible',
+              },
+              paint: {
+                'text-color': '#ffffff',
+                'text-halo-color': '#2a1240',
+                'text-halo-width': 2,
+              },
+            });
+            // Popup with the numbers only (rank, similarity, centre) so nothing model-written
+            // is ever injected into setHTML.
+            currentMap.on('click', fillLayerId, (e: maplibregl.MapLayerMouseEvent) => {
+              const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
+              const rank = Number.isFinite(Number(p.rank)) ? Number(p.rank) : null;
+              const sim = Number.isFinite(Number(p.similarity)) ? Number(p.similarity).toFixed(4) : null;
+              const lat = Number.isFinite(Number(p.center_lat)) ? Number(p.center_lat).toFixed(4) : null;
+              const lon = Number.isFinite(Number(p.center_lon)) ? Number(p.center_lon).toFixed(4) : null;
+              const km = Number.isFinite(Number(p.distance_km)) ? Number(p.distance_km).toFixed(1) : null;
+              const html =
+                `<strong>${rank !== null ? `Match ${rank}` : 'Match'}</strong>` +
+                `<div class="similar-popup__row"><span>Similarity</span><code>${sim ?? '—'}</code></div>` +
+                `<div class="similar-popup__row"><span>Centre</span><code>${lat ?? '—'}, ${lon ?? '—'}</code></div>` +
+                (km !== null ? `<div class="similar-popup__row"><span>From example</span><code>${km} km</code></div>` : '');
+              new maplibregl.Popup({ className: 'similar-popup' }).setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
+            });
+            currentMap.on('mouseenter', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = 'pointer';
+            });
+            currentMap.on('mouseleave', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = '';
+            });
+          } else if (isChangeScan) {
             currentMap.addLayer({
               id: fillLayerId,
               type: 'fill',
@@ -453,7 +546,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           id: fillLayerId,
           sourceId: geometryId,
           name: name,
-          url: JSON.stringify(geometry.features).substring(0, 200),
+          // The s3:// URL when the collection came from display_visual (drives the layers-plate
+          // grouping); a features excerpt for drawn/ad-hoc geometry.
+          url: geometry.sourceUrl || JSON.stringify(geometry.features).substring(0, 200),
           type: 'geometry',
           bounds: boundsArray
         }]);
@@ -534,6 +629,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     console.log(`🎯 Flying to layer:`, layer.name);
   };
 
+  // A geometry's fill layer travels with its companions: the outline, and for a similarity
+  // result the dashed query outline and the rank labels.
+  const geometryCompanionIds = (fillLayerId: string) =>
+    ['-outline', '-query', '-labels'].map(suffix => fillLayerId.replace('-fill', suffix));
+
   // Remove a specific layer
   const removeLayer = (layerId: string) => {
     if (!map.current) return;
@@ -544,14 +644,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     const mapInstance = map.current;
 
     if (layer.type === 'geometry') {
-      // Geometry has both fill and outline layers
-      const outlineLayerId = layer.id.replace('-fill', '-outline');
-      if (mapInstance.getLayer(layer.id)) {
-        mapInstance.removeLayer(layer.id);
-      }
-      if (mapInstance.getLayer(outlineLayerId)) {
-        mapInstance.removeLayer(outlineLayerId);
-      }
+      // Geometry has a fill layer plus its companion layers
+      [layer.id, ...geometryCompanionIds(layer.id)].forEach(id => {
+        if (mapInstance.getLayer(id)) {
+          mapInstance.removeLayer(id);
+        }
+      });
       if (mapInstance.getSource(layer.sourceId)) {
         mapInstance.removeSource(layer.sourceId);
       }
@@ -586,14 +684,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
 
     allLayers.forEach(layer => {
       if (layer.type === 'geometry') {
-        // Geometry has both fill and outline layers
-        const outlineLayerId = layer.id.replace('-fill', '-outline');
-        if (mapInstance.getLayer(layer.id)) {
-          mapInstance.removeLayer(layer.id);
-        }
-        if (mapInstance.getLayer(outlineLayerId)) {
-          mapInstance.removeLayer(outlineLayerId);
-        }
+        // Geometry has a fill layer plus its companion layers
+        [layer.id, ...geometryCompanionIds(layer.id)].forEach(id => {
+          if (mapInstance.getLayer(id)) {
+            mapInstance.removeLayer(id);
+          }
+        });
         if (mapInstance.getSource(layer.sourceId)) {
           mapInstance.removeSource(layer.sourceId);
         }
@@ -914,12 +1010,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
         mapInstance.setLayoutProperty(layerId, 'visibility', visibility);
       }
       
-      // For geometry layers, also update the outline layer
+      // For geometry layers, also update the companion layers (outline, query, labels)
       if (layerId.includes('geometry') && layerId.includes('-fill')) {
-        const outlineLayerId = layerId.replace('-fill', '-outline');
-        if (mapInstance.getLayer(outlineLayerId)) {
-          mapInstance.setLayoutProperty(outlineLayerId, 'visibility', visibility);
-        }
+        geometryCompanionIds(layerId).forEach(id => {
+          if (mapInstance.getLayer(id)) {
+            mapInstance.setLayoutProperty(id, 'visibility', visibility);
+          }
+        });
       }
     });
   }, [rasterVisibility]);
@@ -1025,6 +1122,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
                   {layerGroups.changeDetection.map((layer) =>
                     renderLayerRow(layer, formatLayerDisplayText(layer, 'spectral'))
                   )}
+                </div>
+              )}
+
+              {/* Search by example: ranked look-alikes, with the release's one legend. */}
+              {layerGroups.similarPlaces.length > 0 && (
+                <div>
+                  <h3 className="map-group__title">Similar places</h3>
+                  {layerGroups.similarPlaces.map((layer) =>
+                    renderLayerRow(layer, formatLayerDisplayText(layer, 'similar'))
+                  )}
+                  <div className="map-legend" role="img" aria-label="Colour ramp: lighter violet is less alike, deeper violet is more alike">
+                    <span className="map-legend__label">less alike</span>
+                    <span className="map-legend__ramp" aria-hidden="true" />
+                    <span className="map-legend__label">more alike</span>
+                  </div>
                 </div>
               )}
 

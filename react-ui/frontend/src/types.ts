@@ -24,6 +24,7 @@ export interface GeometryData {
     };
   }>;
   locationName?: string; // Optional location name from tool call
+  sourceUrl?: string; // The s3:// URL the collection was loaded from (drives layer grouping)
 }
 
 export interface StreamEvent {

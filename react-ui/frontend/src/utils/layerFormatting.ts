@@ -110,9 +110,46 @@ export function isSpectralIndex(layer: LayerMetadata): boolean {
 }
 
 /**
+ * A "similar places" result from find_similar_places: a .geojson whose file name starts with
+ * `similar_` (the tool writes `similar_<example>_<region>_<yyyymm>.geojson`). Detected from the
+ * URL, never from the layer title, so a model-written title cannot move a layer between groups.
+ */
+export function isSimilarityLayer(layer: LayerMetadata): boolean {
+  if (layer.type !== 'geometry') return false;
+  const basename = (layer.url || '').split('/').pop()?.toLowerCase() ?? '';
+  return basename.startsWith('similar_') && basename.endsWith('.geojson');
+}
+
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "Places like <example> · <Mon YYYY>" from a similarity file name; falls back to the title.
+ * The example slug's last token before the `_<yyyymm>` suffix is the region, which the row
+ * does not repeat (the group header already says where the search ran).
+ */
+export function formatSimilarityLabel(layer: LayerMetadata): string {
+  const basename = (layer.url || '').split('/').pop() ?? '';
+  const m = basename.match(/^similar_(.+)_(\d{4})(\d{2})\.geojson$/i);
+  if (!m) return layer.name;
+  const monthIndex = Number(m[3]) - 1;
+  const when = monthIndex >= 0 && monthIndex < 12 ? `${MONTH_ABBR[monthIndex]} ${m[2]}` : m[2];
+  // The slug is "<example>_<region>"; the example may itself contain underscores, so take the
+  // title's example name when the model gave one ("Places like Central Park"), else the slug.
+  // Titles seen from the model: "Places like Central Park across New York",
+  // "Places Similar to Central Park — New York State, July 2025". Stop at a dash, a comma,
+  // or a locating preposition.
+  const fromTitle = layer.name.match(/(?:like|similar to|resembling)\s+(.+?)(?:\s*[—–-]|,|\s+(?:in|across|around|within)\b|$)/i);
+  const example = fromTitle ? fromTitle[1].trim() : m[1].replace(/_/g, ' ');
+  return `Places like ${example} · ${when}`;
+}
+
+/**
  * Format layer display text based on layer type
  */
-export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 'spectral' | 'geometry'): string {
+export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 'spectral' | 'geometry' | 'similar'): string {
+  if (layerType === 'similar') {
+    return formatSimilarityLabel(layer);
+  }
   const cleanedName = cleanLayerName(layer.name);
   const formattedDate = layer.date ? formatDate(layer.date) : '';
 
@@ -148,7 +185,8 @@ export function groupLayers(layers: LayerMetadata[]) {
       isSpectralIndex(l) &&
       !isChangeDetection(l)
     ),
-    geometries: layers.filter(l => l.type === 'geometry'),
+    similarPlaces: layers.filter(l => isSimilarityLayer(l)),
+    geometries: layers.filter(l => l.type === 'geometry' && !isSimilarityLayer(l)),
     basemap: layers.filter(l => l.id === BASEMAP_LAYER_ID),
   };
 }
