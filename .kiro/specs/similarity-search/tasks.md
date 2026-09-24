@@ -63,11 +63,23 @@ before Friday (task 1.4 records the before/after guard).
 - [ ] 7. Gate G2 (Friday Oct 3) and Act 1 rehearsal
   - [ ] 7.1 `pytest -q`, `npm test`, `npm run design:check`, `eval.py --target dev` (live, 8 prompts); record counts below
     - Pre-flight Sep 24 on dev v24 (commit `ad3eb96`): pytest 116/116, vitest 51/51, detector 0, eval **8/8** live in 329 s total (31–49 s per imagery prompt, scan-colorado 32 s, similar-central-park 67 s with two state geocodes, five reverse geocodes, two inspections, all matches inside New York; closer names West Point 0.957). Formal gate stays on Friday Oct 3
-  - [ ] 7.2 `scripts/promote.sh` with `PROMOTE_FRONTEND=1`: tag `deployed-2026-10-03`, stable runtime deployed, CloudFront UI deployed; confirm env vars on the stable runtime, one smoke invoke, `eval.py --target stable --only similar-central-park` and `--only vegetation-central-park`; push `develop`, `demo-stable` and the tag to `fork`
+  - [x] 7.2 Run **Wednesday Sep 24** (nine days early, gate green twice the same day; the presenter chose not to wait for Friday). `PROMOTE_FRONTEND=1 scripts/promote.sh`: in-script eval 8/8; `demo-stable` fast-forwarded 45 commits from `0df2734` to `249018c`, tagged **`deployed-2026-09-24`**; stable runtime `geospatial_agent_on_aws` v69 → **v70**, all eight env vars persisted; `GeospatialAgentStack` deployed (task role now allows `InvokeAgentRuntime`/`StopRuntimeSession` on the two runtime ARNs only; task definition replaced with `AGENT_RUNTIMES`; ALB idle timeout 120 s; origin secret rotated). Stable eval: `vegetation-central-park` PASS 31 s (doubled as the smoke invoke), `similar-central-park` PASS 67 s. CloudFront `https://d3psp63cdugg2k.cloudfront.net` serves the new bundle (contains "Places like Central Park", "Similar places", the maplibre worker chunk loads with 200); `/api/agents` without a token → 401 Unauthorized, and the built bundle has the dev-mode bypass compiled out (`.dockerignore` excludes `.env`). `develop`, `demo-stable` and the tag pushed to `fork`
   - [ ] 7.3 Rehearse the Act 1 run sheet (design.md) twice against stable on the CloudFront UI, pre-warmed; record both timings and the beat where time was lost; apply the fallback if over 7:30 and record the decision
   - [ ] 7.4 Update `ROADMAP.md`: row 3 status, G2 result; note anything deferred to Week 4
   - _Requirements: 6.3, 6.4, 6.5_
 
 ## Gate log
 
-- (append Friday Oct 3 results here: commands with counts, promotion tag, stable smoke + eval, two rehearsal timings)
+### G2 — Wednesday 2026-09-24 (early): PROMOTED, rehearsal pending
+
+Commands (all exit 0, run this day, dev v24 then in-script):
+- `cd geo_agent && ../.venv/bin/python -m pytest -q` → 116 passed
+- `cd react-ui/frontend && npm test` → 51 passed (5 files)
+- `cd react-ui/frontend && npm run design:check` → 0 findings
+- `scripts/eval.py --target dev` → 8/8 (329 s; then 8/8 again inside `promote.sh`)
+- `PROMOTE_FRONTEND=1 scripts/promote.sh` → `demo-stable` = `249018c`, tag `deployed-2026-09-24`, stable runtime v70, `GeospatialAgentStack` updated
+- `scripts/eval.py --target stable --only vegetation-central-park` → PASS 31 s; `--only similar-central-park` → PASS 67 s
+
+Gate condition met: Release 1 (foundation + eyes + similarity) is on the stable runtime and the CloudFront UI, both verified live. **Open:** 7.3, two timed Act 1 rehearsals on the CloudFront URL (the presenter's), and 7.4 once the timings are in.
+
+Also this week (unplanned but gate-relevant): dependency bumps + maplibre-gl 6 migration (`4b9f5c3`), Lambda input validation hardening across all modes (`57b5e7b`), `frontend-cdk/.env` gained `AGENT_RUNTIMES` so the live switcher offers both runtimes, `.venv` exec bits restored after the laptop move.
