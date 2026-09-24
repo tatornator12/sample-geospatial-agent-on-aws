@@ -1296,6 +1296,155 @@ async def scan_region_change(
 
 
 @tool
+async def find_similar_places(
+    location: str,
+    geometry_s3_url: str,
+    search_region: str,
+    year: int = None,
+    month: int = None,
+    top_k: int = 10,
+    search_bbox: list = None,
+    min_similarity: float = 0.90,
+    min_separation_km: float = 5.0,
+    exclude_radius_km: float = 5.0,
+) -> str:
+    """Find the places in a state or country that look most like an EXAMPLE place, using
+    Clay AI embeddings (search by example, not by name).
+
+    This compares one place with every other 1.28 km cell in the search region at the same
+    month and year (one Clay v1.5 embedding per cell, cosine similarity). It is NOT
+    scan_region_change, which compares a place with itself over time; use this when the user
+    says "find places like", "more like this", "where else looks like", "similar to".
+
+    Args:
+        location: Name of the example place (used in the report and the file name).
+        geometry_s3_url: The example's geometry: from find_location_boundary + get_best_geometry
+            for a named place, or from create_bbox_from_coordinates for a drawn point/polygon.
+            Cells whose centre falls inside this geometry form the example (max 64 cells ~ 100 km2;
+            use a point or a smaller polygon for anything bigger).
+        search_region: Whole country or US state to search, e.g. "New York", "Colorado", "Kenya".
+            Must be an exact supported name; for anything else pass search_bbox.
+        year: Year to compare (default: the most recent year with the chosen month in the archive,
+            Jan 2017 - Apr 2026).
+        month: Month 1-12 (default: the region's peak growing season; a month outside the season is
+            moved into it so vegetation states are comparable).
+        top_k: How many matches to return (default 10, max 50).
+        search_bbox: OPTIONAL [west, south, east, north] in degrees; overrides search_region for a
+            custom extent (a metro, a valley, a coast).
+        min_similarity: Cosine floor for a match (default 0.90; same-place month-to-month sits near
+            0.86-0.98, so 0.90 means "reads like the same kind of place").
+        min_separation_km: Thin matches so no two are closer than this (default 5 km; 0 disables).
+        exclude_radius_km: Ignore cells this close to the example itself (default 5 km).
+
+    Returns: JSON with summary (region, month/year used, cells compared, partitions, seconds,
+        errors), query (example centre, cells pooled), matches [{rank, similarity, center_lat,
+        center_lon, distance_km, bbox}], similar_geometry_s3_url (GeoJSON of the example cell(s)
+        and the ranked matches for the map), method, next_steps.
+
+    Workflow:
+    1. display_visual(similar_geometry_s3_url) right away.
+    2. reverse_geocode the top matches so you can name places before coordinates.
+    3. Put eyes on the top two: create_bbox_from_coordinates around each centre
+       (radius_meters=640), get_rasters, inspect_image, one sentence each on what makes it like
+       the example. Four inspections per turn is still the cap.
+    4. Report: compact table (rank, place, similarity, km from the example), then one plain
+       1-2 sentence closer naming the top match and the month compared.
+    """
+    from . import lgnd_similarity as sim
+
+    try:
+        top_k = sim._int(top_k, "top_k", 1, sim.TOP_K_MAX)
+        min_similarity = sim._finite(min_similarity, "min_similarity", -1.0, 1.0)
+        min_separation_km = sim._finite(min_separation_km, "min_separation_km", 0.0, 500.0)
+        exclude_radius_km = sim._finite(exclude_radius_km, "exclude_radius_km", 0.0, 500.0)
+        if not isinstance(geometry_s3_url, str) or not geometry_s3_url.startswith("s3://"):
+            return json.dumps({"error": "geometry_s3_url must be an s3:// URL from a geometry tool."})
+
+        extent, region_label = sim.resolve_search_extent(search_region, search_bbox)
+
+        geom_gdf = download_geometry_from_s3(geometry_s3_url).to_crs("EPSG:4326")
+        geometry = geom_gdf.geometry.union_all() if hasattr(geom_gdf.geometry, "union_all") else geom_gdf.geometry.unary_union
+        if geometry.is_empty:
+            return json.dumps({"error": f"The geometry at {geometry_s3_url} is empty."})
+        centroid = geometry.centroid
+        query_center = (float(centroid.y), float(centroid.x))
+
+        year, month, period_note = sim.resolve_period(query_center[0], year, month)
+        client = sim.lambda_client()
+
+        logger.info("SIMILAR PLACES: %s -> %s %s, %d-%02d, k=%d, floor=%.2f",
+                    location, region_label, extent, year, month, top_k, min_similarity)
+
+        query_vec, query_cells = sim.query_embedding(geometry, year, month, client)
+        result = sim.search_similar(
+            query_vec, query_cells, query_center, extent, year, month,
+            top_k=top_k, min_similarity=min_similarity,
+            exclude_radius_km=exclude_radius_km, min_separation_km=min_separation_km,
+            client=client,
+        )
+
+        geojson = sim.to_geojson(query_cells, result["matches"], location)
+        session_id = os.environ.get('AGENT_SESSION_ID', config.DEFAULT_SESSION_ID)
+        s3_key = (f"session_data/{session_id}/geometries/"
+                  f"similar_{_slugify(location)}_{_slugify(region_label)}_{year}{month:02d}.geojson")
+        boto3.client('s3').put_object(
+            Bucket=config.S3_BUCKET_NAME, Key=s3_key,
+            Body=json.dumps(geojson).encode('utf-8'), ContentType='application/geo+json',
+        )
+        similar_url = f"s3://{config.S3_BUCKET_NAME}/{s3_key}"
+
+        n = len(result["matches"])
+        out = {
+            "summary": {
+                "example": location,
+                "search_region": region_label,
+                "bbox": list(extent),
+                "year": year, "month": month, "month_name": sim.MONTH_NAMES[month],
+                "period_note": period_note,
+                "partitions": result["partitions"],
+                "cells_compared": result["cells_compared"],
+                "query_cells": len(query_cells),
+                "min_similarity": min_similarity,
+                "top_k": top_k,
+                "matches_returned": n,
+                "seconds": result["seconds"],
+                "errors": result["errors"],
+            },
+            "query": {
+                "location": location,
+                "center_lat": round(query_center[0], 4),
+                "center_lon": round(query_center[1], 4),
+                "cell_ids": [c["cell_id"] for c in query_cells],
+            },
+            "matches": result["matches"],
+            "similar_geometry_s3_url": similar_url,
+            "method": sim.METHOD,
+            "interpretation": (
+                f"Compared {result['cells_compared']:,} cells across {region_label} for "
+                f"{sim.MONTH_NAMES[month]} {year} with the example's {len(query_cells)}-cell embedding; "
+                f"{n} match{'es' if n != 1 else ''} at or above cosine {min_similarity:.2f}, at least "
+                f"{min_separation_km:g} km apart and more than {exclude_radius_km:g} km from the example."
+                + (" No match cleared the floor; lower min_similarity (e.g. 0.85) or widen the search." if n == 0 else "")
+            ),
+            "next_steps": (
+                "display_visual(similar_geometry_s3_url) now; reverse_geocode the top matches to name "
+                "them; then inspect the top two (create_bbox_from_coordinates radius_meters=640 -> "
+                "get_rasters -> inspect_image) and say what makes each one like the example."
+            ),
+        }
+        logger.info("✅ SIMILAR PLACES: %d matches from %d cells in %.1fs",
+                    n, result["cells_compared"], result["seconds"])
+        return json.dumps(out)
+
+    except sim.SimilarityError as e:
+        return json.dumps({"error": str(e)})
+    except Exception as e:
+        error_msg = f"❌ SIMILAR PLACES ERROR: {type(e).__name__}: {str(e)[:200]}"
+        logger.error(error_msg, exc_info=True)
+        return json.dumps({"error": error_msg})
+
+
+@tool
 async def run_change_detection(
     location: str,
     red_s3_url_date1: str,

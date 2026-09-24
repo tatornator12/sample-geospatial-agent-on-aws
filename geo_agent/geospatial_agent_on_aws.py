@@ -37,12 +37,12 @@ from utils.tools import (find_location_boundary, create_bbox_from_coordinates,
                          get_best_geometry, get_rasters, get_rasters_for_dates, run_bandmath,
                          display_visual, inspect_image, calculator, list_session_assets,
                          calculate_environmental_impact,
-                         run_change_detection, scan_region_change, protected_area_context,
-                         display_protected_area_by_name)
+                         run_change_detection, scan_region_change, find_similar_places,
+                         protected_area_context, display_protected_area_by_name)
 from utils.scenario_loader import load_scenario, build_scenario_context
 import config
 
-# The region-wide LGND embedding scan (scan_region_change) depends on the
+# The LGND embedding tools (scan_region_change, find_similar_places) depend on the
 # lgnd-partition-query Lambda provisioned by the optional ChangeDetectionStack.
 # Only register the tool when explicitly enabled so the agent never advertises
 # a tool whose backing infrastructure may not be deployed. Off by default.
@@ -183,7 +183,7 @@ async def sat_image_analyzer_agent(payload, context=None):
                                     calculate_environmental_impact,
                                    run_change_detection, protected_area_context,
                                    display_protected_area_by_name]
-                                   + ([scan_region_change] if LGND_EMBEDDINGS_ENABLED else []),
+                                   + ([scan_region_change, find_similar_places] if LGND_EMBEDDINGS_ENABLED else []),
                 model=bedrock_model,
                 system_prompt=system_content,
                 record_direct_tool_call=True,
