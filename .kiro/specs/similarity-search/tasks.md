@@ -62,6 +62,7 @@ before Friday (task 1.4 records the before/after guard).
 
 - [ ] 7. Gate G2 (Friday Oct 3) and Act 1 rehearsal
   - [ ] 7.1 `pytest -q`, `npm test`, `npm run design:check`, `eval.py --target dev` (live, 8 prompts); record counts below
+    - Pre-flight Sep 24 on dev v24 (commit `ad3eb96`): pytest 116/116, vitest 51/51, detector 0, eval **8/8** live in 329 s total (31–49 s per imagery prompt, scan-colorado 32 s, similar-central-park 67 s with two state geocodes, five reverse geocodes, two inspections, all matches inside New York; closer names West Point 0.957). Formal gate stays on Friday Oct 3
   - [ ] 7.2 `scripts/promote.sh` with `PROMOTE_FRONTEND=1`: tag `deployed-2026-10-03`, stable runtime deployed, CloudFront UI deployed; confirm env vars on the stable runtime, one smoke invoke, `eval.py --target stable --only similar-central-park` and `--only vegetation-central-park`; push `develop`, `demo-stable` and the tag to `fork`
   - [ ] 7.3 Rehearse the Act 1 run sheet (design.md) twice against stable on the CloudFront UI, pre-warmed; record both timings and the beat where time was lost; apply the fallback if over 7:30 and record the decision
   - [ ] 7.4 Update `ROADMAP.md`: row 3 status, G2 result; note anything deferred to Week 4
