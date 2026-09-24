@@ -1,0 +1,14 @@
+# Staged from geo_agent/ by stage_shared.sh (never edit by hand)
+_geo_agent/
+Dockerfile
+requirements.txt
+
+# Secrets and generated AgentCore config
+.env
+.env.*
+!.env.example
+.bedrock_agentcore.yaml
+.bedrock_agentcore/
+
+__pycache__/
+.pytest_cache/

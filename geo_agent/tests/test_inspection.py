@@ -85,6 +85,15 @@ def test_change_map_uses_reversed_ramp_over_zero_to_half(inspection):
     assert inspection.index_style("s3://b/rasters/tci_clipped_loc_2026-01-01.tif") is None
 
 
+def test_emit_methane_plume_uses_plasma_over_zero_to_1500(inspection):
+    """The Methane Hunter's staged plumes (ch4plm_*.tif) preview in the map's plasma ramp."""
+    style = inspection.index_style("s3://b/methane/cache/ch4plm_EMIT_L2B_CH4PLM_002_20240812T190223_002202.tif")
+    assert style.name == "ch4" and not style.reverse and (style.vmin, style.vmax) == (0.0, 1500.0)
+    ramp = inspection.build_ramp(style.anchors)
+    assert tuple(ramp[0]) == (0x0d, 0x08, 0x87)   # background -> deep blue-violet
+    assert tuple(ramp[-1]) == (0xf0, 0xf9, 0x21)  # >= 1500 ppm·m -> yellow
+
+
 def test_unknown_single_band_gets_percentile_grey_stretch(tmp_path, inspection):
     band = np.linspace(100, 900, 50 * 50, dtype=np.float32).reshape(1, 50, 50)
     path = _write(tmp_path / "elevation_dem.tif", band, "float32")

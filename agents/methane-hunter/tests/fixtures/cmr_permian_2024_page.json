@@ -1,0 +1,604 @@
+{
+ "feed": {
+  "entry": [
+   {
+    "id": "G3953774135-LPCLOUD",
+    "title": "EMIT_L2B_CH4PLM_002_20241130T180310_003723",
+    "time_start": "2024-11-30T18:03:10.000Z",
+    "time_end": "2024-11-30T18:03:10.000Z",
+    "polygons": [
+     [
+      "30.9926 -102.99517 30.99206 -102.99517 30.99206 -102.99789 30.99098 -102.99843 30.99098 -102.99897 30.98989 -102.99897 30.98989 -102.99951 30.98881 -103.00005 30.98881 -103.0006 30.98772 -103.0006 30.98718 -103.00168 30.98501 -103.00168 30.98501 -103.00114 30.98176 -103.00114 30.98176 -103.0006 30.97905 -103.0006 30.97905 -103.00114 30.97688 -103.00114 30.97688 -103.00168 30.97471 -103.00168 30.97471 -103.00222 30.97308 -103.00222 30.97308 -103.00277 30.97254 -103.00277 30.972 -103.00385 30.97091 -103.00439 30.97037 -103.00548 30.96983 -103.00548 30.96983 -103.0071 30.96929 -103.0071 30.96929 -103.00981 30.96874 -103.00981 30.96874 -103.01198 30.9682 -103.01198 30.96766 -103.01307 30.96712 -103.01307 30.96712 -103.01361 30.96603 -103.01415 30.96549 -103.01524 30.95302 -103.01524 30.95302 -103.01578 30.95194 -103.01578 30.95194 -103.01632 30.95031 -103.01632 30.95031 -103.01686 30.94922 -103.01686 30.94922 -103.01741 30.94814 -103.01741 30.94814 -103.01795 30.94651 -103.01795 30.94651 -103.01849 30.9438 -103.01849 30.9438 -103.01903 30.94218 -103.01903 30.94218 -103.01958 30.94163 -103.01958 30.94109 -103.02066 30.94055 -103.02066 30.94055 -103.0212 30.94001 -103.0212 30.94001 -103.02174 30.93892 -103.02174 30.93838 -103.02283 30.93784 -103.02283 30.93784 -103.02337 30.93729 -103.02337 30.93729 -103.02391 30.93621 -103.02446 30.93567 -103.02554 30.93513 -103.02554 30.93513 -103.02662 30.93458 -103.02662 30.93458 -103.02717 30.9335 -103.02771 30.9335 -103.02879 30.93296 -103.02879 30.93296 -103.02934 30.93241 -103.02934 30.93187 -103.03042 30.93133 -103.03042 30.93133 -103.03096 30.93079 -103.03096 30.93025 -103.03205 30.92916 -103.03205 30.92862 -103.03313 30.92808 -103.03313 30.92808 -103.03367 30.92699 -103.03422 30.92699 -103.03476 30.92591 -103.03476 30.92537 -103.03584 30.92428 -103.03584 30.92374 -103.03693 30.92265 -103.03693 30.92211 -103.03801 30.92103 -103.03801 30.92049 -103.0391 30.9194 -103.0391 30.9194 -103.03964 30.91777 -103.03964 30.91777 -103.04018 30.91669 -103.04018 30.91669 -103.04072 30.91506 -103.04072 30.91506 -103.04126 30.90801 -103.04126 30.90801 -103.04072 30.90747 -103.04072 30.90693 -103.03964 30.90639 -103.03964 30.90639 -103.0391 30.90585 -103.0391 30.90585 -103.03855 30.90476 -103.03801 30.90476 -103.03747 30.90422 -103.03747 30.90422 -103.03693 30.90368 -103.03693 30.90313 -103.03476 30.90259 -103.03476 30.90259 -103.03313 30.90205 -103.03313 30.90205 -103.03205 30.90151 -103.03205 30.90151 -103.03096 30.90097 -103.03096 30.90097 -103.02934 30.90042 -103.02934 30.90042 -103.02717 30.89988 -103.02717 30.89988 -103.02554 30.89934 -103.02554 30.89934 -103.02283 30.8988 -103.02283 30.8988 -103.02012 30.89825 -103.02012 30.89825 -103.01741 30.89771 -103.01741 30.89771 -103.00439 30.89825 -103.00439 30.89825 -103.00331 30.89934 -103.00277 30.89988 -103.0006 30.90042 -103.0006 30.90042 -102.99951 30.90151 -102.99897 30.90151 -102.99789 30.90205 -102.99789 30.90205 -102.99734 30.90422 -102.99734 30.90422 -102.9968 30.90801 -102.9968 30.90801 -102.99626 30.91181 -102.99626 30.91181 -102.99572 30.91506 -102.99572 30.91506 -102.99517 30.91832 -102.99517 30.91832 -102.99463 30.92157 -102.99463 30.92157 -102.99517 30.92482 -102.99517 30.92482 -102.99572 30.92753 -102.99572 30.92753 -102.99626 30.9297 -102.99626 30.9297 -102.99572 30.93079 -102.99572 30.93079 -102.99517 30.93241 -102.99517 30.93241 -102.99463 30.9335 -102.99463 30.9335 -102.99409 30.93458 -102.99409 30.93458 -102.99355 30.93621 -102.99355 30.93621 -102.99301 30.93784 -102.99301 30.93784 -102.99246 30.94001 -102.99246 30.94001 -102.99192 30.94272 -102.99192 30.94272 -102.99138 30.9476 -102.99138 30.9476 -102.99084 30.95194 -102.99084 30.95194 -102.99029 30.95302 -102.98975 30.95356 -102.98758 30.95465 -102.98704 30.95465 -102.9865 30.95519 -102.9865 30.95519 -102.98596 30.95736 -102.98541 30.95736 -102.98487 30.95844 -102.98487 30.95844 -102.98433 30.9617 -102.98379 30.9617 -102.98325 30.96386 -102.98325 30.96386 -102.9827 30.96766 -102.9827 30.96766 -102.98325 30.97037 -102.98325 30.97037 -102.9827 30.97146 -102.9827 30.97146 -102.98216 30.97254 -102.98216 30.97254 -102.98162 30.97471 -102.98162 30.97471 -102.98108 30.9785 -102.98108 30.9785 -102.98162 30.98122 -102.98162 30.98122 -102.98216 30.98772 -102.98216 30.98772 -102.9827 30.98881 -102.9827 30.98935 -102.98379 30.99043 -102.98433 30.99043 -102.9865 30.99098 -102.9865 30.99098 -102.98921 30.99152 -102.98921 30.99152 -102.99084 30.99206 -102.99084 30.99206 -102.99246 30.9926 -102.99246 30.9926 -102.99517"
+     ]
+    ],
+    "links": [
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.tif",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.png",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "api endpoint to retrieve temporary credentials valid for same-region direct s3 access",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://earth.jpl.nasa.gov/emit/"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/centers/lp-daac"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://doi.org/10.5067/EMIT/EMITL2BCH4PLM.002"
+     },
+     {
+      "inherited": true,
+      "length": "64.8KB",
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "hreflang": "en-US",
+      "href": "https://search.earthdata.nasa.gov/search/granules?p=C3242707413-LPCLOUD"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_ATBD.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_User_Guide.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-ghg"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/nasa/EMIT-Data-Resources"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/data/instruments/emit-imaging-spectrometer/resources"
+     }
+    ]
+   },
+   {
+    "id": "G3953781310-LPCLOUD",
+    "title": "EMIT_L2B_CH4PLM_002_20241130T180310_003724",
+    "time_start": "2024-11-30T18:03:10.000Z",
+    "time_end": "2024-11-30T18:03:10.000Z",
+    "polygons": [
+     [
+      "31.00182 -102.92414 31.00128 -102.92414 31.00128 -102.92577 31.00074 -102.92577 31.00074 -102.92631 30.99965 -102.92631 30.99965 -102.92685 30.99857 -102.92685 30.99857 -102.9274 30.99694 -102.9274 30.99694 -102.92794 30.99423 -102.92794 30.99423 -102.9274 30.99369 -102.9274 30.99314 -102.92631 30.9926 -102.92631 30.9926 -102.92577 30.99152 -102.92577 30.99152 -102.92523 30.99098 -102.92523 30.99043 -102.92414 30.98989 -102.92414 30.98989 -102.9236 30.98935 -102.9236 30.98935 -102.92143 30.98881 -102.92143 30.98881 -102.91547 30.98935 -102.91547 30.98935 -102.91492 30.99043 -102.91438 30.99043 -102.91384 30.9926 -102.91384 30.9926 -102.91438 30.99369 -102.91438 30.99423 -102.91547 30.99477 -102.91547 30.99477 -102.91601 30.99531 -102.91601 30.99531 -102.91655 30.9964 -102.91655 30.9964 -102.91709 30.99911 -102.91709 30.99911 -102.91764 31.00074 -102.91764 31.00074 -102.91818 31.00182 -102.91872 31.00182 -102.92414"
+     ]
+    ],
+    "links": [
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003724.tif",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLM_002_20241130T180310_003724.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLMMETA_002_20241130T180310_003724.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003724.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003724.png",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLM_002_20241130T180310_003724.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003724.cmr.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLM_002_20241130T180310_003724.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLM_002_20241130T180310_003724.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003724.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLM_002_20241130T180310_003724.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003724/EMIT_L2B_CH4PLM_002_20241130T180310_003724.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "api endpoint to retrieve temporary credentials valid for same-region direct s3 access",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://earth.jpl.nasa.gov/emit/"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/centers/lp-daac"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://doi.org/10.5067/EMIT/EMITL2BCH4PLM.002"
+     },
+     {
+      "inherited": true,
+      "length": "64.8KB",
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "hreflang": "en-US",
+      "href": "https://search.earthdata.nasa.gov/search/granules?p=C3242707413-LPCLOUD"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_ATBD.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_User_Guide.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-ghg"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/nasa/EMIT-Data-Resources"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/data/instruments/emit-imaging-spectrometer/resources"
+     }
+    ]
+   },
+   {
+    "id": "G3953781311-LPCLOUD",
+    "title": "EMIT_L2B_CH4PLM_002_20241130T180310_003725",
+    "time_start": "2024-11-30T18:03:10.000Z",
+    "time_end": "2024-11-30T18:03:10.000Z",
+    "polygons": [
+     [
+      "30.98555 -102.9236 30.98447 -102.92414 30.98447 -102.92577 30.98393 -102.92577 30.98393 -102.92794 30.98338 -102.92794 30.98338 -102.9339 30.98284 -102.9339 30.98284 -102.93661 30.9823 -102.93661 30.9823 -102.9377 30.98176 -102.9377 30.98176 -102.93824 30.98067 -102.93878 30.98067 -102.93932 30.97959 -102.93932 30.97905 -102.94041 30.9785 -102.94041 30.9785 -102.93987 30.97742 -102.93932 30.97742 -102.93824 30.97688 -102.93824 30.97688 -102.93444 30.97634 -102.93444 30.97634 -102.9339 30.97525 -102.9339 30.97471 -102.93499 30.97362 -102.93553 30.97308 -102.93661 30.972 -102.93661 30.972 -102.93716 30.97091 -102.93716 30.97091 -102.93661 30.97037 -102.93661 30.96983 -102.93553 30.96874 -102.93499 30.96874 -102.9339 30.9682 -102.9339 30.9682 -102.93228 30.96766 -102.93228 30.96766 -102.93119 30.96712 -102.93119 30.96712 -102.92956 30.96658 -102.92956 30.96658 -102.92848 30.96603 -102.92848 30.96603 -102.92685 30.96549 -102.92685 30.96549 -102.92468 30.96495 -102.92468 30.96495 -102.92197 30.96441 -102.92197 30.96441 -102.91926 30.96386 -102.91926 30.96386 -102.91655 30.96441 -102.91655 30.96441 -102.91492 30.96495 -102.91492 30.96495 -102.91438 30.96549 -102.91438 30.96603 -102.9133 30.96658 -102.9133 30.96658 -102.91221 30.96712 -102.91221 30.96712 -102.91167 30.9682 -102.91113 30.9682 -102.91059 30.96983 -102.91059 30.96983 -102.91004 30.972 -102.91004 30.972 -102.91059 30.97308 -102.91059 30.97362 -102.91167 30.97471 -102.91167 30.97471 -102.91221 30.97525 -102.91221 30.97525 -102.91276 30.97634 -102.9133 30.97634 -102.91384 30.97688 -102.91384 30.97742 -102.91492 30.9785 -102.91547 30.9785 -102.91601 30.98176 -102.91655 30.9823 -102.91764 30.98338 -102.91764 30.98393 -102.91872 30.98501 -102.91926 30.98501 -102.92035 30.98555 -102.92035 30.98555 -102.9236"
+     ]
+    ],
+    "links": [
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003725.tif",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLM_002_20241130T180310_003725.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLMMETA_002_20241130T180310_003725.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003725.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003725.png",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLM_002_20241130T180310_003725.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003725.cmr.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLM_002_20241130T180310_003725.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLM_002_20241130T180310_003725.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003725.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLM_002_20241130T180310_003725.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003725/EMIT_L2B_CH4PLM_002_20241130T180310_003725.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "api endpoint to retrieve temporary credentials valid for same-region direct s3 access",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://earth.jpl.nasa.gov/emit/"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/centers/lp-daac"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://doi.org/10.5067/EMIT/EMITL2BCH4PLM.002"
+     },
+     {
+      "inherited": true,
+      "length": "64.8KB",
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "hreflang": "en-US",
+      "href": "https://search.earthdata.nasa.gov/search/granules?p=C3242707413-LPCLOUD"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_ATBD.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_User_Guide.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-ghg"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/nasa/EMIT-Data-Resources"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/data/instruments/emit-imaging-spectrometer/resources"
+     }
+    ]
+   },
+   {
+    "id": "G3953774135-LPCLOUD",
+    "title": "EMIT_L2B_CH4PLM_002_20240101T000000_000001",
+    "time_start": "2024-11-30T18:03:10.000Z",
+    "time_end": "2024-11-30T18:03:10.000Z",
+    "polygons": [
+     [
+      "30.9926 -102.99517 30.99206 -102.99517 30.99206 -102.99789 30.99098 -102.99843 30.99098 -102.99897 30.98989 -102.99897 30.98989 -102.99951 30.98881 -103.00005 30.98881 -103.0006 30.98772 -103.0006 30.98718 -103.00168 30.98501 -103.00168 30.98501 -103.00114 30.98176 -103.00114 30.98176 -103.0006 30.97905 -103.0006 30.97905 -103.00114 30.97688 -103.00114 30.97688 -103.00168 30.97471 -103.00168 30.97471 -103.00222 30.97308 -103.00222 30.97308 -103.00277 30.97254 -103.00277 30.972 -103.00385 30.97091 -103.00439 30.97037 -103.00548 30.96983 -103.00548 30.96983 -103.0071 30.96929 -103.0071 30.96929 -103.00981 30.96874 -103.00981 30.96874 -103.01198 30.9682 -103.01198 30.96766 -103.01307 30.96712 -103.01307 30.96712 -103.01361 30.96603 -103.01415 30.96549 -103.01524 30.95302 -103.01524 30.95302 -103.01578 30.95194 -103.01578 30.95194 -103.01632 30.95031 -103.01632 30.95031 -103.01686 30.94922 -103.01686 30.94922 -103.01741 30.94814 -103.01741 30.94814 -103.01795 30.94651 -103.01795 30.94651 -103.01849 30.9438 -103.01849 30.9438 -103.01903 30.94218 -103.01903 30.94218 -103.01958 30.94163 -103.01958 30.94109 -103.02066 30.94055 -103.02066 30.94055 -103.0212 30.94001 -103.0212 30.94001 -103.02174 30.93892 -103.02174 30.93838 -103.02283 30.93784 -103.02283 30.93784 -103.02337 30.93729 -103.02337 30.93729 -103.02391 30.93621 -103.02446 30.93567 -103.02554 30.93513 -103.02554 30.93513 -103.02662 30.93458 -103.02662 30.93458 -103.02717 30.9335 -103.02771 30.9335 -103.02879 30.93296 -103.02879 30.93296 -103.02934 30.93241 -103.02934 30.93187 -103.03042 30.93133 -103.03042 30.93133 -103.03096 30.93079 -103.03096 30.93025 -103.03205 30.92916 -103.03205 30.92862 -103.03313 30.92808 -103.03313 30.92808 -103.03367 30.92699 -103.03422 30.92699 -103.03476 30.92591 -103.03476 30.92537 -103.03584 30.92428 -103.03584 30.92374 -103.03693 30.92265 -103.03693 30.92211 -103.03801 30.92103 -103.03801 30.92049 -103.0391 30.9194 -103.0391 30.9194 -103.03964 30.91777 -103.03964 30.91777 -103.04018 30.91669 -103.04018 30.91669 -103.04072 30.91506 -103.04072 30.91506 -103.04126 30.90801 -103.04126 30.90801 -103.04072 30.90747 -103.04072 30.90693 -103.03964 30.90639 -103.03964 30.90639 -103.0391 30.90585 -103.0391 30.90585 -103.03855 30.90476 -103.03801 30.90476 -103.03747 30.90422 -103.03747 30.90422 -103.03693 30.90368 -103.03693 30.90313 -103.03476 30.90259 -103.03476 30.90259 -103.03313 30.90205 -103.03313 30.90205 -103.03205 30.90151 -103.03205 30.90151 -103.03096 30.90097 -103.03096 30.90097 -103.02934 30.90042 -103.02934 30.90042 -103.02717 30.89988 -103.02717 30.89988 -103.02554 30.89934 -103.02554 30.89934 -103.02283 30.8988 -103.02283 30.8988 -103.02012 30.89825 -103.02012 30.89825 -103.01741 30.89771 -103.01741 30.89771 -103.00439 30.89825 -103.00439 30.89825 -103.00331 30.89934 -103.00277 30.89988 -103.0006 30.90042 -103.0006 30.90042 -102.99951 30.90151 -102.99897 30.90151 -102.99789 30.90205 -102.99789 30.90205 -102.99734 30.90422 -102.99734 30.90422 -102.9968 30.90801 -102.9968 30.90801 -102.99626 30.91181 -102.99626 30.91181 -102.99572 30.91506 -102.99572 30.91506 -102.99517 30.91832 -102.99517 30.91832 -102.99463 30.92157 -102.99463 30.92157 -102.99517 30.92482 -102.99517 30.92482 -102.99572 30.92753 -102.99572 30.92753 -102.99626 30.9297 -102.99626 30.9297 -102.99572 30.93079 -102.99572 30.93079 -102.99517 30.93241 -102.99517 30.93241 -102.99463 30.9335 -102.99463 30.9335 -102.99409 30.93458 -102.99409 30.93458 -102.99355 30.93621 -102.99355 30.93621 -102.99301 30.93784 -102.99301 30.93784 -102.99246 30.94001 -102.99246 30.94001 -102.99192 30.94272 -102.99192 30.94272 -102.99138 30.9476 -102.99138 30.9476 -102.99084 30.95194 -102.99084 30.95194 -102.99029 30.95302 -102.98975 30.95356 -102.98758 30.95465 -102.98704 30.95465 -102.9865 30.95519 -102.9865 30.95519 -102.98596 30.95736 -102.98541 30.95736 -102.98487 30.95844 -102.98487 30.95844 -102.98433 30.9617 -102.98379 30.9617 -102.98325 30.96386 -102.98325 30.96386 -102.9827 30.96766 -102.9827 30.96766 -102.98325 30.97037 -102.98325 30.97037 -102.9827 30.97146 -102.9827 30.97146 -102.98216 30.97254 -102.98216 30.97254 -102.98162 30.97471 -102.98162 30.97471 -102.98108 30.9785 -102.98108 30.9785 -102.98162 30.98122 -102.98162 30.98122 -102.98216 30.98772 -102.98216 30.98772 -102.9827 30.98881 -102.9827 30.98935 -102.98379 30.99043 -102.98433 30.99043 -102.9865 30.99098 -102.9865 30.99098 -102.98921 30.99152 -102.98921 30.99152 -102.99084 30.99206 -102.99084 30.99206 -102.99246 30.9926 -102.99246 30.9926 -102.99517"
+     ]
+    ],
+    "links": [
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.png",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "api endpoint to retrieve temporary credentials valid for same-region direct s3 access",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://earth.jpl.nasa.gov/emit/"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/centers/lp-daac"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://doi.org/10.5067/EMIT/EMITL2BCH4PLM.002"
+     },
+     {
+      "inherited": true,
+      "length": "64.8KB",
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "hreflang": "en-US",
+      "href": "https://search.earthdata.nasa.gov/search/granules?p=C3242707413-LPCLOUD"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_ATBD.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_User_Guide.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-ghg"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/nasa/EMIT-Data-Resources"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/data/instruments/emit-imaging-spectrometer/resources"
+     }
+    ]
+   },
+   {
+    "id": "G3953774135-LPCLOUD",
+    "title": "EMIT_../../etc/passwd",
+    "time_start": "2024-11-30T18:03:10.000Z",
+    "time_end": "2024-11-30T18:03:10.000Z",
+    "polygons": [
+     [
+      "30.9926 -102.99517 30.99206 -102.99517 30.99206 -102.99789 30.99098 -102.99843 30.99098 -102.99897 30.98989 -102.99897 30.98989 -102.99951 30.98881 -103.00005 30.98881 -103.0006 30.98772 -103.0006 30.98718 -103.00168 30.98501 -103.00168 30.98501 -103.00114 30.98176 -103.00114 30.98176 -103.0006 30.97905 -103.0006 30.97905 -103.00114 30.97688 -103.00114 30.97688 -103.00168 30.97471 -103.00168 30.97471 -103.00222 30.97308 -103.00222 30.97308 -103.00277 30.97254 -103.00277 30.972 -103.00385 30.97091 -103.00439 30.97037 -103.00548 30.96983 -103.00548 30.96983 -103.0071 30.96929 -103.0071 30.96929 -103.00981 30.96874 -103.00981 30.96874 -103.01198 30.9682 -103.01198 30.96766 -103.01307 30.96712 -103.01307 30.96712 -103.01361 30.96603 -103.01415 30.96549 -103.01524 30.95302 -103.01524 30.95302 -103.01578 30.95194 -103.01578 30.95194 -103.01632 30.95031 -103.01632 30.95031 -103.01686 30.94922 -103.01686 30.94922 -103.01741 30.94814 -103.01741 30.94814 -103.01795 30.94651 -103.01795 30.94651 -103.01849 30.9438 -103.01849 30.9438 -103.01903 30.94218 -103.01903 30.94218 -103.01958 30.94163 -103.01958 30.94109 -103.02066 30.94055 -103.02066 30.94055 -103.0212 30.94001 -103.0212 30.94001 -103.02174 30.93892 -103.02174 30.93838 -103.02283 30.93784 -103.02283 30.93784 -103.02337 30.93729 -103.02337 30.93729 -103.02391 30.93621 -103.02446 30.93567 -103.02554 30.93513 -103.02554 30.93513 -103.02662 30.93458 -103.02662 30.93458 -103.02717 30.9335 -103.02771 30.9335 -103.02879 30.93296 -103.02879 30.93296 -103.02934 30.93241 -103.02934 30.93187 -103.03042 30.93133 -103.03042 30.93133 -103.03096 30.93079 -103.03096 30.93025 -103.03205 30.92916 -103.03205 30.92862 -103.03313 30.92808 -103.03313 30.92808 -103.03367 30.92699 -103.03422 30.92699 -103.03476 30.92591 -103.03476 30.92537 -103.03584 30.92428 -103.03584 30.92374 -103.03693 30.92265 -103.03693 30.92211 -103.03801 30.92103 -103.03801 30.92049 -103.0391 30.9194 -103.0391 30.9194 -103.03964 30.91777 -103.03964 30.91777 -103.04018 30.91669 -103.04018 30.91669 -103.04072 30.91506 -103.04072 30.91506 -103.04126 30.90801 -103.04126 30.90801 -103.04072 30.90747 -103.04072 30.90693 -103.03964 30.90639 -103.03964 30.90639 -103.0391 30.90585 -103.0391 30.90585 -103.03855 30.90476 -103.03801 30.90476 -103.03747 30.90422 -103.03747 30.90422 -103.03693 30.90368 -103.03693 30.90313 -103.03476 30.90259 -103.03476 30.90259 -103.03313 30.90205 -103.03313 30.90205 -103.03205 30.90151 -103.03205 30.90151 -103.03096 30.90097 -103.03096 30.90097 -103.02934 30.90042 -103.02934 30.90042 -103.02717 30.89988 -103.02717 30.89988 -103.02554 30.89934 -103.02554 30.89934 -103.02283 30.8988 -103.02283 30.8988 -103.02012 30.89825 -103.02012 30.89825 -103.01741 30.89771 -103.01741 30.89771 -103.00439 30.89825 -103.00439 30.89825 -103.00331 30.89934 -103.00277 30.89988 -103.0006 30.90042 -103.0006 30.90042 -102.99951 30.90151 -102.99897 30.90151 -102.99789 30.90205 -102.99789 30.90205 -102.99734 30.90422 -102.99734 30.90422 -102.9968 30.90801 -102.9968 30.90801 -102.99626 30.91181 -102.99626 30.91181 -102.99572 30.91506 -102.99572 30.91506 -102.99517 30.91832 -102.99517 30.91832 -102.99463 30.92157 -102.99463 30.92157 -102.99517 30.92482 -102.99517 30.92482 -102.99572 30.92753 -102.99572 30.92753 -102.99626 30.9297 -102.99626 30.9297 -102.99572 30.93079 -102.99572 30.93079 -102.99517 30.93241 -102.99517 30.93241 -102.99463 30.9335 -102.99463 30.9335 -102.99409 30.93458 -102.99409 30.93458 -102.99355 30.93621 -102.99355 30.93621 -102.99301 30.93784 -102.99301 30.93784 -102.99246 30.94001 -102.99246 30.94001 -102.99192 30.94272 -102.99192 30.94272 -102.99138 30.9476 -102.99138 30.9476 -102.99084 30.95194 -102.99084 30.95194 -102.99029 30.95302 -102.98975 30.95356 -102.98758 30.95465 -102.98704 30.95465 -102.9865 30.95519 -102.9865 30.95519 -102.98596 30.95736 -102.98541 30.95736 -102.98487 30.95844 -102.98487 30.95844 -102.98433 30.9617 -102.98379 30.9617 -102.98325 30.96386 -102.98325 30.96386 -102.9827 30.96766 -102.9827 30.96766 -102.98325 30.97037 -102.98325 30.97037 -102.9827 30.97146 -102.9827 30.97146 -102.98216 30.97254 -102.98216 30.97254 -102.98162 30.97471 -102.98162 30.97471 -102.98108 30.9785 -102.98108 30.9785 -102.98162 30.98122 -102.98162 30.98122 -102.98216 30.98772 -102.98216 30.98772 -102.9827 30.98881 -102.9827 30.98935 -102.98379 30.99043 -102.98433 30.99043 -102.9865 30.99098 -102.9865 30.99098 -102.98921 30.99152 -102.98921 30.99152 -102.99084 30.99206 -102.99084 30.99206 -102.99246 30.9926 -102.99246 30.9926 -102.99517"
+     ]
+    ],
+    "links": [
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.tif",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "title": "Download EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.png",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "Download EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.tif"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/s3#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLMMETA_002_20241130T180310_003723.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/browse#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-public/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.png"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "This link provides direct download access via S3 to the granule",
+      "hreflang": "en-US",
+      "href": "s3://lp-prod-protected/EMITL2BCH4PLM.002/EMIT_L2B_CH4PLM_002_20241130T180310_003723/EMIT_L2B_CH4PLM_002_20241130T180310_003723.cmr.json"
+     },
+     {
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "title": "api endpoint to retrieve temporary credentials valid for same-region direct s3 access",
+      "hreflang": "en-US",
+      "href": "https://data.lpdaac.earthdatacloud.nasa.gov/s3credentials"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://earth.jpl.nasa.gov/emit/"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/centers/lp-daac"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/metadata#",
+      "hreflang": "en-US",
+      "href": "https://doi.org/10.5067/EMIT/EMITL2BCH4PLM.002"
+     },
+     {
+      "inherited": true,
+      "length": "64.8KB",
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/data#",
+      "hreflang": "en-US",
+      "href": "https://search.earthdata.nasa.gov/search/granules?p=C3242707413-LPCLOUD"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_ATBD.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-sds-tgp/blob/main/docs/EMIT_L2B_TRACE_GAS_User_Guide.md"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/emit-sds/emit-ghg"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://github.com/nasa/EMIT-Data-Resources"
+     },
+     {
+      "inherited": true,
+      "rel": "http://esipfed.org/ns/fedsearch/1.1/documentation#",
+      "hreflang": "en-US",
+      "href": "https://www.earthdata.nasa.gov/data/instruments/emit-imaging-spectrometer/resources"
+     }
+    ]
+   }
+  ]
+ }
+}

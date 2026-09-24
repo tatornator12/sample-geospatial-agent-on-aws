@@ -9,19 +9,25 @@
 #   DEPLOY_TARGET=stable CONFIRM_STABLE=yes ./deploy.sh    # live demo runtime, reads .env
 #   DRY_RUN=1 DEPLOY_TARGET=dev ./deploy.sh                # print the commands, touch nothing
 #
-# Optional:
-#   DEV_AGENT_NAME=methane_hunter   # name of the dev/side runtime (default geospatial_agent_dev)
-#   AGENTCORE_BIN=/path/to/agentcore  # the bedrock-agentcore-starter-toolkit CLI
+# Optional (set by other agents' deploy scripts, e.g. agents/methane-hunter/deploy.sh):
+#   STABLE_AGENT_NAME=methane_hunter      # stable runtime name (default geospatial_agent_on_aws)
+#   DEV_AGENT_NAME=methane_hunter_dev     # dev runtime name (default geospatial_agent_dev)
+#   AGENTCORE_BIN=/path/to/agentcore      # the bedrock-agentcore-starter-toolkit CLI
 #
 # Usage from a deploy script:
 #   source "$(cd "$(dirname "$0")" && pwd)/deploy_lib.sh"
 #   resolve_deploy_target      # sets AGENT_NAME, ENV_FILE, AGENTCORE_BIN
 #   run <command...>           # executes, or prints (with secrets redacted) when DRY_RUN=1
 
+# The directory of this library, so the venv CLI is found wherever the calling script lives.
+DEPLOY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_REPO_ROOT="$(cd "${DEPLOY_LIB_DIR}/.." && pwd)"
+
 resolve_deploy_target() {
+    local stable_name="${STABLE_AGENT_NAME:-geospatial_agent_on_aws}"
     case "${DEPLOY_TARGET:-}" in
         stable)
-            AGENT_NAME="geospatial_agent_on_aws"
+            AGENT_NAME="${stable_name}"
             ENV_FILE=".env"
             if [ "${CONFIRM_STABLE:-}" != "yes" ]; then
                 echo "Refusing to deploy to the STABLE demo runtime (${AGENT_NAME}) without CONFIRM_STABLE=yes." >&2
@@ -32,8 +38,8 @@ resolve_deploy_target() {
         dev)
             AGENT_NAME="${DEV_AGENT_NAME:-geospatial_agent_dev}"
             ENV_FILE=".env.dev"
-            if [ "${AGENT_NAME}" = "geospatial_agent_on_aws" ]; then
-                echo "Refusing: DEV_AGENT_NAME must not be the stable runtime name." >&2
+            if [ "${AGENT_NAME}" = "${stable_name}" ] || [ "${AGENT_NAME}" = "geospatial_agent_on_aws" ]; then
+                echo "Refusing: DEV_AGENT_NAME must not be a stable runtime name." >&2
                 exit 1
             fi
             ;;
@@ -64,8 +70,8 @@ EOF
     # The Homebrew `agentcore` (AgentCore CLI, CDK-based) has no configure/launch commands.
     # Prefer the starter-toolkit CLI in the project venv unless AGENTCORE_BIN is set.
     if [ -z "${AGENTCORE_BIN:-}" ]; then
-        if [ -x "../.venv/bin/agentcore" ]; then
-            AGENTCORE_BIN="../.venv/bin/agentcore"
+        if [ -x "${DEPLOY_REPO_ROOT}/.venv/bin/agentcore" ]; then
+            AGENTCORE_BIN="${DEPLOY_REPO_ROOT}/.venv/bin/agentcore"
         else
             AGENTCORE_BIN="agentcore"
         fi

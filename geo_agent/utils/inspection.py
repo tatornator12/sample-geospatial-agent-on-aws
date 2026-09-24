@@ -36,6 +36,9 @@ _SPECTRAL = ["#9e0142", "#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#ffffbf",
 _BLUES = ["#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6",
           "#2171b5", "#08519c", "#08306b"]
 _GREYS = ["#000000", "#ffffff"]
+# matplotlib `plasma` sampled at 0.0, 0.1, ... 1.0 (TiTiler's plasma is the same ramp).
+_PLASMA = ["#0d0887", "#41049d", "#6a00a8", "#8f0da4", "#b12a90", "#cc4778",
+           "#e16462", "#f2844b", "#fca636", "#fcce25", "#f0f921"]
 
 # Sentinel-2 scene classification (SCL) classes.
 SCL_NODATA = (0,)
@@ -59,6 +62,8 @@ INDEX_STYLES: tuple[tuple[tuple[str, ...], IndexStyle], ...] = (
     (("ndvi_", "ndvi-"), IndexStyle("ndvi", 0.0, 1.0, tuple(_RDYLGN))),
     (("ndwi_", "ndwi-"), IndexStyle("ndwi", -1.0, 1.0, tuple(_BLUES))),
     (("nbr_", "nbr-", "/nbr."), IndexStyle("nbr", -1.0, 1.0, tuple(_SPECTRAL))),
+    # EMIT CH4 plume enhancement (ppm·m), the Methane Hunter's render hint: plasma over 0-1500.
+    (("ch4plm",), IndexStyle("ch4", 0.0, 1500.0, tuple(_PLASMA))),
 )
 
 

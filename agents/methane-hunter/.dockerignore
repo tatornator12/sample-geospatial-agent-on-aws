@@ -1,0 +1,16 @@
+# Env files at ANY level of the build context (a bare `.env` only matches the root).
+**/.env
+**/.env.*
+!**/.env.example
+
+# Tests, caches, generated AgentCore config
+tests/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.bedrock_agentcore.yaml
+.bedrock_agentcore/
+.dockerignore
+.gitignore
+*.md
+.DS_Store

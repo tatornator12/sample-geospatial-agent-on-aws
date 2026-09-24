@@ -95,13 +95,16 @@ async def list_session_assets() -> str:
 
 # visualization tool for sending map data to map
 @tool
-async def display_visual(s3_url: str, title: str, description: str = "") -> str:
+async def display_visual(s3_url: str, title: str, description: str = "", render: dict = None) -> str:
     """Display geometry or imagery (TCI, NDVI, NDWI, NBR) on map.
     
     Args:
         s3_url: S3 URL to GeoJSON or raster
         title: Display title
         description: Optional details
+        render: OPTIONAL styling hint for the map. Pass it only when a tool gave you one (e.g.
+            the Methane Hunter's plume tools return `render`); copy it unchanged. Omit it for
+            TCI/NDVI/NDWI/NBR/change maps and boundaries: the map already styles those.
     
     Returns: JSON with display metadata
     
