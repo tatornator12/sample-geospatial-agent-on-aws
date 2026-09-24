@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import '../utils/maplibreWorker.ts';
 import MapboxDraw from 'maplibre-gl-draw';
 import 'maplibre-gl-draw/dist/mapbox-gl-draw.css';
 import { getPresignedUrl } from '../services/api.ts';
@@ -149,8 +150,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
       zoom: 2,
       // Compact attribution: a small info button in the corner instead of a white bar under the plates.
       attributionControl: { compact: true },
-      preserveDrawingBuffer: true,
-      failIfMajorPerformanceCaveat: false,
+      // maplibre-gl >= 5 takes WebGL context attributes in one nested object.
+      canvasContextAttributes: {
+        preserveDrawingBuffer: true,
+        failIfMajorPerformanceCaveat: false,
+      },
       transformRequest: (url) => {
         // Add API key for TiTiler requests
         if (url.startsWith(TITILER_URL) && TITILER_API_KEY) {
@@ -240,17 +244,20 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
 
     map.current.addControl(draw.current as any);
 
-    // Listen for draw events
-    map.current.on('draw.create', () => {
+    // Listen for draw events. maplibre-gl-draw fires its own `draw.*` events on the map,
+    // which maplibre-gl 6's strictly typed `on` does not know about, so widen the type here.
+    const drawEvents = map.current as unknown as { on(type: string, listener: () => void): void };
+
+    drawEvents.on('draw.create', () => {
       setHasDrawnFeatures(true);
     });
 
-    map.current.on('draw.delete', () => {
+    drawEvents.on('draw.delete', () => {
       const data = draw.current?.getAll();
       setHasDrawnFeatures(data ? data.features.length > 0 : false);
     });
 
-    map.current.on('draw.update', () => {
+    drawEvents.on('draw.update', () => {
       setHasDrawnFeatures(true);
     });
 

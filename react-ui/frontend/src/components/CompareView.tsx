@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
+import '../utils/maplibreWorker.ts';
 import { getPresignedUrl } from '../services/api.ts';
 import { TITILER_URL, TITILER_API_KEY } from '../config.ts';
 import type { LayerMetadata } from '../utils/layerFormatting';
@@ -7,12 +8,15 @@ import type { LayerMetadata } from '../utils/layerFormatting';
 // Load the Compare class lazily to avoid ES module hoisting issues.
 // The dist bundle attaches Compare to window.maplibregl, but static imports
 // are hoisted above our window assignment. Dynamic import solves this.
+// maplibre-gl 6 is ESM-only, so the namespace import is a frozen module object;
+// the plugin does `window.maplibregl.Compare = ...`, which needs a writable copy.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let CompareClass: any = null;
 async function loadCompare() {
   if (CompareClass) return CompareClass;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).maplibregl = maplibregl;
+  const w = window as any;
+  if (!w.maplibregl) w.maplibregl = { ...maplibregl };
   await import('@maplibre/maplibre-gl-compare/dist/maplibre-gl-compare.js');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   CompareClass = (window as any).maplibregl?.Compare;
@@ -91,8 +95,8 @@ export function CompareView({ leftLayer, rightLayer, bounds, center, zoom, onClo
 
       // Wait for both maps to load
       await Promise.all([
-        new Promise<void>(resolve => lMap.on('load', resolve)),
-        new Promise<void>(resolve => rMap.on('load', resolve)),
+        new Promise<void>(resolve => lMap.once('load', () => resolve())),
+        new Promise<void>(resolve => rMap.once('load', () => resolve())),
       ]);
 
       if (cancelled) return;
