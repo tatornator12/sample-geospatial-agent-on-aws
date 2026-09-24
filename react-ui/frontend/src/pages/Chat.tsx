@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
-import { prewarmSession } from '../services/api';
+import { getApiUrl, prewarmSession } from '../services/api';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { MapView } from '../components/MapView';
@@ -107,14 +107,6 @@ export function Chat() {
       setScenarioError(null);
 
       try {
-        // Get API URL with same logic as api.ts
-        const getApiUrl = () => {
-          if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-          if (import.meta.env.VITE_DEV_MODE === 'true' || window.location.hostname === 'localhost') {
-            return 'http://localhost:3001';
-          }
-          return window.location.origin;
-        };
         const API_URL = getApiUrl();
 
         // Fetch scenario config

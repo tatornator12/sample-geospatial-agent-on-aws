@@ -1,7 +1,10 @@
-# Ignore local environment files (dev-only)
-.env
-.env.local
-.env*.local
+# Ignore local environment files (dev-only) at EVERY level of the build context.
+# A bare `.env` only matches the context root; `frontend/.env` (VITE_DEV_MODE, the local
+# API base, local TiTiler values) once reached a production build this way. Production
+# build inputs arrive as Docker build args from frontend-cdk, never from env files.
+**/.env
+**/.env.*
+!**/.env.example
 
 # Ignore node_modules (will be installed fresh in Docker)
 node_modules

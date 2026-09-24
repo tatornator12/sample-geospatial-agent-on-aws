@@ -12,7 +12,15 @@
  * WARNING: Never use this in production!
  */
 
-const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+// Dev mode needs BOTH the build flag and a local host. The second condition is the guard
+// that matters: a bundle accidentally built with VITE_DEV_MODE=true still cannot bypass sign-in
+// when it is served from a real domain (this happened once on the CloudFront deploy of
+// 2026-09-24; the server-side JWT check held, but the UI showed a fake logged-in state).
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+const DEV_MODE =
+  import.meta.env.VITE_DEV_MODE === 'true' &&
+  typeof window !== 'undefined' &&
+  LOCAL_HOSTS.has(window.location.hostname);
 
 export interface AuthTokens {
   idToken: string;

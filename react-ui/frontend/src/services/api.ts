@@ -3,14 +3,16 @@ import { getIdToken } from '../utils/auth';
 
 // API URL: In production (when served from same origin), use current origin
 // In development, use localhost:3001 or VITE_API_URL from env
-const getApiUrl = () => {
+export const getApiUrl = () => {
   // If explicitly set in env, use it
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
 
-  // If in dev mode or on localhost, use localhost:3001
-  if (import.meta.env.VITE_DEV_MODE === 'true' || window.location.hostname === 'localhost') {
+  // Local development (vite dev server) talks to the local backend. Decided by where the page
+  // is served from, never by a build flag: a production bundle must always call its own origin.
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') {
     return 'http://localhost:3001';
   }
 

@@ -15,8 +15,15 @@ RUN npm ci
 # Copy frontend source
 COPY frontend/ ./
 
-# Build frontend
-RUN npm run build
+# Production build inputs come ONLY from build args (set by frontend-cdk). Any env file that
+# slipped past .dockerignore is removed so a dev setting can never be baked into the bundle.
+ARG VITE_TITILER_URL=""
+ARG VITE_TITILER_API_KEY=""
+ENV VITE_TITILER_URL=${VITE_TITILER_URL} \
+    VITE_TITILER_API_KEY=${VITE_TITILER_API_KEY} \
+    VITE_DEV_MODE=false \
+    VITE_API_URL=""
+RUN rm -f .env .env.* && npm run build
 
 # Stage 2: Build backend and serve
 FROM node:20-alpine AS production

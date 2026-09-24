@@ -301,10 +301,23 @@ export class GeospatialAgentStack extends cdk.Stack {
     // ========================================
     // Build Docker Image
     // ========================================
+    // The frontend is a static Vite build inside the image, so the values it needs at build
+    // time (the TiTiler tile server) are passed as Docker build args from this stack's
+    // environment. Nothing is read from react-ui/frontend/.env: that file is dev-only and is
+    // excluded from the build context.
+    const titilerUrl = (this.node.tryGetContext('titilerUrl') || process.env.VITE_TITILER_URL || '') as string;
+    const titilerApiKey = (this.node.tryGetContext('titilerApiKey') || process.env.VITE_TITILER_API_KEY || '') as string;
+    if (!titilerUrl) {
+      throw new Error('VITE_TITILER_URL is required (frontend-cdk/.env); without it the live map has no imagery tiles.');
+    }
     const dockerImage = new ecr_assets.DockerImageAsset(this, 'AppImage', {
       directory: path.join(__dirname, '../../react-ui'),
       file: 'Dockerfile',
       platform: ecr_assets.Platform.LINUX_ARM64,
+      buildArgs: {
+        VITE_TITILER_URL: titilerUrl,
+        VITE_TITILER_API_KEY: titilerApiKey,
+      },
     });
 
     // ========================================
