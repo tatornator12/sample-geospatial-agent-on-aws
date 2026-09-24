@@ -193,18 +193,29 @@ def _cell_bbox(i: int) -> dict:
     return {"xmin": xmin, "ymin": ymin, "xmax": xmin + 0.01, "ymax": ymin + 0.01}
 
 
-@pytest.fixture(scope="session")
-def lgnd_partition(tmp_path_factory, lgnd_handler_module) -> Path:
-    """Two monthly parquet partitions in the handler's exact hive layout, local base dir."""
-    h = lgnd_handler_module
-    base = tmp_path_factory.mktemp("lgnd")
+def lgnd_base_vectors() -> tuple[np.ndarray, np.ndarray]:
+    """The two orthonormal 256-vectors every synthetic embedding is built from.
 
+    `u` is the unchanged/base direction (cells 00-29 in both periods); `v` is the
+    orthogonal direction mixed in to hit exact cosines. Exposed so tests can build a
+    query vector that matches the partition exactly (similarity-search tests).
+    """
     rng = np.random.default_rng(42)
     u = rng.normal(size=256)
     u /= np.linalg.norm(u)
     v = rng.normal(size=256)
     v -= (v @ u) * u
     v /= np.linalg.norm(v)
+    return u, v
+
+
+@pytest.fixture(scope="session")
+def lgnd_partition(tmp_path_factory, lgnd_handler_module) -> Path:
+    """Two monthly parquet partitions in the handler's exact hive layout, local base dir."""
+    h = lgnd_handler_module
+    base = tmp_path_factory.mktemp("lgnd")
+
+    u, v = lgnd_base_vectors()
 
     def embedding(i: int, period: int) -> list[float]:
         if period == 0 or i < 30:
