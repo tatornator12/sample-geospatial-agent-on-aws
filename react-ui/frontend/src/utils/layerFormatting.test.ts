@@ -4,10 +4,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  boundsWithin,
+  findComparePair,
   formatLayerDisplayText,
   formatSimilarityLabel,
   groupLayers,
   isSimilarityLayer,
+  rasterPlaceKey,
   type LayerMetadata,
 } from './layerFormatting.ts';
 
@@ -72,5 +75,42 @@ describe('formatSimilarityLabel', () => {
 
   it('returns the title untouched when the file name is not a similarity result', () => {
     expect(formatSimilarityLabel(boundary)).toBe('Central Park');
+  });
+});
+
+describe('findComparePair', () => {
+  const folsom21 = layer({ id: 'f21', type: 'raster', name: 'Satellite Image of Folsom Lake - 2021-07-23', url: 's3://b/r/tci_clipped_folsom_lake_2021-07-23.tif', date: '2021-07-23' });
+  const folsom22 = layer({ id: 'f22', type: 'raster', name: 'Folsom Lake TCI 2022', url: 's3://b/r/tci_clipped_folsom_lake_2022-08-12.tif', date: '2022-08-12' });
+  const folsom23 = layer({ id: 'f23', type: 'raster', name: 'Folsom Lake TCI 2023', url: 's3://b/r/tci_clipped_folsom_lake_2023-07-01.tif', date: '2023-07-01' });
+  const westPoint = layer({ id: 'wp', type: 'raster', name: 'Rank 1 Match: West Point, NY — Sentinel-2 TCI, 2025-06-03', url: 's3://b/r/tci_clipped_west_point_ny_2025-06-03.tif', date: '2025-06-03' });
+  const lakeGeorge = layer({ id: 'lg', type: 'raster', name: 'Rank 2 Match: Lake George — Sentinel-2 TCI, 2025-07-21', url: 's3://b/r/tci_clipped_lake_george_ny_2025-07-21.tif', date: '2025-07-21' });
+
+  it('pairs two dates of the same place, earliest left', () => {
+    expect(findComparePair([folsom22, folsom21])).toEqual({ left: folsom21, right: folsom22 });
+  });
+
+  it('does not pair two different places (the eyes on two similarity matches)', () => {
+    expect(findComparePair([westPoint, lakeGeorge])).toBeNull();
+  });
+
+  it('ignores same-place same-date duplicates and picks the widest span', () => {
+    expect(findComparePair([folsom22, folsom23, folsom21, westPoint])).toEqual({ left: folsom21, right: folsom23 });
+    expect(findComparePair([folsom21, layer({ ...folsom21, id: 'dup' })])).toBeNull();
+  });
+
+  it('reads the place from the file name, not the title', () => {
+    expect(rasterPlaceKey(westPoint)).toBe('west_point_ny');
+    expect(rasterPlaceKey(layer({ ...westPoint, url: 's3://b/r/scene.tif' }))).toBeNull();
+    expect(findComparePair([westPoint, layer({ ...westPoint, id: 'x', url: 's3://b/r/scene.tif' })])).toBeNull();
+  });
+});
+
+describe('boundsWithin', () => {
+  it('is true only when inner is fully inside outer', () => {
+    const ny: [number, number, number, number] = [-79.76, 40.5, -71.86, 45.02];
+    expect(boundsWithin([-74.0, 40.7, -73.9, 40.8], ny)).toBe(true);
+    expect(boundsWithin([-80.0, 40.7, -73.9, 40.8], ny)).toBe(false);
+    expect(boundsWithin(undefined, ny)).toBe(false);
+    expect(boundsWithin([-74.0, 40.7, -73.9, 40.8], undefined)).toBe(false);
   });
 });

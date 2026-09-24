@@ -144,6 +144,53 @@ export function formatSimilarityLabel(layer: LayerMetadata): string {
 }
 
 /**
+ * The place a clipped raster belongs to, from the agent's own file naming
+ * (`<band>_clipped_<location>_<YYYY-MM-DD>.tif` in sentinel_utils): the basename without the
+ * band prefix, the date suffix and the extension. Null when the URL is not in that form.
+ */
+export function rasterPlaceKey(layer: LayerMetadata): string | null {
+  const basename = (layer.url || '').split('/').pop() ?? '';
+  const m = basename.match(/^[a-z0-9]+_clipped_(.+)_(\d{4}-\d{2}-\d{2})\.tiff?$/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/**
+ * The before/after pair for the compare slider: two true-colour scenes of the SAME place on
+ * DIFFERENT dates. Two scenes of two different places (the eyes on two similarity matches, say)
+ * are not a before and after, so no pair is returned for them. When one place has more than
+ * two dates, the earliest and the latest are the pair.
+ */
+export function findComparePair(tciLayers: LayerMetadata[]): { left: LayerMetadata; right: LayerMetadata } | null {
+  const byPlace = new Map<string, LayerMetadata[]>();
+  for (const layer of tciLayers) {
+    const key = rasterPlaceKey(layer);
+    if (!key) continue;
+    const list = byPlace.get(key) ?? [];
+    list.push(layer);
+    byPlace.set(key, list);
+  }
+  for (const layers of byPlace.values()) {
+    const dated = layers
+      .filter(l => !!l.date)
+      .sort((a, b) => (a.date as string).localeCompare(b.date as string));
+    const distinctDates = new Set(dated.map(l => l.date));
+    if (distinctDates.size >= 2) {
+      return { left: dated[0], right: dated[dated.length - 1] };
+    }
+  }
+  return null;
+}
+
+/** Whether `inner` lies entirely inside `outer` ([west, south, east, north]). */
+export function boundsWithin(
+  inner: [number, number, number, number] | undefined,
+  outer: [number, number, number, number] | undefined,
+): boolean {
+  if (!inner || !outer) return false;
+  return inner[0] >= outer[0] && inner[1] >= outer[1] && inner[2] <= outer[2] && inner[3] <= outer[3];
+}
+
+/**
  * Format layer display text based on layer type
  */
 export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 'spectral' | 'geometry' | 'similar'): string {

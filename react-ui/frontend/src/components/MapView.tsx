@@ -8,8 +8,11 @@ import { getPresignedUrl } from '../services/api.ts';
 import type { GeometryData, RasterData } from '../types.ts';
 import { TITILER_URL, TITILER_API_KEY } from '../config.ts';
 import {
+  boundsWithin,
+  findComparePair,
   formatLayerDisplayText,
   groupLayers,
+  isSimilarityLayer,
   type LayerMetadata,
 } from '../utils/layerFormatting';
 import { CompareView } from './CompareView';
@@ -38,6 +41,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
 
   // Memoize layer groups to avoid repeated filtering on each render
   const layerGroups = useMemo(() => groupLayers(allLayers), [allLayers]);
+  // The compare slider needs a before and an after of the SAME place; two scenes of two
+  // different places (the eyes on two similarity matches) are not a pair.
+  const comparePair = useMemo(() => findComparePair(layerGroups.tci), [layerGroups.tci]);
+  // Mirror of allLayers for the async geometry loader, which otherwise closes over a stale list.
+  const allLayersRef = useRef<LayerMetadata[]>([]);
+  useEffect(() => {
+    allLayersRef.current = allLayers;
+  }, [allLayers]);
 
   // Function to update base map layer
   const updateBaseMapLayer = (style: 'dark' | 'google-roads' | 'google-satellite' | 'esri-satellite') => {
@@ -286,6 +297,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
         
         console.log(`➕ Adding new geometry to map`);
 
+        // Detect a similarity result from find_similar_places: match cells carry a numeric
+        // `similarity` and `tier: 'match'`; the example is `tier: 'query'`. Evidence colour:
+        // a single-hue violet ramp (light = less alike, deep = more alike), never the accent.
+        const isSimilarity = Array.isArray(geometry.features) &&
+          geometry.features.some((f) =>
+            f?.properties && f.properties.tier === 'match' && typeof f.properties.similarity === 'number');
+
         try {
           currentMap.addSource(geometryId, {
             type: 'geojson',
@@ -304,13 +322,6 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           const isProtectedArea = Array.isArray(geometry.features) &&
             geometry.features.some((f: any) =>
               f?.properties && f.properties.__layer_type === 'protected_area');
-
-          // Detect a similarity result from find_similar_places: match cells carry a numeric
-          // `similarity` and `tier: 'match'`; the example is `tier: 'query'`. Evidence colour:
-          // a single-hue violet ramp (light = less alike, deep = more alike), never the accent.
-          const isSimilarity = Array.isArray(geometry.features) &&
-            geometry.features.some((f) =>
-              f?.properties && f.properties.tier === 'match' && typeof f.properties.similarity === 'number');
 
           if (isSimilarity) {
             const sims = geometry.features
@@ -555,8 +566,18 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
         
         console.log(`✅ Geometry added:`, name, `bounds:`, boundsArray);
 
-        currentMap.fitBounds(bounds, { padding: 50, duration: 1500, maxZoom: 15 });
-        console.log(`🎯 fitBounds called`);
+        // The frame rule: once a ranked "similar places" map is on the stage, a geometry that
+        // lies inside it (a match's bbox, a drill-down) does not steal the frame. The row's
+        // name still flies there on demand. Anything outside the ranked map, or the ranked map
+        // itself, fits as before.
+        const rankedMap = allLayersRef.current.find(isSimilarityLayer);
+        const keepFrame = !!rankedMap && !isSimilarity && boundsWithin(boundsArray, rankedMap.bounds);
+        if (keepFrame) {
+          console.log(`🖼️ Keeping the ranked map in frame; not fitting to`, name);
+        } else {
+          currentMap.fitBounds(bounds, { padding: 50, duration: 1500, maxZoom: 15 });
+          console.log(`🎯 fitBounds called`);
+        }
       };
 
       if (currentMap.isStyleLoaded()) {
@@ -1067,11 +1088,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
   };
 
   const openCompare = () => {
-    const sorted = [...layerGroups.tci].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (!comparePair) return;
     const currentMap = map.current;
     const center = currentMap ? currentMap.getCenter() : { lng: 0, lat: 20 };
     const zoom = currentMap ? currentMap.getZoom() : 2;
-    setCompareMode({ left: sorted[0], right: sorted[sorted.length - 1], center: [center.lng, center.lat], zoom });
+    setCompareMode({ left: comparePair.left, right: comparePair.right, center: [center.lng, center.lat], zoom });
   };
 
   return (
@@ -1144,7 +1165,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
                 <div>
                   <h3 className="map-group__title">Satellite imagery</h3>
                   {layerGroups.tci.map((layer) => renderLayerRow(layer, formatLayerDisplayText(layer, 'tci')))}
-                  {layerGroups.tci.length >= 2 && (
+                  {comparePair && (
                     <button type="button" className="stage-btn map-group__action" onClick={openCompare}>
                       <Icon name="compare" size={16} />
                       Compare before and after
