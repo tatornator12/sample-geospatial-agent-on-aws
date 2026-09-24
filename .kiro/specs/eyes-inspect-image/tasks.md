@@ -55,6 +55,7 @@ recorded in `design.md` under "Deviations recorded during the build".
     - 7/7 live against dev v5 (34–63 s each), no recalibration needed
   - [ ] 6.2 Friday gate G-eyes: `pytest -q`, `npm test`, `npm run design:check`, `eval.py --target dev` (live); record the gate log below; decide whether to promote (Week 3's G2 is the planned promotion)
     - Pre-flight Sep 18: pytest 52/52, vitest 22/22, detector 0, eval 7/7. Formal gate stays on Friday Sep 26
+    - Pre-flight Sep 24 (after commit 4b9f5c3: express 4.22.3, maplibre-gl 6 migration, uuid 14): pytest 56/56, vitest 37/37, detector 0, eval 7/7 live against dev v21 (27–57 s each; every imagery prompt produced its "sees" sentence). Manual UI round-trip on the maplibre-gl 6 build: compare slider, draw tool, protected-area popup, basemap switch, layers plate all working
   - _Requirements: 3.4, 5.3_
 
 ## Gate log
