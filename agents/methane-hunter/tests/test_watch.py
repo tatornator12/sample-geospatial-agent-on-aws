@@ -261,8 +261,14 @@ def test_check_recent_passes_reads_scenes_and_stages_windows(watch, fake_s3, mon
     monkeypatch.setattr(watch, "_cmr_entries", lambda client, params, limit: seen.append(params) or (
         [{"title": SCENE}, {"title": "EMIT_L2B_CH4ENH_002_20260101T000000_2600001_001"}, {"title": "junk"}], 17))
     strong, weak = _scene_tifs(40, 2500.0, 100.0), _scene_tifs(2, 2500.0, 100.0)
-    monkeypatch.setattr(watch, "download_scene_layer",
-                        lambda sid, layer, token: (strong if sid == SCENE else weak)[0 if layer == "CH4ENH" else 1])
+    reads = []
+
+    def fake_read(sid, layer, token, box):
+        reads.append((sid, layer))
+        data = (strong if sid == SCENE else weak)[0 if layer == "CH4ENH" else 1]
+        with rasterio.MemoryFile(data) as mem, mem.open() as ds:
+            return watch._read_window(ds, box)
+    monkeypatch.setattr(watch, "read_scene_window", fake_read)
     out = json.loads(_run(watch.check_recent_passes(LAT, LON)))
     assert seen[0]["short_name"] == "EMITL2BCH4ENH" and seen[0]["temporal"].startswith("2025-01-01T")
     s = out["summary"]
@@ -270,8 +276,13 @@ def test_check_recent_passes_reads_scenes_and_stages_windows(watch, fake_s3, mon
     assert out["strongest_candidate"]["date"] == "2026-08-12"
     assert out["strongest_candidate"]["window_s3_url"] == f"s3://{BUCKET}/session_data/{SESSION}/methane/pass_{SCENE}.tif"
     assert TOKEN not in json.dumps(out)
-    # Second run: every verdict from the shared cache, no download, same answer.
-    monkeypatch.setattr(watch, "download_scene_layer", lambda *a, **k: pytest.fail("should come from the cache"))
+    # The weak pass fails on the enhancement alone: its uncertainty layer is never read.
+    assert sorted(reads) == sorted([(SCENE, "CH4ENH"), (SCENE, "CH4UNCERT"),
+                                    ("EMIT_L2B_CH4ENH_002_20260101T000000_2600001_001", "CH4ENH")])
+    weak_pass = next(p for p in out["passes"] if p["scene_id"] != SCENE)
+    assert weak_pass["pixels_significant"] is None and "only 2 pixels" in weak_pass["reason"]
+    # Second run: every verdict from the shared cache, no read, same answer.
+    monkeypatch.setattr(watch, "read_scene_window", lambda *a, **k: pytest.fail("should come from the cache"))
     again = json.loads(_run(watch.check_recent_passes(LAT, LON)))
     assert again["summary"]["from_cache"] == 2 and again["summary"]["candidates"] == 1
     assert [p["verdict"] for p in again["passes"]] == [p["verdict"] for p in out["passes"]]
@@ -281,3 +292,63 @@ def test_check_recent_passes_says_when_emit_cannot_look(watch, monkeypatch):
     monkeypatch.setattr(watch, "_cmr_entries", lambda *a, **k: pytest.fail("no search north of the ISS"))
     out = json.loads(_run(watch.check_recent_passes(66.0, 76.0)))
     assert out["summary"]["read"] == 0 and "ISS" in out["say"] and "confidence stays low" in out["say"]
+
+
+# --- range reads through LP DAAC's redirect ---------------------------------------------------------
+
+class _Transport:
+    """httpx transport that records (host, had_token) and answers from a script."""
+    def __init__(self, answers):
+        self.answers, self.seen = answers, []
+
+    def __call__(self, request):
+        import httpx
+        self.seen.append((request.url.host, "authorization" in request.headers))
+        status, location = self.answers[request.url.host]
+        return httpx.Response(status, headers={"location": location} if location else {})
+
+
+def _patch_httpx(watch, monkeypatch, transport):
+    import httpx
+    real = httpx.Client
+    monkeypatch.setattr(watch.httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(transport), **kw))
+
+
+def test_signed_url_keeps_the_token_on_nasa_hosts(watch, monkeypatch):
+    url = watch.scene_url(SCENE, "CH4ENH")
+    t = _Transport({"data.lpdaac.earthdatacloud.nasa.gov": (307, "https://urs.earthdata.nasa.gov/oauth?x=1"),
+                    "urs.earthdata.nasa.gov": (302, "https://d1nklfio7vscoe.cloudfront.net/s/x.tif?Signature=abc")})
+    _patch_httpx(watch, monkeypatch, t)
+    assert watch.signed_download_url(url, TOKEN) == "https://d1nklfio7vscoe.cloudfront.net/s/x.tif?Signature=abc"
+    # The signed host is returned, never contacted with the token (never contacted at all here).
+    assert t.seen == [("data.lpdaac.earthdatacloud.nasa.gov", True), ("urs.earthdata.nasa.gov", True)]
+
+
+@pytest.mark.parametrize("answers,reason", [
+    ({"data.lpdaac.earthdatacloud.nasa.gov": (401, None)}, "token_rejected"),
+    ({"data.lpdaac.earthdatacloud.nasa.gov": (404, None)}, "not_found"),
+    ({"data.lpdaac.earthdatacloud.nasa.gov": (302, "http://plain.example.com/x.tif")}, "insecure_redirect"),
+    ({"data.lpdaac.earthdatacloud.nasa.gov": (500, None)}, "http_500"),
+])
+def test_signed_url_failures(watch, monkeypatch, answers, reason):
+    _patch_httpx(watch, monkeypatch, _Transport(answers))
+    with pytest.raises(watch.mt.PlumeFetchError) as e:
+        watch.signed_download_url(watch.scene_url(SCENE, "CH4ENH"), TOKEN)
+    assert e.value.reason == reason
+
+
+def test_signed_url_refuses_other_hosts_and_a_missing_token(watch):
+    with pytest.raises(watch.mt.PlumeFetchError) as e:
+        watch.signed_download_url("https://evil.example.com/x.tif", TOKEN)
+    assert e.value.reason == "host_not_allowed"
+    with pytest.raises(watch.mt.PlumeFetchError) as e:
+        watch.signed_download_url(watch.scene_url(SCENE, "CH4ENH"), "")
+    assert e.value.reason == "token_missing"
+
+
+def test_a_direct_200_falls_back_to_the_whole_file(watch, monkeypatch):
+    _patch_httpx(watch, monkeypatch, _Transport({"data.lpdaac.earthdatacloud.nasa.gov": (200, None)}))
+    enh, _ = _scene_tifs(40, 2500.0, 100.0)
+    monkeypatch.setattr(watch.mt, "download_url", lambda url, token, *a, **k: enh)
+    arr, _, _ = watch.read_scene_window(SCENE, "CH4ENH", TOKEN, watch.box_around(LAT, LON, 3))
+    assert np.nanmax(arr) == pytest.approx(2500.0)

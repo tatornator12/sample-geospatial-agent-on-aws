@@ -29,6 +29,7 @@ import _paths  # noqa: F401
 import httpx
 import numpy as np
 import rasterio
+from rasterio.errors import RasterioIOError
 from rasterio.io import MemoryFile
 from rasterio.transform import from_origin
 from rasterio.windows import from_bounds
@@ -63,7 +64,7 @@ TROPOMI_MAX_AREA_DEG2 = 400.0         # e.g. 20 x 20 degrees
 TROPOMI_ORBIT_RE = re.compile(r"^S5P_OFFL_L2__CH4____(\d{8}T\d{6})_(\d{8}T\d{6})_(\d{5})_\d{2}_\d{6}_\d{8}T\d{6}$")
 HOTSPOT_MIN_DAYS = 3
 HOTSPOT_SEPARATION_KM = 40.0
-MAX_PARALLEL_READS = 8
+MAX_PARALLEL_READS = 12
 
 SITE_KM = 3.0
 # NASA's plume product is dense through 2024 (600 plumes) and nearly empty after (1 in 2025,
@@ -343,7 +344,8 @@ def overpass_orbits(keys: list[str], day: date, lon_center: float) -> list[str]:
 def read_tropomi_window(stem: str, bbox) -> tuple[np.ndarray, Any]:
     """CH4 (ppb) over bbox for one orbit, NaN where missing or qa < TROPOMI_QA_MIN."""
     base = f"https://{TROPOMI_BUCKET_HOST}/{stem}_PRODUCT_"
-    with rasterio.open(base + "methane_mixing_ratio_4326.tif") as ds, rasterio.open(base + "qa_value_4326.tif") as qa:
+    with rasterio.Env(**REMOTE_COG_ENV), rasterio.open(base + "methane_mixing_ratio_4326.tif") as ds, \
+            rasterio.open(base + "qa_value_4326.tif") as qa:
         win = from_bounds(*bbox, ds.transform).round_offsets().round_lengths()
         ch4 = ds.read(1, window=win, boundless=True, fill_value=ds.nodata).astype(np.float64)
         q = qa.read(1, window=win, boundless=True, fill_value=0)
@@ -433,13 +435,20 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
 
     lon_c = (box[0] + box[2]) / 2
     s3p = tropomi_s3()
-    stems: list[str] = []
-    day, looked = end, 0
-    while len({s.split('/')[3] + s.split('/')[4] + s.split('/')[5] for s in stems}) < days and looked < days + 7:
+
+    def orbits_on(day):
         listing = s3p.list_objects_v2(Bucket="meeo-s5p", Prefix=f"{TROPOMI_PREFIX}/{day:%Y/%m/%d}/")
-        stems += overpass_orbits([o["Key"] for o in listing.get("Contents", [])], day, lon_c)
-        day -= timedelta(days=1)
-        looked += 1
+        return overpass_orbits([o["Key"] for o in listing.get("Contents", [])], day, lon_c)
+
+    candidates = [end - timedelta(days=i) for i in range(days + 7)]   # a week of slack for gaps
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
+        listed = list(pool.map(orbits_on, candidates))                  # newest first
+    stems: list[str] = []
+    days_read = 0
+    for orbits in listed:
+        if orbits and days_read < days:
+            stems += orbits
+            days_read += 1
     if not stems:
         return json.dumps({"error": "No TROPOMI orbits were found for that window; try an earlier end_date."})
 
@@ -464,7 +473,6 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     background = float(np.nanmedian(med))
     anomaly = med - background
     # A hotspot must persist: seen on HOTSPOT_MIN_DAYS days, or on every day of a shorter scan.
-    days_read = len({s.rsplit("/", 4)[1:4].__str__() for s in stems})
     hotspots = find_hotspots(anomaly, valid_days, transform, min_days=min(HOTSPOT_MIN_DAYS, max(days_read, 1)))
     cog = _cog_bytes(anomaly, transform.c, transform.f, transform.a, -transform.e)
     url = _put_bytes(session_key, cog, "image/tiff")
@@ -491,46 +499,127 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
 
 # --- EMIT cue: recent raw passes -------------------------------------------------------------
 
-def download_scene_layer(scene_id: str, layer: str, token: str) -> bytes:
-    return mt.download_url(scene_url(scene_id, layer), token, SCENE_TIMEOUT_S, SCENE_CAP_BYTES)
+# Hosts that may receive the Earthdata token while resolving a download (NASA's own).
+TOKEN_HOSTS = (mt.LPDAAC_HOST, "urs.earthdata.nasa.gov")
 
 
-def window_stats(enh_bytes: bytes, unc_bytes: bytes, lat: float, lon: float, km: float = WINDOW_KM) -> dict:
-    """Enhancement and uncertainty in a km x km window around the point, plus the verdict."""
-    box = box_around(lat, lon, km / 2)
-    with MemoryFile(enh_bytes) as m1, m1.open() as e, MemoryFile(unc_bytes) as m2, m2.open() as u:
-        win = from_bounds(*box, e.transform).round_offsets().round_lengths()
-        enh = e.read(1, window=win, boundless=True, fill_value=e.nodata if e.nodata is not None else -9999).astype(np.float64)
-        unc = u.read(1, window=from_bounds(*box, u.transform).round_offsets().round_lengths(), boundless=True,
-                     fill_value=u.nodata if u.nodata is not None else -9999).astype(np.float64)
-        nod = e.nodata if e.nodata is not None else -9999
-        transform = e.window_transform(win)
-        xres, yres = abs(e.transform.a), abs(e.transform.e)
-    enh[(enh == nod) | ~np.isfinite(enh)] = np.nan
-    if unc.shape != enh.shape:
-        unc = np.full(enh.shape, np.nan)
-    unc[(unc <= 0) | ~np.isfinite(unc)] = np.nan
+def signed_download_url(url: str, token: str) -> str | None:
+    """LP DAAC answers a download with a redirect to a short-lived signed URL. Follow it by hand,
+    sending the token only to NASA's hosts, and return the signed https URL (it then serves byte
+    ranges with no token). None when LP DAAC serves the file directly instead (the caller then
+    downloads it whole). Raises PlumeFetchError; the signed URL is never logged or returned."""
+    if not url.startswith(f"https://{mt.LPDAAC_HOST}/lp-prod-protected/"):
+        raise mt.PlumeFetchError("host_not_allowed")
+    if not token:
+        raise mt.PlumeFetchError("token_missing")
+    with httpx.Client(timeout=SCENE_TIMEOUT_S, follow_redirects=False) as client:
+        current = url
+        for _ in range(5):
+            # GET, not HEAD: LP DAAC signs the redirect for the method that asked (a HEAD-signed
+            # URL answers GDAL's range GETs with 403). Streamed and closed unread, so a direct 200
+            # does not download the scene here.
+            req = client.build_request("GET", current, headers={"Authorization": f"Bearer {token}"})
+            r = client.send(req, stream=True)
+            r.close()
+            if r.status_code in (401, 403):
+                raise mt.PlumeFetchError("token_rejected")
+            if r.status_code == 404:
+                raise mt.PlumeFetchError("not_found")
+            if r.status_code == 200:
+                return None
+            if r.status_code not in (301, 302, 303, 307, 308) or "location" not in r.headers:
+                raise mt.PlumeFetchError(f"http_{r.status_code}")
+            target = httpx.URL(r.headers["location"])
+            if target.scheme != "https":
+                raise mt.PlumeFetchError("insecure_redirect")
+            if target.host not in TOKEN_HOSTS:
+                return str(target)            # the signed URL: no token goes there
+            current = str(target)
+    raise mt.PlumeFetchError("too_many_redirects")
+
+
+# GDAL settings for reading a window out of a remote COG in a few range requests.
+REMOTE_COG_ENV = dict(
+    GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",       # no directory listing on every open
+    CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif",
+    GDAL_HTTP_MERGE_CONSECUTIVE_RANGES="YES",
+    GDAL_HTTP_MULTIPLEX="YES",
+    VSI_CACHE="TRUE",
+    GDAL_HTTP_MAX_RETRY="2",
+    GDAL_HTTP_RETRY_DELAY="0.5",
+    GDAL_HTTP_TIMEOUT="30",
+)
+
+
+def _read_window(ds, box) -> tuple[np.ndarray, Any, tuple[float, float]]:
+    """A window of band 1 as float64 with NaN for nodata, its transform and pixel size."""
+    win = from_bounds(*box, ds.transform).round_offsets().round_lengths()
+    nod = ds.nodata if ds.nodata is not None else -9999
+    a = ds.read(1, window=win, boundless=True, fill_value=nod).astype(np.float64)
+    a[(a == nod) | ~np.isfinite(a)] = np.nan
+    return a, ds.window_transform(win), (abs(ds.transform.a), abs(ds.transform.e))
+
+
+def read_scene_window(scene_id: str, layer: str, token: str, box) -> tuple[np.ndarray, Any, tuple[float, float]]:
+    """A window of one raw scene layer: range reads through the signed URL (a tile or two of the
+    512 x 512 tiled COG), or the whole file when LP DAAC serves it directly."""
+    url = scene_url(scene_id, layer)
+    signed = signed_download_url(url, token)
+    if signed is None:
+        data = mt.download_url(url, token, SCENE_TIMEOUT_S, SCENE_CAP_BYTES)
+        with MemoryFile(data) as mem, mem.open() as ds:
+            return _read_window(ds, box)
+    try:
+        with rasterio.Env(**REMOTE_COG_ENV), rasterio.open(signed) as ds:
+            return _read_window(ds, box)
+    except RasterioIOError:
+        raise mt.PlumeFetchError("unreadable_scene")
+
+
+def judge_window(enh: np.ndarray, unc: np.ndarray | None) -> dict:
+    """The verdict for one pass. `unc` is None when the enhancement alone already rejects it."""
     valid = int(np.isfinite(enh).sum())
     strong = int(np.nansum(enh >= CANDIDATE_PPM_M))
-    with np.errstate(invalid="ignore"):
-        significant = int(np.nansum((enh >= 500) & (enh > UNCERT_SIGMA * unc)))
     peak = float(np.nanmax(enh)) if valid else None
+    significant = None
+    if unc is not None:
+        if unc.shape != enh.shape:
+            unc = np.full(enh.shape, np.nan)
+        unc = np.where((unc > 0) & np.isfinite(unc), unc, np.nan)
+        with np.errstate(invalid="ignore"):
+            significant = int(np.nansum((enh >= 500) & (enh > UNCERT_SIGMA * unc)))
     if valid == 0:
         verdict, reason = "rejected", "no valid pixels at the site (cloud, water or outside the swath)"
     elif strong < CANDIDATE_MIN_PIXELS:
         verdict, reason = "rejected", f"only {strong} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m (need {CANDIDATE_MIN_PIXELS})"
+    elif significant is None:
+        raise ValueError("uncertainty is needed to judge a pass with enough strong pixels")
     elif significant < CANDIDATE_MIN_PIXELS:
         verdict, reason = "rejected", f"only {significant} pixels above {UNCERT_SIGMA:g}× their uncertainty"
     else:
         verdict, reason = "candidate", f"{strong} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m, {significant} above {UNCERT_SIGMA:g}× uncertainty"
     return {"valid_pixels": valid, "peak_ppm_m": round(peak, 1) if peak is not None else None,
-            "pixels_ge_1000": strong, "pixels_significant": significant, "verdict": verdict, "reason": reason,
-            "_window": enh, "_transform": transform, "_res": (xres, yres)}
+            "pixels_ge_1000": strong, "pixels_significant": significant, "verdict": verdict, "reason": reason}
+
+
+def needs_uncertainty(enh: np.ndarray) -> bool:
+    return bool(np.isfinite(enh).any() and np.nansum(enh >= CANDIDATE_PPM_M) >= CANDIDATE_MIN_PIXELS)
+
+
+def window_stats(enh_bytes: bytes, unc_bytes: bytes, lat: float, lon: float, km: float = WINDOW_KM) -> dict:
+    """The verdict for a pass from whole-file bytes (tests and the direct-download path)."""
+    box = box_around(lat, lon, km / 2)
+    with MemoryFile(enh_bytes) as m1, m1.open() as e:
+        enh, transform, res = _read_window(e, box)
+    unc = None
+    if needs_uncertainty(enh):
+        with MemoryFile(unc_bytes) as m2, m2.open() as u:
+            unc, _, _ = _read_window(u, box)
+    return {**judge_window(enh, unc), "_window": enh, "_transform": transform, "_res": res}
 
 
 def pass_cache_base(scene_id: str, lat: float, lon: float) -> str:
-    """Shared across sessions: a scene never changes, so its verdict at a site is computed once
-    (the scenes are 8-14 MB each; rehearsals and the stage then run warm)."""
+    """Shared across sessions: a scene never changes, so its verdict at a site is computed once."""
     return f"methane/cache/passwin_{validate_scene_id(scene_id)}_{lat:.4f}_{lon:.4f}_{WINDOW_KM:g}km"
 
 
@@ -543,11 +632,12 @@ def check_one_pass(scene_id: str, lat: float, lon: float, token: str, s3) -> dic
             if stats.get("valid_pixels") else None
         source = "cache"
     except s3.exceptions.NoSuchKey:
-        enh = download_scene_layer(scene_id, "CH4ENH", token)
-        unc = download_scene_layer(scene_id, "CH4UNCERT", token)
-        stats = window_stats(enh, unc, lat, lon)
-        win, tr, (xres, yres) = stats.pop("_window"), stats.pop("_transform"), stats.pop("_res")
-        window = _cog_bytes(win, tr.c, tr.f, xres, yres) if stats["valid_pixels"] else None
+        box = box_around(lat, lon, WINDOW_KM / 2)
+        enh, tr, (xres, yres) = read_scene_window(scene_id, "CH4ENH", token, box)
+        # Most rejected passes fail on the enhancement alone: skip their uncertainty read.
+        unc = read_scene_window(scene_id, "CH4UNCERT", token, box)[0] if needs_uncertainty(enh) else None
+        stats = judge_window(enh, unc)
+        window = _cog_bytes(enh, tr.c, tr.f, xres, yres) if stats["valid_pixels"] else None
         if window:
             s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.tif", Body=window, ContentType="image/tiff")
         s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.json", Body=json.dumps(stats).encode(),

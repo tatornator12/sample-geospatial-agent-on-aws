@@ -113,6 +113,12 @@ approval path, then replay and evals.
     - 9.5 `watch_baseline` live: 1,686 detections → 1,104 sites, 24 seen on ≥ 5 dates (top ×10, ×9, ×8), 7.9 s cold, cached a week in `methane/cache/sites_v002.geojson`.
     - Bugs caught by the tests: numpy bools in hotspot results would not JSON-serialize; a 1-day scan could never report a hotspot (min days now caps at days read).
     - pytest methane-hunter: 78 passed (+17 in `tests/test_watch.py`).
+  - [x] 9.7 Speed (Sep 25, before task 10)
+    - EMIT raw passes are range-read: the tool resolves LP DAAC's redirect itself (GET, token sent only to `data.lpdaac…` / `urs.earthdata…`; LP DAAC signs the redirect per method, a HEAD-signed URL 403s on GETs) and GDAL reads the 6 km window from the tiled COG (512 × 512 blocks) at the signed URL; a direct 200 falls back to the whole-file download. The uncertainty layer is read only when the enhancement alone does not reject the pass. Turkmenistan site, 8 passes: 53 s → 12 s cold, 1.9 s warm; same verdicts as before.
+    - TROPOMI: tuned GDAL (`GDAL_DISABLE_READDIR_ON_OPEN`, merged ranges, HTTP/2 multiplex, VSI cache; 1.9 s → 0.6 s per orbit window), day listings in parallel, 12 parallel reads. 14-day scan: south Caspian 55 s → 5.7 s, Zagros 31 s → 4.1 s cold; 0.3–0.6 s warm.
+    - `scripts/warm_watch.py`: baseline, every watch area at 14 and 7 days, the top 2 EMIT-visible hotspots per area (passes + history, at the scan's own coordinates) and the two fixed sites. All 7 areas: 166 s cold, 40 s warm (~0.8 s per call, CMR lookups). Run the day before and the morning of each rehearsal and the show (the TROPOMI composite is keyed by its end day).
+    - Warm-up findings worth a look in task 10: south Caspian hotspot 1 (39.47, 53.64, +123 ppb) has 4 of 4 recent EMIT passes as candidates, one peaking at 9,144 ppm·m on 2025-08-01; Zagros hotspot 2 4 of 4; Shanxi 5 of 8; Hassi Messaoud and Orenburg hotspot 1: 0 candidates (TROPOMI tip not confirmed by EMIT: the honest "rejected" beat).
+    - Tests: 85 passed (+7: token routing on the redirect, failures, host refusal, direct-200 fallback, skipped uncertainty read).
 - [ ] 10. Mission prompt and brief
   - [ ] 10.1 `draft_brief` (fixed explanation enum, phrasing checks, draft to S3) + tests for every forbidden pattern
   - [ ] 10.2 Prompt: plan first, tip before cue, name the gap, self-check sentences, brief, stop; wording rule per Decision 4; closer and "Decision: analyst's."
