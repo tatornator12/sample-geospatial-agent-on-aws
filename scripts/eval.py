@@ -264,6 +264,14 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     expected = case.get("expected_tools", [])
     if expected and not is_subsequence(expected, tool_names):
         problems.append(f"expected tool subsequence {expected}, saw {tool_names}")
+    # required_tools: each must appear, in any order (tools called in parallel stream in any order).
+    missing = [t for t in case.get("required_tools", []) if t not in tool_names]
+    if missing:
+        problems.append(f"required tools {missing} not called")
+    # forbidden_tools: must never be called (e.g. a live search on a replay or refusal turn).
+    called = [t for t in case.get("forbidden_tools", []) if t in tool_names]
+    if called:
+        problems.append(f"forbidden tools {called} called")
 
     for forbidden in case.get("forbidden_text", []):
         if forbidden in text:
@@ -302,6 +310,8 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     record = {
         "name": case["name"], "passed": not problems, "seconds": round(elapsed, 1),
         "tools": tool_names, "observations": observations(text),
+        # Tool inputs (what the model asked for), trimmed: enough to debug a retry or a wrong argument.
+        "tool_inputs": [{"name": t["name"], "input": str(t.get("input", ""))[:3000]} for t in extract_tool_calls(text)],
         "prose_chars": prose_chars, "report_chars": report_chars, "report_seconds": report_seconds,
         # Keep the TAIL: the closer is what matters, and a head cut made complete closers look truncated.
         "report_text": (text[spans[-1][1]:] if spans else text).strip()[-2000:],

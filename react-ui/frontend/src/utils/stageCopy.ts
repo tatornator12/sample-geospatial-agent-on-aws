@@ -29,6 +29,11 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
   // The Methane Hunter's two beats (design.md, Act 2 run sheet); the prompts are the golden ones.
   methane: {
     prompts: [
+      // Act 2 v2: the mission (the golden prompt watch-mission); the two beats below are the fallback run sheet.
+      {
+        label: 'Methane Watch brief',
+        prompt: 'Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.',
+      },
       {
         label: 'Find and rank Permian plumes',
         prompt: 'Find the methane plumes EMIT detected over the Permian Basin in 2024 and rank them by how much methane they carry',

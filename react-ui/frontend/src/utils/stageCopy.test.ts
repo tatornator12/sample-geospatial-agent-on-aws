@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { stageAgentLabel, stageCopyFor, stepName } from './stageCopy.ts';
 
 describe('stageCopyFor', () => {
-  it('gives the Methane Hunter its two beats and its own console copy', () => {
+  it('gives the Methane Hunter its mission, its two fallback beats and its own console copy', () => {
     const copy = stageCopyFor('methane');
-    expect(copy.prompts.map((p) => p.label)).toEqual(['Find and rank Permian plumes', 'Strongest plume and the ground']);
+    expect(copy.prompts.map((p) => p.label)).toEqual([
+      'Methane Watch brief', 'Find and rank Permian plumes', 'Strongest plume and the ground',
+    ]);
     expect(copy.placeholder).toBe('Name a basin and a year');
   });
 
