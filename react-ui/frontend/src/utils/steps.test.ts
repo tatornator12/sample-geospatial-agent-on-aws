@@ -45,7 +45,10 @@ describe('groupDetail', () => {
 
   it('says what the cue followed, with the point as numbers', () => {
     const groups = groupSteps([call('scan_tropomi', { area: 'south caspian' }), call('check_recent_passes', { lat: '39.4741', lon: 53.6435 })]);
-    expect(groupDetail(groups[1], groups[0])).toEqual({ text: 'Following the TROPOMI tip', mono: '39.47, 53.64' });
+    expect(groupDetail(groups[1], groups.slice(0, 1))).toEqual({ text: 'Following the TROPOMI tip', mono: '39.47, 53.64', points: ['39.47, 53.64'] });
+    // The tip's map update rides between the scan and the cue: still following the tip.
+    const withDisplay = groupSteps([call('scan_tropomi', { area: 'south caspian' }), call('display_visual'), call('check_recent_passes', { lat: 1, lon: 2 })]);
+    expect(groupDetail(withDisplay[2], withDisplay.slice(0, 2))?.text).toBe('Following the TROPOMI tip');
     expect(groupDetail(groupSteps([call('check_recent_passes', { lat: 'north', lon: 1 })])[0])).toEqual({ text: 'Recent EMIT passes' });
   });
 });

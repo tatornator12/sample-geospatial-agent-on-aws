@@ -53,8 +53,9 @@ export function StepColumn({ steps, live, evidence = [], onOpenEvidence, methane
           {PLAN_STAGES.map((name, i) => (
             <li
               key={name}
-              className={`plan-strip__stage${i < stage ? ' plan-strip__stage--done' : ''}${i === stage ? ' plan-strip__stage--now' : ''}`}
-              aria-current={i === stage ? 'step' : undefined}
+              // Amber only while working (the One Spotlight Rule: once done, the brief's primary action owns it).
+              className={`plan-strip__stage${i < stage || (!live && i === stage) ? ' plan-strip__stage--done' : ''}${live && i === stage ? ' plan-strip__stage--now' : ''}`}
+              aria-current={live && i === stage ? 'step' : undefined}
             >
               {name}
             </li>
@@ -70,7 +71,7 @@ export function StepColumn({ steps, live, evidence = [], onOpenEvidence, methane
         {compact && !live ? (
           <li className="step-toggle">
             <button type="button" className="stage-btn stage-btn--quiet" onClick={() => setExpanded((e) => !e)} aria-expanded={expanded}>
-              {expanded ? 'Show the summary' : `Show all ${groups.length} steps`}
+              {expanded ? 'Show the summary' : groups.length === 1 ? 'Show the step' : `Show all ${groups.length} steps`}
             </button>
           </li>
         ) : hidden > 0 && (
@@ -90,12 +91,16 @@ export function StepColumn({ steps, live, evidence = [], onOpenEvidence, methane
           const done = !lit;
           const at = groups.indexOf(group);
           const n = at + 1;
-          const previous = at > 0 ? groups[at - 1] : undefined;
-          const detail = groupDetail(group, previous);
+          const fullDetail = groupDetail(group, groups.slice(0, at));
+          // The end frame shows the chosen site only (the first cue); the runner-up is in the full list.
+          const detail = fullDetail && collapsed && fullDetail.points?.length
+            ? { ...fullDetail, mono: fullDetail.points[0] }
+            : fullDetail;
           const items = group.calls.map((c) => evidenceByTool.get(c.id)).filter((x): x is EvidenceItem => !!x);
-          const films = group.calls
+          const allFilms = group.calls
             .map((c) => ({ call: c, url: passManifestUrl(methaneDir, c) }))
             .filter((f): f is { call: ToolCall; url: string } => !!f.url);
+          const films = collapsed ? allFilms.slice(0, 1) : allFilms;
           return (
             <li
               key={group.id || `${group.name}-${n}`}
@@ -160,11 +165,16 @@ export function StepColumn({ steps, live, evidence = [], onOpenEvidence, methane
               {detail && (
                 <span className="step-detail">
                   {detail.text}
-                  {detail.mono && <span className="step-detail__mono">{detail.mono}</span>}
+                  {/* Two filmstrips label their own sites; one line of both points would say it twice. */}
+                  {detail.mono && films.length < 2 && <span className="step-detail__mono">{detail.mono}</span>}
                 </span>
               )}
-              {methaneDir && films.map(({ call, url }) => (
+              {methaneDir && films.map(({ call, url }, j) => (
                 <div key={call.id || url} style={{ gridColumn: '2 / -1' }}>
+                  {/* Two sites cued: each strip says whose passes it shows (points and films share the calls' order). */}
+                  {films.length > 1 && fullDetail?.points?.[j] && (
+                    <span className="step-detail__mono pass-film__site">{fullDetail.points[j]}</span>
+                  )}
                   <PassFilmstrip
                     toolId={call.id}
                     manifestUrl={url}

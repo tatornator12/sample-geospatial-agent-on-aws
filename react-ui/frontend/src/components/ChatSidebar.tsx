@@ -505,7 +505,7 @@ export function ChatSidebar({
             evidence={evidence}
             onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
             methaneDir={methaneDir}
-            compact={!!briefId && !isStreaming}
+            compact={!!briefId && !isStreaming && stepTools.some((t) => t.name === 'draft_brief')}
             key={briefId ?? 'steps'}
           />
           {briefId && !isStreaming && (

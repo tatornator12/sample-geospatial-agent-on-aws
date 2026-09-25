@@ -64,6 +64,18 @@ const scenarios: Scenario[] = [
     status: 'available',
     agent: 'methane',
   },
+  {
+    id: 'methane-watch-south-caspian',
+    name: 'Methane Watch brief',
+    description: 'One prompt, the whole mission: a global baseline, a TROPOMI tip, EMIT cued on recent passes, a self-check and a draft brief for the analyst',
+    icon: '/methane_watch.png',
+    metrics: [
+      { label: 'Candidate Passes', value: '4 of 4 since 2025' },
+      { label: 'Strongest Peak', value: '9,144.0 ppm·m' },
+    ],
+    status: 'available',
+    agent: 'methane',
+  },
 ];
 
 export function UseCaseGallery() {

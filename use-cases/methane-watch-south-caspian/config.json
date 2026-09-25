@@ -1,0 +1,428 @@
+{
+  "name": "Methane Watch brief",
+  "description": "One prompt, the whole mission: a global baseline, a TROPOMI tip, EMIT cued on recent passes, a self-check, and a draft brief for the analyst",
+  "location": "Methane watch areas",
+  "user_question": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
+  "agent": "methane",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "methane_hunter_dev",
+  "tool_calls": [
+    {
+      "name": "watch_baseline",
+      "params": {},
+      "result": "Baseline built from NASA's plume record"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/watch_sites_v002.geojson",
+        "title": "EMIT Global Methane Repeat Sites",
+        "description": "24 sites seen on 5+ separate dates, 1,686 total detections",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "permian basin",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "south caspian",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "zagros foreland",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "shanxi coal basin",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "orenburg and lower volga",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "west siberia and yamal",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "hassi messaoud",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/tropomi_anomaly_south_caspian_turkmenistan_2026-09-23_14d.tif",
+        "title": "TROPOMI CH4 Anomaly – South Caspian (14 days to 2026-09-23)",
+        "description": "Top hotspot: 122.9 ppb anomaly at 39.47°N, 53.64°E",
+        "render": {
+          "kind": "raster",
+          "colormap": "viridis",
+          "rescale": [
+            0,
+            60
+          ],
+          "units": "ppb",
+          "group": "methane",
+          "max_zoom": 8,
+          "legend": "CH4 anomaly",
+          "bounds": [
+            52.0,
+            36.5,
+            62.5,
+            41.5
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 39.4741,
+        "lon": 53.6435
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 35.233,
+        "lon": 113.7382
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 39.4741,
+        "lon": 53.6435
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 53.6435,
+        "y": 39.4741
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/pass_EMIT_L2B_CH4ENH_002_20250801T075903_2521305_016.tif",
+        "title": "EMIT CH4 enhancement – South Caspian, 2025-08-01",
+        "question": "Shape, direction and extent of the methane plume"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/pass_EMIT_L2B_CH4ENH_002_20250801T075903_2521305_016.tif",
+        "title": "EMIT CH4 Enhancement – South Caspian, 2025-08-01 (peak 9,144 ppm·m)",
+        "render": {
+          "kind": "raster",
+          "colormap": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "legend": "CH4 enhancement",
+          "bounds": [
+            53.60859,
+            39.44697,
+            53.67841,
+            39.50123
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/columns_EMIT_L2B_CH4ENH_002_20250801T075903_2521305_016.geojson",
+        "title": "EMIT CH4 Column Enhancement – South Caspian, 2025-08-01",
+        "render": {
+          "kind": "columns",
+          "property": "ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "legend": "CH4 enhancement"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[53.6435,39.4741]}",
+        "location": "Krasnovodsk watch site",
+        "radius_meters": 3000
+      },
+      "result": "3 km frame around the site"
+    },
+    {
+      "name": "get_rasters",
+      "params": {
+        "location": "Krasnovodsk watch site",
+        "geometry_s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/plumes_detected.geojson",
+        "current_date_str": "2025-08-01"
+      },
+      "result": "Sentinel-2 scene fetched"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "question": "What infrastructure or land cover is visible beneath the methane plume?",
+        "s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/tci_clipped_krasnovodsk_watch_site_2025-08-01.tif",
+        "title": "Sentinel-2 true colour – Krasnovodsk watch site, 2025-08-01"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-south-caspian/tci_clipped_krasnovodsk_watch_site_2025-08-01.tif",
+        "title": "Sentinel-2 true colour – Krasnovodsk watch site, 2025-08-01",
+        "description": "Arid desert terrain with small settlement, road network and linear infrastructure features beneath the plume"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "draft_brief",
+      "params": {
+        "title": "Recurring methane, south Caspian site near Krasnovodsk",
+        "place": "Arid desert terrain near Krasnovodsk, Turkmenistan, with a small settlement and linear infrastructure features visible on the ground.",
+        "lat": 39.4741,
+        "lon": 53.6435,
+        "observations": [
+          "EMIT looked at this site 24 times from 2022-08-15 to 2025-08-20.",
+          "NASA outlined methane plumes here on 4 dates (2023-06-20, 2023-10-09, 2024-08-12, 2024-10-05), with a peak of 4,096 ppm·m and a rate of 2,567.3 kg/h on 2024-10-05.",
+          "EMIT's own passes since 2025-01-01 show 4 candidates on 4 separate dates, with peaks of 1,916.0, 4,325.9, 9,144.0, and 4,353.6 ppm·m.",
+          "The strongest candidate on 2025-08-01 had 1,346 pixels at or above 1,000 ppm·m and 1,162 pixels above 3x uncertainty.",
+          "TROPOMI recorded a 122.9 ppb anomaly over this site in the 14 days to 2026-09-23, the highest of all watch areas scanned."
+        ],
+        "looks": 24,
+        "candidates": 4,
+        "passes_read": 4,
+        "explanations": [
+          {
+            "id": "routine_venting",
+            "assessment": "possible",
+            "next_check": "Repeated enhancement on multiple dates without gaps would support this; ground inspection or aircraft survey could confirm or rule it out."
+          },
+          {
+            "id": "equipment_failure_or_leak",
+            "assessment": "possible",
+            "next_check": "A sudden increase in peak ppm·m relative to prior passes, or a change in plume location, would indicate this."
+          },
+          {
+            "id": "unlit_flare",
+            "assessment": "possible",
+            "next_check": "Thermal infrared imagery or night-time VIIRS data showing no persistent heat source would help rule this out."
+          },
+          {
+            "id": "maintenance_blowdown",
+            "assessment": "less likely",
+            "next_check": "Enhancement on 4 separate dates spanning months makes a single blowdown less consistent; repeat aircraft passes would clarify."
+          },
+          {
+            "id": "non_oil_gas_source",
+            "assessment": "less likely",
+            "next_check": "Sentinel-2 shows arid terrain with no wetlands or agriculture; a ground survey would confirm the absence of biogenic sources."
+          }
+        ],
+        "confidence": "high",
+        "gaps": [
+          "NASA's plume product is nearly empty after 2024, so passes since late 2024 have not been independently outlined.",
+          "EMIT only observes on its orbital passes and cannot provide continuous monitoring.",
+          "No wind-based flux estimates are available for the 2025 candidate passes.",
+          "Sentinel-2 imagery shows structures but cannot identify the specific source of methane enhancement."
+        ],
+        "next_collection": "A dedicated EMIT overpass or airborne survey over the Krasnovodsk site would confirm recurrence and provide a flux estimate.",
+        "watch_area": "south caspian"
+      },
+      "result": "Brief drafted (not filed)"
+    },
+    {
+      "name": "draft_brief",
+      "params": {
+        "candidates": 4,
+        "confidence": "high",
+        "explanations": [
+          {
+            "assessment": "possible",
+            "id": "routine_venting",
+            "next_check": "Repeated enhancement on multiple dates without gaps would support this; ground inspection could confirm or rule it out."
+          },
+          {
+            "assessment": "possible",
+            "id": "equipment_failure_or_leak",
+            "next_check": "A sudden increase in peak ppm·m or a change in plume location relative to prior passes would indicate this."
+          },
+          {
+            "assessment": "possible",
+            "id": "unlit_flare",
+            "next_check": "Night-time VIIRS thermal data showing no persistent heat source would help rule this out."
+          },
+          {
+            "assessment": "less likely",
+            "id": "maintenance_blowdown",
+            "next_check": "Enhancement on 4 separate dates spanning months is inconsistent with a single blowdown; aircraft passes would clarify."
+          },
+          {
+            "assessment": "less likely",
+            "id": "non_oil_gas_source",
+            "next_check": "Sentinel-2 shows arid terrain with no wetlands or agriculture; a ground survey would confirm absence of biogenic sources."
+          }
+        ],
+        "gaps": [
+          "NASA's plume product is nearly empty after 2024, so passes since late 2024 have not been independently outlined.",
+          "EMIT only observes on its orbital passes and cannot provide continuous monitoring.",
+          "No wind-based flux estimates are available for the 2025 candidate passes.",
+          "Sentinel-2 imagery shows structures but cannot identify the specific source of methane enhancement."
+        ],
+        "lat": 39.4741,
+        "lon": 53.6435,
+        "looks": 24,
+        "next_collection": "A dedicated EMIT overpass or airborne survey over the Krasnovodsk site would confirm recurrence and provide a flux estimate.",
+        "observations": [
+          "EMIT looked at this site 24 times from 2022-08-15 to 2025-08-20.",
+          "NASA outlined methane plumes here on 4 dates (2023-06-20, 2023-10-09, 2024-08-12, 2024-10-05), with a peak of 4,096 ppm·m and a rate of 2,567.3 kg/h on 2024-10-05.",
+          "EMIT's own passes since 2025-01-01 show 4 candidates on 4 separate dates, with peaks of 1,916.0, 4,325.9, 9,144.0, and 4,353.6 ppm·m.",
+          "The strongest candidate on 2025-08-01 had 1,346 pixels at or above 1,000 ppm·m and 1,162 pixels above 3x uncertainty.",
+          "TROPOMI recorded a 122.9 ppb anomaly over this site in the 14 days to 2026-09-23, the highest of all watch areas scanned."
+        ],
+        "passes_read": 4,
+        "place": "Arid desert near Krasnovodsk, Turkmenistan, with linear infrastructure visible.",
+        "title": "Recurring methane, south Caspian site near Krasnovodsk",
+        "watch_area": "south caspian"
+      },
+      "result": "Brief drafted (not filed)"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "tropomi_anomaly_south_caspian_turkmenistan_2026-09-23_14d.tif",
+        "title": "TROPOMI CH4 Anomaly – South Caspian (14 days to 2026-09-23)",
+        "render": {
+          "kind": "raster",
+          "colormap": "viridis",
+          "rescale": [
+            0,
+            60
+          ],
+          "units": "ppb",
+          "group": "methane",
+          "max_zoom": 8,
+          "legend": "CH4 anomaly",
+          "bounds": [
+            52.0,
+            36.5,
+            62.5,
+            41.5
+          ]
+        }
+      },
+      {
+        "file": "pass_EMIT_L2B_CH4ENH_002_20250801T075903_2521305_016.tif",
+        "title": "EMIT CH4 Enhancement – South Caspian, 2025-08-01 (peak 9,144 ppm·m)",
+        "render": {
+          "kind": "raster",
+          "colormap": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "legend": "CH4 enhancement",
+          "bounds": [
+            53.60859,
+            39.44697,
+            53.67841,
+            39.50123
+          ]
+        }
+      },
+      {
+        "file": "watch_sites_v002.geojson",
+        "title": "EMIT Global Methane Repeat Sites",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      {
+        "file": "columns_EMIT_L2B_CH4ENH_002_20250801T075903_2521305_016.geojson",
+        "title": "EMIT CH4 Column Enhancement – South Caspian, 2025-08-01",
+        "render": {
+          "kind": "columns",
+          "property": "ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "legend": "CH4 enhancement"
+        }
+      },
+      {
+        "file": "tci_clipped_krasnovodsk_watch_site_2025-08-01.tif",
+        "title": "Sentinel-2 true colour – Krasnovodsk watch site, 2025-08-01"
+      }
+    ]
+  }
+}

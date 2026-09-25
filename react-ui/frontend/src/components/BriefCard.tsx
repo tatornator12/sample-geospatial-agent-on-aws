@@ -82,11 +82,13 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
   };
 
   return (
-    <section ref={cardRef} className="brief-card" aria-label="Draft brief">
-      <p className="brief-card__kicker">{filed ? 'Brief, filed' : 'Draft brief'}</p>
-      <h3 className="brief-card__title">{card.title}</h3>
+    <section ref={cardRef} className="brief-card" aria-label={filed ? 'Filed brief' : 'Draft brief'}>
+      <h3 className="brief-card__title">
+        <span className="brief-card__state">{filed ? 'Filed brief' : 'Draft brief'}</span> {card.title}
+      </h3>
       <p className="brief-card__line">
-        <span className="brief-card__num">{card.candidates} of {card.passesRead}</span> recent passes are candidates;
+        <span className="brief-card__num">{card.candidates}</span> of <span className="brief-card__num">{card.passesRead}</span>{' '}
+        recent passes are candidates;
         EMIT looked <span className="brief-card__num">{card.looks}</span> times.
       </p>
       <dl className="brief-card__confidence">

@@ -72,7 +72,7 @@ function coord(value: unknown, digits: number): string | null {
  * The line under a step: the watch areas a scan covered, or the point EMIT was cued on (with the
  * adapt line when a TROPOMI tip came first). Null when there is nothing safe to say.
  */
-export function groupDetail(group: StepGroup, previous?: StepGroup): { text: string; mono?: string } | null {
+export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text: string; mono?: string; points?: string[] } | null {
   if (group.name === 'scan_tropomi') {
     const areas = [...new Set(group.calls.map((c) => knownArea(c.params?.area)).filter((a): a is string => !!a))];
     return areas.length > 0 ? { text: areas.join(' · ') } : null;
@@ -82,9 +82,11 @@ export function groupDetail(group: StepGroup, previous?: StepGroup): { text: str
       .map((c) => [coord(c.params?.lat, 2), coord(c.params?.lon, 2)])
       .filter(([la, lo]) => la !== null && lo !== null)
       .map(([la, lo]) => `${la}, ${lo}`);
-    const tip = previous?.name === 'scan_tropomi';
+    // The cue follows the tip when a TROPOMI scan came earlier in the turn (the map update for the
+    // tip rides in the same response, so it is not always the step right before).
+    const tip = earlier.some((g) => g.name === 'scan_tropomi');
     const text = tip ? 'Following the TROPOMI tip' : 'Recent EMIT passes';
-    return { text, ...(points.length > 0 ? { mono: points.join(' · ') } : {}) };
+    return { text, ...(points.length > 0 ? { mono: points.join(' · '), points } : {}) };
   }
   return null;
 }
