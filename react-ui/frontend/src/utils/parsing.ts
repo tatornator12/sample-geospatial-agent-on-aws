@@ -1,4 +1,5 @@
 import type { ToolCall } from '../types.ts';
+import { parseRenderHint, type RenderHint } from './render.ts';
 
 /**
  * Clean streaming text from formatting artifacts
@@ -387,11 +388,11 @@ function isDisplayVisualComplete(tool: ToolCall): boolean {
  * Returns both rasters (.tif) and geometries (.geojson)
  */
 export function extractAllVisualizationData(tools: ToolCall[]): {
-  rasters: Array<{ url: string; title: string; date?: string; cloudCoverage?: string }>;
-  geometries: Array<{ url: string; title: string }>;
+  rasters: Array<{ url: string; title: string; date?: string; cloudCoverage?: string; render?: RenderHint }>;
+  geometries: Array<{ url: string; title: string; render?: RenderHint }>;
 } {
-  const rasters: Array<{ url: string; title: string; date?: string; cloudCoverage?: string }> = [];
-  const geometries: Array<{ url: string; title: string }> = [];
+  const rasters: Array<{ url: string; title: string; date?: string; cloudCoverage?: string; render?: RenderHint }> = [];
+  const geometries: Array<{ url: string; title: string; render?: RenderHint }> = [];
   const seenUrls = new Set<string>();
 
   for (const tool of tools) {
@@ -415,13 +416,16 @@ export function extractAllVisualizationData(tools: ToolCall[]): {
     }
     
     seenUrls.add(s3Url);
+    // The agent's styling hint, validated; only present when it passes (see utils/render.ts).
+    const render = parseRenderHint(tool.params.render) ?? undefined;
     
     // Determine type by file extension
     if (s3Url.toLowerCase().endsWith('.geojson')) {
       // Geometry file
       geometries.push({
         url: s3Url,
-        title: title
+        title: title,
+        ...(render && render.kind === 'vector' ? { render } : {}),
       });
       continue;
     }
@@ -447,7 +451,8 @@ export function extractAllVisualizationData(tools: ToolCall[]): {
         url: s3Url,
         title: title,
         date: date,
-        cloudCoverage: cloudCoverage
+        cloudCoverage: cloudCoverage,
+        ...(render && render.kind === 'raster' ? { render } : {}),
       });
     }
   }

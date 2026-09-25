@@ -21,8 +21,20 @@ export interface EvidenceItem {
 
 const TRUE_COLOUR = /(^|[/_-])(tci|visual|true[_-]?colou?r|rgb)([._-]|$)/i;
 
-/** Where the agent saved what it saw, or null when the URL is not a session raster. */
-export function evidenceUrlsFor(rasterS3Url: string): string[] | null {
+const SESSION_ID = /^[A-Za-z0-9._-]{1,128}$/;
+
+/**
+ * Where the agent saved what it saw, or null when the URL is not a raster we know. Session
+ * rasters map inside their own session. A shared plume raster (`s3://b/methane/cache/ch4plm_*.tif`,
+ * cached once for every session) was inspected in THIS session, so it needs the session id.
+ */
+export function evidenceUrlsFor(rasterS3Url: string, sessionId?: string): string[] | null {
+  const shared = rasterS3Url.match(/^s3:\/\/([^/]+)\/methane\/cache\/(ch4plm_[A-Za-z0-9_]+)\.tiff?$/);
+  if (shared) {
+    if (!sessionId || !SESSION_ID.test(sessionId)) return null;
+    const base = `s3://${shared[1]}/session_data/${sessionId}/inspections/${shared[2]}`;
+    return [`${base}.png`, `${base}.jpg`];
+  }
   const match = rasterS3Url.match(/^(s3:\/\/[^/]+\/session_data\/[^/]+\/)[^/]+\/([^/]+)$/);
   if (!match) return null;
   const [, sessionPrefix, basename] = match;
@@ -32,7 +44,7 @@ export function evidenceUrlsFor(rasterS3Url: string): string[] | null {
 }
 
 /** inspect_image calls with a usable s3_url and title, de-duplicated by tool id, in stream order. */
-export function extractEvidence(tools: ToolCall[]): EvidenceItem[] {
+export function extractEvidence(tools: ToolCall[], sessionId?: string): EvidenceItem[] {
   const seen = new Set<string>();
   const items: EvidenceItem[] = [];
   for (const tool of tools) {
@@ -40,7 +52,7 @@ export function extractEvidence(tools: ToolCall[]): EvidenceItem[] {
     const s3Url = tool.params?.s3_url;
     const title = tool.params?.title;
     if (typeof s3Url !== 'string' || typeof title !== 'string' || !title) continue;
-    const evidenceUrls = evidenceUrlsFor(s3Url);
+    const evidenceUrls = evidenceUrlsFor(s3Url, sessionId);
     if (!evidenceUrls) continue;
     seen.add(tool.id);
     items.push({

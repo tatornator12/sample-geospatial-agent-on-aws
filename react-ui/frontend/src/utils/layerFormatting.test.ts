@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   boundsWithin,
   findComparePair,
+  formatDate,
   formatLayerDisplayText,
   formatSimilarityLabel,
   groupLayers,
@@ -51,6 +52,31 @@ describe('groupLayers', () => {
     expect(groups.changeDetection.map(l => l.id)).toEqual(['chg']);
     expect(groups.tci.map(l => l.id)).toEqual(['tci']);
     expect(groups.spectralIndices.map(l => l.id)).toEqual(['ndvi']);
+  });
+
+  it('gathers the Methane Hunter layers by hint or file name, out of imagery and boundaries (Week 4)', () => {
+    const plume = layer({ id: 'plume', type: 'raster', name: 'Plume', url: 's3://b/methane/cache/ch4plm_EMIT_L2B_CH4PLM_002_20240131T182459_002534.tif' });
+    const detected = layer({ id: 'det', name: 'Plumes', url: 's3://b/session_data/s/methane/plumes_permian_basin_2024-01-01_2024-12-31.geojson' });
+    const ranked = layer({ id: 'rank', name: 'Ranked', url: 's3://b/session_data/s/methane/plumes_ranked_permian_basin_2024-01-01_2024-12-31.geojson' });
+    const hinted = layer({ id: 'hint', type: 'raster', name: 'Hinted', url: 's3://b/x/whatever.tif', render: { kind: 'raster', group: 'methane' } });
+    // The same names outside the tools' paths stay where they were.
+    const lookalike = layer({ id: 'look', name: 'plumes', url: 's3://b/session_data/s/geometries/plumes_park.geojson' });
+    const groups = groupLayers([tci, plume, detected, ranked, hinted, boundary, lookalike]);
+    expect(groups.methane.map(l => l.id)).toEqual(['plume', 'det', 'rank', 'hint']);
+    expect(groups.tci.map(l => l.id)).toEqual(['tci']);
+    expect(groups.geometries.map(l => l.id)).toEqual(['geo', 'look']);
+  });
+});
+
+describe('layer dates', () => {
+  it('reads a calendar date as written, in any time zone', () => {
+    expect(formatDate('2023-12-28')).toBe('Dec 28 2023');
+    expect(formatDate('2025-01-06')).toBe('Jan 06 2025');
+  });
+  it('does not repeat a date the title already carries', () => {
+    const scene = layer({ type: 'raster', name: 'Sentinel-2 True Colour — Midland, Texas, 2023-12-28', date: '2023-12-28' });
+    expect(formatLayerDisplayText(scene, 'tci')).toBe('Sentinel-2 True Colour — Midland, Texas, 2023-12-28');
+    expect(formatLayerDisplayText(tci, 'tci')).toBe('Central Park - Jul 12 2025');
   });
 });
 

@@ -33,6 +33,18 @@ describe('evidenceUrlsFor', () => {
     expect(evidenceUrlsFor('https://example.com/session_data/x/rasters/tci.tif')).toBeNull();
     expect(evidenceUrlsFor('')).toBeNull();
   });
+
+  it('maps a shared plume raster to THIS session\'s inspections (Week 4)', () => {
+    const plume = 's3://bucket/methane/cache/ch4plm_EMIT_L2B_CH4PLM_002_20240131T182459_002534.tif';
+    expect(evidenceUrlsFor(plume, 'abc-123')).toEqual([
+      's3://bucket/session_data/abc-123/inspections/ch4plm_EMIT_L2B_CH4PLM_002_20240131T182459_002534.png',
+      's3://bucket/session_data/abc-123/inspections/ch4plm_EMIT_L2B_CH4PLM_002_20240131T182459_002534.jpg',
+    ]);
+    // No session, or one that could climb out of its prefix: no chip.
+    expect(evidenceUrlsFor(plume)).toBeNull();
+    expect(evidenceUrlsFor(plume, '../other')).toBeNull();
+    expect(evidenceUrlsFor('s3://bucket/methane/cache/../secrets/ch4plm_x.tif', 'abc-123')).toBeNull();
+  });
 });
 
 describe('extractEvidence', () => {

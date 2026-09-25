@@ -58,7 +58,8 @@
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  width: 100%;
+  /* The step column is the chip's width; the 36px indent comes out of it, not on top of it. */
+  width: calc(100% - 36px);
   margin: 4px 0 8px 36px;
   padding: 0;
   border-radius: 6px;
@@ -102,6 +103,7 @@
   font-size: 15px;
   line-height: 1.35;
   color: var(--label);
+  overflow-wrap: anywhere;
 }
 .evidence-chip--ready .evidence-chip__title {
   color: var(--fog);
@@ -633,6 +635,12 @@
   line-height: 1.2;
   color: var(--label);
   white-space: nowrap;
+}
+/* Numeric legend ends (methane: 0 / 1,500+ ppm·m): the Tabular rule. */
+.map-legend__label--num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fog);
 }
 
 /* Match popup rows: label left, number right in the mono face with tabular figures. */

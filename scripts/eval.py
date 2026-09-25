@@ -129,9 +129,15 @@ def is_subsequence(expected: list[str], actual: list[str]) -> bool:
     return all(name in it for name in expected)
 
 
-def stream_invoke(client, arn: str, prompt: str, timeout: int) -> tuple[str, list[tuple[int, float]]]:
-    """Invoke the runtime; return the full decoded stream text and, per chunk, (char offset, seconds)."""
-    session_id = f"eval-{uuid.uuid4()}-{uuid.uuid4().hex[:8]}"  # >= 33 chars
+def new_session_id() -> str:
+    return f"eval-{uuid.uuid4()}-{uuid.uuid4().hex[:8]}"  # >= 33 chars
+
+
+def stream_invoke(client, arn: str, prompt: str, timeout: int,
+                  session_id: str | None = None) -> tuple[str, list[tuple[int, float]]]:
+    """Invoke the runtime; return the full decoded stream text and, per chunk, (char offset, seconds).
+    Pass session_id to continue a conversation (a two-turn case); otherwise each call is a fresh session."""
+    session_id = session_id or new_session_id()
     started = time.monotonic()
     response = client.invoke_agent_runtime(
         agentRuntimeArn=arn,
@@ -236,7 +242,13 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     """Run one golden prompt; returns (passed, detail, record)."""
     started = time.monotonic()
     try:
-        text, marks = stream_invoke(client, arn, case["prompt"], timeout)
+        # setup_prompt: a first turn in the same session (not checked), so a follow-up is tested as
+        # the presenter types it. Timing and checks cover the second turn only.
+        session_id = new_session_id()
+        if case.get("setup_prompt"):
+            stream_invoke(client, arn, case["setup_prompt"], timeout, session_id)
+            started = time.monotonic()
+        text, marks = stream_invoke(client, arn, case["prompt"], timeout, session_id)
     except Exception as e:  # RuntimeClientError, timeout, throttling ...
         record = {"name": case["name"], "passed": False, "seconds": round(time.monotonic() - started, 1),
                   "tools": [], "observations": [], "detail": f"invoke failed: {type(e).__name__}: {e}"}
@@ -271,6 +283,13 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
         closer = paragraphs[-1] if paragraphs else ""
         if not closer.endswith(suffix):
             problems.append(f"closing paragraph does not end with {suffix!r}")
+    # closer_forbidden: phrases the spoken closer must not contain (coordinates: the room hears places).
+    if case.get("closer_forbidden"):
+        paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
+        closer = paragraphs[-1] if paragraphs else ""
+        for bad in case["closer_forbidden"]:
+            if bad in closer:
+                problems.append(f"closing paragraph contains {bad!r}")
 
     # Characters of prose (everything that is not a tool-call object): a proxy for how much
     # the model wrote, which is what the room waits on at the end of a turn.
@@ -321,7 +340,8 @@ def main() -> int:
 
     if args.dry_run:
         for case in cases:
-            print(f"  [plan] {case['name']}: expect {case.get('expected_tools', [])}")
+            setup = " (after a setup turn)" if case.get("setup_prompt") else ""
+            print(f"  [plan] {case['name']}{setup}: expect {case.get('expected_tools', [])}")
         print("Dry run: nothing invoked.")
         return 0
 

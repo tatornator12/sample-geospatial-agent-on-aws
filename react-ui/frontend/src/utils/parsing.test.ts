@@ -203,4 +203,27 @@ describe('extractAllVisualizationData', () => {
     expect(rasters).toHaveLength(0);
     expect(geometries).toHaveLength(0);
   });
+
+  it('carries a valid render hint on the matching kind only (Week 4)', () => {
+    const raster = { kind: 'raster', colormap: 'plasma', rescale: [0, 1500], group: 'methane' };
+    const vector = { kind: 'vector', property: 'max_ppm_m', ramp: 'plasma', group: 'methane', label: 'rank' };
+    const { rasters, geometries } = extractAllVisualizationData([
+      completedTool('display_visual', { s3_url: 's3://b/methane/cache/ch4plm_x.tif', title: 'Plume', render: raster }, 'a'),
+      completedTool('display_visual', { s3_url: 's3://b/s/plumes_ranked_p.geojson', title: 'Ranked', render: vector }, 'b'),
+      // A vector hint on a raster is ignored, not applied.
+      completedTool('display_visual', { s3_url: 's3://b/other.tif', title: 'Other', render: vector }, 'c'),
+    ]);
+    expect(rasters[0].render).toEqual(raster);
+    expect(geometries[0].render).toEqual(vector);
+    expect(rasters[1]).not.toHaveProperty('render');
+  });
+
+  it('drops an invalid hint and keeps the layer (file-name fallback)', () => {
+    const { rasters } = extractAllVisualizationData([
+      completedTool('display_visual', {
+        s3_url: 's3://b/x.tif', title: 'X', render: { kind: 'raster', colormap: 'plasma&url=https://evil' },
+      }),
+    ]);
+    expect(rasters).toEqual([{ url: 's3://b/x.tif', title: 'X', date: undefined, cloudCoverage: undefined }]);
+  });
 });

@@ -7,6 +7,7 @@ import type { ToolCall } from '../types.ts';
 import { theme } from '../theme';
 import type { EvidenceItem } from '../utils/evidence.ts';
 import { EvidenceChip } from './EvidenceChip.tsx';
+import { stepName } from '../utils/stageCopy.ts';
 
 interface StepColumnProps {
   steps: ToolCall[];
@@ -18,10 +19,6 @@ interface StepColumnProps {
 }
 
 const MAX_VISIBLE = 9;
-
-function shortToolName(name: string): string {
-  return name.replace(/_/g, ' ');
-}
 
 export function StepColumn({ steps, live, evidence = [], onOpenEvidence }: StepColumnProps) {
   if (steps.length === 0) return null;
@@ -102,7 +99,7 @@ export function StepColumn({ steps, live, evidence = [], onOpenEvidence }: StepC
                 letterSpacing: '0.005em',
               }}
             >
-              {shortToolName(step.name)}
+              {stepName(step.name)}
               {lit && (
                 <span
                   style={{

@@ -30,7 +30,7 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
   - [x] 3.1 `METHANE_PROMPT`: Earth Analyst's RESPONSE STYLE / FINAL REPORT / DISPLAY RIDES ALONG / LOOK BEFORE YOU ANALYSE verbatim + the Methane Hunter block from design.md (workflow, units, the fixed confidence sentence, never name an emitter)
   - [x] 3.2 `.env.dev` (same bucket and role as the Earth Analyst, `EARTHDATA_TOKEN` from `.env.spikes`); `DEPLOY_TARGET=dev ./deploy.sh` → `methane_hunter_dev` v1; confirm env vars persisted (token present, never printed); smoke invoke with `{"prewarm": true}` then one prompt
   - [x] 3.3 `golden_prompts.json` (`plumes-permian`, `triage-permian`, `strongest-plume`); `scripts/eval.py --agent {earth,methane}` (agent dir, yaml, default prompts file; `earth` default keeps every existing invocation working); live run against `methane_hunter_dev`; calibrate from the recorded streams; record seconds. **Measure** warm triage of 30 Permian plumes (target < 20 s) and record here
-  - [ ] 3.4 Manual prompts on dev through the local UI with `AGENT_RUNTIMES` extended locally (`react-ui/backend/.env`): the three prepared prompts in order; confirm the display → triage → plume → ground order, the confidence sentence in the closer, and that no emitter is named
+  - [x] 3.4 Manual prompts on dev through the local UI with `AGENT_RUNTIMES` extended locally (`react-ui/backend/.env`): the three prepared prompts in order; confirm the display → triage → plume → ground order, the confidence sentence in the closer, and that no emitter is named
   - _Requirements: 1.5 (eval part), 2.*, 3.*, 4.5, 4.6, 7.3_
   - Results (built Sep 24–25, ahead of Week 4a):
     - 1–2: commit `233858f`; `pytest` in `agents/methane-hunter/` = 59 passed (search 19, triage/show 31, staging 5, entrypoint 4); `geo_agent/` = 117 passed. Earth Analyst `DRY_RUN=1` plans unchanged.
@@ -41,15 +41,23 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
 
 ## Week 4b (Oct 13–17): the platform knows two agents; replay case; G3
 
-- [ ] 4. `render` hints and the methane surface (frontend)
-  - [ ] 4.1 `/impeccable critique` the layers plate (legend row will be the second) and the map popup; record the brief in `.impeccable/surfaces/`
-  - [ ] 4.2 `utils/render.ts`: `parseRenderHint` (allowlists, finite rescale, character-filtered labels), `tileParamsFor`; `parsing.ts` carries `render` on rasters and geometries; types updated; `ChatSidebar` forwards it
-  - [ ] 4.3 `MapView.tsx`: raster branch prefers the hint; vector `kind` branch (graduated outlines by `property`, ranked vs detected tiers, rank labels, numbers-only popup); `groupLayers` `methane` by hint or `ch4plm_` basename; "Methane" group after Change detection with legend row (plasma bar, `0` / `1500 ppm·m` mono). Fallback path unchanged: the Earth Analyst's layers render exactly as before (existing vitest cases stay green)
-  - [ ] 4.4 `ChatSidebar.tsx`: `PREPARED_PROMPTS` keyed by agent id with `default` fallback; the three methane plates
-  - [ ] 4.5 `render.test.ts` (accept/reject matrix, tile params), `layerFormatting.test.ts` (methane grouping by hint and basename, prompts per agent + fallback), `parsing.test.ts` (render passthrough, junk dropped)
-  - [ ] 4.6 DESIGN.md: plasma methane ramp + graduated footprints; plate order; legend rule now covers methane and similarity
-  - [ ] 4.7 `npm run build`, `npm test`, `npm run design:check` = 0, lint at baseline; `/impeccable polish`; headless Chrome DOM check (group, legend, rows) against dev
+- [x] 4. `render` hints and the methane surface (frontend)
+  - [x] 4.1 `/impeccable critique` the layers plate (legend row will be the second) and the map popup; record the brief in `.impeccable/surfaces/`
+  - [x] 4.2 `utils/render.ts`: `parseRenderHint` (allowlists, finite rescale, character-filtered labels), `tileParamsFor`; `parsing.ts` carries `render` on rasters and geometries; types updated; `ChatSidebar` forwards it
+  - [x] 4.3 `MapView.tsx`: raster branch prefers the hint; vector `kind` branch (graduated outlines by `property`, ranked vs detected tiers, rank labels, numbers-only popup); `groupLayers` `methane` by hint or `ch4plm_` basename; "Methane" group after Change detection with legend row (plasma bar, `0` / `1500 ppm·m` mono). Fallback path unchanged: the Earth Analyst's layers render exactly as before (existing vitest cases stay green)
+  - [x] 4.4 `ChatSidebar.tsx`: `PREPARED_PROMPTS` keyed by agent id with `default` fallback; the three methane plates
+  - [x] 4.5 `render.test.ts` (accept/reject matrix, tile params), `layerFormatting.test.ts` (methane grouping by hint and basename, prompts per agent + fallback), `parsing.test.ts` (render passthrough, junk dropped)
+  - [x] 4.6 DESIGN.md: plasma methane ramp + graduated footprints; plate order; legend rule now covers methane and similarity
+  - [x] 4.7 `npm run build`, `npm test`, `npm run design:check` = 0, lint at baseline; `/impeccable polish`; headless Chrome DOM check (group, legend, rows) against dev
+  - [x] 4.8 Critique additions (Sep 25 critique, 20/36; decisions approved by the user: dim basemap, top 3 lit, camera follows): basemap dims while a methane layer is visible; the ranked footprints replace the detected ones; top 3 lit with `#rank · ppm·m` labels, the rest fog hairlines; camera fits the plume raster on arrival (hint `bounds` from `show_plume`) and the ground scene after it; the plume's own evidence chip (`methane/cache/` source → the session's `inspections/`); plain-language step labels; per-agent placeholder and idle caption; caption speaker label without "(dev)"
+  - [x] 4.9 Agent side: the closer stays one sentence with a place name on follow-up turns; `eval.py` `setup_prompt` (two turns, one session) and golden prompt `strongest-followup`
   - _Requirements: 4.1, 4.2, 4.3, 5.2, 5.4, 7.2_
+  - Results (built Sep 25, ahead of Week 4b):
+    - 4.1 critique `.impeccable/critique/2026-09-25T13-31-23Z__…chat-tsx.md`: 20/36 (P0 ×2: no camera, invisible plume; P1 ×2: ranking not on the map, wrong-agent chrome). Detector 0 then and after. Closed by the polish pass after every P0/P1 was addressed.
+    - 4.2–4.5: `utils/render.ts` (allowlist validator, tile params, plasma ramp) and `utils/stageCopy.ts` (per-agent prompts/placeholder/idle, speaker label, step names); methane group + legend, lit top 3 with centre labels, fog hairlines, ranked replaces detected, basemap dim, camera (hint `bounds` → TiTiler `/cog/bounds`, verified live → geometry); the plume's evidence chip; layer dates read as written (the "2023-12-28 - Dec 27 2023" bug was a UTC parse). Deviation: two methane plates, not three (design.md Deviations 6).
+    - 4.7: `npm run build` 0; `npm test` 87 passed (8 files; +render, +stageCopy, +methane grouping/dates/evidence/parsing cases); `npm run design:check` 0; eslint on touched files at the HEAD baseline (no new findings). Headless Chrome 1920×1080 before/after captures of the two beats on the local UI against `methane_hunter_dev` v4 (not committed; `/tmp`). Mobile not checked: stage-only surface (PRODUCT.md), projector resolution still unconfirmed.
+    - 4.9: `methane_hunter_dev` v4 (env vars persisted, token present). `eval.py --agent methane --target dev`: **4/4 PASS** — `plumes-permian` 11 s, `triage-permian` 27 s, `strongest-plume` 50 s, `strongest-followup` 34 s (two turns, one session; closer names Midland, no coordinates). Earth Analyst `eval.py --target dev` after the `eval.py` changes: **8/8 PASS** (28–68 s). pytest: methane 60, geo_agent 117.
+    - Not done here (P3 from the critique, recorded): the transcript drawer overlaps the caption band's right end when open; the agent picker in the rail still shows "(dev)" (presenter control; the stable labels in `frontend-cdk/.env`, task 5.1, carry no suffix).
 
 - [ ] 5. Two agents end to end
   - [ ] 5.1 `react-ui/backend/.env` and `frontend-cdk/.env`: `AGENT_RUNTIMES` gains `methane` (stable first, then dev, then methane); `promote.sh` env check requires `"methane"`; `cdk synth` shows the task role gaining exactly the methane ARN
@@ -74,5 +82,6 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
 ## Gate log
 
 - (Oct 10 checkpoint: dev runtime version, three golden prompts, triage timing)
-  - Sep 25 (early): dev runtime `methane_hunter_dev-rIr0SoGuR2` live; triage cold 23.4 s / warm 0.8 s for 39 plumes; golden prompts 3/3 on run 5 (12 / 22 / 50 s); Earth Analyst dev 8/8. Checkpoint met early except 3.4 (manual UI run).
+  - Sep 25 (early): dev runtime `methane_hunter_dev-rIr0SoGuR2` live; triage cold 23.4 s / warm 0.8 s for 39 plumes; golden prompts 3/3 on run 5 (12 / 22 / 50 s); Earth Analyst dev 8/8. Checkpoint met early.
+  - 3.4 (Sep 25, local UI, user): both prompts work end to end on `methane_hunter_dev`; verdict "working, a bit clunky and not visually pleasing" — expected before task 4 (hints ignored, file-name fallback styling). Task 4 critique takes this as its starting brief.
 - (Oct 17 G3: commands with counts, tag, both stable smokes + evals, four rehearsal timings)

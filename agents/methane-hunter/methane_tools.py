@@ -628,6 +628,9 @@ async def show_plume(granule_id: str) -> str:
                 if props.get("granule_id") == gid and "rank" in props:
                     ring = f["geometry"]["coordinates"][0]
                     lons, lats = [p[0] for p in ring], [p[1] for p in ring]
+                    bbox = [round(min(lons), 5), round(min(lats), 5), round(max(lons), 5), round(max(lats), 5)]
+                    # The UI's camera fits the plume from these bounds (validated there as a lon/lat box).
+                    render = {**RENDER_RASTER, "bounds": bbox}
                     return json.dumps({
                         "granule_id": gid,
                         "rank": props["rank"],
@@ -637,9 +640,9 @@ async def show_plume(granule_id: str) -> str:
                         "plume_area_km2": props.get("plume_area_km2"),
                         "center_lat": props.get("center_lat"),
                         "center_lon": props.get("center_lon"),
-                        "bbox": [min(lons), min(lats), max(lons), max(lats)],
+                        "bbox": bbox,
                         "plume_s3_url": f"s3://{config.S3_BUCKET_NAME}/{cache_key(gid)}",
-                        "render": RENDER_RASTER,
+                        "render": render,
                         "next_steps": ("inspect_image(plume_s3_url); then display_visual(plume_s3_url, render=render) "
                                        "with create_bbox_from_coordinates at the centre (radius_meters=3000) → "
                                        "get_rasters(current_date_str=acquired_date) → inspect_image(tci)."),

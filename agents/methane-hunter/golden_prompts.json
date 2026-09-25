@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line.",
+  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line. setup_prompt: an unchecked first turn in the same session, so the presenter's follow-up wording is tested; closer_forbidden: the spoken closer names the place, never coordinates (°N/°W).",
   "prompts": [
     {
       "name": "plumes-permian",
@@ -17,7 +17,11 @@
         "EMIT sees the methane, not its source."
       ],
       "closer_max_chars": 280,
-      "closer_endswith": "EMIT sees the methane, not its source."
+      "closer_endswith": "EMIT sees the methane, not its source.",
+      "closer_forbidden": [
+        "°N",
+        "°W"
+      ]
     },
     {
       "name": "triage-permian",
@@ -37,7 +41,11 @@
         "EMIT sees the methane, not its source."
       ],
       "closer_max_chars": 280,
-      "closer_endswith": "EMIT sees the methane, not its source."
+      "closer_endswith": "EMIT sees the methane, not its source.",
+      "closer_forbidden": [
+        "°N",
+        "°W"
+      ]
     },
     {
       "name": "strongest-plume",
@@ -59,7 +67,37 @@
         "EMIT sees the methane, not its source."
       ],
       "closer_max_chars": 280,
-      "closer_endswith": "EMIT sees the methane, not its source."
+      "closer_endswith": "EMIT sees the methane, not its source.",
+      "closer_forbidden": [
+        "°N",
+        "°W"
+      ]
+    },
+    {
+      "name": "strongest-followup",
+      "setup_prompt": "Find the methane plumes EMIT detected over the Permian Basin in 2024 and rank them by how much methane they carry",
+      "prompt": "Show me the strongest plume and what is on the ground beneath it",
+      "expected_tools": [
+        "show_plume",
+        "inspect_image",
+        "get_rasters",
+        "inspect_image"
+      ],
+      "forbidden_text": [
+        "Error:",
+        "operations",
+        " leak"
+      ],
+      "required_text": [
+        "does not identify the source",
+        "EMIT sees the methane, not its source."
+      ],
+      "closer_max_chars": 280,
+      "closer_endswith": "EMIT sees the methane, not its source.",
+      "closer_forbidden": [
+        "°N",
+        "°W"
+      ]
     }
   ]
 }

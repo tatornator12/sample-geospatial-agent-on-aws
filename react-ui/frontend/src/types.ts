@@ -1,3 +1,5 @@
+import type { RenderHint } from './utils/render.ts';
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -25,6 +27,7 @@ export interface GeometryData {
   }>;
   locationName?: string; // Optional location name from tool call
   sourceUrl?: string; // The s3:// URL the collection was loaded from (drives layer grouping)
+  render?: RenderHint; // Validated display_visual `render` hint, when the agent sent one
 }
 
 export interface StreamEvent {
@@ -40,4 +43,5 @@ export interface RasterData {
   date?: string; // Optional date from title or params
   cloudCoverage?: string; // Optional cloud coverage percentage
   zIndex?: number; // Layer stacking order (higher = on top)
+  render?: RenderHint; // Validated display_visual `render` hint, when the agent sent one
 }

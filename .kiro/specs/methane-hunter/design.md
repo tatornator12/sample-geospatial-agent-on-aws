@@ -357,3 +357,17 @@ Found while building tasks 1–3 against live data; each keeps the approved inte
    when the agent stops early; offers of a next step go above it.
 8. Security gap found outside this spec: `/api/presigned-url` signs any bucket/key. Tracked as
    task 5.4, must land before G3.
+9. Critique of the methane stage (Sep 25, `.impeccable/critique/`, 20/36): the plan styled the
+   layers but gave the act no camera and no contrast. Added to task 4 (user-approved choices):
+   - Basemap dims (`raster-brightness-max` 0.45, desaturated) while any methane layer is visible;
+     restored when none is. Plasma only reads on dark ground.
+   - After triage the ranked footprints replace the detected ones. Ranks 1–3 are lit (plasma
+     outline graduated by `max_ppm_m`, light fill, `#1 · 8,131 ppm·m` mono labels); every other
+     footprint is a fog hairline. 39 is the count; 3 is the story.
+   - Camera: a methane raster fits to its own bounds on arrival (`show_plume` adds `bounds` to its
+     `render` hint, validated as a finite lon/lat box); the next raster in the act (the Sentinel-2
+     ground scene) fits to its own bounds too (TiTiler `/cog/bounds`, falling back to the current
+     geometry). Padding keeps the finding clear of the step column, caption band and layers plate.
+     The Earth Analyst's camera is unchanged.
+   - The plume's own evidence chip; plain-language step labels; per-agent placeholder, idle
+     caption and prepared prompts; the caption's speaker label drops "(dev)"/"(stable)".

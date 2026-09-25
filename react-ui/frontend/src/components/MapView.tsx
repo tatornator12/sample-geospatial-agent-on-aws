@@ -12,13 +12,45 @@ import {
   findComparePair,
   formatLayerDisplayText,
   groupLayers,
+  isMethaneLayer,
   isSimilarityLayer,
   type LayerMetadata,
 } from '../utils/layerFormatting';
+import { rampExpression, rampGradient, tileParamsFor, type RenderHint } from '../utils/render.ts';
 import { CompareView } from './CompareView';
 import { Icon } from './Icons.tsx';
 import { theme } from '../theme';
 import '../stage.css';
+
+const BASEMAP_IDS = ['dark-base', 'google-roads-base', 'google-satellite-base', 'esri-satellite-base'];
+
+// The finding's frame: clear of the step column (left), the caption band and console (bottom)
+// and the layers plate (right), so what the camera lands on is what the room sees.
+const STAGE_PADDING = { top: 90, bottom: 300, left: 340, right: 370 };
+
+// The Methane Hunter's defaults when a layer arrived without a (valid) hint: the tools' own values.
+const METHANE_RASTER: RenderHint = { kind: 'raster', colormap: 'plasma', rescale: [0, 1500], units: 'ppm·m', group: 'methane' };
+const METHANE_VECTOR: RenderHint = { kind: 'vector', ramp: 'plasma', property: 'max_ppm_m', rescale: [0, 1500], units: 'ppm·m', group: 'methane', label: 'rank' };
+// Ranks at or above this are lit and labelled; every other footprint is a hairline. 39 is the count; 3 is the story.
+const LIT_RANKS = 3;
+
+/** A raster's real extent from TiTiler, or null (timeout, error, junk): the camera then keeps its fallback. */
+async function fetchCogBounds(presignedUrl: string): Promise<[number, number, number, number] | null> {
+  try {
+    const response = await fetch(`${TITILER_URL}/cog/bounds?url=${encodeURIComponent(presignedUrl)}`, {
+      headers: TITILER_API_KEY ? { 'x-api-key': TITILER_API_KEY } : {},
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    const b = body?.bounds;
+    if (!Array.isArray(b) || b.length !== 4 || !b.every((v: unknown) => typeof v === 'number' && Number.isFinite(v))) return null;
+    const [w, s, e, n] = b as number[];
+    return w < e && s < n && w >= -180 && e <= 180 && s >= -90 && n <= 90 ? [w, s, e, n] : null;
+  } catch {
+    return null;
+  }
+}
 
 interface MapViewProps {
   geometry: GeometryData | null;
@@ -145,6 +177,28 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     if (!map.current || !map.current.loaded()) return;
     updateBaseMapLayer(baseMapStyle);
   }, [baseMapStyle]);
+
+  // Everything else dims while methane is on the stage: plasma only reads on dark ground. Runs
+  // after the basemap effect above, so a basemap switch mid-act comes back dimmed too.
+  const methaneOnStage = useMemo(
+    () => layerGroups.methane.some((l) => rasterVisibility[l.id] !== false),
+    [layerGroups.methane, rasterVisibility]
+  );
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const apply = () => {
+      BASEMAP_IDS.forEach((id) => {
+        if (!mapInstance.getLayer(id)) return;
+        mapInstance.setPaintProperty(id, 'raster-brightness-max-transition', { duration: 600, delay: 0 });
+        mapInstance.setPaintProperty(id, 'raster-saturation-transition', { duration: 600, delay: 0 });
+        mapInstance.setPaintProperty(id, 'raster-brightness-max', methaneOnStage ? 0.45 : 1);
+        mapInstance.setPaintProperty(id, 'raster-saturation', methaneOnStage ? -0.6 : 0);
+      });
+    };
+    if (mapInstance.isStyleLoaded()) apply();
+    else mapInstance.once('idle', apply);
+  }, [methaneOnStage, baseMapStyle]);
 
   // Initialize map
   useEffect(() => {
@@ -304,6 +358,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           geometry.features.some((f) =>
             f?.properties && f.properties.tier === 'match' && typeof f.properties.similarity === 'number');
 
+        // Methane Hunter footprints: by the validated hint, or by the tools' own file names.
+        const methaneHint: RenderHint | null =
+          geometry.render?.kind === 'vector' && geometry.render.group === 'methane'
+            ? geometry.render
+            : isMethaneLayer({ id: '', sourceId: '', name: '', url: geometry.sourceUrl || '', type: 'geometry' })
+              ? METHANE_VECTOR
+              : null;
+        const isMethane = methaneHint !== null;
+
         try {
           currentMap.addSource(geometryId, {
             type: 'geojson',
@@ -323,7 +386,102 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
             geometry.features.some((f: any) =>
               f?.properties && f.properties.__layer_type === 'protected_area');
 
-          if (isSimilarity) {
+          if (isMethane && methaneHint) {
+            // Ranks 1-3 are lit: plasma outline graduated by the hint's property, a light fill, and
+            // "#1 · 8,131 ppm·m" labels. Every other footprint is a fog hairline, a little brighter
+            // before triage (nothing is ranked yet, so the count itself is the finding).
+            const property = methaneHint.property ?? 'max_ppm_m';
+            const [lo, hi] = methaneHint.rescale ?? [0, 1500];
+            const ramp =
+              (rampExpression(methaneHint.ramp ?? 'plasma', property, lo, hi) as maplibregl.ExpressionSpecification | null) ??
+              '#f89540';
+            const lit: maplibregl.FilterSpecification = ['<=', ['to-number', ['get', 'rank'], 9999], LIT_RANKS];
+            const unlit: maplibregl.FilterSpecification = ['>', ['to-number', ['get', 'rank'], 9999], LIT_RANKS];
+            const anyRanked = geometry.features.some((f) => Number.isFinite(Number(f?.properties?.rank)));
+            const units = methaneHint.units ?? 'ppm·m';
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'fill',
+              source: geometryId,
+              filter: lit,
+              // A breath of fill: some footprints are 70 km tall, and the outline carries the colour.
+              paint: { 'fill-color': ramp, 'fill-opacity': 0.1 },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: `${geometryId}-hairline`,
+              type: 'line',
+              source: geometryId,
+              filter: unlit,
+              paint: { 'line-color': '#e9eef3', 'line-opacity': anyRanked ? 0.4 : 0.75, 'line-width': anyRanked ? 1 : 1.5 },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'line',
+              source: geometryId,
+              filter: lit,
+              paint: { 'line-color': ramp, 'line-width': 3 },
+              layout: { visibility: 'visible' },
+            });
+            // Labels sit at each plume's centre (the tool's center_lat/lon), not on a polygon vertex,
+            // and are placed by rank with collision checks so #2 and #3 never print over each other.
+            const centres = geometry.features.flatMap((f) => {
+              const p = f?.properties ?? {};
+              const lon = Number(p.center_lon);
+              const lat = Number(p.center_lat);
+              if (!Number.isFinite(lon) || !Number.isFinite(lat)) return [];
+              return [{ type: 'Feature' as const, properties: p, geometry: { type: 'Point' as const, coordinates: [lon, lat] } }];
+            });
+            currentMap.addSource(`${geometryId}-points`, {
+              type: 'geojson',
+              data: { type: 'FeatureCollection', features: centres },
+            });
+            currentMap.addLayer({
+              id: `${geometryId}-labels`,
+              type: 'symbol',
+              source: `${geometryId}-points`,
+              filter: lit,
+              layout: {
+                'symbol-placement': 'point',
+                'symbol-sort-key': ['to-number', ['get', 'rank'], 9999],
+                'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
+                'text-radial-offset': 0.9,
+                'text-field': [
+                  'format',
+                  ['concat', '#', ['to-string', ['get', 'rank']]], { 'font-scale': 1 },
+                  '  ', {},
+                  // One decimal, as in the table and the caption, so the room reads the same number everywhere.
+                  ['concat', ['number-format', ['to-number', ['get', property], 0], { locale: 'en-US', 'max-fraction-digits': 1 }], ` ${units}`],
+                  { 'font-scale': 0.75 },
+                ] as maplibregl.ExpressionSpecification,
+                'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+                'text-size': 24,
+                'text-justify': 'auto',
+                'text-padding': 4,
+                visibility: 'visible',
+              },
+              paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2.5 },
+            });
+            // Popup: numbers and an ISO date only, so nothing model- or CMR-written reaches setHTML.
+            currentMap.on('click', fillLayerId, (e: maplibregl.MapLayerMouseEvent) => {
+              const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
+              const num = (v: unknown, digits: number) => (Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-US', { maximumFractionDigits: digits }) : '—');
+              const acquired = typeof p.acquired === 'string' && /^\d{4}-\d{2}-\d{2}/.test(p.acquired) ? p.acquired.slice(0, 10) : '—';
+              const html =
+                `<strong>Plume ${num(p.rank, 0)}</strong>` +
+                `<div class="similar-popup__row"><span>Peak</span><code>${num(p[property], 1)} ppm·m</code></div>` +
+                `<div class="similar-popup__row"><span>Area ≥ 500</span><code>${num(p.plume_area_km2, 1)} km²</code></div>` +
+                `<div class="similar-popup__row"><span>Acquired</span><code>${acquired}</code></div>`;
+              new maplibregl.Popup({ className: 'similar-popup' }).setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
+            });
+            currentMap.on('mouseenter', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = 'pointer';
+            });
+            currentMap.on('mouseleave', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = '';
+            });
+          } else if (isSimilarity) {
             const sims = geometry.features
               .map((f) => f?.properties?.similarity)
               .filter((s: unknown): s is number => typeof s === 'number');
@@ -561,10 +719,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           // grouping); a features excerpt for drawn/ad-hoc geometry.
           url: geometry.sourceUrl || JSON.stringify(geometry.features).substring(0, 200),
           type: 'geometry',
-          bounds: boundsArray
+          bounds: boundsArray,
+          ...(methaneHint ? { render: methaneHint } : {}),
         }]);
         
         console.log(`✅ Geometry added:`, name, `bounds:`, boundsArray);
+
+        // The ranked footprints replace the detected ones (same plumes, now measured): one set of
+        // outlines on the stage, never two stacked.
+        if (isMethane) {
+          allLayersRef.current
+            .filter((l) => l.type === 'geometry' && l.id !== fillLayerId && isMethaneLayer(l))
+            .forEach((l) => removeLayer(l.id));
+          currentMap.fitBounds(bounds, { padding: STAGE_PADDING, duration: 1500, maxZoom: 11 });
+          return;
+        }
 
         // The frame rule: once a ranked "similar places" map is on the stage, a geometry that
         // lies inside it (a match's bbox, a drill-down) does not steal the frame. The row's
@@ -632,7 +801,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
   const flyToLayer = (layerId: string) => {
     if (!map.current) return;
     
-    const layer = allLayers.find(l => l.id === layerId);
+    const layer = allLayersRef.current.find(l => l.id === layerId);
     if (!layer || !layer.bounds) return;
     
     const mapInstance = map.current;
@@ -653,13 +822,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
   // A geometry's fill layer travels with its companions: the outline, and for a similarity
   // result the dashed query outline and the rank labels.
   const geometryCompanionIds = (fillLayerId: string) =>
-    ['-outline', '-query', '-labels'].map(suffix => fillLayerId.replace('-fill', suffix));
+    ['-outline', '-query', '-labels', '-hairline'].map(suffix => fillLayerId.replace('-fill', suffix));
 
-  // Remove a specific layer
+  // Remove a specific layer. Reads the ref, not the state, so the geometry loader (which closes
+  // over an older render) can replace a layer it did not see in its own closure.
   const removeLayer = (layerId: string) => {
     if (!map.current) return;
 
-    const layer = allLayers.find(l => l.id === layerId);
+    const layer = allLayersRef.current.find(l => l.id === layerId);
     if (!layer) return;
 
     const mapInstance = map.current;
@@ -671,9 +841,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           mapInstance.removeLayer(id);
         }
       });
-      if (mapInstance.getSource(layer.sourceId)) {
-        mapInstance.removeSource(layer.sourceId);
-      }
+      // The geometry's own source, and the label points a methane layer adds beside it.
+      [layer.sourceId, `${layer.sourceId}-points`].forEach(id => {
+        if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+      });
     } else {
       // Raster layer
       if (mapInstance.getLayer(layer.id)) {
@@ -711,9 +882,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
             mapInstance.removeLayer(id);
           }
         });
-        if (mapInstance.getSource(layer.sourceId)) {
-          mapInstance.removeSource(layer.sourceId);
-        }
+        [layer.sourceId, `${layer.sourceId}-points`].forEach(id => {
+          if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+        });
       } else {
         // Raster layer
         if (mapInstance.getLayer(layer.id)) {
@@ -878,7 +1049,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           const urlLower = raster.url.toLowerCase();
           let tileUrl: string;
 
-          if (urlLower.includes('change_detection') || urlLower.includes('change-detection')) {
+          // A methane plume raster: by its validated hint, or by the tool's own file name.
+          const probe: LayerMetadata = { id: '', sourceId: '', name: raster.name, url: raster.url, type: 'raster', render: raster.render };
+          const isMethaneRaster = isMethaneLayer(probe);
+          const hint: RenderHint | undefined = raster.render ?? (isMethaneRaster ? METHANE_RASTER : undefined);
+          // The camera follows the methane act: the plume on arrival, then the ground scene after it.
+          const followCamera =
+            isMethaneRaster ||
+            allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l)) ||
+            newLayerMetadata.some((l) => isMethaneLayer(l));
+          const hintParams = tileParamsFor(hint);
+
+          if (hintParams) {
+            // The agent said how this layer looks (validated in utils/render.ts).
+            tileUrl = `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&${hintParams}`;
+          } else if (urlLower.includes('change_detection') || urlLower.includes('change-detection')) {
             // Change Detection: 0 to 1 range, reversed RdYlGn (green=no change, red=high change)
             tileUrl = `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&bidx=1&rescale=0,0.5&colormap_name=rdylgn_r`;
           } else if (urlLower.includes('ndvi_') || urlLower.includes('ndvi-')) {
@@ -904,9 +1089,17 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           // Calculate appropriate minzoom from bounds to prevent requesting tiles at
           // zoom levels where the COG is too small relative to the tile extent.
           // At low zooms, TiTiler times out trying to render a tiny COG into a world-scale tile.
+          // This raster's own extent when the act needs it (the camera goes there): the hint's bounds,
+          // else TiTiler's; otherwise the current geometry's, as before.
+          let rasterBounds = bounds;
+          if (followCamera) {
+            rasterBounds = hint?.bounds ?? (await fetchCogBounds(presignedUrl)) ?? bounds;
+            if (abortController.signal.aborted) break;
+          }
+
           let sourceMinZoom = 0;
-          if (bounds) {
-            const lonExtent = bounds[2] - bounds[0]; // east - west
+          if (rasterBounds) {
+            const lonExtent = rasterBounds[2] - rasterBounds[0]; // east - west
             // At zoom z, each tile covers 360/2^z degrees of longitude.
             // We want the COG to fill at least ~10% of a tile before requesting.
             for (let z = 0; z <= 18; z++) {
@@ -924,7 +1117,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
             tileSize: 256,
             minzoom: sourceMinZoom,
             maxzoom: 22,
-            bounds: bounds,
+            bounds: rasterBounds,
           });
 
           const isVisible = rasterVisibility[layerId] !== undefined ? rasterVisibility[layerId] : true;
@@ -938,8 +1131,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           const isChangeDetection = urlLower.includes('change_detection') || urlLower.includes('change-detection');
 
           let beforeId: string | undefined;
-          if (isChangeDetection) {
-            // Change detection: add on top (no beforeId = top of stack)
+          if (isChangeDetection || isMethaneRaster) {
+            // Change detection and methane plumes are the finding: on top (no beforeId = top of
+            // stack), so the ground scene that follows slides in beneath the plume.
             beforeId = undefined;
           } else {
             // Other rasters: add above basemaps but below existing COG layers
@@ -971,12 +1165,24 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
             url: raster.url,
             date: raster.date,
             type: 'raster',
-            bounds: bounds
+            bounds: rasterBounds,
+            ...(hint ? { render: hint } : {}),
           });
 
           // CRITICAL FIX: Only add URL to ref AFTER layer is successfully added to map
           // This prevents race condition where ref is updated but layer isn't added due to abort
           addedRasterUrls.current.add(raster.url);
+
+          // The camera moves to the finding: the plume fills the frame; the ground scene after it
+          // tightens a little further. Only in the methane act; other acts keep today's framing.
+          if (followCamera && rasterBounds) {
+            const [w, s, e, n] = rasterBounds;
+            mapInstance.fitBounds([[w, s], [e, n]], {
+              padding: STAGE_PADDING,
+              duration: 1800,
+              maxZoom: isMethaneRaster ? 13 : 14,
+            });
+          }
 
           console.log(`✅ [${i}] Raster successfully added to map:`, raster.name, `Layer ID: ${layerId}`, `Visible: ${isVisible}`);
 
@@ -1145,6 +1351,31 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
                   )}
                 </div>
               )}
+
+              {/* Methane: the plume, its footprints, and the ramp that reads them. */}
+              {layerGroups.methane.length > 0 && (() => {
+                const legendHint = layerGroups.methane.find((l) => l.render?.rescale)?.render ?? METHANE_RASTER;
+                const [lo, hi] = legendHint.rescale ?? [0, 1500];
+                const units = legendHint.units ?? 'ppm·m';
+                const gradient = rampGradient(legendHint.colormap ?? legendHint.ramp ?? 'plasma') ?? undefined;
+                return (
+                  <div>
+                    <h3 className="map-group__title">Methane</h3>
+                    {layerGroups.methane.map((layer) => renderLayerRow(layer, layer.name))}
+                    <div
+                      className="map-legend"
+                      role="img"
+                      aria-label={`Colour ramp: CH4 enhancement from ${lo} to ${hi} ${units} and above, dark purple to yellow`}
+                    >
+                      <span className="map-legend__label map-legend__label--num">{lo.toLocaleString('en-US')}</span>
+                      <span className="map-legend__ramp" style={{ background: gradient }} aria-hidden="true" />
+                      <span className="map-legend__label map-legend__label--num">
+                        {hi.toLocaleString('en-US')}+ {units}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Search by example: ranked look-alikes, with the release's one legend. */}
               {layerGroups.similarPlaces.length > 0 && (

@@ -286,6 +286,10 @@ def test_show_plume_finds_a_triaged_plume(tools, monkeypatch, fake_s3):
     assert out["rank"] == 1 and out["acquired_date"] == "2024-08-12"
     assert out["plume_s3_url"] == f"s3://{BUCKET}/methane/cache/ch4plm_{PLUME_ID_2}.tif"
     assert out["render"]["kind"] == "raster" and out["max_ppm_m"] == pytest.approx(2500.0, abs=0.05)
+    # The camera's bounds ride on the hint: the footprint's lon/lat box, and the shared constant is untouched.
+    w, s, e, n = out["render"]["bounds"]
+    assert out["render"]["bounds"] == out["bbox"] and w < e and s < n and -180 <= w and n <= 90
+    assert "bounds" not in tools.RENDER_RASTER
 
 
 def test_show_plume_requires_triage_and_a_valid_id(tools, fake_s3):

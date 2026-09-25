@@ -23,6 +23,8 @@ import {
   extractLocationChanged,
 } from '../utils/parsing.ts';
 import { formatScenarioAnalysis, type ScenarioConfig } from '../utils/formatScenario';
+import { stageAgentLabel, stageCopyFor } from '../utils/stageCopy.ts';
+import type { RenderHint } from '../utils/render.ts';
 
 /**
  * Load tool calls from scenario config
@@ -46,16 +48,7 @@ function loadToolCallsFromConfig(config: ScenarioConfig): ToolCall[] {
   }));
 }
 
-const PREPARED_PROMPTS = [
-  { label: 'Vegetation, Central Park', prompt: 'Show vegetation health for Central Park, New York' },
-  {
-    label: 'Wildfire, Pacific Palisades',
-    prompt: 'Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025',
-  },
-  { label: 'Water, Folsom Lake', prompt: 'Compare water levels for Folsom Lake, California 2021 vs 2022' },
-  { label: 'Scan Colorado', prompt: 'Scan Colorado for land change between 2019 and 2024' },
-  { label: 'Places like Central Park', prompt: 'Find places across New York State that look like Central Park' },
-];
+
 
 interface ChatSidebarProps {
   sessionId: string;
@@ -258,7 +251,7 @@ export function ChatSidebar({
     // just the first — while de-duping across streaming updates. Each loaded
     // geometry is pushed separately and stacks as its own layer on the map.
     const loadedGeometryUrls = new Set<string>();
-    const loadNewGeometries = async (list: Array<{ url: string; title: string }>) => {
+    const loadNewGeometries = async (list: Array<{ url: string; title: string; render?: RenderHint }>) => {
       for (const g of list) {
         if (loadedGeometryUrls.has(g.url)) continue;
         loadedGeometryUrls.add(g.url); // mark first so rapid stream updates don't double-load
@@ -272,6 +265,7 @@ export function ChatSidebar({
           if (geometry) {
             geometry.locationName = g.title;
             geometry.sourceUrl = g.url;
+            if (g.render) geometry.render = g.render;
             onGeometryUpdate(geometry);
           } else {
             loadedGeometryUrls.delete(g.url);
@@ -339,6 +333,7 @@ export function ChatSidebar({
                   name: r.title,
                   date: r.date,
                   cloudCoverage: r.cloudCoverage,
+                  ...(r.render ? { render: r.render } : {}),
                 }));
 
                 // Use setTimeout to defer raster updates and prevent blocking the stream
@@ -404,6 +399,7 @@ export function ChatSidebar({
             name: r.title,
             date: r.date,
             cloudCoverage: r.cloudCoverage,
+            ...(r.render ? { render: r.render } : {}),
           }));
 
           // Defer final raster update to prevent blocking
@@ -476,7 +472,10 @@ export function ChatSidebar({
   // Where the agent is: this turn's tools while working, the last turn's when finished.
   const stepTools = isStreaming ? streamingTools : lastAssistant?.tools || [];
   // What the agent looked at: the inspect_image steps of the same turn.
-  const evidence = extractEvidence(stepTools);
+  const evidence = extractEvidence(stepTools, sessionId);
+  // This act's prompts, placeholder and idle line; the room hears the act's name, not "(dev)".
+  const copy = stageCopyFor(agentId);
+  const speaker = stageAgentLabel(agentLabel) ?? 'Agent';
 
   const canSend = !isProcessing && userInput.trim().length > 0;
 
@@ -512,7 +511,7 @@ export function ChatSidebar({
           aria-live="polite"
           aria-atomic="true"
         >
-          <span className="docent-caption__who">{idle ? 'Ready' : agentLabel ?? 'Agent'}</span>
+          <span className="docent-caption__who">{idle ? 'Ready' : speaker}</span>
           <div className="docent-caption__text">
             {caption ? (
               <span className="markdown-content">
@@ -521,7 +520,7 @@ export function ChatSidebar({
             ) : isStreaming ? (
               <span>Reading the request</span>
             ) : (
-              <span>Name a place and a question. The agent finds the imagery, runs the analysis, and puts the result on the map.</span>
+              <span>{copy.idle}</span>
             )}
             {isStreaming && (
               <span className="docent-working" aria-hidden="true">
@@ -546,7 +545,7 @@ export function ChatSidebar({
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isProcessing ? 'Working… press Esc to stop' : 'Ask about any place on Earth'}
+            placeholder={isProcessing ? 'Working… press Esc to stop' : copy.placeholder}
             disabled={isProcessing}
             rows={1}
             aria-label="Prompt for the agent"
@@ -592,7 +591,7 @@ export function ChatSidebar({
 
         <div className="docent-prepared">
           <span className="docent-prepared__label">Prepared</span>
-          {PREPARED_PROMPTS.map((p) => (
+          {copy.prompts.map((p) => (
             <button
               key={p.label}
               type="button"

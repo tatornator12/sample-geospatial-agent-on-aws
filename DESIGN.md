@@ -172,7 +172,9 @@ A deep blue-grey dome with fog-white text and a single warm accent; hairlines ra
 - **Signal Green** (#7bd88f): completed states in the step column and tool timeline.
 
 ### Data colour on the map
-Map layers keep their scientific palettes: the RdYlGn change-scan ramp, cyan boundaries and hotspot outlines, purple protected areas, and the similarity ramp (a single violet hue from `#e8dcf5` to `#5b2a86`, lighter = less alike, deeper = more alike, with the example drawn as a dashed cyan outline and white 24 px mono rank labels with a dark halo). These are evidence, not UI, and are not restyled to the accent. The similarity group carries the stage's only legend: a ramp bar with "less alike" / "more alike" labels at 15 px.
+Map layers keep their scientific palettes: the RdYlGn change-scan ramp, cyan boundaries and hotspot outlines, purple protected areas, and the similarity ramp (a single violet hue from `#e8dcf5` to `#5b2a86`, lighter = less alike, deeper = more alike, with the example drawn as a dashed cyan outline and white 24 px mono rank labels with a dark halo). These are evidence, not UI, and are not restyled to the accent. The similarity and methane groups carry the stage's legends: a ramp bar at 15 px, with "less alike" / "more alike" for similarity and `0` / `1,500+ ppm·m` in the mono face for methane.
+
+Methane (Act 2) uses matplotlib's plasma ramp (`#0d0887` → `#7e03a8` → `#cc4778` → `#f89540` → `#f0f921`) over a fixed 0–1,500 ppm·m, so every plume reads on one legend and anything stronger saturates to yellow. Plume rasters render through TiTiler with that ramp. The footprints show the ranking, not the count: ranks 1–3 are lit with a plasma outline graduated by peak enhancement, a 10% fill and 24 px mono labels (`#1  8,130.7 ppm·m`, fog on a dome halo, placed at the plume centre with collision checks); every other footprint is a fog hairline (40% opacity, brighter before triage). **The Dim Rule:** while a methane layer is visible the basemap dims (brightness 0.45, saturation −0.6, 600 ms), because plasma only reads on dark ground; it comes back when the last methane layer is hidden or removed. The camera follows the act: footprints fit on arrival, the plume raster fits to its own bounds, the ground scene after it tightens further, always padded clear of the step column, caption band and layers plate.
 
 ### Named Rules
 **The One Spotlight Rule.** Amber marks exactly what is active. If two things on the same screen are amber, one of them is wrong.
@@ -208,7 +210,7 @@ The stage is a fixed frame with one live window. The map fills the viewport belo
 - **Exhibit rail** (top, 56px): title left, sections centre, quiet sign-out right. The active section is lit amber with an underline.
 - **Step column** (left, 296px wide, 360px above 2200px): appears only while or after the agent works. Grows downward to `calc(100% - 300px)` and scrolls inside itself.
 - **Caption band and console** (bottom centre, `min(1040px, 100% - 480px)`): the docent's sentence, the presenter's single input line with Send / Stop, transcript toggle and new-session, then prepared prompts as label plates with the session id in mono at the right.
-- **Layers plate** (top right, 320px): groups in a fixed order (change detection, similar places, satellite imagery, spectral indices, boundaries), each row a checkbox, a name that flies the map to the layer, and a remove control.
+- **Layers plate** (top right, 320px): groups in a fixed order (change detection, methane, similar places, satellite imagery, spectral indices, boundaries), each row a checkbox, a name that flies the map to the layer, and a remove control.
 - **Draw rail** (bottom left, 40px icon buttons in a column) and **Basemap plate** (bottom right).
 - **Transcript drawer** (right, `min(520px, 100% - 360px)`): slides over the layers plate when opened; closes with the same control. Rails never reflow; only the map and its plates change.
 

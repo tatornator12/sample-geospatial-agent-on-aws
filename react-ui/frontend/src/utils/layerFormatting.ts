@@ -2,6 +2,8 @@
  * Utility functions for formatting and categorizing map layers
  */
 
+import type { RenderHint } from './render.ts';
+
 export interface LayerMetadata {
   id: string;
   sourceId: string;
@@ -10,6 +12,7 @@ export interface LayerMetadata {
   date?: string;
   type: 'raster' | 'geometry';
   bounds?: [number, number, number, number]; // [west, south, east, north]
+  render?: RenderHint; // the agent's validated styling hint, when it sent one
 }
 
 // Constants
@@ -20,6 +23,14 @@ export const BASEMAP_LAYER_ID = 'esri-world-imagery-layer';
  */
 export function formatDate(date: string): string {
   if (!date) return '';
+
+  // A calendar date (the agent's file names): read it as written. `new Date('2023-12-28')` is
+  // UTC midnight, which prints as Dec 27 anywhere west of Greenwich.
+  const ymd = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) {
+    const monthIndex = Number(ymd[2]) - 1;
+    if (monthIndex >= 0 && monthIndex < 12) return `${MONTH_ABBR[monthIndex]} ${ymd[3]} ${ymd[1]}`;
+  }
 
   try {
     const dateObj = new Date(date);
@@ -120,6 +131,19 @@ export function isSimilarityLayer(layer: LayerMetadata): boolean {
   return basename.startsWith('similar_') && basename.endsWith('.geojson');
 }
 
+/**
+ * A Methane Hunter layer: by the agent's hint (`group: 'methane'`), or, when the hint is absent
+ * or was dropped, by the tools' own file names (`ch4plm_<granule>.tif` plume rasters,
+ * `.../methane/plumes_*.geojson` footprints). Never by the model-written title.
+ */
+export function isMethaneLayer(layer: LayerMetadata): boolean {
+  if (layer.render?.group === 'methane') return true;
+  const url = (layer.url || '').toLowerCase();
+  const basename = url.split('/').pop() ?? '';
+  if (layer.type === 'raster') return /^ch4plm_.+\.tiff?$/.test(basename);
+  return url.includes('/methane/') && basename.startsWith('plumes_') && basename.endsWith('.geojson');
+}
+
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
@@ -198,7 +222,8 @@ export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 
     return formatSimilarityLabel(layer);
   }
   const cleanedName = cleanLayerName(layer.name);
-  const formattedDate = layer.date ? formatDate(layer.date) : '';
+  // The title often already carries the date ("… Midland, Texas, 2023-12-28"); say it once.
+  const formattedDate = layer.date && !cleanedName.includes(layer.date) ? formatDate(layer.date) : '';
 
   if (layerType === 'spectral') {
     // Use same format as TCI: "Location Index Name - Date"
@@ -215,25 +240,28 @@ export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 
  * Group layers by type for organized display
  */
 export function groupLayers(layers: LayerMetadata[]) {
+  const methane = layers.filter(isMethaneLayer);
+  const rest = layers.filter(l => !isMethaneLayer(l));
   return {
-    changeDetection: layers.filter(l =>
+    changeDetection: rest.filter(l =>
       l.type === 'raster' &&
       l.id !== BASEMAP_LAYER_ID &&
       isChangeDetection(l)
     ),
-    tci: layers.filter(l =>
+    methane,
+    tci: rest.filter(l =>
       l.type === 'raster' &&
       l.id !== BASEMAP_LAYER_ID &&
       !isSpectralIndex(l)
     ),
-    spectralIndices: layers.filter(l =>
+    spectralIndices: rest.filter(l =>
       l.type === 'raster' &&
       l.id !== BASEMAP_LAYER_ID &&
       isSpectralIndex(l) &&
       !isChangeDetection(l)
     ),
-    similarPlaces: layers.filter(l => isSimilarityLayer(l)),
-    geometries: layers.filter(l => l.type === 'geometry' && !isSimilarityLayer(l)),
+    similarPlaces: rest.filter(l => isSimilarityLayer(l)),
+    geometries: rest.filter(l => l.type === 'geometry' && !isSimilarityLayer(l)),
     basemap: layers.filter(l => l.id === BASEMAP_LAYER_ID),
   };
 }
