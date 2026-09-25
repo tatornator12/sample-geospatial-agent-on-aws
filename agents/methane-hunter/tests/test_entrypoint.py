@@ -86,3 +86,35 @@ def test_prompt_carries_the_confidence_sentence_and_render_rule():
     assert "Current date is 2026-10-06" in p
     assert "render" in p and "never name an emitter" in p.lower()
     assert "ppm·m" in p
+
+
+# --- replay cases (scenario_id) -------------------------------------------------------------------
+
+_CASE = {
+    "name": "Permian Basin methane, 2024", "location": "Permian Basin", "dates": {"window": "2024-01-01/2024-12-31"},
+    "analysis": {}, "narrative": "The strongest plume ... peaked at 8,130.7 ppm·m. EMIT sees the methane, not its source.",
+    "s3_prefix": "s3://b/use-cases/methane-permian-2024/", "assets": {"geometry_url": "s3://b/use-cases/methane-permian-2024/geometry.geojson"},
+    "config": {"assets": {"layers": [{"file": "ch4plm_x.tif", "title": "Plume"}]}},
+}
+
+
+def test_replay_case_extends_the_prompt_and_forbids_the_live_workflow(entry, monkeypatch):
+    import utils.scenario_loader as loader
+    asked = []
+    monkeypatch.setattr(loader, "load_scenario", lambda sid: asked.append(sid) or _CASE)
+    p = entry.system_prompt_for({"prompt": "why that one?", "scenario_id": "methane-permian-2024"})
+    assert asked == ["methane-permian-2024"]
+    assert p.startswith(entry.methane_config.build_prompt()[:200])
+    assert "SCENARIO MODE ACTIVE: Permian Basin methane, 2024" in p and "8,130.7 ppm·m" in p
+    assert "search_methane_plumes, triage_plumes" in p and "s3://b/use-cases/methane-permian-2024/ch4plm_x.tif" in p
+    assert "burned" not in p.lower()
+
+
+def test_no_or_bad_scenario_id_is_the_live_prompt(entry, monkeypatch):
+    import utils.scenario_loader as loader
+    monkeypatch.setattr(loader, "load_scenario", lambda sid: pytest.fail("should not load"))
+    live = entry.methane_config.build_prompt()
+    for payload in ({"prompt": "x"}, {"prompt": "x", "scenario_id": "../sessions"}, {"scenario_id": 7}, None):
+        assert entry.system_prompt_for(payload)[:300] == live[:300]
+    monkeypatch.setattr(loader, "load_scenario", lambda sid: None)
+    assert "SCENARIO MODE" not in entry.system_prompt_for({"scenario_id": "missing-case"})

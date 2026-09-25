@@ -11,6 +11,8 @@ interface Scenario {
     value: string;
   }[];
   status: 'available' | 'coming-soon';
+  /** The act the case belongs to; the stage switches to it when the case loads. */
+  agent?: string;
 }
 
 const scenarios: Scenario[] = [
@@ -50,6 +52,18 @@ const scenarios: Scenario[] = [
     ],
     status: 'available',
   },
+  {
+    id: 'methane-permian-2024',
+    name: 'Permian Basin Methane',
+    description: 'The strongest methane plume NASA EMIT saw over the Permian Basin in 2024, and the ground beneath it',
+    icon: '/methane_permian.png',
+    metrics: [
+      { label: 'Plume Complexes', value: '39 in 2024' },
+      { label: 'Strongest Peak', value: '8,130.7 ppm·m' },
+    ],
+    status: 'available',
+    agent: 'methane',
+  },
 ];
 
 export function UseCaseGallery() {
@@ -57,7 +71,7 @@ export function UseCaseGallery() {
 
   const handleScenarioClick = (scenario: Scenario) => {
     if (scenario.status === 'available') {
-      navigate(`/?scenario=${scenario.id}`);
+      navigate(`/?scenario=${scenario.id}${scenario.agent ? `&agent=${scenario.agent}` : ''}`);
     }
   };
 

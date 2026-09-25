@@ -9,6 +9,7 @@ ArcGIS MCP geocoder when reachable, and the tool-call streaming format the UI pa
 import contextlib
 import logging
 import os
+import re
 
 import _paths  # noqa: F401  (shared platform code on sys.path first)
 
@@ -72,6 +73,29 @@ def is_prewarm(payload) -> bool:
     return bool(isinstance(payload, dict) and payload.get("prewarm"))
 
 
+SCENARIO_ID_RE = re.compile(r"^[a-z0-9-]{1,64}$")
+
+
+def system_prompt_for(payload) -> str:
+    """The Methane Hunter's prompt; for a replay case (`scenario_id`), plus the recorded case, so
+    follow-ups answer from the recording instead of calling CMR / LP DAAC (the point of a replay
+    case is that those may be down). An unknown or malformed id falls back to the live prompt."""
+    prompt = methane_config.build_prompt()
+    scenario_id = payload.get("scenario_id") if isinstance(payload, dict) else None
+    if not scenario_id:
+        return prompt
+    if not isinstance(scenario_id, str) or not SCENARIO_ID_RE.match(scenario_id):
+        logger.warning("⚠️ ignoring a malformed scenario_id")
+        return prompt
+    from utils.scenario_loader import build_scenario_context, load_scenario
+    scenario = load_scenario(scenario_id)
+    if not scenario:
+        logger.warning(f"⚠️ Scenario {scenario_id} not found, continuing in live mode")
+        return prompt
+    logger.info(f"✅ Replay case loaded: {scenario['name']}")
+    return prompt + build_scenario_context(scenario)
+
+
 @app.entrypoint
 async def methane_hunter_agent(payload, context=None):
     """Agent entrypoint with streaming and S3-backed session memory."""
@@ -120,7 +144,7 @@ async def methane_hunter_agent(payload, context=None):
                 tools=mcp_tools + LOCAL_TOOLS,
                 model=bedrock_model,
                 system_prompt=[
-                    SystemContentBlock(text=methane_config.build_prompt()),
+                    SystemContentBlock(text=system_prompt_for(payload)),
                     SystemContentBlock(cachePoint={"type": "default"}),
                 ],
                 record_direct_tool_call=True,

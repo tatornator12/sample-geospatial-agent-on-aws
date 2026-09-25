@@ -371,3 +371,8 @@ Found while building tasks 1–3 against live data; each keeps the approved inte
      The Earth Analyst's camera is unchanged.
    - The plume's own evidence chip; plain-language step labels; per-agent placeholder, idle
      caption and prepared prompts; the caption's speaker label drops "(dev)"/"(stable)".
+10. Replay case (Sep 25): named `methane-permian-2024` (the data is 2024). Layers name files
+    inside the case prefix instead of carrying `s3_url`s, so no bucket or account id is committed
+    and the backend cannot be pointed elsewhere; tool calls keep the `s3://bucket/` placeholder the
+    other cases use, rewritten by the backend for this case only. The case is recorded by a
+    script from one live run, so it can be rebuilt if the data or prompt changes.

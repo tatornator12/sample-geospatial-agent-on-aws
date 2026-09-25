@@ -1,0 +1,220 @@
+{
+  "name": "Permian Basin methane, 2024",
+  "description": "The strongest methane plume NASA EMIT saw over the Permian Basin in 2024, and the ground beneath it",
+  "location": "Permian Basin, Texas and New Mexico",
+  "user_question": "Find the strongest methane plume EMIT saw over the Permian Basin in 2024 and show me what is on the ground beneath it",
+  "agent": "methane",
+  "dates": {
+    "window": "2024-01-01/2024-12-31"
+  },
+  "scenario_version": "1.0",
+  "recorded_from": "methane_hunter_dev",
+  "tool_calls": [
+    {
+      "name": "search_methane_plumes",
+      "params": {
+        "region": "Permian Basin",
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31"
+      },
+      "result": "39 plume complexes found in EMIT L2B CH4PLM for 2024"
+    },
+    {
+      "name": "triage_plumes",
+      "params": {
+        "plumes_geometry_s3_url": "s3://bucket/use-cases/methane-permian-2024/plumes_detected.geojson",
+        "top_n": 10
+      },
+      "result": "39 plumes ranked by peak enhancement"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-permian-2024/plumes_detected.geojson",
+        "title": "EMIT Methane Plumes — Permian Basin 2024",
+        "description": "39 plume complexes detected by NASA EMIT over the Permian Basin, 2024-01-01 to 2024-12-31",
+        "render": {
+          "kind": "vector",
+          "property": "max_ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "label": "rank"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -101.77678,
+        "y": 31.87749
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -101.69298,
+        "y": 31.54305
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -101.70695,
+        "y": 31.32869
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-permian-2024/geometry.geojson",
+        "title": "EMIT Methane Plumes Ranked — Permian Basin 2024",
+        "description": "Top 10 plumes ranked by max CH4 enhancement (ppm·m), Permian Basin 2024",
+        "render": {
+          "kind": "vector",
+          "property": "max_ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "label": "rank"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "show_plume",
+      "params": {
+        "granule_id": "EMIT_L2B_CH4PLM_002_20240131T182459_002534"
+      },
+      "result": "Plume raster opened"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-permian-2024/ch4plm_EMIT_L2B_CH4PLM_002_20240131T182459_002534.tif",
+        "title": "Rank 1 CH4 plume — Midland, Texas, 2024-01-31",
+        "question": "What is the shape, direction and extent of the plume?"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-permian-2024/ch4plm_EMIT_L2B_CH4PLM_002_20240131T182459_002534.tif",
+        "title": "Rank 1 CH4 Plume — Midland, TX, 2024-01-31 (8,130.7 ppm·m)",
+        "description": "Strongest EMIT plume in the Permian Basin in 2024. Max enhancement 8,130.7 ppm·m, area 2.0 km², near Midland, Texas.",
+        "render": {
+          "kind": "raster",
+          "colormap": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "legend": "CH4 enhancement",
+          "bounds": [
+            -101.79142,
+            31.8618,
+            -101.76322,
+            31.89271
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[-101.77678, 31.87749]}",
+        "location": "Midland TX plume",
+        "radius_meters": 3000
+      },
+      "result": "3 km frame around the plume centre"
+    },
+    {
+      "name": "get_rasters",
+      "params": {
+        "location": "Midland TX plume",
+        "geometry_s3_url": "s3://bucket/use-cases/methane-permian-2024/plumes_detected.geojson",
+        "current_date_str": "2024-01-31"
+      },
+      "result": "Sentinel-2 scene fetched"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "question": "What land cover and structures are visible beneath the plume location?",
+        "s3_url": "s3://bucket/use-cases/methane-permian-2024/tci_clipped_midland_tx_plume_2023-12-28.tif",
+        "title": "Sentinel-2 true colour — Midland, TX plume site, 2023-12-28"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-permian-2024/tci_clipped_midland_tx_plume_2023-12-28.tif",
+        "title": "Sentinel-2 True Colour — Midland, TX Plume Site (2023-12-28)",
+        "description": "Ground beneath the strongest EMIT plume in the Permian Basin in 2024. Arid scrubland with dense road grid, well pads, tank clusters, and impoundments visible."
+      },
+      "result": "Shown on the map"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "geometry.geojson",
+        "title": "EMIT Methane Plumes Ranked — Permian Basin 2024",
+        "render": {
+          "kind": "vector",
+          "property": "max_ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "label": "rank"
+        }
+      },
+      {
+        "file": "ch4plm_EMIT_L2B_CH4PLM_002_20240131T182459_002534.tif",
+        "title": "Rank 1 CH4 Plume — Midland, TX, 2024-01-31 (8,130.7 ppm·m)",
+        "render": {
+          "kind": "raster",
+          "colormap": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m",
+          "group": "methane",
+          "legend": "CH4 enhancement",
+          "bounds": [
+            -101.79142,
+            31.8618,
+            -101.76322,
+            31.89271
+          ]
+        }
+      },
+      {
+        "file": "tci_clipped_midland_tx_plume_2023-12-28.tif",
+        "title": "Sentinel-2 True Colour — Midland, TX Plume Site (2023-12-28)"
+      }
+    ]
+  }
+}

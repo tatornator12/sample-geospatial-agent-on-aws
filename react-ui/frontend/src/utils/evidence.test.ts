@@ -45,6 +45,18 @@ describe('evidenceUrlsFor', () => {
     expect(evidenceUrlsFor(plume, '../other')).toBeNull();
     expect(evidenceUrlsFor('s3://bucket/methane/cache/../secrets/ch4plm_x.tif', 'abc-123')).toBeNull();
   });
+
+  it('maps a replay case raster to the case\'s own inspections (Week 4)', () => {
+    expect(evidenceUrlsFor('s3://bucket/use-cases/methane-permian-2024/tci_clipped_midland_2023-12-28.tif')).toEqual([
+      's3://bucket/use-cases/methane-permian-2024/inspections/tci_clipped_midland_2023-12-28.jpg',
+      's3://bucket/use-cases/methane-permian-2024/inspections/tci_clipped_midland_2023-12-28.png',
+    ]);
+    expect(evidenceUrlsFor('s3://bucket/use-cases/methane-permian-2024/ch4plm_x.tif')?.[0]).toBe(
+      's3://bucket/use-cases/methane-permian-2024/inspections/ch4plm_x.png'
+    );
+    expect(evidenceUrlsFor('s3://bucket/use-cases/Bad_Id/x.tif')).toBeNull();
+    expect(evidenceUrlsFor('s3://bucket/use-cases/case/../x.tif')).toBeNull();
+  });
 });
 
 describe('extractEvidence', () => {

@@ -13,6 +13,7 @@ import { MapView } from '../components/MapView';
 import { ChatSidebar } from '../components/ChatSidebar';
 import type { GeometryData, RasterData } from '../types';
 import { getIdToken } from '../utils/auth';
+import { parseRenderHint } from '../utils/render';
 import '../stage.css';
 
 interface ScenarioToolCall {
@@ -35,7 +36,11 @@ interface ScenarioConfig {
   };
   narrative: string;
   tool_calls?: ScenarioToolCall[];
+  /** The act the case belongs to (e.g. `methane`); the stage selects it when the case loads. */
+  agent?: string;
   assets: {
+    /** The case's own map, in order (backend-validated URLs inside the case's prefix). */
+    layers?: Array<{ s3_url: string; title: string; render?: unknown }>;
     geometry_url: string;
     before: {
       tci: string;
@@ -124,8 +129,40 @@ export function Chat() {
         console.log('✅ Scenario config loaded:', config.name);
         setScenarioConfig(config);
 
-        // Pre-load geometry
         const { loadGeometry } = await import('../services/api');
+
+        // A case that lists its own layers (the Methane Hunter's) renders exactly those, with
+        // the agent's recorded render hints, re-validated here like live ones. The first raster
+        // listed stacks on top.
+        const layers = Array.isArray(config.assets?.layers) ? config.assets.layers : [];
+        if (layers.length > 0) {
+          const rasters: RasterData[] = [];
+          for (const [i, layer] of layers.entries()) {
+            const render = parseRenderHint(layer.render) ?? undefined;
+            if (layer.s3_url.toLowerCase().endsWith('.geojson')) {
+              const geometry = await loadGeometry(layer.s3_url);
+              if (geometry) {
+                geometry.locationName = layer.title;
+                geometry.sourceUrl = layer.s3_url;
+                if (render?.kind === 'vector') geometry.render = render;
+                setCurrentGeometry(geometry);
+              }
+            } else {
+              const date = layer.s3_url.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+              rasters.push({
+                url: layer.s3_url,
+                name: layer.title,
+                date,
+                zIndex: layers.length - i,
+                ...(render?.kind === 'raster' ? { render } : {}),
+              });
+            }
+          }
+          setCurrentRasters(rasters);
+          return;
+        }
+
+        // Pre-load geometry
         const geometry = await loadGeometry(config.assets.geometry_url);
         if (geometry) {
           console.log('✅ Geometry pre-loaded');
@@ -253,24 +290,45 @@ export function Chat() {
 
   // Switching acts on the rail starts a fresh session: new id, cleared map, empty transcript.
   // The first non-null value is the initial selection, not a switch, so it does not reset.
-  const { selectedAgentId, selectedAgent } = useAgents();
+  const { agents, selectedAgentId, selectedAgent, selectAgent } = useAgents();
   const previousAgentId = useRef<string | null>(null);
+  // A replay case selects its own act; that switch keeps the case on the stage.
+  const scenarioAgentSwitch = useRef<string | null>(null);
   useEffect(() => {
     if (!selectedAgentId) return;
     if (previousAgentId.current && previousAgentId.current !== selectedAgentId) {
-      handleSessionReset();
+      if (scenarioAgentSwitch.current === selectedAgentId) {
+        scenarioAgentSwitch.current = null;
+      } else {
+        handleSessionReset();
+      }
     }
     previousAgentId.current = selectedAgentId;
     // handleSessionReset is recreated every render; the effect only needs to fire on a switch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgentId]);
 
+  // Once per loaded case: if it belongs to another act the backend offers, switch to it so the
+  // prompts, the caption's speaker and any follow-up go to the right runtime.
+  const agentCheckedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!scenarioConfig || !selectedAgentId || agentCheckedFor.current === scenarioConfig.id) return;
+    agentCheckedFor.current = scenarioConfig.id;
+    const wanted = scenarioConfig.agent;
+    if (wanted && wanted !== selectedAgentId && agents.some((a) => a.id === wanted)) {
+      scenarioAgentSwitch.current = wanted;
+      selectAgent(wanted);
+    }
+  }, [scenarioConfig, selectedAgentId, agents, selectAgent]);
+
   // Every new session boots its runtime in the background the moment it exists, so the first
-  // prompt on stage never pays the cold start. Once per session id.
+  // prompt on stage never pays the cold start. Once per session and agent (a replay case may
+  // switch the agent without a new session).
   const prewarmedSessions = useRef(new Set<string>());
   useEffect(() => {
-    if (!selectedAgentId || prewarmedSessions.current.has(sessionId)) return;
-    prewarmedSessions.current.add(sessionId);
+    const key = `${selectedAgentId}:${sessionId}`;
+    if (!selectedAgentId || prewarmedSessions.current.has(key)) return;
+    prewarmedSessions.current.add(key);
     void prewarmSession(sessionId, selectedAgentId);
   }, [sessionId, selectedAgentId]);
 

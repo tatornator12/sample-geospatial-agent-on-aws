@@ -21,6 +21,13 @@ use-cases/
         └── ndvi|nbr|ndwi-YYYY-MM-DD.tif  # Index raster (after)
 ```
 
+A case can instead list its own map (the Methane Hunter's `methane-permian-2024`): `config.json`
+carries `"agent"` (the act the stage switches to) and `"assets": {"layers": [{"file", "title",
+"render"}]}`. Layers name files inside the case folder, never URLs; the backend validates them and
+the UI re-validates each `render` hint. Tool-call URLs use the placeholder bucket
+`s3://bucket/use-cases/<id>/…`, and `inspections/` holds what the agent looked at (the evidence
+chips). Such a case is recorded from one live run by `agents/methane-hunter/build_replay_case.py`.
+
 ## Included Scenarios
 
 | Scenario | Location | Analysis Type | Time Range |
@@ -28,6 +35,7 @@ use-cases/
 | `la-fires-2025` | Los Angeles, CA | Normalized Burn Ratio (NBR) | Dec 2024 - Mar 2025 |
 | `lake-mead-water` | Nevada/Arizona | Normalized Difference Water Index (NDWI) | Sep 2020 - Oct 2025 |
 | `amazon-deforestation` | Amazon Basin | Normalized Difference Vegetation Index (NDVI) | Dec 2020 - Sep 2025 |
+| `methane-permian-2024` | Permian Basin, TX/NM | NASA EMIT CH4 plume ranking (ppm·m) + Sentinel-2 ground | Jan - Dec 2024 |
 
 ## Notes
 

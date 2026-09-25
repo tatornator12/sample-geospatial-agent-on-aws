@@ -78,9 +78,25 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
   const comparePair = useMemo(() => findComparePair(layerGroups.tci), [layerGroups.tci]);
   // Mirror of allLayers for the async geometry loader, which otherwise closes over a stale list.
   const allLayersRef = useRef<LayerMetadata[]>([]);
+  // Set the moment the camera frames a methane raster, before its metadata is committed: the
+  // footprints (which can land later on a cold page load) must not pull the frame back out.
+  const plumeFramed = useRef(false);
   useEffect(() => {
     allLayersRef.current = allLayers;
   }, [allLayers]);
+
+  // The Dim Rule's current state, readable when a basemap layer is (re)created: the dim can be
+  // decided before the basemap exists (a replay case lands every layer at once on load).
+  const methaneOnStageRef = useRef(false);
+  const applyBasemapDim = (mapInstance: maplibregl.Map, on: boolean) => {
+    BASEMAP_IDS.forEach((id) => {
+      if (!mapInstance.getLayer(id)) return;
+      mapInstance.setPaintProperty(id, 'raster-brightness-max-transition', { duration: 600, delay: 0 });
+      mapInstance.setPaintProperty(id, 'raster-saturation-transition', { duration: 600, delay: 0 });
+      mapInstance.setPaintProperty(id, 'raster-brightness-max', on ? 0.45 : 1);
+      mapInstance.setPaintProperty(id, 'raster-saturation', on ? -0.6 : 0);
+    });
+  };
 
   // Function to update base map layer
   const updateBaseMapLayer = (style: 'dark' | 'google-roads' | 'google-satellite' | 'esri-satellite') => {
@@ -185,19 +201,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     [layerGroups.methane, rasterVisibility]
   );
   useEffect(() => {
+    methaneOnStageRef.current = methaneOnStage;
     const mapInstance = map.current;
     if (!mapInstance) return;
-    const apply = () => {
-      BASEMAP_IDS.forEach((id) => {
-        if (!mapInstance.getLayer(id)) return;
-        mapInstance.setPaintProperty(id, 'raster-brightness-max-transition', { duration: 600, delay: 0 });
-        mapInstance.setPaintProperty(id, 'raster-saturation-transition', { duration: 600, delay: 0 });
-        mapInstance.setPaintProperty(id, 'raster-brightness-max', methaneOnStage ? 0.45 : 1);
-        mapInstance.setPaintProperty(id, 'raster-saturation', methaneOnStage ? -0.6 : 0);
-      });
-    };
-    if (mapInstance.isStyleLoaded()) apply();
-    else mapInstance.once('idle', apply);
+    // Paint properties apply to any layer that exists, loaded tiles or not; waiting for `idle`
+    // alone left a cold replay load bright while its tiles streamed in. Idle is the backstop for
+    // a basemap that is still being created.
+    const apply = () => applyBasemapDim(mapInstance, methaneOnStageRef.current);
+    apply();
+    mapInstance.once('idle', apply);
   }, [methaneOnStage, baseMapStyle]);
 
   // Initialize map
@@ -255,6 +267,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     // Load initial basemap (dynamic, controlled by baseMapStyle state)
     map.current.once('load', () => {
       updateBaseMapLayer(baseMapStyle);
+      // A replay case can put methane on the stage before the basemap exists: dim it on arrival.
+      if (map.current) applyBasemapDim(map.current, methaneOnStageRef.current);
     });
 
     // Initialize draw control
@@ -731,7 +745,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           allLayersRef.current
             .filter((l) => l.type === 'geometry' && l.id !== fillLayerId && isMethaneLayer(l))
             .forEach((l) => removeLayer(l.id));
-          currentMap.fitBounds(bounds, { padding: STAGE_PADDING, duration: 1500, maxZoom: 11 });
+          // The frame rule, methane edition: once a plume raster is on the stage it owns the frame
+          // (a replay case lands the footprints and the plume together; the plume wins).
+          if (!plumeFramed.current && !allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l))) {
+            currentMap.fitBounds(bounds, { padding: STAGE_PADDING, duration: 1500, maxZoom: 11 });
+          }
           return;
         }
 
@@ -900,6 +918,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     setAllLayers([]);
     setRasterVisibility({});
     addedRasterUrls.current.clear(); // Clear the URL tracking ref
+    plumeFramed.current = false;
 
     console.log(`🗑️ Cleared ${count} layers`);
   };
@@ -1173,9 +1192,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           // This prevents race condition where ref is updated but layer isn't added due to abort
           addedRasterUrls.current.add(raster.url);
 
+          // The ranking reads over the plume: the lit outlines and their "#1 · ppm·m" labels stay
+          // above the plume raster (which goes to the top of the stack).
+          if (isMethaneRaster) {
+            allLayersRef.current
+              .filter((l) => l.type === 'geometry' && isMethaneLayer(l))
+              .flatMap((l) => ['-outline', '-labels'].map((suffix) => l.id.replace('-fill', suffix)))
+              .forEach((id) => {
+                if (mapInstance.getLayer(id)) mapInstance.moveLayer(id);
+              });
+          }
+
           // The camera moves to the finding: the plume fills the frame; the ground scene after it
           // tightens a little further. Only in the methane act; other acts keep today's framing.
           if (followCamera && rasterBounds) {
+            plumeFramed.current = true;
             const [w, s, e, n] = rasterBounds;
             mapInstance.fitBounds([[w, s], [e, n]], {
               padding: STAGE_PADDING,

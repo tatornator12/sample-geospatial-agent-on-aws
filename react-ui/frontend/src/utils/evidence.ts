@@ -35,7 +35,9 @@ export function evidenceUrlsFor(rasterS3Url: string, sessionId?: string): string
     const base = `s3://${shared[1]}/session_data/${sessionId}/inspections/${shared[2]}`;
     return [`${base}.png`, `${base}.jpg`];
   }
-  const match = rasterS3Url.match(/^(s3:\/\/[^/]+\/session_data\/[^/]+\/)[^/]+\/([^/]+)$/);
+  // A replay case keeps what the agent saw beside its rasters: use-cases/<id>/inspections/<stem>.
+  const replay = rasterS3Url.match(/^(s3:\/\/[^/]+\/use-cases\/[a-z0-9-]{1,64}\/)([A-Za-z0-9][A-Za-z0-9._-]*)$/);
+  const match = replay ? [replay[0], replay[1], replay[2]] : rasterS3Url.match(/^(s3:\/\/[^/]+\/session_data\/[^/]+\/)[^/]+\/([^/]+)$/);
   if (!match) return null;
   const [, sessionPrefix, basename] = match;
   const stem = basename.includes('.') ? basename.slice(0, basename.lastIndexOf('.')) : basename;

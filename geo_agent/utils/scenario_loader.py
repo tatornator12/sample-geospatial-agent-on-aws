@@ -116,49 +116,58 @@ def build_scenario_context(scenario: Dict) -> str:
         String to append to system prompt
     """
 
+    # Agent-neutral: every act's replay case uses this (the Earth Analyst's before/after cases and
+    # the Methane Hunter's layer-list case). Case-specific facts come from the case's own files.
+    dates = scenario.get('dates') or {}
+    dates_text = "\n".join(f"  - {k.replace('_', ' ').capitalize()}: {v}" for k, v in dates.items()) or "  - N/A"
+    layers = ((scenario.get('config') or {}).get('assets') or {}).get('layers') or []
+    if layers:
+        asset_lines = "\n".join(
+            f"   - {layer.get('title', layer.get('file'))}: `{scenario['s3_prefix']}{layer.get('file')}`"
+            for layer in layers if isinstance(layer, dict) and layer.get('file')
+        )
+    else:
+        asset_lines = (
+            f"   - Geometry: `{scenario['assets']['geometry_url']}`\n"
+            f"   - Before imagery: TCI, Red, NIR08, SWIR2, index at `{scenario['s3_prefix']}before/`\n"
+            f"   - After imagery: TCI, Red, NIR08, SWIR2, index at `{scenario['s3_prefix']}after/`"
+        )
+
     assets_summary = f"""
 
 ═══════════════════════════════════════════════════════════
-🔥 SCENARIO MODE ACTIVE: {scenario['name']}
+SCENARIO MODE ACTIVE: {scenario['name']}
 ═══════════════════════════════════════════════════════════
 
-**CRITICAL**: This is a PRE-LOADED scenario. All data is already available.
+**CRITICAL**: This is a PRE-LOADED replay case. The analysis is already done and on the map.
 
-📍 **Location**: {scenario['location']}
-📅 **Dates**:
-  - Before: {scenario['dates'].get('before', 'N/A')}
-  - After: {scenario['dates'].get('after', 'N/A')}
+**Location**: {scenario['location']}
+**Dates**:
+{dates_text}
 
-📊 **PRE-COMPUTED ANALYSIS** (Use these metrics IMMEDIATELY):
-{json.dumps(scenario['analysis'], indent=2) if scenario['analysis'] else 'None'}
+**PRE-COMPUTED ANALYSIS**:
+{json.dumps(scenario['analysis'], indent=2) if scenario['analysis'] else 'None (use the recorded answer below)'}
 
-📄 **Background Context**:
+**The recorded answer** (what the room has already seen):
 {scenario['narrative']}
 
-🎯 **SCENARIO MODE INSTRUCTIONS** (FOLLOW THESE):
+**SCENARIO MODE INSTRUCTIONS** (FOLLOW THESE):
 
-1. **IMMEDIATELY provide the analysis** when user asks about this event:
-   - State the location, dates, and key metrics from the pre-computed analysis above
-   - Reference the total area burned, structures at risk, severity distribution
-   - Include context from the narrative (weather conditions, terrain, etc.)
+1. Answer from the recorded answer and the analysis above: the place, the dates and the key
+   figures exactly as they appear there. Never add a figure that is not in them.
 
-2. **DO NOT run normal workflows**:
-   - DO NOT call find_address_candidates or find_location_boundary (location already known)
-   - DO NOT call get_rasters (imagery already available if needed)
-   - You CAN call display_visual() to show pre-loaded assets if requested
+2. DO NOT re-run the live workflow (the data may be unreachable, and the result is recorded):
+   - no geocoding or boundary lookups (find_address_candidates, find_location_boundary)
+   - no new imagery or data searches (get_rasters, search_methane_plumes, triage_plumes)
+   - You CAN call display_visual() to show a pre-loaded asset again if asked
 
-3. **Available pre-loaded assets** (use ONLY if user specifically requests visualization):
-   - Geometry: `{scenario['assets']['geometry_url']}`
-   - Before imagery: TCI, Red, NIR08, SWIR2, NBR at `{scenario['s3_prefix']}before/`
-   - After imagery: TCI, Red, NIR08, SWIR2, NBR at `{scenario['s3_prefix']}after/`
+3. **Pre-loaded assets** (display ONLY if the user asks):
+{asset_lines}
 
-4. **For follow-up questions**:
-   - Continue referencing the pre-computed analysis
-   - Break down severity distributions, structure impacts, etc.
-   - Provide context from the narrative
-   - DO NOT revert to normal "I need to analyze" workflows
+4. For follow-up questions, keep referencing the recorded answer, keep its caveats and
+   confidence statements, and end the way the agent's own rules say (its closing paragraph).
 
-**YOU ARE IN SCENARIO MODE - Treat this as a pre-analyzed case study, NOT a new analysis request!**
+**This is a pre-analyzed case, NOT a new analysis request.**
 
 ═══════════════════════════════════════════════════════════
 """

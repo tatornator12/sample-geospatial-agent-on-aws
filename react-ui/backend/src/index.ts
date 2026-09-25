@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand, StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { checkS3Access } from './s3Access';
+import { isScenarioId, scenarioAgent, scenarioLayers, scenarioToolCalls } from './scenario';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Readable } from 'stream';
 import * as fs from 'fs';
@@ -259,6 +260,10 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
 
   if (!prompt || !sessionId) {
     return res.status(400).json({ error: 'prompt and sessionId are required' });
+  }
+  // The runtime turns scenario_id into an S3 prefix: same rule as /api/scenario/:id.
+  if (scenario_id !== undefined && scenario_id !== null && scenario_id !== '' && !isScenarioId(scenario_id)) {
+    return res.status(400).json({ error: 'Invalid scenario_id' });
   }
 
   // Resolve the runtime before the response turns into an SSE stream, so a bad agentId is a
@@ -635,8 +640,12 @@ app.get('/api/scenario/:scenarioId', async (req: Request, res: Response) => {
       index_type: config.index_type,
       dates: config.dates || {},
       narrative: narrative,
-      tool_calls: config.tool_calls || [],
+      agent: scenarioAgent(config),
+      tool_calls: scenarioToolCalls(config, bucket, scenarioId),
       assets: {
+        // A case with its own layer list (the Methane Hunter's) renders exactly those; the
+        // before/after URLs below stay for the Earth Analyst's cases.
+        layers: scenarioLayers(config, bucket, scenarioId),
         geometry_url: `${s3Prefix}geometry.geojson`,
         before: {
           tci: beforeDate ? `${s3Prefix}before/tci-${beforeDate}.tif` : `${s3Prefix}before/tci.tif`,
