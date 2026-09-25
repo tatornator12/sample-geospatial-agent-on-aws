@@ -360,9 +360,17 @@ class PlumeFetchError(Exception):
 def download_plume(granule_id: str, token: str, timeout_s: float = DOWNLOAD_TIMEOUT_S,
                    cap_bytes: int = DOWNLOAD_CAP_BYTES) -> bytes:
     """Stream one plume GeoTIFF from LP DAAC with the bearer token. Raises PlumeFetchError."""
+    return download_url(tif_url(granule_id), token, timeout_s, cap_bytes)
+
+
+def download_url(url: str, token: str, timeout_s: float = DOWNLOAD_TIMEOUT_S,
+                 cap_bytes: int = DOWNLOAD_CAP_BYTES) -> bytes:
+    """Stream one LP DAAC file with the bearer token, capped. Only https://<LPDAAC_HOST>/ URLs
+    (callers build them from validated ids); anything else is refused before a request."""
+    if not isinstance(url, str) or not url.startswith(f"https://{LPDAAC_HOST}/lp-prod-protected/"):
+        raise PlumeFetchError("host_not_allowed")
     if not token:
         raise PlumeFetchError("token_missing")
-    url = tif_url(granule_id)
     # follow_redirects: LP DAAC answers with a redirect to a signed CloudFront URL; httpx removes
     # the Authorization header when the redirect changes origin, so the token stays with LP DAAC.
     with httpx.Client(timeout=timeout_s, follow_redirects=True, max_redirects=5) as client:
@@ -431,6 +439,72 @@ def fetch_plume(granule_id: str, token: str, s3, center_lat: float | None = None
     stats["source"] = source
     stats["plume_s3_url"] = f"s3://{config.S3_BUCKET_NAME}/{key}"
     return stats
+
+
+META_CAP_BYTES = 1_000_000              # real metadata files are 6-14 KB
+_WIND_SOURCES = {"HRRR", "ERA5", "GEOS-FP", "GEOSFP", "MERRA2", "GFS"}
+
+
+def meta_url(granule_id: str) -> str:
+    """NASA's per-plume metadata (EMIT_L2B_CH4PLMMETA_*.json), built from a validated id."""
+    gid = validate_granule_id(granule_id)
+    return f"https://{LPDAAC_HOST}/lp-prod-protected/{COLLECTION_PATH}/{gid}/{gid.replace('CH4PLM_', 'CH4PLMMETA_')}.json"
+
+
+def meta_cache_key(granule_id: str) -> str:
+    return f"methane/cache/ch4plmmeta_{validate_granule_id(granule_id)}.json"
+
+
+def _num(value: Any, lo: float, hi: float, digits: int) -> float | None:
+    """A finite number within range, or None ('NA', strings, inf, out of range)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    v = float(value)
+    return round(v, digits) if math.isfinite(v) and lo <= v <= hi else None
+
+
+def parse_plume_meta(data: bytes) -> dict:
+    """NASA's published numbers for one plume. 'NA' and anything non-numeric become None (never
+    0); wind source only from a short allowlist. Nothing free-text is passed on."""
+    try:
+        doc = json.loads(data)
+        props = doc["features"][0]["properties"]
+    except Exception:
+        return {}
+    source = props.get("Wind Speed Source")
+    return {
+        "max_ppm_m_nasa": _num(props.get("Max Plume Concentration (ppm m)"), 0, 1e6, 1),
+        "peak_lat": _num(props.get("Latitude of max concentration"), -90, 90, 5),
+        "peak_lon": _num(props.get("Longitude of max concentration"), -180, 180, 5),
+        "wind_m_s": _num(props.get("Wind Speed (m/s)"), 0, 100, 2),
+        "wind_source": source if source in _WIND_SOURCES else None,
+        "rate_kg_h": _num(props.get("Emissions Rate Estimate (kg/hr)"), 0, 1e7, 1),
+        "rate_uncertainty_kg_h": _num(props.get("Emissions Rate Estimate Uncertainty (kg/hr)"), 0, 1e7, 1),
+        "fetch_length_m": (lambda v: int(round(v)) if v is not None else None)(
+            _num(props.get("Fetch Length (m)"), 0, 1e6, 1)),
+    }
+
+
+def fetch_plume_meta(granule_id: str, token: str, s3) -> dict:
+    """NASA's metadata for one plume, from the shared cache or LP DAAC (then cached). Never
+    raises: a missing file is `{"meta_error": reason}` and the plume is still ranked."""
+    try:
+        key = meta_cache_key(granule_id)
+        try:
+            data = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=key)["Body"].read(META_CAP_BYTES + 1)
+        except s3.exceptions.NoSuchKey:
+            data = download_url(meta_url(granule_id), token, DOWNLOAD_TIMEOUT_S, META_CAP_BYTES)
+            if parse_plume_meta(data):
+                s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=key, Body=data, ContentType="application/json")
+        meta = parse_plume_meta(data)
+        return meta or {"meta_error": "unreadable"}
+    except PlumeFetchError as e:
+        return {"meta_error": e.reason}
+    except Exception as e:
+        return {"meta_error": type(e).__name__}
+
+
+META_FIELDS = ("rate_kg_h", "rate_uncertainty_kg_h", "wind_m_s", "wind_source", "fetch_length_m", "peak_lat", "peak_lon")
 
 
 def rank_key(p: dict):
@@ -545,8 +619,13 @@ async def triage_plumes(plumes_geometry_s3_url: str, top_n: int = 10) -> str:
     s3 = _s3()
     measured: dict[str, dict] = {}
     errors: list[dict] = []
+    def measure(gid, props):
+        stats = fetch_plume(gid, token, s3, props.get("center_lat"))
+        meta = fetch_plume_meta(gid, token, s3)   # NASA's rate and wind; never fails the plume
+        return {**stats, **{k: meta.get(k) for k in META_FIELDS}}
+
     with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL, len(work))) as pool:
-        futures = {pool.submit(fetch_plume, gid, token, s3, props.get("center_lat")): (gid, props) for gid, props in work}
+        futures = {pool.submit(measure, gid, props): (gid, props) for gid, props in work}
         for fut in as_completed(futures):
             gid, props = futures[fut]
             try:
@@ -573,13 +652,14 @@ async def triage_plumes(plumes_geometry_s3_url: str, top_n: int = 10) -> str:
         p = by_gid.get(props.get("granule_id"))
         if p:
             props.update(rank=p["rank"], max_ppm_m=p["max_ppm_m"], plume_area_km2=p["plume_area_km2"],
+                         rate_kg_h=p.get("rate_kg_h"), rate_uncertainty_kg_h=p.get("rate_uncertainty_kg_h"),
                          tier="ranked" if p["rank"] <= top_n else "detected")
         f["properties"] = props
 
     ranked_url = _put_json(f"{session_prefix()}plumes_ranked_{url.rsplit('/plumes_', 1)[1]}", fc)
     top = [{k: p[k] for k in ("rank", "granule_id", "acquired", "max_ppm_m", "mean_ppm_m", "plume_pixels",
                               "plume_area_km2", "valid_pixels", "center_lat", "center_lon", "plume_s3_url")}
-           | {"bbox": p["bounds"]} for p in ordered[:top_n]]
+           | {k: p.get(k) for k in META_FIELDS} | {"bbox": p["bounds"]} for p in ordered[:top_n]]
     summary = {
         "plumes_in": len(features), "triaged": len(measured), "failed": len(errors),
         "from_cache": sum(1 for p in measured.values() if p["source"] == "cache"),
@@ -587,8 +667,11 @@ async def triage_plumes(plumes_geometry_s3_url: str, top_n: int = 10) -> str:
         "truncated_to": MAX_TRIAGE if truncated else None,
         "errors": sorted(errors, key=lambda e: e["granule_id"])[:20],
         "top_n": top_n, "seconds": round(time.time() - started, 1),
+        "with_rate": sum(1 for p in measured.values() if p.get("rate_kg_h") is not None),
         "definitions": (f"max_ppm_m: highest CH4 enhancement in the plume complex. plume_area_km2 and "
-                        f"mean_ppm_m: over pixels at or above {ENHANCED_PPM_M:g} ppm·m (the rest is background)."),
+                        f"mean_ppm_m: over pixels at or above {ENHANCED_PPM_M:g} ppm·m (the rest is background). "
+                        "rate_kg_h ± rate_uncertainty_kg_h: NASA's published emission-rate estimate (null when "
+                        "NASA published none); say 'NASA estimates', with the ±."),
     }
     logger.info("TRIAGE: %d measured (%d cached, %d downloaded), %d failed in %.1fs",
                 summary["triaged"], summary["from_cache"], summary["downloaded"], summary["failed"], summary["seconds"])

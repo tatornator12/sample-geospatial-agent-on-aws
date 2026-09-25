@@ -39,6 +39,9 @@ env/
 .env.development
 .env.production
 .env.*.local
+# Every env file and its backups (runtimes.py register writes .env.bak); templates stay tracked.
+.env*
+!.env.example
 
 
 # IDE files

@@ -90,20 +90,29 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
   - [ ] 7.4 `ROADMAP.md` row 4 status + G3 result; Week 5 (`ai-archaeologist`) notes: what the archaeologist reuses (`render` hints, `find_similar_places`, `inspect_image`)
   - _Requirements: 7.3, 7.4, 7.5_
 
-## Week 4c (Sep 29 – Oct 16): Act 2 v2, Methane Watch (awaiting approval; Requirements 8–12)
+## Week 4c (Sep 25 – Oct 16): Act 2 v2, Methane Watch (approved Sep 25; Requirements 8–12)
 
 Estimate 8–9 working days; the program is ~11 days ahead of Week 4a, so G3 on Oct 17 holds.
 Order is data first (each tool usable alone), then the mission prompt, then visuals, then the
 approval path, then replay and evals.
 
-- [ ] 8. Safety net: promote the current Release 2 (two-beat Act 2) early with `PROMOTE_FRONTEND=1 scripts/promote.sh` (user-confirmed), tag, CloudFront replay timing (6.3)
-- [ ] 9. Data tools
-  - [ ] 9.1 NASA plume metadata in `triage_plumes` (fetch, cap, cache, nulls) + tests with and without rates
-  - [ ] 9.2 `site_history` (NASA plumes nearby, EMIT looks via CMR `point=`, gap date) + tests
-  - [ ] 9.3 `scan_tropomi` (day listing, validated keys, windowed reads, qa ≥ 0.5, median composite, anomaly, hotspots, staged COG) + tests on a synthetic window; live timing for 14 days over two areas recorded here (target < 20 s warm)
-  - [ ] 9.4 `check_recent_passes` (CMR, CH4ENH + CH4UNCERT, 3 km window, candidate rule, cache, 52°N rule) + tests on a synthetic scene; live timing for 8 passes recorded (target < 25 s cold)
-  - [ ] 9.5 Site clusters for the globe (`sites_v002.geojson`, cached) + test
-  - [ ] 9.6 Watch-area table + tests (no substring match, EMIT coverage flags)
+- [x] 8. Safety net: promote the current Release 2 (two-beat Act 2) early with `PROMOTE_FRONTEND=1 scripts/promote.sh` (user-confirmed), tag, CloudFront replay timing (6.3)
+- [x] 9. Data tools
+  - [x] 9.1 NASA plume metadata in `triage_plumes` (fetch, cap, cache, nulls) + tests with and without rates
+  - [x] 9.2 `site_history` (NASA plumes nearby, EMIT looks via CMR `point=`, gap date) + tests
+  - [x] 9.3 `scan_tropomi` (day listing, validated keys, windowed reads, qa ≥ 0.5, median composite, anomaly, hotspots, staged COG) + tests on a synthetic window; live timing for 14 days over two areas recorded here (target < 20 s warm)
+  - [x] 9.4 `check_recent_passes` (CMR, CH4ENH + CH4UNCERT, 3 km window, candidate rule, cache, 52°N rule) + tests on a synthetic scene; live timing for 8 passes recorded (target < 25 s cold)
+  - [x] 9.5 Site clusters for the globe (`sites_v002.geojson`, cached) + test
+  - [x] 9.6 Watch-area table + tests (no substring match, EMIT coverage flags)
+  - Results (Sep 25):
+    - 8: Earth dev redeployed first (v25) so the gate tested what ships; replay follow-up on `la-fires-2025` answered from the recording (23 s, no tools). `promote.sh` with `PROMOTE_FRONTEND=1`: gates earth 8/8, methane 4/4; stable deploys `geospatial_agent_on_aws` and `methane_hunter`; env checks and smokes pass (`similar-central-park` 65 s, `strongest-plume` 72 s); `methane` registered in `frontend-cdk/.env` with the stable ARN; CloudFront stack deployed. `demo-stable` = `cf378dd`, tag `deployed-2026-09-25`, both pushed. CloudFront: `/health` 200, new bundle carries the methane prompts and the replay card, icon served, `/api/agents` 401 unauthenticated. Replay timing on CloudFront (6.3) needs a signed-in browser: user to check. Found and fixed: `frontend-cdk/.env.bak` (from `runtimes.py register`) was not gitignored; root `.gitignore` now ignores `.env*` except `.env.example`.
+    - 9.1: `triage_plumes` carries NASA's `rate_kg_h ± rate_uncertainty_kg_h`, wind (HRRR), fetch length, peak point; `NA` → null; wind source allowlisted; metadata through `download_url` (LP DAAC host only), 1 MB cap, cache `methane/cache/ch4plmmeta_*.json`. Live: rank 1 6,685.3 ± 202.4 kg/h, 4.54 m/s HRRR, 1,155 m, 2.8 s cold.
+    - 9.2 `site_history` live (Permian rank 1): EMIT looked 27 times 2023-06-20..2026-08-23, NASA plumes on 4 dates within 2 km (only 2024-01-31 carries a rate), 0.8–3.0 s; says the post-2024 gap and "no detection is not evidence of no emissions".
+    - 9.3 `scan_tropomi` live (14 days, 28 orbits): south Caspian 55 s cold → 0.6 s warm, background 1,948.7 ppb, top hotspot +122.9 ppb (39.47, 53.64) on 6 days; Zagros foreland 31 s cold → 0.3 s warm, top +44.2 ppb. Cold misses the < 20 s target: the composite is cached per (area, end day, days) in `methane/cache/`, so the runbook warms it the day before; warm is well under.
+    - 9.4 `check_recent_passes` live (Turkmenistan 37.48, 61.025, since 2025-01-01): 8 looks, 3 candidates, 5 rejected with reasons (e.g. "only 0 pixels above 3× their uncertainty"); strongest candidate 2026-08-12, peak 3,998.2 ppm·m, 88 px ≥ 1,000. 53 s cold → 1.5 s warm (verdicts and windows cached per scene and site). Window 6 km, not 3 (footprint centroids are approximate: 3 km kept only 3 of the 8 passes). Default `since` 2025-01-01 (NASA's product is dense through 2024; its single 2025 plume is 2025-09-22).
+    - 9.5 `watch_baseline` live: 1,686 detections → 1,104 sites, 24 seen on ≥ 5 dates (top ×10, ×9, ×8), 7.9 s cold, cached a week in `methane/cache/sites_v002.geojson`.
+    - Bugs caught by the tests: numpy bools in hotspot results would not JSON-serialize; a 1-day scan could never report a hotspot (min days now caps at days read).
+    - pytest methane-hunter: 78 passed (+17 in `tests/test_watch.py`).
 - [ ] 10. Mission prompt and brief
   - [ ] 10.1 `draft_brief` (fixed explanation enum, phrasing checks, draft to S3) + tests for every forbidden pattern
   - [ ] 10.2 Prompt: plan first, tip before cue, name the gap, self-check sentences, brief, stop; wording rule per Decision 4; closer and "Decision: analyst's."
