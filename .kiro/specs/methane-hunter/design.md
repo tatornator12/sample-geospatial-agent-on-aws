@@ -376,3 +376,107 @@ Found while building tasks 1–3 against live data; each keeps the approved inte
     and the backend cannot be pointed elsewhere; tool calls keep the `s3://bucket/` placeholder the
     other cases use, rewritten by the backend for this case only. The case is recorded by a
     script from one live run, so it can be rebuilt if the data or prompt changes.
+
+## Act 2 v2: Methane Watch (drafted Sep 25, awaiting approval)
+
+### The mission (one prompt, 7 minutes)
+
+Prepared prompt: "Brief me on methane super-emitters in the watch areas that are still active,
+and how confident you are." A second plate names one watch area for a predictable dive.
+
+| t | What the agent does | What the room sees |
+|---|---|---|
+| 0:00 | States a 4-step plan: baseline, tip, cue, brief | Plan in the step column; globe, dimmed |
+| 0:30 | Baseline: global NASA detections, clustered by site | 1,686 plasma points; rings `×10`, `×9` on repeat sites; slow rotation |
+| 1:30 | Tip: `scan_tropomi` over the watch areas, last 14 days | TROPOMI anomaly composite; hotspots numbered |
+| 2:30 | Notices NASA's plume product ends in 2024; says so | One sentence in the caption |
+| 3:00 | Cue: `check_recent_passes` on the top hotspot EMIT can see | Filmstrip: 8 passes arrive in parallel; weak ones dimmed "rejected: inside uncertainty" |
+| 4:15 | `site_history`: looked N times, methane on M | Numbers in the record |
+| 4:45 | Looks closer: strongest candidate, Sentinel-2 ground | Camera tilts; methane columns rise over the ground |
+| 5:45 | `draft_brief`: explanations, confidence, gaps, next collection | Brief in the stream; "Approve and file" / "Request another look" |
+| 6:30 | Presenter approves; backend files it; agent confirms | "Filed: briefs/<id>.md" |
+
+Fallbacks: over 7:30 in rehearsal → start from the globe replay case at 1:30; any live source
+down → the mission replay case.
+
+### Watch areas
+
+A fixed table in `methane_tools.py` (bbox, label for the record only, EMIT coverage flag):
+Permian Basin; south Caspian (Turkmenistan); Zagros foreland (south-west Iran); Shanxi coal
+basin (China); Orenburg and lower Volga (southern Russia, EMIT-visible); West Siberia and Yamal
+(TROPOMI only, above EMIT's coverage); Hassi Messaoud (Algeria). North Korea is not a watch
+area: EMIT has never detected a plume there, and an empty result is not evidence. Xinjiang is
+not a watch area. The agent treats every area with the same rules; the globe carries no labels.
+
+### Tools (new or extended)
+
+```python
+triage_plumes(...)          # + NASA metadata per plume (rate ± uncertainty, wind, fetch, peak point)
+site_history(lat, lon, radius_km=2)                      # NASA plumes nearby + how often EMIT looked
+scan_tropomi(region=None, bbox=None, days=14)            # TROPOMI qa-masked median composite, anomaly, hotspots
+check_recent_passes(lat, lon, since=None, max_scenes=12) # EMIT raw scenes: candidate | rejected per pass
+draft_brief(site, findings)                              # structured brief, fixed explanation list, draft to S3
+plume_columns(granule_id)                                # pixels >= 500 ppm·m as a GeoJSON grid for 3D
+```
+
+- TROPOMI: `https://meeo-s5p.s3.eu-central-1.amazonaws.com/COGT/OFFL/L2__CH4___/YYYY/MM/DD/*_methane_mixing_ratio_4326.tif`
+  and the matching `qa_value`; windowed reads with rasterio (overviews make a basin window a few
+  hundred KB); the key is built from a validated date and a listing of that day's prefix, never
+  from model text. The composite is written to our bucket, so `s3Access.ts` stays unchanged.
+- EMIT raw scenes: `EMITL2BCH4ENH` granules via CMR `point=` search; the CH4ENH and CH4UNCERT
+  tifs from LP DAAC with the token; a 3 km window around the point; candidate rule: ≥ 5 pixels
+  ≥ 1,000 ppm·m AND ≥ 5 pixels with enhancement > 3 × uncertainty; otherwise `rejected` with
+  the failing condition. Cache `methane/cache/ch4enh_<scene>.tif` (validated scene id).
+- Site clustering for the globe: greedy 3 km grouping of all 1,686 footprint centres, computed
+  once and cached as `methane/cache/sites_v002.geojson` (repeat dates, first and last date).
+- The brief: explanations are an enum in code; the model fills evidence and confidence per
+  explanation; the tool rejects a draft that states one as fact (pattern checks) or mentions a
+  forbidden term (operator/company lists are not maintained; the check is on phrasing such as
+  "is caused by", "belongs to", "operated by").
+
+### Approval (enforced outside the model)
+
+`draft_brief` writes `session_data/<sid>/briefs/<brief_id>.draft.json` and returns the id. The
+UI shows the brief card with two buttons. "Approve and file" calls
+`POST /api/brief/approve {sessionId, briefId}` (Cognito-authenticated like every `/api` route):
+the backend validates both ids, copies the draft to `briefs/<brief_id>.md` plus the current map
+snapshot the browser sends (PNG, size-capped), and then sends the agent one message ("The
+analyst approved and filed brief <id>"). No agent tool can write under `briefs/` except the
+draft. "Request another look" sends a normal prompt naming the next collection.
+
+### Visuals
+
+- Globe: MapLibre 6 `setProjection({type: 'globe'})` while a `render.group === 'watch'` layer is
+  on stage; mercator otherwise (the Earth Analyst keeps today's map). Rotation: `easeTo` bearing
+  steps while the stream is live, stopped on the final paragraph; honours
+  `prefers-reduced-motion`.
+- Rings: circle layer over site points, radius by repeat dates, label `×N` in the mono face.
+- TROPOMI anomaly: `magma` over a fixed ppb range with its own legend row in the Methane group.
+- Filmstrip: evidence chips for each pass (NASA browse PNG for plumes; our rendered 3 km window
+  for raw passes), lit or dimmed by verdict, in the step column (no new panel).
+- Methane columns: `fill-extrusion` from `plume_columns` (60 m cells, height = ppm·m × 0.5 m,
+  plasma colour), camera `pitch: 55`, the Sentinel-2 scene beneath.
+- `render` allowlist gains group `watch` and kinds `points` and `columns`; everything else stays
+  validated as today.
+
+### Security
+
+- New hosts: `meeo-s5p.s3.eu-central-1.amazonaws.com` (public, read-only, unsigned) and the
+  existing LP DAAC host; host checks before every request; TROPOMI keys built from dates, EMIT
+  scene ids regex-validated; caps: 25 MB per raw scene, 12 scenes per call, 14 TROPOMI days.
+- The browser only ever reads our bucket (composites and windows are staged), so the S3 read
+  allowlist is unchanged; the brief files under `session_data/<sid>/briefs/` (already allowed).
+- The approval endpoint is authenticated, validates ids against the session's drafts, and is the
+  only writer of filed briefs.
+
+### Decisions to approve
+
+1. The single-prompt mission with plan, tip and cue, gap-filling, self-check and approval,
+   replacing the two presenter-driven beats (which stay as the fallback run sheet and replay).
+2. TROPOMI from the Registry of Open Data on AWS (COGTs), composited server-side.
+3. Watch areas as listed, including Iran, China (Shanxi) and Russia, the globe unlabelled, North
+   Korea and Xinjiang excluded; the on-stage named dive chosen after sign-off (see tasks 13.1).
+4. The wording rule loosens to "may list explanations as unconfirmed hypotheses from the fixed
+   list; never state one, never name an operator, owner, government or intent".
+5. The human decision is enforced by the backend, not by the prompt.
+6. Promote today's Release 2 (the two-beat Act 2) as a safety net before this rebuild starts.

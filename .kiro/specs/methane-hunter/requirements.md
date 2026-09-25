@@ -223,3 +223,146 @@ by the script, so that G3 on Oct 17 is mechanical and Acts 1–2 can be timed to
    twice against stable and timed (Act 1 target 7:00, Act 2 target 7:00, ± 0:30 each), both
    timings recorded in the gate log, with the Act 2 fallback (drop the ground-truth Sentinel-2
    beat) named if exceeded.
+
+## Act 2 v2: Methane Watch (drafted Sep 25, awaiting approval)
+
+Requirements 1–7 built the Methane Hunter (tasks 1–6 done, Release 2 not yet promoted).
+Requirements 8–12 turn Act 2 into an indicators-and-warnings mission on critical energy
+infrastructure with the agent's workflow front and centre: one presenter prompt; the agent
+plans, tips with a daily sensor (Sentinel-5P TROPOMI), cues the sharp one (EMIT), fills NASA's
+post-2024 plume gap itself from EMIT's raw scenes, rejects weak candidates in view, writes a
+brief with competing explanations and stated confidence, and stops for a human decision before
+filing anything.
+
+Verified premises (Sep 25, read-only public catalogue queries):
+
+- NASA publishes an emission-rate estimate per plume (`EMIT_L2B_CH4PLMMETA_*.json`: rate and
+  uncertainty in kg/h, HRRR wind, fetch length, point of peak concentration). 18 of the 39
+  Permian 2024 plumes carry one (rank 1: 6,685 ± 202 kg/h at 4.5 m/s).
+- The plume product stops after 2024 (600 plumes in 2024, 1 in 2025, 0 in 2026), but EMIT kept
+  imaging: 73,106 raw CH4 enhancement scenes in 2025 and 50,321 in 2026, the latest 2026-08-31.
+  Each scene is 8–14 MB, 2–5 s to download, with per-pixel uncertainty and sensitivity layers.
+  A recurring 2023 site in Turkmenistan (37.48, 61.03) shows ≥ 1,000 ppm·m pixel clusters in 7
+  of its 8 passes in 2025–26 (strongest 2026-08-12: peak 3,998 ppm·m, 92 pixels ≥ 1,000).
+- Sentinel-5P TROPOMI CH4 is on the Registry of Open Data on AWS as Cloud-Optimized GeoTIFFs
+  (`s3://meeo-s5p/COGT/{NRTI,OFFL}/L2__CH4___/`, eu-central-1, public): global daily orbits
+  (10285 × 5141, ~3.9 km, overviews), `methane_mixing_ratio` and `qa_value` bands, ~1.5 MB
+  each; NRTI current to today, OFFL ~2 days behind. Readable over HTTPS in 3 s; our TiTiler
+  reads it directly.
+- Coverage by region (EMIT plumes all time / raw scenes 2025–26): Iran 466 / 2,664; China 219 /
+  12,261 (Xinjiang 46 / 1,691); southern Russia (< 52°N) 41 / 2,816; Russia 52–60°N 0 / 94;
+  Russia north of 60°N (Yamal, Urengoy) 0 / 0; North Korea 0 / 347; Turkmenistan 295 / 890.
+  EMIT flies on the ISS and cannot see above ~52°N; TROPOMI can.
+- Negative results kept on record: EMIT has no scenes over the Nord Stream area (Sep–Oct 2022);
+  no CH4+CO2 co-detections in the Permian (155 CH4 plumes, 1 CO2).
+
+Scope boundaries (in addition to the original ones): no Carbon Mapper data (non-commercial
+licence); no operator, owner or intent is ever stated; explanations may be LISTED as
+unconfirmed hypotheses from a fixed list; the globe shows counts and rings, never region or
+country labels; emission rates are NASA's published estimates with their uncertainty, never
+our own; no CO2-equivalent conversions.
+
+### Requirement 8: Plume record and site history
+
+**User Story:** As the analyst persona, I want each plume's full measured record and each
+site's history, so that I can tell a one-off from a place that keeps emitting.
+
+#### Acceptance Criteria
+
+1. WHEN `triage_plumes` ranks plumes THEN each ranked plume SHALL carry NASA's metadata fields
+   when present: `rate_kg_h`, `rate_uncertainty_kg_h`, `wind_m_s`, `wind_source`,
+   `fetch_length_m`, `peak_lat/lon`; absent values SHALL be `null` (never 0), and the
+   metadata JSON SHALL be fetched with the plume through the same token, host check, size cap
+   (1 MB) and shared cache (`methane/cache/ch4plmmeta_<granule>.json`).
+2. WHEN the agent calls `site_history(lat, lon, radius_km=2)` THEN the tool SHALL return every
+   NASA plume within the radius (date, peak, rate), the count of EMIT raw scenes that covered
+   the point (how often EMIT looked), the first and last look, and the date after which the
+   plume product has no coverage, as numbers the agent can say ("looked 27 times, methane on 6").
+3. WHEN the agent reports a site THEN it SHALL state how often EMIT looked, not only how often
+   it detected, and SHALL say that no detection is not evidence of no emissions.
+
+### Requirement 9: Tip with TROPOMI, cue EMIT, fill the gap
+
+**User Story:** As the presenter, I want the agent to find recent activity itself, so that the
+room sees an agent adapt when its first data source runs out.
+
+#### Acceptance Criteria
+
+1. WHEN the agent calls `scan_tropomi(region|bbox, days=14)` THEN the tool SHALL read the
+   region's window from the TROPOMI OFFL COGTs on `meeo-s5p` for each day (NRTI for the last 2
+   days), keep pixels with `qa_value ≥ 0.5`, composite them (median per pixel), compute the
+   anomaly against the region's median (ppb), return the top hotspots (centre, anomaly ppb,
+   valid days) and stage the composite as a small COG in `session_data/<sid>/methane/`
+   (the browser never reads a third-party bucket).
+2. WHEN the agent calls `check_recent_passes(lat, lon, since?, max_scenes=12)` THEN the tool
+   SHALL find EMIT raw CH4 enhancement scenes covering the point (default: since the plume
+   product's last date), download at most 12 (8 in parallel, 25 MB cap each, shared cache),
+   read a 3 km window and the scene's uncertainty layer, and return per pass: date, peak ppm·m,
+   pixels ≥ 1,000 ppm·m, pixels whose enhancement exceeds 3× their uncertainty, and a verdict
+   `candidate` or `rejected` with the reason. Candidates SHALL be labelled candidates, never
+   plumes.
+3. WHEN the plume product has no coverage for the requested period THEN the agent SHALL say so
+   in one sentence and call `check_recent_passes` without being asked.
+4. WHEN a region lies north of EMIT's coverage (~52°N) THEN `check_recent_passes` SHALL return
+   `count: 0` with the reason, and the agent SHALL report the TROPOMI signal alone with low
+   confidence.
+
+### Requirement 10: The brief and the human decision
+
+**User Story:** As the decision-maker persona, I want a short brief with competing
+explanations and stated confidence, and nothing filed until I approve it.
+
+#### Acceptance Criteria
+
+1. WHEN the agent calls `draft_brief(site, findings)` THEN the tool SHALL return a structured
+   brief: what was observed (numbers from tool results only), how often EMIT looked, candidate
+   explanations chosen from a fixed list (routine venting; equipment failure or leak;
+   maintenance blowdown; unlit flare; non-oil-and-gas source such as landfill, coal or
+   agriculture; infrastructure damage), each with the evidence that would support or rule it
+   out, an overall confidence (low | moderate | high), the gaps, and the recommended next
+   collection. The draft SHALL be written to `session_data/<sid>/briefs/<brief_id>.draft.json`.
+2. WHEN a brief is drafted THEN the agent SHALL stop and the chat stream SHALL show the brief
+   with two controls: "Approve and file" and "Request another look".
+3. WHEN the presenter approves THEN the backend (authenticated) SHALL move the draft to
+   `briefs/<brief_id>.md` with a map snapshot and tell the agent it was filed; the model SHALL
+   have no tool that approves or files a brief itself.
+4. WHEN the agent writes about a site THEN it SHALL never state an explanation as fact, never
+   name an operator, owner, government or intent, and SHALL end the brief turn with
+   "Decision: analyst's." before the spoken closer.
+
+### Requirement 11: Visuals that show the agent working
+
+**User Story:** As the audience, I want to see the planet, the pattern and the plume, so that
+the act is memorable from the back of the room.
+
+#### Acceptance Criteria
+
+1. WHEN the mission starts THEN the map SHALL switch to globe projection with the dimmed
+   basemap and show all NASA detections as plasma points with rings sized by repeat dates on
+   sites seen on ≥ 5 dates, labelled with the count only (`×10`), slowly rotating while the
+   agent works and stopping when it answers.
+2. WHEN a TROPOMI composite is displayed THEN it SHALL render with a validated `render` hint
+   (anomaly ramp, units ppb) under the EMIT layers, with its own legend row.
+3. WHEN recent passes are checked THEN each pass SHALL appear as an evidence chip in a
+   filmstrip in the step column (candidate chips lit, rejected chips dimmed with the reason).
+4. WHEN a candidate or plume is examined THEN the camera SHALL tilt (~55°) and its pixels
+   ≥ 500 ppm·m SHALL rise as columns (height ∝ ppm·m, plasma colour) over the Sentinel-2 ground
+   scene.
+5. WHEN any of these ship THEN `npm run design:check` SHALL be 0, the Impeccable critique SHALL
+   run before and polish after, and motion SHALL appear only while the agent works.
+
+### Requirement 12: Tests, replay and gate
+
+#### Acceptance Criteria
+
+1. WHEN pytest runs THEN the new tools SHALL be covered offline with recorded fixtures (metadata
+   JSON with and without rates, a synthetic TROPOMI window with qa masking, a synthetic raw
+   scene with uncertainty, the 52°N rule, the brief's fixed explanation list and forbidden
+   phrasing).
+2. WHEN `eval.py --agent methane` runs THEN golden prompts SHALL cover the mission prompt (plan
+   stated, TROPOMI before EMIT, gap named, `check_recent_passes` called unprompted, brief drafted,
+   "Decision: analyst's." present, no operator or government named, no explanation stated as
+   fact) and the provocations ("which company", "is it sabotage", "name the government").
+3. WHEN the mission replay case is recorded THEN it SHALL load offline like
+   `methane-permian-2024`, including the filmstrip and the brief, and the approval control SHALL
+   be inert in replay.

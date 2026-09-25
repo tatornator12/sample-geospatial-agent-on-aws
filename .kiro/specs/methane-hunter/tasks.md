@@ -90,6 +90,37 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
   - [ ] 7.4 `ROADMAP.md` row 4 status + G3 result; Week 5 (`ai-archaeologist`) notes: what the archaeologist reuses (`render` hints, `find_similar_places`, `inspect_image`)
   - _Requirements: 7.3, 7.4, 7.5_
 
+## Week 4c (Sep 29 – Oct 16): Act 2 v2, Methane Watch (awaiting approval; Requirements 8–12)
+
+Estimate 8–9 working days; the program is ~11 days ahead of Week 4a, so G3 on Oct 17 holds.
+Order is data first (each tool usable alone), then the mission prompt, then visuals, then the
+approval path, then replay and evals.
+
+- [ ] 8. Safety net: promote the current Release 2 (two-beat Act 2) early with `PROMOTE_FRONTEND=1 scripts/promote.sh` (user-confirmed), tag, CloudFront replay timing (6.3)
+- [ ] 9. Data tools
+  - [ ] 9.1 NASA plume metadata in `triage_plumes` (fetch, cap, cache, nulls) + tests with and without rates
+  - [ ] 9.2 `site_history` (NASA plumes nearby, EMIT looks via CMR `point=`, gap date) + tests
+  - [ ] 9.3 `scan_tropomi` (day listing, validated keys, windowed reads, qa ≥ 0.5, median composite, anomaly, hotspots, staged COG) + tests on a synthetic window; live timing for 14 days over two areas recorded here (target < 20 s warm)
+  - [ ] 9.4 `check_recent_passes` (CMR, CH4ENH + CH4UNCERT, 3 km window, candidate rule, cache, 52°N rule) + tests on a synthetic scene; live timing for 8 passes recorded (target < 25 s cold)
+  - [ ] 9.5 Site clusters for the globe (`sites_v002.geojson`, cached) + test
+  - [ ] 9.6 Watch-area table + tests (no substring match, EMIT coverage flags)
+- [ ] 10. Mission prompt and brief
+  - [ ] 10.1 `draft_brief` (fixed explanation enum, phrasing checks, draft to S3) + tests for every forbidden pattern
+  - [ ] 10.2 Prompt: plan first, tip before cue, name the gap, self-check sentences, brief, stop; wording rule per Decision 4; closer and "Decision: analyst's."
+  - [ ] 10.3 Golden prompts: `watch-mission`, `watch-named-area`, provocations (`which-company`, `sabotage`, `name-the-government`), plus the existing four; dev deploy; eval green
+- [ ] 11. Visuals (critique first, polish after)
+  - [ ] 11.1 `/impeccable critique` of the stage with a mission run; brief recorded
+  - [ ] 11.2 `render` allowlist: group `watch`, kinds `points`, `columns`; tests
+  - [ ] 11.3 Globe projection + rings + rotation (reduced motion honoured); TROPOMI layer + legend; filmstrip chips; methane columns + tilted camera
+  - [ ] 11.4 vitest for grouping, projection switching and hint handling; build, design:check 0, lint baseline; headless before/after captures; `/impeccable polish`
+- [ ] 12. Human decision
+  - [ ] 12.1 Brief card in the chat stream with "Approve and file" / "Request another look"; inert in replay
+  - [ ] 12.2 Backend `POST /api/brief/approve` (auth, id validation, draft → filed, snapshot cap) + node:test
+- [ ] 13. Replay, stage choice and gate
+  - [ ] 13.1 Stage dive choice (user, after sign-off from their management/comms on naming a country on stage): Turkmenistan (recommended), an Iran watch area, or the Permian
+  - [ ] 13.2 Record `methane-watch-<area>` with `build_replay_case.py` (mission prompt); gallery card; offline check (0 CMR / LP DAAC / TROPOMI requests)
+  - [ ] 13.3 G3 as tasks 7.1–7.4, with the mission eval and the Act 2 v2 run sheet timed twice
+
 ## Gate log
 
 - (Oct 10 checkpoint: dev runtime version, three golden prompts, triage timing)
