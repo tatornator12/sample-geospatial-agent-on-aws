@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "rm -rf .test-build && tsc -p tsconfig.test.json && node --test .test-build/"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "^3.921.0",

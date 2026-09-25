@@ -59,7 +59,10 @@ def resolve_agent_arn(target: str, agent: str = "earth") -> str:
         import yaml
 
         config = yaml.safe_load(AGENTCORE_YAML.read_text())
-        arn = config["agents"][agent_name]["bedrock_agentcore"]["agent_arn"]
+        try:
+            arn = config["agents"][agent_name]["bedrock_agentcore"]["agent_arn"]
+        except (KeyError, TypeError):
+            arn = None  # not deployed yet (e.g. a stable runtime before its first promotion)
     except ModuleNotFoundError:
         # Fallback: scan the agent's block for its agent_arn line.
         arn = None

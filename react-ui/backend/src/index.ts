@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand, StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { checkS3Access } from './s3Access';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Readable } from 'stream';
 import * as fs from 'fs';
@@ -518,24 +519,15 @@ app.post('/api/agent/stop-session', async (req: Request, res: Response) => {
 
 // Generate pre-signed URL for private S3 objects
 app.get('/api/presigned-url', async (req: Request, res: Response) => {
-  const { s3Url } = req.query;
-
-  if (!s3Url || typeof s3Url !== 'string') {
-    return res.status(400).json({ error: 's3Url parameter is required' });
+  // Only the data bucket's displayable prefixes and file types (see s3Access.ts).
+  const access = checkS3Access(req.query.s3Url, process.env.S3_BUCKET_NAME, 'render');
+  if (!access.ok) {
+    console.warn(`Refused pre-signed URL (${access.status}): ${access.reason}`);
+    return res.status(access.status).json({ error: access.reason });
   }
-
-  console.log(`Generating pre-signed URL for: ${s3Url}`);
+  const { bucket, key } = access;
 
   try {
-    // Parse S3 URL to extract bucket and key
-    const s3Match = s3Url.match(/^s3:\/\/([^\/]+)\/(.+)$/);
-    if (!s3Match) {
-      return res.status(400).json({ error: 'Invalid S3 URL format. Expected: s3://bucket/key' });
-    }
-
-    const bucket = s3Match[1];
-    const key = s3Match[2];
-
     // Generate pre-signed URL (valid for 1 hour)
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
     const command = new GetObjectCommand({
@@ -681,26 +673,16 @@ app.get('/api/scenario/:scenarioId', async (req: Request, res: Response) => {
 
 // Load geometry from S3 GeoJSON file
 app.get('/api/geometry', async (req: Request, res: Response) => {
-  const { s3Url } = req.query;
-
-  if (!s3Url || typeof s3Url !== 'string') {
-    return res.status(400).json({ error: 's3Url parameter is required' });
+  // Only the data bucket's displayable prefixes, GeoJSON only (see s3Access.ts).
+  const access = checkS3Access(req.query.s3Url, process.env.S3_BUCKET_NAME, 'geometry');
+  if (!access.ok) {
+    console.warn(`Refused geometry (${access.status}): ${access.reason}`);
+    return res.status(access.status).json({ error: access.reason });
   }
-
-  console.log(`Loading geometry from: ${s3Url}`);
+  const { bucket, key } = access;
 
   try {
-    // Parse S3 URL to extract bucket and key
-    // Format: s3://bucket-name/path/to/file.geojson
-    const s3Match = s3Url.match(/^s3:\/\/([^\/]+)\/(.+)$/);
-    if (!s3Match) {
-      return res.status(400).json({ error: 'Invalid S3 URL format. Expected: s3://bucket/key' });
-    }
-
-    const bucket = s3Match[1];
-    const key = s3Match[2];
-
-    console.log(`Fetching from bucket: ${bucket}, key: ${key}`);
+    console.log(`Fetching geometry from bucket: ${bucket}, key: ${key}`);
 
     // Fetch from S3
     const command = new GetObjectCommand({
