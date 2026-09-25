@@ -39,8 +39,9 @@ _GREYS = ["#000000", "#ffffff"]
 # matplotlib `plasma` sampled at 0.0, 0.1, ... 1.0 (TiTiler's plasma is the same ramp).
 _PLASMA = ["#0d0887", "#41049d", "#6a00a8", "#8f0da4", "#b12a90", "#cc4778",
            "#e16462", "#f2844b", "#fca636", "#fcce25", "#f0f921"]
-# matplotlib `magma` sampled at 0.0, 0.25, ... 1.0 (TiTiler's magma; the TROPOMI anomaly ramp).
-_MAGMA = ["#000004", "#51127c", "#b73779", "#fc8961", "#fcfdbf"]
+# matplotlib `viridis` sampled at 0.0, 0.25, ... 1.0 (TiTiler's viridis; the TROPOMI anomaly ramp,
+# chosen to read as a different scale from the plasma EMIT ramp).
+_VIRIDIS = ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"]
 
 # Sentinel-2 scene classification (SCL) classes.
 SCL_NODATA = (0,)
@@ -66,9 +67,9 @@ INDEX_STYLES: tuple[tuple[tuple[str, ...], IndexStyle], ...] = (
     (("nbr_", "nbr-", "/nbr."), IndexStyle("nbr", -1.0, 1.0, tuple(_SPECTRAL))),
     # EMIT CH4 plume enhancement (ppm·m), the Methane Hunter's render hint: plasma over 0-1500.
     # Methane Watch: EMIT raw-scene windows (pass_EMIT_L2B_CH4ENH_*.tif) share the plume ramp;
-    # the Sentinel-5P TROPOMI anomaly composite (ppb above the area's median) uses magma, 0-60.
+    # the Sentinel-5P TROPOMI anomaly composite (ppb above the area's median) uses viridis, 0-60.
     (("ch4plm", "ch4enh"), IndexStyle("ch4", 0.0, 1500.0, tuple(_PLASMA))),
-    (("tropomi_anomaly",), IndexStyle("tropomi", 0.0, 60.0, tuple(_MAGMA))),
+    (("tropomi_anomaly",), IndexStyle("tropomi", 0.0, 60.0, tuple(_VIRIDIS))),
 )
 
 

@@ -132,16 +132,21 @@ export function isSimilarityLayer(layer: LayerMetadata): boolean {
 }
 
 /**
- * A Methane Hunter layer: by the agent's hint (`group: 'methane'`), or, when the hint is absent
- * or was dropped, by the tools' own file names (`ch4plm_<granule>.tif` plume rasters,
- * `.../methane/plumes_*.geojson` footprints). Never by the model-written title.
+ * A Methane Hunter layer: by the agent's hint (`group: 'methane'` or `'watch'`), or, when the
+ * hint is absent or was dropped, by the tools' own file names: `ch4plm_<granule>.tif` plume
+ * rasters anywhere; under `/methane/` (a session) or `/use-cases/methane-*` (a replay case) the
+ * TROPOMI composite `tropomi_anomaly_*.tif`, an EMIT pass window `pass_*.tif`, footprints
+ * `plumes_*.geojson`, the watch baseline `watch_sites_*.geojson` and `columns_*.geojson`.
+ * Never by the model-written title.
  */
 export function isMethaneLayer(layer: LayerMetadata): boolean {
-  if (layer.render?.group === 'methane') return true;
+  if (layer.render?.group === 'methane' || layer.render?.group === 'watch') return true;
   const url = (layer.url || '').toLowerCase();
   const basename = url.split('/').pop() ?? '';
-  if (layer.type === 'raster') return /^ch4plm_.+\.tiff?$/.test(basename);
-  return url.includes('/methane/') && basename.startsWith('plumes_') && basename.endsWith('.geojson');
+  if (layer.type === 'raster' && /^ch4plm_.+\.tiff?$/.test(basename)) return true;
+  if (!url.includes('/methane/') && !url.includes('/use-cases/methane-')) return false;
+  if (layer.type === 'raster') return /^(tropomi_anomaly|pass)_.+\.tiff?$/.test(basename);
+  return /^(plumes|watch_sites|columns)_.+\.geojson$/.test(basename);
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

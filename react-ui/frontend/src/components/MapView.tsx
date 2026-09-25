@@ -17,6 +17,15 @@ import {
   type LayerMetadata,
 } from '../utils/layerFormatting';
 import { rampExpression, rampGradient, tileParamsFor, type RenderHint } from '../utils/render.ts';
+import {
+  COLUMN_METRES_PER_PPM_M,
+  METHANE_RASTER,
+  globeCentre,
+  isoDay,
+  methaneGeometryHint,
+  methaneLegend,
+  methaneRasterHint,
+} from '../utils/methaneLayers.ts';
 import { CompareView } from './CompareView';
 import { Icon } from './Icons.tsx';
 import { theme } from '../theme';
@@ -28,11 +37,18 @@ const BASEMAP_IDS = ['dark-base', 'google-roads-base', 'google-satellite-base', 
 // and the layers plate (right), so what the camera lands on is what the room sees.
 const STAGE_PADDING = { top: 90, bottom: 300, left: 340, right: 370 };
 
-// The Methane Hunter's defaults when a layer arrived without a (valid) hint: the tools' own values.
-const METHANE_RASTER: RenderHint = { kind: 'raster', colormap: 'plasma', rescale: [0, 1500], units: 'ppm·m', group: 'methane' };
-const METHANE_VECTOR: RenderHint = { kind: 'vector', ramp: 'plasma', property: 'max_ppm_m', rescale: [0, 1500], units: 'ppm·m', group: 'methane', label: 'rank' };
 // Ranks at or above this are lit and labelled; every other footprint is a hairline. 39 is the count; 3 is the story.
 const LIT_RANKS = 3;
+// The watch globe: how far out it sits, how fast it turns while the agent works (degrees of
+// longitude per second), and the tilt the 3D columns are read at.
+const GLOBE_ZOOM = 1.6;
+const GLOBE_DEG_PER_S = 4;
+const COLUMNS_PITCH = 55;
+// A coarse raster (TROPOMI) is dimmer than the finding so the EMIT candidate reads through it.
+const COARSE_RASTER_OPACITY = 0.75;
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** A raster's real extent from TiTiler, or null (timeout, error, junk): the camera then keeps its fallback. */
 async function fetchCogBounds(presignedUrl: string): Promise<[number, number, number, number] | null> {
@@ -56,9 +72,11 @@ interface MapViewProps {
   geometry: GeometryData | null;
   rasters: RasterData[];
   onDrawnGeometry?: (geojson: any) => void;
+  /** The agent is working this turn: the watch globe turns until the first finding lands. */
+  working?: boolean;
 }
 
-export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
+export function MapView({ geometry, rasters, onDrawnGeometry, working = false }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
@@ -84,6 +102,49 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
   useEffect(() => {
     allLayersRef.current = allLayers;
   }, [allLayers]);
+
+  // The watch globe: on when a watch baseline lands, off when the map is cleared. It turns while
+  // the agent works, until a methane raster takes the frame, the presenter grabs the map, or
+  // the viewer asked for reduced motion.
+  const [globeOn, setGlobeOn] = useState(false);
+  const presenterHolding = useRef(false);
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const apply = () => mapInstance.setProjection({ type: globeOn ? 'globe' : 'mercator' });
+    if (mapInstance.isStyleLoaded()) apply();
+    else mapInstance.once('styledata', apply);
+  }, [globeOn]);
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !globeOn || !working || prefersReducedMotion()) return;
+    let frame = 0;
+    let last = performance.now();
+    const hold = () => { presenterHolding.current = true; };
+    const release = () => { presenterHolding.current = false; last = performance.now(); };
+    mapInstance.on('mousedown', hold);
+    mapInstance.on('touchstart', hold);
+    mapInstance.on('mouseup', release);
+    mapInstance.on('touchend', release);
+    const turn = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const idle = !presenterHolding.current && !plumeFramed.current && !mapInstance.isMoving();
+      if (idle && mapInstance.getZoom() < 3) {
+        const c = mapInstance.getCenter();
+        mapInstance.setCenter([c.lng + GLOBE_DEG_PER_S * dt, c.lat]);
+      }
+      if (!plumeFramed.current) frame = requestAnimationFrame(turn);
+    };
+    frame = requestAnimationFrame(turn);
+    return () => {
+      cancelAnimationFrame(frame);
+      mapInstance.off('mousedown', hold);
+      mapInstance.off('touchstart', hold);
+      mapInstance.off('mouseup', release);
+      mapInstance.off('touchend', release);
+    };
+  }, [globeOn, working]);
 
   // The Dim Rule's current state, readable when a basemap layer is (re)created: the dim can be
   // decided before the basemap exists (a replay case lands every layer at once on load).
@@ -372,13 +433,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           geometry.features.some((f) =>
             f?.properties && f.properties.tier === 'match' && typeof f.properties.similarity === 'number');
 
-        // Methane Hunter footprints: by the validated hint, or by the tools' own file names.
-        const methaneHint: RenderHint | null =
-          geometry.render?.kind === 'vector' && geometry.render.group === 'methane'
-            ? geometry.render
-            : isMethaneLayer({ id: '', sourceId: '', name: '', url: geometry.sourceUrl || '', type: 'geometry' })
-              ? METHANE_VECTOR
-              : null;
+        // Methane Watch layers: footprints (vector), the watch baseline (points) and the 3D
+        // columns, by the validated hint or by the tools' own file names.
+        const methaneHint: RenderHint | null = methaneGeometryHint(geometry.render, geometry.sourceUrl);
         const isMethane = methaneHint !== null;
 
         try {
@@ -400,7 +457,105 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
             geometry.features.some((f: any) =>
               f?.properties && f.properties.__layer_type === 'protected_area');
 
-          if (isMethane && methaneHint) {
+          if (methaneHint?.kind === 'points') {
+            // The watch baseline on the globe: every site a small fog dot, sites seen on five or
+            // more dates ringed and labelled "×N", the watch areas as dashed hairlines. Counts and
+            // shapes only: no names. Fog, not plasma: dates are a count, not a measurement.
+            const property = methaneHint.property ?? 'repeat_dates';
+            const count: maplibregl.ExpressionSpecification = ['to-number', ['get', property], 1];
+            const isPoint: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'Point'];
+            const repeat: maplibregl.FilterSpecification = ['all', isPoint, ['==', ['get', 'tier'], 'repeat']];
+            currentMap.addLayer({
+              id: `${geometryId}-hairline`,
+              type: 'line',
+              source: geometryId,
+              filter: ['==', ['get', 'tier'], 'watch_area'],
+              paint: { 'line-color': '#e9eef3', 'line-opacity': 0.5, 'line-width': 1.5, 'line-dasharray': [3, 2] },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'circle',
+              source: geometryId,
+              filter: isPoint,
+              paint: {
+                'circle-color': '#e9eef3',
+                'circle-opacity': ['case', ['==', ['get', 'tier'], 'repeat'], 0.95, 0.55],
+                'circle-radius': ['interpolate', ['linear'], count, 1, 2.5, 5, 4, 20, 6],
+                'circle-pitch-alignment': 'map',
+              },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'circle',
+              source: geometryId,
+              filter: repeat,
+              paint: {
+                'circle-opacity': 0,
+                'circle-radius': ['interpolate', ['linear'], count, 5, 9, 20, 15],
+                'circle-stroke-color': '#e9eef3',
+                'circle-stroke-width': 2,
+                'circle-stroke-opacity': 0.9,
+                'circle-pitch-alignment': 'map',
+              },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: `${geometryId}-labels`,
+              type: 'symbol',
+              source: geometryId,
+              filter: repeat,
+              layout: {
+                'symbol-sort-key': ['-', 0, count],
+                'text-field': ['concat', '×', ['to-string', count]],
+                'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+                'text-size': 18,
+                'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
+                'text-radial-offset': 1.2,
+                'text-padding': 4,
+                visibility: 'visible',
+              },
+              paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2.5 },
+            });
+            // Popup: counts and ISO dates only; nothing model- or CMR-written reaches setHTML.
+            currentMap.on('click', fillLayerId, (e: maplibregl.MapLayerMouseEvent) => {
+              const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
+              const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }) : 'n/a');
+              const html =
+                `<strong>Site seen on ${num(p[property])} dates</strong>` +
+                `<div class="similar-popup__row"><span>NASA plumes</span><code>${num(p.plumes)}</code></div>` +
+                `<div class="similar-popup__row"><span>First</span><code>${isoDay(p.first)}</code></div>` +
+                `<div class="similar-popup__row"><span>Last</span><code>${isoDay(p.last)}</code></div>`;
+              new maplibregl.Popup({ className: 'similar-popup' }).setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
+            });
+            currentMap.on('mouseenter', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = 'pointer';
+            });
+            currentMap.on('mouseleave', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = '';
+            });
+          } else if (methaneHint?.kind === 'columns') {
+            // The strongest pass in 3D: one column per enhanced pixel, as tall as its ppm·m and
+            // coloured on the same plasma ramp as the plume, read at a tilt.
+            const property = methaneHint.property ?? 'ppm_m';
+            const [lo, hi] = methaneHint.rescale ?? [0, 1500];
+            const ramp =
+              (rampExpression(methaneHint.ramp ?? 'plasma', property, lo, hi) as maplibregl.ExpressionSpecification | null) ??
+              '#f89540';
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'fill-extrusion',
+              source: geometryId,
+              paint: {
+                'fill-extrusion-color': ramp,
+                'fill-extrusion-height': ['*', ['to-number', ['get', property], 0], COLUMN_METRES_PER_PPM_M],
+                'fill-extrusion-base': 0,
+                'fill-extrusion-opacity': 0.9,
+              },
+              layout: { visibility: 'visible' },
+            });
+          } else if (isMethane && methaneHint) {
             // Ranks 1-3 are lit: plasma outline graduated by the hint's property, a light fill, and
             // "#1 · 8,131 ppm·m" labels. Every other footprint is a fog hairline, a little brighter
             // before triage (nothing is ranked yet, so the count itself is the finding).
@@ -741,13 +896,36 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
 
         // The ranked footprints replace the detected ones (same plumes, now measured): one set of
         // outlines on the stage, never two stacked.
-        if (isMethane) {
+        if (isMethane && methaneHint) {
+          // Same kind replaces same kind (ranked footprints replace detected ones; a second
+          // baseline or a second set of columns replaces the first); the baseline stays under
+          // the columns and the footprints.
           allLayersRef.current
-            .filter((l) => l.type === 'geometry' && l.id !== fillLayerId && isMethaneLayer(l))
+            .filter((l) => l.type === 'geometry' && l.id !== fillLayerId && isMethaneLayer(l) &&
+              (methaneGeometryHint(l.render, l.url)?.kind ?? 'vector') === methaneHint.kind)
             .forEach((l) => removeLayer(l.id));
-          // The frame rule, methane edition: once a plume raster is on the stage it owns the frame
-          // (a replay case lands the footprints and the plume together; the plume wins).
-          if (!plumeFramed.current && !allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l))) {
+          const rasterOnStage = plumeFramed.current || allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l));
+          if (methaneHint.kind === 'points') {
+            // The watch globe: the whole baseline at once, facing the watch areas.
+            setGlobeOn(true);
+            if (!rasterOnStage) {
+              const centre = globeCentre(geometry.features as Parameters<typeof globeCentre>[0]);
+              currentMap.easeTo({ center: centre ?? [40, 30], zoom: GLOBE_ZOOM, pitch: 0, bearing: 0, duration: 2000 });
+            }
+          } else if (methaneHint.kind === 'columns') {
+            // The columns are read at a tilt, over the pass they were built from.
+            const cam = currentMap.cameraForBounds(bounds, { padding: STAGE_PADDING });
+            plumeFramed.current = true;
+            currentMap.easeTo({
+              ...(cam?.center ? { center: cam.center } : {}),
+              zoom: Math.min(cam?.zoom ?? 12, 13),
+              pitch: COLUMNS_PITCH,
+              bearing: -20,
+              duration: 2200,
+            });
+          } else if (!rasterOnStage) {
+            // The frame rule, methane edition: once a plume raster is on the stage it owns the frame
+            // (a replay case lands the footprints and the plume together; the plume wins).
             currentMap.fitBounds(bounds, { padding: STAGE_PADDING, duration: 1500, maxZoom: 11 });
           }
           return;
@@ -919,6 +1097,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
     setRasterVisibility({});
     addedRasterUrls.current.clear(); // Clear the URL tracking ref
     plumeFramed.current = false;
+    // Back to the flat, upright map the other acts expect.
+    setGlobeOn(false);
+    if (mapInstance.getPitch() !== 0 || mapInstance.getBearing() !== 0) mapInstance.easeTo({ pitch: 0, bearing: 0, duration: 600 });
 
     console.log(`🗑️ Cleared ${count} layers`);
   };
@@ -1071,7 +1252,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           // A methane plume raster: by its validated hint, or by the tool's own file name.
           const probe: LayerMetadata = { id: '', sourceId: '', name: raster.name, url: raster.url, type: 'raster', render: raster.render };
           const isMethaneRaster = isMethaneLayer(probe);
-          const hint: RenderHint | undefined = raster.render ?? (isMethaneRaster ? METHANE_RASTER : undefined);
+          const hint: RenderHint | undefined =
+            methaneRasterHint(raster.render, raster.url) ?? raster.render ?? (isMethaneRaster ? METHANE_RASTER : undefined);
           // The camera follows the methane act: the plume on arrival, then the ground scene after it.
           const followCamera =
             isMethaneRaster ||
@@ -1164,12 +1346,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           }
 
           // Add raster layer (above basemaps, beforeId places new layers at bottom of COG stack)
+          // A coarse raster (the hint caps its zoom: TROPOMI's ~4 km cells) is hidden above that
+          // zoom and dimmed below it, so it tips the eye without walling off the finding.
+          const coarse = typeof hint?.max_zoom === 'number';
           mapInstance.addLayer({
             id: layerId,
             type: 'raster',
             source: sourceId,
+            ...(coarse ? { maxzoom: hint!.max_zoom } : {}),
             paint: {
-              'raster-opacity': 1.0,
+              'raster-opacity': coarse ? COARSE_RASTER_OPACITY : 1.0,
             },
             layout: {
               visibility: isVisible ? 'visible' : 'none',
@@ -1194,10 +1380,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
 
           // The ranking reads over the plume: the lit outlines and their "#1 · ppm·m" labels stay
           // above the plume raster (which goes to the top of the stack).
+          // The watch areas, site dots and rings stay readable over the TROPOMI composite, and
+          // the columns stand over the pass window.
           if (isMethaneRaster) {
             allLayersRef.current
               .filter((l) => l.type === 'geometry' && isMethaneLayer(l))
-              .flatMap((l) => ['-outline', '-labels'].map((suffix) => l.id.replace('-fill', suffix)))
+              .flatMap((l) => {
+                const kind = methaneGeometryHint(l.render, l.url)?.kind ?? 'vector';
+                const suffixes = kind === 'vector' ? ['-outline', '-labels'] : ['-hairline', '-fill', '-outline', '-labels'];
+                return suffixes.map((suffix) => l.id.replace('-fill', suffix));
+              })
               .forEach((id) => {
                 if (mapInstance.getLayer(id)) mapInstance.moveLayer(id);
               });
@@ -1208,10 +1400,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
           if (followCamera && rasterBounds) {
             plumeFramed.current = true;
             const [w, s, e, n] = rasterBounds;
+            // A coarse raster frames below its own cap so it is still on screen when the camera lands.
+            const cap = coarse ? Math.max(1, hint!.max_zoom! - 0.5) : isMethaneRaster ? 13 : 14;
+            // With the 3D columns on the stage the frame keeps their tilt; otherwise it is flat.
+            const columnsOnStage = allLayersRef.current.some((l) => methaneGeometryHint(l.render, l.url)?.kind === 'columns');
             mapInstance.fitBounds([[w, s], [e, n]], {
               padding: STAGE_PADDING,
               duration: 1800,
-              maxZoom: isMethaneRaster ? 13 : 14,
+              maxZoom: cap,
+              pitch: columnsOnStage ? COLUMNS_PITCH : 0,
             });
           }
 
@@ -1385,25 +1582,41 @@ export function MapView({ geometry, rasters, onDrawnGeometry }: MapViewProps) {
 
               {/* Methane: the plume, its footprints, and the ramp that reads them. */}
               {layerGroups.methane.length > 0 && (() => {
-                const legendHint = layerGroups.methane.find((l) => l.render?.rescale)?.render ?? METHANE_RASTER;
-                const [lo, hi] = legendHint.rescale ?? [0, 1500];
-                const units = legendHint.units ?? 'ppm·m';
-                const gradient = rampGradient(legendHint.colormap ?? legendHint.ramp ?? 'plasma') ?? undefined;
+                // One row per ramp: EMIT's plasma ppm·m and TROPOMI's viridis ppb are different
+                // instruments and units and never share a bar; the sites line explains the rings.
+                const legend = methaneLegend(layerGroups.methane.map((l) => l.render));
+                const ramps = legend.ramps.length > 0 || legend.sites
+                  ? legend.ramps
+                  : methaneLegend([METHANE_RASTER]).ramps;
+                const words: Record<string, string> = { plasma: 'dark purple to yellow', viridis: 'dark violet to yellow-green' };
                 return (
                   <div>
                     <h3 className="map-group__title">Methane</h3>
                     {layerGroups.methane.map((layer) => renderLayerRow(layer, layer.name))}
-                    <div
-                      className="map-legend"
-                      role="img"
-                      aria-label={`Colour ramp: CH4 enhancement from ${lo} to ${hi} ${units} and above, dark purple to yellow`}
-                    >
-                      <span className="map-legend__label map-legend__label--num">{lo.toLocaleString('en-US')}</span>
-                      <span className="map-legend__ramp" style={{ background: gradient }} aria-hidden="true" />
-                      <span className="map-legend__label map-legend__label--num">
-                        {hi.toLocaleString('en-US')}+ {units}
-                      </span>
-                    </div>
+                    {ramps.map((r) => (
+                      <div key={`${r.ramp}-${r.units}`} className="map-legend map-legend--stacked">
+                        <span className="map-legend__name">{r.label}</span>
+                        <div
+                          className="map-legend__bar"
+                          role="img"
+                          aria-label={`Colour ramp: ${r.label} from ${r.lo} to ${r.hi} ${r.units} and above, ${words[r.ramp] ?? 'low to high'}`}
+                        >
+                          <span className="map-legend__label map-legend__label--num">{r.lo.toLocaleString('en-US')}</span>
+                          <span className="map-legend__ramp" style={{ background: rampGradient(r.ramp) ?? undefined }} aria-hidden="true" />
+                          <span className="map-legend__label map-legend__label--num">
+                            {r.hi.toLocaleString('en-US')}+ {r.units}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {legend.sites && (
+                      <div className="map-legend map-legend--sites" role="img" aria-label="A dot is a site with a NASA plume; a ring marks a site seen on five or more dates">
+                        <span className="map-legend__dot" aria-hidden="true" />
+                        <span className="map-legend__label">site</span>
+                        <span className="map-legend__ring" aria-hidden="true" />
+                        <span className="map-legend__label">seen on 5+ dates</span>
+                      </div>
+                    )}
                   </div>
                 );
               })()}

@@ -284,3 +284,57 @@ export async function stopRuntimeSession(sessionId: string, agentId?: string): P
     return false;
   }
 }
+
+/** The brief card's data (validated server-side from the draft in S3; see backend/src/brief.ts). */
+export interface BriefCardData {
+  briefId: string;
+  title: string;
+  place: string;
+  lat: number;
+  lon: number;
+  looks: number;
+  candidates: number;
+  passesRead: number;
+  confidence: 'low' | 'moderate' | 'high';
+  singleExplanation: string;
+  hypotheses: Array<{ label: string; assessment: string }>;
+}
+
+export interface BriefState {
+  status: 'draft' | 'filed' | 'replay';
+  filedAt?: string;
+  filedBy?: string;
+  card: BriefCardData;
+}
+
+/** A draft brief of this session (or of a replay case), or null when it is not there (yet). */
+export async function getBrief(briefId: string, where: { sessionId: string } | { caseId: string }): Promise<BriefState | null> {
+  try {
+    const params = new URLSearchParams({ briefId, ...where });
+    const response = await fetch(`${API_URL}/api/brief?${params.toString()}`, { headers: getAuthHeaders() });
+    if (!response.ok) return null;
+    return (await response.json()) as BriefState;
+  } catch {
+    return null;
+  }
+}
+
+/** The analyst files the brief. The backend does the filing; the agent is only told afterwards. */
+export async function approveBrief(
+  sessionId: string,
+  briefId: string,
+  snapshot?: string | null
+): Promise<{ ok: true; filedAt?: string; filedBy?: string } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`${API_URL}/api/brief/approve`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(snapshot ? { sessionId, briefId, snapshot } : { sessionId, briefId }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) return { ok: false, error: typeof body?.error === 'string' ? body.error : `HTTP ${response.status}` };
+    return { ok: true, filedAt: body.filedAt, filedBy: body.filedBy };
+  } catch {
+    return { ok: false, error: 'The backend could not be reached.' };
+  }
+}

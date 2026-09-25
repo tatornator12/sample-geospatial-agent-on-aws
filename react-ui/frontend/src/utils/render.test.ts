@@ -42,6 +42,16 @@ describe('parseRenderHint', () => {
     expect(parseRenderHint(hint)).toBeNull();
   });
 
+  it('accepts the Methane Watch kinds and group, and a bounded max_zoom (Week 4c)', () => {
+    const sites = { kind: 'points', group: 'watch', property: 'repeat_dates', label: 'repeat_dates', units: 'dates' };
+    const columns = { kind: 'columns', property: 'ppm_m', ramp: 'plasma', rescale: [0, 1500], units: 'ppm·m', group: 'methane' };
+    const tropomi = { kind: 'raster', colormap: 'viridis', rescale: [0, 60], units: 'ppb', group: 'methane', max_zoom: 8 };
+    expect(parseRenderHint(sites)).toEqual(sites);
+    expect(parseRenderHint(columns)).toEqual(columns);
+    expect(parseRenderHint(tropomi)).toEqual(tropomi);
+    for (const z of [-1, 23, NaN, '8']) expect(parseRenderHint({ ...tropomi, max_zoom: z })).toBeNull();
+  });
+
   it('ignores fields it does not know', () => {
     expect(parseRenderHint({ kind: 'raster', colormap: 'viridis', onclick: 'x' })).toEqual({ kind: 'raster', colormap: 'viridis' });
   });

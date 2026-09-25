@@ -425,7 +425,7 @@ export function extractAllVisualizationData(tools: ToolCall[]): {
       geometries.push({
         url: s3Url,
         title: title,
-        ...(render && render.kind === 'vector' ? { render } : {}),
+        ...(render && render.kind !== 'raster' ? { render } : {}),
       });
       continue;
     }

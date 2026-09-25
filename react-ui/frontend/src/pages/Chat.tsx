@@ -76,6 +76,7 @@ export function Chat() {
   const [isLoadingScenario, setIsLoadingScenario] = useState(false);
   const [scenarioError, setScenarioError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(true); // Controls MapView render delay on scenario switch
+  const [agentWorking, setAgentWorking] = useState(false);
 
   // Track if this is the first run of the scenario effect
   const isFirstScenarioLoad = useRef(true);
@@ -144,7 +145,7 @@ export function Chat() {
               if (geometry) {
                 geometry.locationName = layer.title;
                 geometry.sourceUrl = layer.s3_url;
-                if (render?.kind === 'vector') geometry.render = render;
+                if (render && render.kind !== 'raster') geometry.render = render;
                 setCurrentGeometry(geometry);
               }
             } else {
@@ -347,6 +348,7 @@ export function Chat() {
             geometry={currentGeometry}
             rasters={currentRasters}
             onDrawnGeometry={handleDrawnGeometry}
+            working={agentWorking}
           />
         )}
       </div>
@@ -365,6 +367,7 @@ export function Chat() {
           onRastersUpdate={setCurrentRasters}
           drawnGeometryMessage={drawnGeometryMessage}
           onDrawnGeometryMessageSent={() => setDrawnGeometryMessage(null)}
+          onWorkingChange={setAgentWorking}
         />
       </div>
     </div>

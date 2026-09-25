@@ -10,12 +10,15 @@
  * blank and nothing unvalidated is ever used.
  */
 
-export type RenderKind = 'raster' | 'vector';
+/** raster: a COG through TiTiler; vector: graduated outlines; points: site dots and repeat rings;
+ * columns: 3D cells extruded by a numeric property. */
+export type RenderKind = 'raster' | 'vector' | 'points' | 'columns';
+export const RENDER_KINDS: readonly RenderKind[] = ['raster', 'vector', 'points', 'columns'];
 
 export const COLORMAPS = ['plasma', 'viridis', 'magma', 'rdylgn', 'rdylgn_r', 'blues', 'spectral'] as const;
 export type ColormapName = (typeof COLORMAPS)[number];
 
-export const RENDER_GROUPS = ['methane', 'change', 'similar', 'imagery', 'index', 'boundary'] as const;
+export const RENDER_GROUPS = ['methane', 'watch', 'change', 'similar', 'imagery', 'index', 'boundary'] as const;
 export type RenderGroup = (typeof RENDER_GROUPS)[number];
 
 export interface RenderHint {
@@ -34,6 +37,8 @@ export interface RenderHint {
   label?: string;
   /** [west, south, east, north] in degrees: where the camera goes when the layer lands. */
   bounds?: [number, number, number, number];
+  /** The layer is hidden above this zoom (a coarse raster must not fill the screen). */
+  max_zoom?: number;
 }
 
 const TEXT_MAX = 24;
@@ -78,7 +83,7 @@ export function parseRenderHint(input: unknown): RenderHint | null {
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  if (!isOneOf(['raster', 'vector'] as const, r.kind)) return null;
+  if (!isOneOf(RENDER_KINDS, r.kind)) return null;
   const hint: RenderHint = { kind: r.kind };
 
   // Each optional field: absent is fine; present and invalid rejects the hint.
@@ -110,6 +115,10 @@ export function parseRenderHint(input: unknown): RenderHint | null {
     const value = r[key];
     if (typeof value !== 'string' || !IDENTIFIER.test(value)) return null;
     hint[key] = value;
+  }
+  if (r.max_zoom !== undefined) {
+    if (typeof r.max_zoom !== 'number' || !Number.isFinite(r.max_zoom) || r.max_zoom < 0 || r.max_zoom > 22) return null;
+    hint.max_zoom = r.max_zoom;
   }
   if (r.bounds !== undefined) {
     const box = lonLatBox(r.bounds);

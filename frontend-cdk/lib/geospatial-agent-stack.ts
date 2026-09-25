@@ -268,12 +268,18 @@ export class GeospatialAgentStack extends cdk.Stack {
       actions: [
         's3:GetObject',
         's3:ListBucket',
-        's3:PutObject',
       ],
       resources: [
         `arn:aws:s3:::${config.s3BucketName}`,
         `arn:aws:s3:::${config.s3BucketName}/*`,
       ],
+    }));
+    // The backend writes exactly one thing: a brief the analyst filed (POST /api/brief/approve
+    // writes <id>.md, <id>.png and <id>.filed.json beside the agent's draft). Nothing else.
+    taskRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['s3:PutObject'],
+      resources: [`arn:aws:s3:::${config.s3BucketName}/session_data/*/briefs/*`],
     }));
 
     // Grant access to invoke Bedrock AgentCore Runtime

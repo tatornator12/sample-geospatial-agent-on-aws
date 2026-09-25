@@ -218,3 +218,34 @@ async def draft_brief(title: str, place: str, lat: float, lon: float, observatio
         "next_steps": ("Paste `markdown` verbatim as the record, then the line \"Decision: analyst's.\", then the "
                        "closing paragraph. Call no other tool. Never say the brief is filed or sent."),
     })
+
+
+BRIEF_ID_RE = re.compile(r"^brief-\d{8}T\d{6}-[0-9a-f]{6}$")
+
+
+@tool
+async def brief_status(brief_id: str) -> str:
+    """Whether a brief was filed by the analyst. The ONLY source for saying a brief is filed.
+
+    Args:
+        brief_id: e.g. brief-20260925T201500-a1b2c3 (from draft_brief).
+
+    Returns: JSON with status "filed" (with filed_at), "draft" (not filed yet) or "not_found".
+    """
+    if not isinstance(brief_id, str) or not BRIEF_ID_RE.fullmatch(brief_id):
+        return json.dumps({"error": "brief_id must look like brief-20260925T201500-a1b2c3"})
+    s3 = mt._s3()
+    prefix = f"session_data/{mt._session_id()}/briefs/{brief_id}"
+    try:
+        filed = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{prefix}.filed.json")["Body"].read(100_000))
+        return json.dumps({"brief_id": brief_id, "status": "filed", "filed_at": filed.get("filed_at"),
+                           "say": "The analyst filed this brief."})
+    except s3.exceptions.NoSuchKey:
+        pass
+    try:
+        s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{prefix}.draft.json")
+        return json.dumps({"brief_id": brief_id, "status": "draft",
+                           "say": "This brief is still a draft: the analyst has not filed it."})
+    except s3.exceptions.NoSuchKey:
+        return json.dumps({"brief_id": brief_id, "status": "not_found",
+                           "say": "There is no brief with that id in this session."})

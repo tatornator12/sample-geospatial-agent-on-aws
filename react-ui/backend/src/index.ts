@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand, StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { checkS3Access } from './s3Access';
 import { isScenarioId, scenarioAgent, scenarioLayers, scenarioToolCalls } from './scenario';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
@@ -11,6 +11,22 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { authenticateToken } from './middleware/auth';
+import {
+  DRAFT_MAX_BYTES,
+  SNAPSHOT_MAX_BYTES,
+  briefCard,
+  caseBriefDraftKey,
+  decodeSnapshot,
+  fileRefusal,
+  filedBy,
+  filedMarkdown,
+  isBriefId,
+  isCaseId,
+  isSessionId,
+  sessionBriefKeys,
+} from './brief';
+
+const BRIEF_APPROVE_PATH = '/api/brief/approve';
 
 dotenv.config();
 
@@ -149,7 +165,10 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
-app.use(express.json());
+// JSON bodies stay at the 100 kB default everywhere except the brief approval, which may carry a
+// map snapshot; that route parses its own (larger) body AFTER authentication.
+const defaultJson = express.json();
+app.use((req, res, next) => (req.path === BRIEF_APPROVE_PATH ? next() : defaultJson(req, res, next)));
 
 // Health check (public, no auth required)
 app.get('/health', (req: Request, res: Response) => {
@@ -726,6 +745,100 @@ app.get('/api/geometry', async (req: Request, res: Response) => {
     console.error('Error loading geometry from S3:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     res.status(500).json({ error: 'Failed to load geometry', message: errorMessage });
+  }
+});
+
+// ========================================
+// The analyst's decision on a Methane Watch brief (see brief.ts)
+// ========================================
+
+/** An S3 object's text (capped), or null when it does not exist. Other errors throw. */
+async function readS3Text(bucket: string, key: string, maxBytes: number): Promise<string | null> {
+  try {
+    const response = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    if (!response.Body) return null;
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of response.Body as Readable) {
+      size += chunk.length;
+      if (size > maxBytes) throw new Error('object larger than its cap');
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString('utf-8');
+  } catch (error: any) {
+    if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) return null;
+    throw error;
+  }
+}
+
+function parseJson(text: string | null): unknown {
+  if (text === null) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+// The card for a draft: the live session's (sessionId), or a replay case's (caseId, never filed).
+app.get('/api/brief', async (req: Request, res: Response) => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  const { sessionId, caseId, briefId } = req.query;
+  if (!bucket) return res.status(503).json({ error: 'S3 bucket not configured' });
+  if (!isBriefId(briefId)) return res.status(400).json({ error: 'Invalid briefId' });
+  const live = isSessionId(sessionId);
+  if (!live && !isCaseId(caseId)) return res.status(400).json({ error: 'sessionId or caseId is required' });
+  try {
+    if (!live) {
+      const record = parseJson(await readS3Text(bucket, caseBriefDraftKey(caseId as string, briefId), DRAFT_MAX_BYTES));
+      const card = briefCard(record, briefId, null);
+      return card ? res.json({ status: 'replay', card }) : res.status(404).json({ error: 'Brief not found' });
+    }
+    const keys = sessionBriefKeys(sessionId as string, briefId);
+    const card = briefCard(parseJson(await readS3Text(bucket, keys.draft, DRAFT_MAX_BYTES)), briefId, sessionId as string);
+    if (!card) return res.status(404).json({ error: 'Brief not found' });
+    const filed = parseJson(await readS3Text(bucket, keys.filed, 10_000)) as { filed_at?: unknown; filed_by?: unknown } | null;
+    return res.json(filed
+      ? { status: 'filed', filedAt: filed.filed_at, filedBy: filed.filed_by, card }
+      : { status: 'draft', card });
+  } catch (error) {
+    console.error('Brief read failed:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'Failed to read the brief' });
+  }
+});
+
+// Approve and file: only the analyst's click does this. Idempotent: a filed brief stays filed.
+app.post(BRIEF_APPROVE_PATH, express.json({ limit: Math.ceil(SNAPSHOT_MAX_BYTES * 1.4) + 4096 }), async (req: Request, res: Response) => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  const { sessionId, briefId, snapshot } = req.body ?? {};
+  if (!bucket) return res.status(503).json({ error: 'S3 bucket not configured' });
+  if (!isSessionId(sessionId) || !isBriefId(briefId)) return res.status(400).json({ error: 'Invalid sessionId or briefId' });
+  const shot = decodeSnapshot(snapshot);
+  if (!shot.ok) return res.status(400).json({ error: shot.reason });
+  const keys = sessionBriefKeys(sessionId, briefId);
+  try {
+    const existing = parseJson(await readS3Text(bucket, keys.filed, 10_000)) as { filed_at?: unknown; filed_by?: unknown } | null;
+    if (existing) return res.json({ status: 'filed', filedAt: existing.filed_at, filedBy: existing.filed_by, already: true });
+    const record = parseJson(await readS3Text(bucket, keys.draft, DRAFT_MAX_BYTES));
+    if (record === null) return res.status(404).json({ error: 'Brief not found' });
+    const refusal = fileRefusal(record, briefId, sessionId);
+    if (refusal) return res.status(409).json({ error: refusal });
+    const by = filedBy((req as any).user);
+    const at = new Date().toISOString();
+    const markdown = filedMarkdown((record as { markdown: string }).markdown, by, at);
+    await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: keys.markdown, Body: markdown, ContentType: 'text/markdown; charset=utf-8' }));
+    if (shot.png) {
+      await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: keys.snapshot, Body: shot.png, ContentType: 'image/png' }));
+    }
+    // The filed record last: brief_status reads it, so it exists only once everything else is written.
+    const filed = { brief_id: briefId, session_id: sessionId, status: 'filed', filed_at: at, filed_by: by,
+                    markdown_key: keys.markdown, snapshot_key: shot.png ? keys.snapshot : null };
+    await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: keys.filed, Body: JSON.stringify(filed), ContentType: 'application/json' }));
+    console.log(`📝 Brief ${briefId} filed by ${by}`);
+    return res.json({ status: 'filed', filedAt: at, filedBy: by });
+  } catch (error) {
+    console.error('Brief filing failed:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'Failed to file the brief' });
   }
 });
 

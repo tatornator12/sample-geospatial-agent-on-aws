@@ -14,6 +14,9 @@ import { StepColumn } from './StepColumn.tsx';
 import { EvidencePlate } from './EvidencePlate.tsx';
 import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
+import { methaneDirFrom } from '../utils/steps.ts';
+import { currentBriefId } from '../utils/brief.ts';
+import { BriefCard } from './BriefCard.tsx';
 import { docentCaption } from '../utils/caption.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
@@ -66,6 +69,8 @@ interface ChatSidebarProps {
   drawnGeometryMessage?: string | null;
   onDrawnGeometryMessageSent?: () => void;
   onToggleSidebar?: () => void;
+  /** Told when the agent starts and stops working a turn (the map's watch globe turns meanwhile). */
+  onWorkingChange?: (working: boolean) => void;
 }
 
 export function ChatSidebar({
@@ -81,12 +86,16 @@ export function ChatSidebar({
   onRastersUpdate,
   drawnGeometryMessage,
   onDrawnGeometryMessageSent,
+  onWorkingChange,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [streamingTools, setStreamingTools] = useState<ToolCall[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  useEffect(() => {
+    onWorkingChange?.(isStreaming);
+  }, [isStreaming, onWorkingChange]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -473,6 +482,11 @@ export function ChatSidebar({
   const stepTools = isStreaming ? streamingTools : lastAssistant?.tools || [];
   // What the agent looked at: the inspect_image steps of the same turn.
   const evidence = extractEvidence(stepTools, sessionId);
+  // Where this session's methane files live (the pass filmstrip reads its manifest there): from
+  // any s3_url a tool was given in this session, this turn first.
+  const methaneDir = methaneDirFrom([...stepTools, ...messages.flatMap((m) => m.tools ?? [])], sessionId);
+  // The draft brief on the stage, if the latest answer drafted one (or the decision on it is pending).
+  const briefId = currentBriefId(messages);
   // This act's prompts, placeholder and idle line; the room hears the act's name, not "(dev)".
   const copy = stageCopyFor(agentId);
   const speaker = stageAgentLabel(agentLabel) ?? 'Agent';
@@ -490,7 +504,20 @@ export function ChatSidebar({
             live={isStreaming}
             evidence={evidence}
             onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
+            methaneDir={methaneDir}
+            compact={!!briefId && !isStreaming}
+            key={briefId ?? 'steps'}
           />
+          {briefId && !isStreaming && (
+            <BriefCard
+              key={briefId}
+              briefId={briefId}
+              sessionId={sessionId}
+              caseId={scenarioId}
+              busy={isProcessing}
+              onDecision={(prompt) => void sendMessage(prompt)}
+            />
+          )}
         </section>
       )}
 

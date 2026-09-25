@@ -195,7 +195,7 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     assert read == [f"COGT/OFFL/L2__CH4___/2026/09/10/{STEM}"]
     assert out["summary"]["background_ppb"] == 1940.0 and out["summary"]["orbits"] == 1
     assert out["anomaly_s3_url"].startswith(f"s3://{BUCKET}/session_data/{SESSION}/methane/tropomi_anomaly_")
-    assert out["render"]["colormap"] == "magma" and out["render"]["units"] == "ppb"
+    assert out["render"]["colormap"] == "viridis" and out["render"]["units"] == "ppb" and out["render"]["max_zoom"] == 8
     assert out["hotspots"][0]["anomaly_ppb"] == 50.0
     # Warm: same answer from the shared cache, nothing read from TROPOMI, a fresh session copy.
     monkeypatch.setattr(watch, "read_tropomi_window", lambda *a, **k: pytest.fail("should come from the cache"))
@@ -203,6 +203,14 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     again = json.loads(_run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-10")))
     assert again["summary"]["source"] == "cache" and again["hotspots"] == out["hotspots"]
     assert "/session_data/another-session-0002/methane/" in again["anomaly_s3_url"]
+    # A composite cached under an older style comes back in today's style (viridis, zoom cap).
+    key = next(k for k in fake_s3.objects if k.endswith("_1d.json") and k.startswith("methane/cache/tropomi_"))
+    stale = json.loads(fake_s3.objects[key])
+    stale["render"] = {"kind": "raster", "colormap": "magma", "rescale": [0, 60]}
+    fake_s3.objects[key] = json.dumps(stale).encode()
+    restyled = json.loads(_run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-10")))
+    assert restyled["render"]["colormap"] == "viridis" and restyled["render"]["max_zoom"] == 8
+    assert restyled["render"]["bounds"] == out["render"]["bounds"]
 
 
 # --- 9.4 EMIT recent passes -------------------------------------------------------------------------
@@ -281,6 +289,22 @@ def test_check_recent_passes_reads_scenes_and_stages_windows(watch, fake_s3, mon
                                     ("EMIT_L2B_CH4ENH_002_20260101T000000_2600001_001", "CH4ENH")])
     weak_pass = next(p for p in out["passes"] if p["scene_id"] != SCENE)
     assert weak_pass["pixels_significant"] is None and "only 2 pixels" in weak_pass["reason"]
+    assert weak_pass["short"] == "too weak" and next(p for p in out["passes"] if p["scene_id"] == SCENE)["short"] == "candidate"
+    # The filmstrip manifest, keyed by the call's lat/lon; chips relative to it.
+    mkey = f"session_data/{SESSION}/methane/passes_{LAT:.4f}_{LON:.4f}.json"
+    manifest = json.loads(fake_s3.objects[mkey])
+    assert [(f["date"], f["verdict"], f["short"]) for f in manifest["passes"]] == [
+        ("2026-08-12", "candidate", "candidate"), ("2026-01-01", "rejected", "too weak")]
+    assert manifest["passes"][0]["chip"] == f"passchip_{SCENE}.png"
+    assert fake_s3.objects[f"session_data/{SESSION}/methane/passchip_{SCENE}.png"][:8] == b"\x89PNG\r\n\x1a\n"
+    # The display window keeps only enhanced pixels, so the ground shows through it.
+    with rasterio.MemoryFile(fake_s3.objects[f"session_data/{SESSION}/methane/pass_{SCENE}.tif"]) as mem, mem.open() as ds:
+        a = ds.read(1, masked=True)
+        assert a.count() == 40 and float(a.min()) >= 500
+    # The strongest candidate's 3D columns: one cell per enhanced pixel, strongest first.
+    cols = json.loads(fake_s3.objects[out["strongest_candidate"]["columns_s3_url"].split(f"{BUCKET}/", 1)[1]])
+    assert len(cols["features"]) == 40 and cols["features"][0]["properties"]["ppm_m"] == pytest.approx(2500.0)
+    assert out["render_columns"]["kind"] == "columns" and out["render_columns"]["property"] == "ppm_m"
     # Second run: every verdict from the shared cache, no read, same answer.
     monkeypatch.setattr(watch, "read_scene_window", lambda *a, **k: pytest.fail("should come from the cache"))
     again = json.loads(_run(watch.check_recent_passes(LAT, LON)))
@@ -352,3 +376,24 @@ def test_a_direct_200_falls_back_to_the_whole_file(watch, monkeypatch):
     monkeypatch.setattr(watch.mt, "download_url", lambda url, token, *a, **k: enh)
     arr, _, _ = watch.read_scene_window(SCENE, "CH4ENH", TOKEN, watch.box_around(LAT, LON, 3))
     assert np.nanmax(arr) == pytest.approx(2500.0)
+
+
+def test_short_reasons_come_from_the_full_reason(watch):
+    assert watch.short_reason({"verdict": "rejected", "reason": "no valid pixels at the site (cloud, water or outside the swath)"}) == "cloud or gap"
+    assert watch.short_reason({"verdict": "rejected", "reason": "only 2 pixels above 3× their uncertainty"}) == "within noise"
+    assert watch.short_reason({"verdict": "rejected", "reason": "only 3 pixels ≥ 1000 ppm·m (need 5)"}) == "too weak"
+    assert watch.short_reason({"verdict": "candidate", "reason": "40 pixels"}) == "candidate"
+
+
+def test_baseline_carries_unlabelled_watch_area_outlines(watch, fake_s3, monkeypatch):
+    import methane_tools as mt
+    fc = {"type": "FeatureCollection", "built_at": 10**12, "detections": 1, "features": [
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [53.6, 39.5]},
+         "properties": {"repeat_dates": 6, "plumes": 7, "first": "2023-01-01", "last": "2024-06-01", "tier": "repeat"}}]}
+    monkeypatch.setattr(watch, "load_sites", lambda client, s3: (fc, "cache"))
+    monkeypatch.setattr(mt, "archive_latest", lambda client: date(2025, 9, 22))
+    out = json.loads(_run(watch.watch_baseline()))
+    feats = json.loads(fake_s3.objects[out["sites_geometry_s3_url"].split(f"{BUCKET}/", 1)[1]])["features"]
+    areas = [f for f in feats if f["properties"]["tier"] == "watch_area"]
+    assert len(areas) == len(watch.WATCH_AREAS) and all(set(f["properties"]) == {"tier", "emit"} for f in areas)
+    assert out["summary"]["sites"] == 1 and out["repeat_sites"][0]["repeat_dates"] == 6

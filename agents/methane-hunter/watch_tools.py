@@ -87,8 +87,17 @@ WATCH_AREAS: dict[str, dict] = {
 }
 
 RENDER_SITES = {"kind": "points", "group": "watch", "property": "repeat_dates", "label": "repeat_dates", "units": "dates"}
-RENDER_TROPOMI = {"kind": "raster", "colormap": "magma", "rescale": [0, 60], "units": "ppb", "group": "methane",
+# viridis, not magma: magma is the same family as plasma and the two would read as one scale.
+# max_zoom: a ~4 km TROPOMI cell must never fill the screen over the EMIT candidate and the ground.
+RENDER_TROPOMI = {"kind": "raster", "colormap": "viridis", "rescale": [0, 60], "units": "ppb", "group": "methane",
+                  "max_zoom": 8,
                   "legend": "CH4 anomaly"}
+RENDER_COLUMNS = {"kind": "columns", "property": "ppm_m", "ramp": "plasma", "rescale": [0, 1500], "units": "ppm·m",
+                  "group": "methane", "legend": "CH4 enhancement"}
+DISPLAY_FLOOR_PPM_M = 500.0           # the display window shows only enhanced pixels; the ground shows through
+COLUMNS_CAP = 3000                    # strongest cells kept for the 3D columns
+CHIP_EDGE = 96                        # filmstrip frames (px, long edge)
+SHORT_REASON = {"candidate": "candidate", "no_valid": "cloud or gap", "weak": "too weak", "noise": "within noise"}
 RENDER_PASS = {"kind": "raster", "colormap": "plasma", "rescale": [0, 1500], "units": "ppm·m", "group": "methane",
                "legend": "CH4 enhancement"}
 
@@ -229,12 +238,17 @@ async def watch_baseline(min_repeat_dates: int = 5) -> str:
         return json.dumps({"error": str(e)})
     except httpx.HTTPError as e:
         return json.dumps({"error": f"The NASA CMR catalogue could not be reached ({type(e).__name__})."})
-    feats = fc.get("features", [])
+    feats = [f for f in fc.get("features", []) if f.get("geometry", {}).get("type") == "Point"]
     for f in feats:
         f["properties"]["tier"] = "repeat" if f["properties"]["repeat_dates"] >= min_repeat_dates else "site"
     repeat = sorted((f for f in feats if f["properties"]["tier"] == "repeat"),
                     key=lambda f: (-f["properties"]["repeat_dates"], f["properties"]["first"]))
-    url = mt._put_json(f"{mt.session_prefix()}watch_sites_v002.geojson", {"type": "FeatureCollection", "features": feats})
+    # The watch areas ride along as outlines (no names: the globe carries counts only).
+    areas = [{"type": "Feature", "properties": {"tier": "watch_area", "emit": spec["emit"]},
+              "geometry": {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}}
+             for spec in WATCH_AREAS.values() for (w, s, e, n) in [spec["bbox"]]]
+    url = mt._put_json(f"{mt.session_prefix()}watch_sites_v002.geojson",
+                       {"type": "FeatureCollection", "features": feats + areas})
     firsts = [f["properties"]["first"] for f in feats]
     return json.dumps({
         "summary": {"detections": fc.get("detections"), "sites": len(feats), "repeat_sites": len(repeat),
@@ -429,6 +443,9 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
         tif = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.tif")["Body"].read(50_000_000)
         url = _put_bytes(session_key, tif, "image/tiff")
         cached["summary"].update(source="cache", seconds=round(time.time() - started, 1))
+        # The styling is today's, not the cache's: a composite cached before a render change
+        # (magma, no zoom cap) must not bring the old look back.
+        cached["render"] = {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]}
         return json.dumps({**cached, "anomaly_s3_url": url})
     except s3.exceptions.NoSuchKey:
         pass
@@ -589,17 +606,20 @@ def judge_window(enh: np.ndarray, unc: np.ndarray | None) -> dict:
         with np.errstate(invalid="ignore"):
             significant = int(np.nansum((enh >= 500) & (enh > UNCERT_SIGMA * unc)))
     if valid == 0:
-        verdict, reason = "rejected", "no valid pixels at the site (cloud, water or outside the swath)"
+        verdict, reason, short = "rejected", "no valid pixels at the site (cloud, water or outside the swath)", "no_valid"
     elif strong < CANDIDATE_MIN_PIXELS:
-        verdict, reason = "rejected", f"only {strong} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m (need {CANDIDATE_MIN_PIXELS})"
+        verdict, reason, short = ("rejected", f"only {strong} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m (need {CANDIDATE_MIN_PIXELS})",
+                                  "weak")
     elif significant is None:
         raise ValueError("uncertainty is needed to judge a pass with enough strong pixels")
     elif significant < CANDIDATE_MIN_PIXELS:
-        verdict, reason = "rejected", f"only {significant} pixels above {UNCERT_SIGMA:g}× their uncertainty"
+        verdict, reason, short = "rejected", f"only {significant} pixels above {UNCERT_SIGMA:g}× their uncertainty", "noise"
     else:
-        verdict, reason = "candidate", f"{strong} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m, {significant} above {UNCERT_SIGMA:g}× uncertainty"
+        verdict, reason, short = ("candidate", f"{strong} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m, {significant} above "
+                                  f"{UNCERT_SIGMA:g}× uncertainty", "candidate")
     return {"valid_pixels": valid, "peak_ppm_m": round(peak, 1) if peak is not None else None,
-            "pixels_ge_1000": strong, "pixels_significant": significant, "verdict": verdict, "reason": reason}
+            "pixels_ge_1000": strong, "pixels_significant": significant, "verdict": verdict, "reason": reason,
+            "short": SHORT_REASON[short]}
 
 
 def needs_uncertainty(enh: np.ndarray) -> bool:
@@ -643,11 +663,73 @@ def check_one_pass(scene_id: str, lat: float, lon: float, token: str, s3) -> dic
         s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.json", Body=json.dumps(stats).encode(),
                       ContentType="application/json")
         source = "lpdaac"
-    # The browser reads session copies only (the backend's S3 allowlist is unchanged).
-    url = _put_bytes(session_key, window, "image/tiff") if window else None
+    stats.setdefault("short", short_reason(stats))   # verdicts cached before short reasons existed
+    # The browser reads session copies only (the backend's S3 allowlist is unchanged): the display
+    # window keeps only enhanced pixels (the ground shows through); the chip shows the whole window.
+    url, chip_url = None, None
+    if window:
+        display = display_window(window)
+        if display:
+            url = _put_bytes(session_key, display, "image/tiff")
+        chip = chip_png(window, s3, f"{base}.png")
+        if chip:
+            chip_url = _put_bytes(f"{mt.session_prefix()}passchip_{scene_id}.png", chip, "image/png")
     m = SCENE_RE.fullmatch(scene_id)
     return {"scene_id": scene_id, "date": f"{m[1][:4]}-{m[1][4:6]}-{m[1][6:8]}", **stats,
-            "window_s3_url": url, "source": source}
+            "window_s3_url": url, "chip_s3_url": chip_url, "source": source}
+
+
+def short_reason(stats: dict) -> str:
+    """The filmstrip's words for a verdict, from the full reason."""
+    reason = stats.get("reason") or ""
+    if stats.get("verdict") == "candidate":
+        return SHORT_REASON["candidate"]
+    if "no valid" in reason:
+        return SHORT_REASON["no_valid"]
+    if "uncertainty" in reason:
+        return SHORT_REASON["noise"]
+    return SHORT_REASON["weak"]
+
+
+def display_window(window_cog: bytes, floor: float = DISPLAY_FLOOR_PPM_M) -> bytes | None:
+    """The window with pixels below `floor` as nodata (None when nothing is left to show)."""
+    with MemoryFile(window_cog) as mem, mem.open() as ds:
+        a, tr, (xres, yres) = _read_window(ds, ds.bounds)
+    a = np.where(a >= floor, a, np.nan)
+    return _cog_bytes(a, tr.c, tr.f, xres, yres) if np.isfinite(a).any() else None
+
+
+def chip_png(window_cog: bytes, s3, cache_key: str) -> bytes | None:
+    """A small plasma rendering of the whole window for the filmstrip (cached with the verdict)."""
+    try:
+        return s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=cache_key)["Body"].read(2_000_000)
+    except s3.exceptions.NoSuchKey:
+        pass
+    try:
+        from utils.inspection import render_preview
+        with MemoryFile(window_cog) as mem:
+            png = render_preview(mem.name, max_edge=CHIP_EDGE, style_hint="ch4enh").data
+    except Exception as e:  # a chip is decoration: never fail the pass for it
+        logger.warning("pass chip failed: %s", type(e).__name__)
+        return None
+    s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=cache_key, Body=png, ContentType="image/png")
+    return png
+
+
+def columns_geojson(window_cog: bytes, floor: float = DISPLAY_FLOOR_PPM_M, cap: int = COLUMNS_CAP) -> dict:
+    """Pixels at or above `floor` as square cells with their ppm·m, strongest first (for 3D columns)."""
+    with MemoryFile(window_cog) as mem, mem.open() as ds:
+        a, tr, (xres, yres) = _read_window(ds, ds.bounds)
+    rows, cols = np.where(np.isfinite(a) & (a >= floor))
+    order = np.argsort(-a[rows, cols])[:cap]
+    feats = []
+    for r, c in zip(rows[order], cols[order]):
+        west, north = tr * (int(c), int(r))
+        east, south = west + xres, north - yres
+        ring = [[round(v, 6) for v in pt] for pt in ((west, south), (east, south), (east, north), (west, north), (west, south))]
+        feats.append({"type": "Feature", "properties": {"ppm_m": round(float(a[r, c]), 1)},
+                      "geometry": {"type": "Polygon", "coordinates": [ring]}})
+    return {"type": "FeatureCollection", "features": feats}
 
 
 @tool
@@ -709,6 +791,22 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
         return json.dumps({"error": "The Earthdata token is missing or expired, so EMIT's recent scenes cannot be read."})
     cands = [p for p in passes if p["verdict"] == "candidate"]
     best = max(cands, key=lambda p: p["peak_ppm_m"] or 0, default=None)
+    # The filmstrip's manifest: the UI derives its key from this call's lat/lon (4 decimals) and reads
+    # it through the backend; chips are named relative to it (a replay case copies them flat).
+    manifest = {"lat": round(lat, 4), "lon": round(lon, 4), "since": since_d.isoformat(), "looks": looks,
+                "passes": [{"date": p.get("date"), "verdict": p["verdict"], "short": p.get("short", "error"),
+                            "reason": p.get("reason"), "peak_ppm_m": p.get("peak_ppm_m"),
+                            "chip": p["chip_s3_url"].rsplit("/", 1)[1] if p.get("chip_s3_url") else None}
+                           for p in passes]}
+    mt._put_json(f"{mt.session_prefix()}passes_{lat:.4f}_{lon:.4f}.json", manifest)
+    columns_url = None
+    if best:
+        try:
+            win = s3.get_object(Bucket=config.S3_BUCKET_NAME,
+                                Key=f"{pass_cache_base(best['scene_id'], lat, lon)}.tif")["Body"].read(SCENE_CAP_BYTES)
+            columns_url = mt._put_json(f"{mt.session_prefix()}columns_{best['scene_id']}.geojson", columns_geojson(win))
+        except Exception as e:
+            logger.warning("columns failed: %s", type(e).__name__)
     summary = {"lat": lat, "lon": lon, "since": since_d.isoformat(), "looks": looks, "read": len(passes),
                "candidates": len(cands), "rejected": sum(p["verdict"] == "rejected" for p in passes),
                "errors": sum(p["verdict"] == "error" for p in passes),
@@ -720,8 +818,11 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
     logger.info("PASSES: %.3f,%.3f %d read, %d candidates in %.1fs", lat, lon, len(passes), len(cands), summary["seconds"])
     return json.dumps({
         "summary": summary, "passes": passes,
-        "strongest_candidate": best and {k: best[k] for k in ("scene_id", "date", "peak_ppm_m", "pixels_ge_1000", "window_s3_url")},
+        "strongest_candidate": best and {**{k: best[k] for k in ("scene_id", "date", "peak_ppm_m", "pixels_ge_1000",
+                                                                "window_s3_url")}, "columns_s3_url": columns_url},
         "render": {**RENDER_PASS, "bounds": [round(v, 5) for v in box_around(lat, lon, WINDOW_KM / 2)]},
-        "next_steps": ("Say how many passes were candidates and which were rejected and why. inspect_image the "
-                       "strongest candidate's window_s3_url, then display_visual it with render=render."),
+        "render_columns": RENDER_COLUMNS,
+        "next_steps": ("Say how many passes were candidates and which were rejected and why (use the short reasons). "
+                       "inspect_image the strongest candidate's window_s3_url, then display_visual it with "
+                       "render=render and display_visual(columns_s3_url, render=render_columns)."),
     })

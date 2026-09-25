@@ -101,3 +101,16 @@ def test_hypothesis_labels_and_describing_what_is_seen_pass_the_checks(brief):
     assert brief.check_text("Pads, tanks and an access road are visible north of the candidate.") == []
     assert brief.check_text("A leak cannot be ruled out without an aircraft survey.") == []
     assert all(brief.check_text(label) == [] for label in brief.EXPLANATIONS.values())
+
+
+def test_brief_status_is_the_only_source_for_filed(brief, fake_s3):
+    out = json.loads(_run(brief.draft_brief(**good())))
+    bid = out["brief_id"]
+    assert json.loads(_run(brief.brief_status(bid)))["status"] == "draft"
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/briefs/{bid}.filed.json",
+                       Body=json.dumps({"filed_at": "2026-09-25T20:00:00Z"}).encode())
+    filed = json.loads(_run(brief.brief_status(bid)))
+    assert filed["status"] == "filed" and filed["filed_at"] == "2026-09-25T20:00:00Z"
+    assert json.loads(_run(brief.brief_status("brief-20260101T000000-abcdef")))["status"] == "not_found"
+    for bad in ("../x", "brief-1", None):
+        assert "error" in json.loads(_run(brief.brief_status(bad)))

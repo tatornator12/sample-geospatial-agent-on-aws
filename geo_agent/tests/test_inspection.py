@@ -95,12 +95,12 @@ def test_emit_methane_plume_uses_plasma_over_zero_to_1500(inspection):
 
 
 def test_methane_watch_rasters_preview_like_the_map(inspection):
-    """Raw EMIT pass windows share the plume ramp; the TROPOMI anomaly uses magma over 0-60 ppb."""
+    """Raw EMIT pass windows share the plume ramp; the TROPOMI anomaly uses viridis over 0-60 ppb."""
     window = inspection.index_style("s3://b/session_data/s/methane/pass_EMIT_L2B_CH4ENH_002_20260812T060000_2622401_012.tif")
     assert window.name == "ch4" and (window.vmin, window.vmax) == (0.0, 1500.0)
     anomaly = inspection.index_style("s3://b/session_data/s/methane/tropomi_anomaly_south_caspian_2026-09-23_14d.tif")
     assert anomaly.name == "tropomi" and (anomaly.vmin, anomaly.vmax) == (0.0, 60.0)
-    assert tuple(inspection.build_ramp(anomaly.anchors)[-1]) == (0xfc, 0xfd, 0xbf)
+    assert tuple(inspection.build_ramp(anomaly.anchors)[-1]) == (0xfd, 0xe7, 0x25)
 
 
 def test_unknown_single_band_gets_percentile_grey_stretch(tmp_path, inspection):

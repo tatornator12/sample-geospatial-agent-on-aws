@@ -75,6 +75,12 @@ const STEP_NAMES: Record<string, string> = {
   scan_region_change: 'Scan for change',
   find_similar_places: 'Find similar places',
   protected_area_context: 'Check protected areas',
+  watch_baseline: 'Build the baseline',
+  scan_tropomi: 'Scan with TROPOMI',
+  check_recent_passes: 'Cue EMIT',
+  site_history: 'Check the site history',
+  draft_brief: 'Draft the brief',
+  brief_status: 'Check the brief',
 };
 
 export function stepName(toolName: string): string {

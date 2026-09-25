@@ -41,7 +41,7 @@ from utils.tools import (  # noqa: E402
 import methane_config  # noqa: E402
 from methane_tools import search_methane_plumes, show_plume, triage_plumes  # noqa: E402
 from watch_tools import check_recent_passes, scan_tropomi, site_history, watch_baseline  # noqa: E402
-from brief_tools import draft_brief  # noqa: E402
+from brief_tools import brief_status, draft_brief  # noqa: E402
 
 app = BedrockAgentCoreApp()
 
@@ -73,6 +73,7 @@ LOCAL_TOOLS = [
     check_recent_passes,
     site_history,
     draft_brief,
+    brief_status,
 ]
 
 
