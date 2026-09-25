@@ -11,27 +11,33 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
 
 ## Week 4a (Oct 6–10): the agent on its own dev runtime
 
-- [ ] 1. Scaffold and shared-code staging
-  - [ ] 1.1 `agents/methane-hunter/`: `methane_hunter.py` (entrypoint copied from the Earth Analyst, tool list swapped), `config.py` (`sys.path` to `_geo_agent`, `from config import *`, `METHANE_PROMPT` placeholder), `requirements.txt` (= geo_agent's), `.env.example` (adds `EARTHDATA_TOKEN`), `.gitignore` (`_geo_agent/`, `.env*`, `.bedrock_agentcore.yaml`), `README.md` (how to run, deploy, test)
-  - [ ] 1.2 `stage_shared.sh`: rsync allowlist (`geo_agent/config.py`, `geo_agent/utils/`, `geo_agent/data/`) into `_geo_agent/`; `Dockerfile` = `geo_agent/Dockerfile_geospatial_agent_on_aws` + `COPY _geo_agent/ ./_geo_agent/` + entrypoint `methane_hunter`
-  - [ ] 1.3 `geo_agent/deploy_lib.sh`: `STABLE_AGENT_NAME` / `DEV_AGENT_NAME` parameters with today's defaults; `agents/methane-hunter/deploy.sh` sources it with `methane_hunter` / `methane_hunter_dev`, runs `stage_shared.sh`, requires `EARTHDATA_TOKEN` in the env file, passes it as `--env` (redacted in dry run). `DRY_RUN=1 DEPLOY_TARGET=dev ./deploy.sh` and the Earth Analyst's dry run both print unchanged plans
-  - [ ] 1.4 `tests/conftest.py` (real `geo_agent/` on `sys.path`, the synthetic-`utils` and stub pattern from `geo_agent/tests/conftest.py`, `S3_BUCKET_NAME` defaulted, a synthetic 222×221 float32 plume COG fixture with nodata −9999 and known values, a recorded CMR page fixture); `tests/test_staging.py` (allowlist covers every `utils.` import); `tests/test_entrypoint.py` (prewarm short-circuit yields "warm" and returns)
+- [x] 1. Scaffold and shared-code staging
+  - [x] 1.1 `agents/methane-hunter/`: `methane_hunter.py` (entrypoint copied from the Earth Analyst, tool list swapped), `config.py` (`sys.path` to `_geo_agent`, `from config import *`, `METHANE_PROMPT` placeholder), `requirements.txt` (= geo_agent's), `.env.example` (adds `EARTHDATA_TOKEN`), `.gitignore` (`_geo_agent/`, `.env*`, `.bedrock_agentcore.yaml`), `README.md` (how to run, deploy, test)
+  - [x] 1.2 `stage_shared.sh`: rsync allowlist (`geo_agent/config.py`, `geo_agent/utils/`, `geo_agent/data/`) into `_geo_agent/`; `Dockerfile` = `geo_agent/Dockerfile_geospatial_agent_on_aws` + `COPY _geo_agent/ ./_geo_agent/` + entrypoint `methane_hunter`
+  - [x] 1.3 `geo_agent/deploy_lib.sh`: `STABLE_AGENT_NAME` / `DEV_AGENT_NAME` parameters with today's defaults; `agents/methane-hunter/deploy.sh` sources it with `methane_hunter` / `methane_hunter_dev`, runs `stage_shared.sh`, requires `EARTHDATA_TOKEN` in the env file, passes it as `--env` (redacted in dry run). `DRY_RUN=1 DEPLOY_TARGET=dev ./deploy.sh` and the Earth Analyst's dry run both print unchanged plans
+  - [x] 1.4 `tests/conftest.py` (real `geo_agent/` on `sys.path`, the synthetic-`utils` and stub pattern from `geo_agent/tests/conftest.py`, `S3_BUCKET_NAME` defaulted, a synthetic 222×221 float32 plume COG fixture with nodata −9999 and known values, a recorded CMR page fixture); `tests/test_staging.py` (allowlist covers every `utils.` import); `tests/test_entrypoint.py` (prewarm short-circuit yields "warm" and returns)
   - _Requirements: 1.1, 1.2, 1.3, 7.1_
 
-- [ ] 2. Tools
-  - [ ] 2.1 `tools.py` `search_methane_plumes`: extent resolution (bbox / geometry bounds / basin table, no substring match), date defaults and bounds, CMR query + paging, polygon and link validation (LP DAAC host only), footprints GeoJSON to `session_data/<sid>/methane/plumes_<slug>_<start>_<end>.geojson`, result JSON with `next_steps` and the vector `render` dict
-  - [ ] 2.2 `triage_plumes`: read the footprints back from S3 (URL must be this session's `methane/` prefix), ≤ 8 parallel streamed downloads with the bearer token, 20 s timeout, 5 MB cap, `rasterio.MemoryFile` stats (max, mean, count, area from the transform), deterministic ranking, staged `ch4plm_<granule>.tif` (id regex-validated), ranked GeoJSON, `summary.errors`, token-missing and 401 errors without the token text
-  - [ ] 2.3 `show_plume`: lookup by granule id in the session's ranked GeoJSON; returns staged URL, bounds, stats, raster `render`
-  - [ ] 2.4 Shared: `display_visual(..., render: dict = None)` in `geo_agent/utils/tools.py` (docstring: optional, Earth Analyst may omit); `inspection.INDEX_STYLES` `("ch4plm",)` plasma over `[0, 1500]`. `geo_agent` pytest still green (add one test for the new style)
-  - [ ] 2.5 `tests/test_search.py`, `tests/test_triage.py`, `tests/test_show.py`: query string and paging, zero results, non-200, polygon/link validation, GeoJSON shape; exact stats on the synthetic plume, ranking with ties, partial and total failure, token missing, 401, size cap, non-LP-DAAC host refused, invalid granule id refused, staged key; show_plume hit/miss. Target ≥ 30 tests
+- [x] 2. Tools
+  - [x] 2.1 `tools.py` `search_methane_plumes`: extent resolution (bbox / geometry bounds / basin table, no substring match), date defaults and bounds, CMR query + paging, polygon and link validation (LP DAAC host only), footprints GeoJSON to `session_data/<sid>/methane/plumes_<slug>_<start>_<end>.geojson`, result JSON with `next_steps` and the vector `render` dict
+  - [x] 2.2 `triage_plumes`: read the footprints back from S3 (URL must be this session's `methane/` prefix), ≤ 8 parallel streamed downloads with the bearer token, 20 s timeout, 5 MB cap, `rasterio.MemoryFile` stats (max, mean, count, area from the transform), deterministic ranking, staged `ch4plm_<granule>.tif` (id regex-validated), ranked GeoJSON, `summary.errors`, token-missing and 401 errors without the token text
+  - [x] 2.3 `show_plume`: lookup by granule id in the session's ranked GeoJSON; returns staged URL, bounds, stats, raster `render`
+  - [x] 2.4 Shared: `display_visual(..., render: dict = None)` in `geo_agent/utils/tools.py` (docstring: optional, Earth Analyst may omit); `inspection.INDEX_STYLES` `("ch4plm",)` plasma over `[0, 1500]`. `geo_agent` pytest still green (add one test for the new style)
+  - [x] 2.5 `tests/test_search.py`, `tests/test_triage.py`, `tests/test_show.py`: query string and paging, zero results, non-200, polygon/link validation, GeoJSON shape; exact stats on the synthetic plume, ranking with ties, partial and total failure, token missing, 401, size cap, non-LP-DAAC host refused, invalid granule id refused, staged key; show_plume hit/miss. Target ≥ 30 tests
   - _Requirements: 1.4, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 4.4, 7.1_
 
 - [ ] 3. Prompt and first dev deploy (checkpoint Friday Oct 10)
-  - [ ] 3.1 `METHANE_PROMPT`: Earth Analyst's RESPONSE STYLE / FINAL REPORT / DISPLAY RIDES ALONG / LOOK BEFORE YOU ANALYSE verbatim + the Methane Hunter block from design.md (workflow, units, the fixed confidence sentence, never name an emitter)
-  - [ ] 3.2 `.env.dev` (same bucket and role as the Earth Analyst, `EARTHDATA_TOKEN` from `.env.spikes`); `DEPLOY_TARGET=dev ./deploy.sh` → `methane_hunter_dev` v1; confirm env vars persisted (token present, never printed); smoke invoke with `{"prewarm": true}` then one prompt
+  - [x] 3.1 `METHANE_PROMPT`: Earth Analyst's RESPONSE STYLE / FINAL REPORT / DISPLAY RIDES ALONG / LOOK BEFORE YOU ANALYSE verbatim + the Methane Hunter block from design.md (workflow, units, the fixed confidence sentence, never name an emitter)
+  - [x] 3.2 `.env.dev` (same bucket and role as the Earth Analyst, `EARTHDATA_TOKEN` from `.env.spikes`); `DEPLOY_TARGET=dev ./deploy.sh` → `methane_hunter_dev` v1; confirm env vars persisted (token present, never printed); smoke invoke with `{"prewarm": true}` then one prompt
   - [ ] 3.3 `golden_prompts.json` (`plumes-permian`, `triage-permian`, `strongest-plume`); `scripts/eval.py --agent {earth,methane}` (agent dir, yaml, default prompts file; `earth` default keeps every existing invocation working); live run against `methane_hunter_dev`; calibrate from the recorded streams; record seconds. **Measure** warm triage of 30 Permian plumes (target < 20 s) and record here
   - [ ] 3.4 Manual prompts on dev through the local UI with `AGENT_RUNTIMES` extended locally (`react-ui/backend/.env`): the three prepared prompts in order; confirm the display → triage → plume → ground order, the confidence sentence in the closer, and that no emitter is named
   - _Requirements: 1.5 (eval part), 2.*, 3.*, 4.5, 4.6, 7.3_
+  - Results (built Sep 24–25, ahead of Week 4a):
+    - 1–2: commit `233858f`; `pytest` in `agents/methane-hunter/` = 59 passed (search 19, triage/show 31, staging 5, entrypoint 4); `geo_agent/` = 117 passed. Earth Analyst `DRY_RUN=1` plans unchanged.
+    - 3.2: `methane_hunter_dev-rIr0SoGuR2` deployed (5 deploys by Sep 25); env vars persisted, `EARTHDATA_TOKEN` present (not printed); prewarm smoke returned "warm".
+    - 3.3 live triage, Permian 2024 (39 plumes, not 30): cold 23.4 s (S3 cache empty; 39 downloads), warm 0.8 s (cache hits). The < 20 s target is for warm; the demo runs warm (`prewarm` + cache already populated). Rank 1: `EMIT_L2B_CH4PLM_002_20240131T182459_002534`, 8,130.7 ppm·m, 2.0 km² ≥ 500 ppm·m, Midland County TX.
+    - 3.3 eval runs 1–4: 0/3 → 2/3. Run 4: `triage-permian` 46 s PASS (158-char closer), `strongest-plume` 69 s PASS, `plumes-permian` FAIL (stopped after search as designed, but ended on an offer "Would you like me to rank them…?" instead of the closer). Fix (run 5, deployed Sep 25): HARD RULE 2 now says every answer ends with the closer, offers go above it; stop-early closer example; stale "last 90 days" wording removed. `eval.py` gains `closer_endswith` and keeps the tail of `report_text` (a head cut at 1,500 chars made run 4's complete `strongest-plume` closer look truncated). Run 5: pending `mwinit`.
+    - Requirement 4.6 amended: the full confidence sentence is the record's last line; the spoken closer ends with the short form "EMIT sees the methane, not its source." and is ≤ 240 chars, because the 280-char caption band keeps the TAIL of a long paragraph (a long closer would show only the disclaimer).
 
 ## Week 4b (Oct 13–17): the platform knows two agents; replay case; G3
 
@@ -49,6 +55,7 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
   - [ ] 5.1 `react-ui/backend/.env` and `frontend-cdk/.env`: `AGENT_RUNTIMES` gains `methane` (stable first, then dev, then methane); `promote.sh` env check requires `"methane"`; `cdk synth` shows the task role gaining exactly the methane ARN
   - [ ] 5.2 `scripts/promote.sh`: `--agent`-aware: eval both agents, then `geo_agent` stable deploy, then `agents/methane-hunter` stable deploy, one tag; `DRY_RUN=1` prints all of it; `.env` for the methane stable runtime prepared (`EARTHDATA_TOKEN`, refreshed token noted in the runbook)
   - [ ] 5.3 Switcher check on the local UI: three entries, prompts change with the agent, session reset and pre-warm on switch, stop-session routes to the right runtime
+  - [ ] 5.4 Security (pre-existing gap, found Sep 24): `react-ui/backend/src/index.ts` `/api/presigned-url` signs any bucket/key it is given. Restrict to `S3_BUCKET_NAME` and the prefixes the UI reads (`session_data/<caller's session>/`, `use-cases/`, `methane/cache/`); reject everything else with 403; unit test the allow/deny matrix. Must land before G3 promotes Release 2
   - _Requirements: 1.5, 5.1, 5.3_
 
 - [ ] 6. Replay case `methane-permian-2025`
@@ -67,4 +74,5 @@ Analyst's behaviour), `geo_agent/utils/tools.py` (`display_visual` gains an opti
 ## Gate log
 
 - (Oct 10 checkpoint: dev runtime version, three golden prompts, triage timing)
+  - Sep 25 (early): dev runtime `methane_hunter_dev-rIr0SoGuR2` live; triage cold 23.4 s / warm 0.8 s for 39 plumes; golden prompts 2/3 on run 4, run 5 pending.
 - (Oct 17 G3: commands with counts, tag, both stable smokes + evals, four rehearsal timings)

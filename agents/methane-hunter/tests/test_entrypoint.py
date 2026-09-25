@@ -82,7 +82,7 @@ def test_tool_surface(entry):
 def test_prompt_carries_the_confidence_sentence_and_render_rule():
     import methane_config
     p = methane_config.build_prompt("2026-10-06")
-    assert methane_config.CONFIDENCE_SENTENCE in p
+    assert methane_config.CONFIDENCE_SENTENCE in p and methane_config.SPOKEN_CONFIDENCE in p
     assert "Current date is 2026-10-06" in p
     assert "render" in p and "never name an emitter" in p.lower()
     assert "ppm·m" in p

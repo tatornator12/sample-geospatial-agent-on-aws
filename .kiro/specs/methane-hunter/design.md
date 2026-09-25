@@ -168,10 +168,9 @@ Earth Analyst it may omit it (its layers keep working from file names). `inspect
   (or the `ch4plm_` basename as fallback); plate shows "Methane" after "Change detection" with a
   legend row: ramp bar (plasma CSS gradient), `0` and `1500 ppm·m` in the mono face.
 - `ChatSidebar.tsx`: `PREPARED_PROMPTS: Record<string, Prompt[]>` keyed by agent id with
-  `default` = the Earth Analyst five; methane: "Plumes over the Permian Basin" → "Show me methane
-  plumes EMIT detected over the Permian Basin in the last 90 days"; "Triage the plumes" → "Rank
-  those plumes by how much methane they carry"; "Show the strongest plume" → "Show me the
-  strongest plume and what is on the ground beneath it".
+  `default` = the Earth Analyst five; methane (as built, two plates; see Deviations): "Find and rank
+  Permian plumes" → the `triage-permian` golden prompt; "Strongest plume and the ground" → the
+  `strongest-plume` golden prompt.
 - `UseCaseGallery.tsx`: card `methane-permian-2025` navigating to
   `/?scenario=methane-permian-2025&agent=methane`; `Chat.tsx` scenario loader renders
   `assets.layers[]` (each `{s3_url, title, render}`) when present, else the before/after scheme.
@@ -302,9 +301,8 @@ Replay `config.json` additions: `"agent": "methane"`, `"assets": {"layers": [{"s
 | t | Beat | Prompt / action | What the room sees |
 |---|---|---|---|
 | 0:00 | Switch | Agent switcher → Methane Hunter (pre-warmed) | Three new prepared plates |
-| 0:15 | Find | Plumes over the Permian Basin | Dozens of thin footprints over West Texas; "EMIT recorded N plume complexes in the last 90 days" |
-| 1:45 | Triage | Triage the plumes | Footprints turn plasma-graduated with rank numbers; table with ppm·m, area, places |
-| 3:15 | See | Show the strongest plume | Plasma plume raster, evidence chip of it, one sentence on its shape |
+| 0:15 | Find + rank | Find and rank Permian plumes (2024) | 39 footprints over West Texas, then plasma-graduated with rank numbers; table with ppm·m, area, places |
+| 3:15 | See | Strongest plume and the ground | Plasma plume raster, evidence chip of it, one sentence on its shape |
 | 4:15 | Ground | (same turn) | Sentinel-2 true colour under it, second chip, one sentence on pads and roads; place named |
 | 5:30 | Close | Transcript drawer, point at the numbers | Table; caption speaks the closer with the confidence sentence |
 | 6:15 | Hand-off | "It found the invisible and told you what it could not confirm." | |
@@ -331,3 +329,31 @@ already shows the eyes). If CMR or LP DAAC is down on the day: the replay case, 
    confirm" is the designed outcome, per PRODUCT.md.
 7. `promote.sh` promotes both agents in one run under one tag. Independent promotion is a
    documented manual path, not the default.
+
+## Deviations (as built, Sep 24–25)
+
+Found while building tasks 1–3 against live data; each keeps the approved intent.
+
+1. Module names: `methane_config.py` and `methane_tools.py`, not `config.py`/`tools.py`. The
+   staged utils do `import config` and must get the platform's config; a local `config.py`
+   would shadow it. `methane_config` re-exports the platform values it needs.
+2. The Dockerfile and `requirements.txt` are generated from geo_agent's by
+   `stage_shared.sh dockerfile` (only the CMD module changes), so the two images cannot drift.
+3. Default window: the 12 months ending at the collection's latest plume (2025-09-22), not
+   "last 90 days". EMITL2BCH4PLM is sparse after 2024 (global 2024: 600 granules, 2025: 1), so
+   90 days returns 0 everywhere. Demo prompts name Permian Basin 2024 (39 plumes).
+4. Plume area and mean are over pixels ≥ 500 ppm·m (`ENHANCED_PPM_M`), not all valid pixels:
+   rasters carry background noise (one granule: 168k valid pixels, median 120 ppm·m). Ranking
+   stays max-first, tie-broken by enhanced-pixel count, then granule id.
+5. Plume GeoTIFFs are cached once in a shared `methane/cache/ch4plm_<granule>.tif` (keyed by the
+   validated granule id) and reused across sessions; `plume_s3_url` points there. Cold triage of
+   39 plumes is 23.4 s, warm 0.8 s; the demo runs warm.
+6. Two-beat run sheet: (1) find + rank, (2) strongest + ground. Sonnet 4.6 triages on "show me
+   plumes" despite prompt rules, so the beats follow what the model does; HARD RULES gate only
+   the ground step. Two methane prepared plates instead of three.
+7. Confidence (Requirement 4.6 amended): the full sentence ends the record; the spoken closer
+   ends with "EMIT sees the methane, not its source." and is ≤ 240 chars, because the 280-char
+   caption band keeps the tail of a long paragraph. Every answer ends with the closer, including
+   when the agent stops early; offers of a next step go above it.
+8. Security gap found outside this spec: `/api/presigned-url` signs any bucket/key. Tracked as
+   task 5.4, must land before G3.

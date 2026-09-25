@@ -13,7 +13,7 @@ Exit code 0 when every prompt passes, 1 otherwise. A runtime crash
 (RuntimeClientError-style) is a failure and prints the raw stream tail.
 
 Usage:
-    python scripts/eval.py --target dev [--dry-run] [--only NAME] [--timeout 600]
+    python scripts/eval.py --target dev [--agent earth|methane] [--dry-run] [--only NAME] [--timeout 600]
 
 The runtime ARN is read from geo_agent/.bedrock_agentcore.yaml by agent name
 (dev -> geospatial_agent_dev, stable -> geospatial_agent_on_aws), so the script always
@@ -27,18 +27,34 @@ import uuid
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-AGENTCORE_YAML = REPO_ROOT / "geo_agent" / ".bedrock_agentcore.yaml"
-DEFAULT_PROMPTS = REPO_ROOT / "scripts" / "golden_prompts.json"
 
-TARGET_AGENTS = {
-    "dev": "geospatial_agent_dev",
-    "stable": "geospatial_agent_on_aws",
+# One entry per agent: where its AgentCore config lives, its runtime names per target, and its
+# golden prompts. `earth` is the default so every existing invocation keeps working.
+AGENTS = {
+    "earth": {
+        "yaml": REPO_ROOT / "geo_agent" / ".bedrock_agentcore.yaml",
+        "targets": {"dev": "geospatial_agent_dev", "stable": "geospatial_agent_on_aws"},
+        "prompts": REPO_ROOT / "scripts" / "golden_prompts.json",
+    },
+    "methane": {
+        "yaml": REPO_ROOT / "agents" / "methane-hunter" / ".bedrock_agentcore.yaml",
+        "targets": {"dev": "methane_hunter_dev", "stable": "methane_hunter"},
+        "prompts": REPO_ROOT / "agents" / "methane-hunter" / "golden_prompts.json",
+    },
 }
 
+# Backwards-compatible names for the Earth Analyst (scripts/prewarm.py and older callers).
+AGENTCORE_YAML = AGENTS["earth"]["yaml"]
+DEFAULT_PROMPTS = AGENTS["earth"]["prompts"]
+TARGET_AGENTS = AGENTS["earth"]["targets"]
 
-def resolve_agent_arn(target: str) -> str:
-    """Read the runtime ARN for the target's agent from .bedrock_agentcore.yaml."""
-    agent_name = TARGET_AGENTS[target]
+
+def resolve_agent_arn(target: str, agent: str = "earth") -> str:
+    """Read the runtime ARN for the agent's target runtime from its .bedrock_agentcore.yaml."""
+    agent_name = AGENTS[agent]["targets"][target]
+    AGENTCORE_YAML = AGENTS[agent]["yaml"]  # noqa: N806 (shadows the module default on purpose)
+    if not AGENTCORE_YAML.exists():
+        raise SystemExit(f"{AGENTCORE_YAML} not found: deploy the {agent} agent's {target} runtime first")
     try:
         import yaml
 
@@ -237,6 +253,24 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     for forbidden in case.get("forbidden_text", []):
         if forbidden in text:
             problems.append(f"forbidden text {forbidden!r} present")
+    # required_text: phrases the agent must say (e.g. the Methane Hunter's confidence sentence).
+    for required in case.get("required_text", []):
+        if required not in text:
+            problems.append(f"required text {required!r} missing")
+    # closer_max_chars: the spoken closing paragraph must fit the stage caption band.
+    limit = case.get("closer_max_chars")
+    if limit:
+        paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
+        closer = paragraphs[-1] if paragraphs else ""
+        if len(closer) > limit:
+            problems.append(f"closing paragraph is {len(closer)} chars (> {limit})")
+    # closer_endswith: the spoken closing paragraph (the last one) must end with this phrase.
+    suffix = case.get("closer_endswith")
+    if suffix:
+        paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
+        closer = paragraphs[-1] if paragraphs else ""
+        if not closer.endswith(suffix):
+            problems.append(f"closing paragraph does not end with {suffix!r}")
 
     # Characters of prose (everything that is not a tool-call object): a proxy for how much
     # the model wrote, which is what the room waits on at the end of a turn.
@@ -247,7 +281,8 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
         "name": case["name"], "passed": not problems, "seconds": round(elapsed, 1),
         "tools": tool_names, "observations": observations(text),
         "prose_chars": prose_chars, "report_chars": report_chars, "report_seconds": report_seconds,
-        "report_text": text[spans[-1][1]:].strip()[:1500] if spans else text.strip()[:1500],
+        # Keep the TAIL: the closer is what matters, and a head cut made complete closers look truncated.
+        "report_text": (text[spans[-1][1]:] if spans else text).strip()[-2000:],
         "detail": "; ".join(problems),
     }
     if problems:
@@ -259,14 +294,17 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--target", required=True, choices=sorted(TARGET_AGENTS))
-    parser.add_argument("--prompts", type=Path, default=DEFAULT_PROMPTS)
+    parser.add_argument("--target", required=True, choices=["dev", "stable"])
+    parser.add_argument("--agent", default="earth", choices=sorted(AGENTS),
+                        help="which agent's runtimes and golden prompts (default: earth)")
+    parser.add_argument("--prompts", type=Path, default=None, help="default: the agent's golden_prompts.json")
     parser.add_argument("--only", help="run a single prompt by name")
     parser.add_argument("--timeout", type=int, default=600, help="per-prompt stream timeout (s)")
     parser.add_argument("--dry-run", action="store_true", help="print the plan, no AWS calls")
     parser.add_argument("--json", type=Path, help="also write a machine-readable report here")
     parser.add_argument("--label", default="", help="free-text label stored in the report (e.g. model id)")
     args = parser.parse_args()
+    args.prompts = args.prompts or AGENTS[args.agent]["prompts"]
 
     cases = json.loads(args.prompts.read_text())["prompts"]
     if args.only:
@@ -275,8 +313,9 @@ def main() -> int:
             print(f"No prompt named {args.only!r} in {args.prompts}")
             return 1
 
-    arn = resolve_agent_arn(args.target)
-    print(f"Target: {args.target} ({TARGET_AGENTS[args.target]})")
+    arn = resolve_agent_arn(args.target, args.agent)
+    print(f"Agent:  {args.agent}")
+    print(f"Target: {args.target} ({AGENTS[args.agent]['targets'][args.target]})")
     print(f"ARN:    {arn}")
     print(f"Cases:  {len(cases)} from {args.prompts.relative_to(REPO_ROOT)}")
 
@@ -306,7 +345,7 @@ def main() -> int:
     print(f"{len(cases) - failures}/{len(cases)} passed", flush=True)
     if args.json:
         args.json.write_text(json.dumps({
-            "target": args.target, "arn": arn, "label": args.label,
+            "agent": args.agent, "target": args.target, "arn": arn, "label": args.label,
             "run_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "passed": len(cases) - failures,
             "total": len(cases), "results": records,
         }, indent=1))

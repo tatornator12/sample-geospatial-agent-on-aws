@@ -25,7 +25,7 @@ import boto3
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-from eval import TARGET_AGENTS, resolve_agent_arn  # noqa: E402
+from eval import AGENTS, resolve_agent_arn  # noqa: E402
 
 # The agent answers {"prewarm": true} with "warm" as soon as its container is up: no model call,
 # nothing written to the session history (see the entrypoint in geospatial_agent_on_aws.py).
@@ -58,16 +58,18 @@ def invoke(client, arn: str, session_id: str) -> tuple[float, float, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--target", required=True, choices=sorted(TARGET_AGENTS))
+    parser.add_argument("--target", required=True, choices=["dev", "stable"])
+    parser.add_argument("--runtime", default="earth", choices=sorted(AGENTS),
+                        help="which agent's runtime to warm (default: earth)")
     parser.add_argument("--count", type=int, default=1, help="how many sessions to warm")
     parser.add_argument("--agent", default="", help="agentId the UI should select (AGENT_RUNTIMES key)")
     parser.add_argument("--ui", default="http://localhost:5173", help="stage base URL for the printed links")
     parser.add_argument("--verify", action="store_true", help="time a second call on each warmed session")
     args = parser.parse_args()
 
-    arn = resolve_agent_arn(args.target)
+    arn = resolve_agent_arn(args.target, args.runtime)
     client = boto3.client("bedrock-agentcore", region_name=arn.split(":")[3])
-    print(f"Warming {args.count} session(s) on {args.target} ({TARGET_AGENTS[args.target]})")
+    print(f"Warming {args.count} session(s) on {args.runtime}/{args.target} ({AGENTS[args.runtime]['targets'][args.target]})")
 
     for _ in range(args.count):
         session_id = str(uuid.uuid4())

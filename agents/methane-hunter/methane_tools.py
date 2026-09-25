@@ -488,8 +488,9 @@ async def search_methane_plumes(region: str, start_date: str = None, end_date: s
                    for f in features],
         "plumes_geometry_s3_url": url,
         "render": RENDER_VECTOR,
-        "next_steps": ("display_visual(plumes_geometry_s3_url, title, description, render=render); "
-                       "then triage_plumes(plumes_geometry_s3_url) to rank them."),
+        "next_steps": ("display_visual(plumes_geometry_s3_url, title, description, render=render), then report the "
+                       "count and window. Call triage_plumes ONLY if the user asked to rank, triage or find the "
+                       "strongest; otherwise stop and offer it."),
     }
     if n == 0:
         out["say"] = (f"EMIT recorded no methane plume complexes over {label} between "
@@ -598,7 +599,8 @@ async def triage_plumes(plumes_geometry_s3_url: str, top_n: int = 10) -> str:
         "render_vector": RENDER_VECTOR,
         "render_raster": RENDER_RASTER,
         "next_steps": ("display_visual(ranked_geometry_s3_url, title, description, render=render_vector) together "
-                       "with reverse_geocode of the top 3 centres; then show_plume(granule_id of rank 1)."),
+                       "with reverse_geocode of the top 3 centres, then report. Call show_plume ONLY if the user asked "
+                       "to see a plume or the ground beneath it; otherwise stop and offer it."),
     })
 
 
