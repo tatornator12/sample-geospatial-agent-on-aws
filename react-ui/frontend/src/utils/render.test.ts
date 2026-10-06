@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRenderHint, rampExpression, rampGradient, tileParamsFor } from './render.ts';
+import { indexLegendFor, parseRenderHint, rampExpression, rampGradient, tileParamsFor } from './render.ts';
 
 // The hints the Methane Hunter's tools emit (agents/methane-hunter/methane_tools.py).
 const RASTER = {
@@ -68,6 +68,17 @@ describe('tileParamsFor', () => {
   });
 });
 
+describe('indexLegendFor (the Earth Analyst legends)', () => {
+  it('names the ramp TiTiler draws for each index, by file name', () => {
+    expect(indexLegendFor('s3://b/session_data/x/rasters/ndvi_clipped_geneva_2025-10-07.tif')).toMatchObject({ label: 'NDVI', ramp: 'rdylgn', lo: 0, hi: 1 });
+    expect(indexLegendFor('s3://b/x/nbr_clipped_palisades_2025-01-20.tif')).toMatchObject({ label: 'NBR', ramp: 'spectral' });
+    expect(indexLegendFor('s3://b/x/ndwi_folsom.tif')).toMatchObject({ label: 'NDWI', ramp: 'blues' });
+    expect(indexLegendFor('s3://b/x/change_detection_colorado.tif')).toMatchObject({ label: 'Change', ramp: 'rdylgn_r', hi: 0.5 });
+    expect(indexLegendFor('s3://b/x/tci_clipped_geneva.tif')).toBeNull();
+    expect(rampGradient('rdylgn')).toContain('#a50026 0%');
+  });
+});
+
 describe('ramps', () => {
   it('interpolates the plasma anchors over the rescale', () => {
     const expr = rampExpression('plasma', 'max_ppm_m', 0, 1500)!;
@@ -75,7 +86,7 @@ describe('ramps', () => {
     expect(expr.slice(3)).toEqual([0, '#0d0887', 375, '#7e03a8', 750, '#cc4778', 1125, '#f89540', 1500, '#f0f921']);
   });
   it('refuses unknown ramps, bad properties and empty ranges', () => {
-    expect(rampExpression('rdylgn', 'max_ppm_m', 0, 1)).toBeNull();
+    expect(rampExpression('nope' as never, 'max_ppm_m', 0, 1)).toBeNull();
     expect(rampExpression('plasma', 'a b', 0, 1)).toBeNull();
     expect(rampExpression('plasma', 'v', 1, 1)).toBeNull();
   });

@@ -2,7 +2,8 @@
  * The step column: where the agent is right now, readable from the back of the room.
  * A numbered list of the turn's steps with exactly one lit marker. Consecutive calls of one tool
  * are one step ("Scan 7 watch areas"); a watch mission shows its plan above the steps
- * (Baseline · Tip · Cue · Brief) and the cue step carries the filmstrip of passes it judged.
+ * (Baseline · Tip · Cue · Check · Brief), the tip board under the scan (every area, strongest
+ * first, before the agent commits), and a filmstrip of judged passes under each cued site.
  * Sits at the left edge of the stage while the agent works and for the turn just finished.
  */
 import { useState } from 'react';
@@ -11,7 +12,23 @@ import { theme } from '../theme';
 import type { EvidenceItem } from '../utils/evidence.ts';
 import { EvidenceChip } from './EvidenceChip.tsx';
 import { PassFilmstrip } from './PassFilmstrip.tsx';
-import { PLAN_STAGES, groupDetail, groupName, groupSteps, passManifestUrl, planStage, type StepGroup } from '../utils/steps.ts';
+import { TipBoard } from './TipBoard.tsx';
+import { useStageFiles } from '../hooks/useStageFiles.ts';
+import {
+  PLAN_STAGES,
+  chosenCue,
+  groupDetail,
+  groupName,
+  groupSteps,
+  parseManifest,
+  passManifestUrl,
+  planStage,
+  rankTips,
+  tipCued,
+  type PassFrame,
+  type StepGroup,
+  type Tip,
+} from '../utils/steps.ts';
 
 interface StepColumnProps {
   steps: ToolCall[];
@@ -20,27 +37,48 @@ interface StepColumnProps {
   /** Images the agent looked at this turn, keyed to the inspect_image step by tool id. */
   evidence?: EvidenceItem[];
   onOpenEvidence?: (item: EvidenceItem, imageUrl: string) => void;
-  /** Where this session's (or replay case's) methane files live; enables the pass filmstrip. */
+  /** Where this session's (or replay case's) methane files live; enables the filmstrips and the board. */
   methaneDir?: string | null;
+  /** The TROPOMI tips loaded so far, by area (ChatSidebar loads them; the map shows them too). */
+  tips?: Tip[];
   /** The mission's end frame (a brief card follows): the plan and the self-check, steps on demand. */
   compact?: boolean;
 }
 
 const MAX_VISIBLE = 9;
 
-export function StepColumn({ steps, live, evidence = [], onOpenEvidence, methaneDir = null, compact = false }: StepColumnProps) {
+export function StepColumn({
+  steps, live, evidence = [], onOpenEvidence, methaneDir = null, tips = [], compact = false,
+}: StepColumnProps) {
   const [expanded, setExpanded] = useState(false);
+
+  // The cue steps' manifests (one per cued site), loaded here so the end frame can tell which site
+  // the agent followed: the one whose passes include the scene it then put on the map.
+  const cues = steps.filter((c) => c.name === 'check_recent_passes');
+  const manifestUrls = cues.map((c) => passManifestUrl(methaneDir, c)).filter((u): u is string => !!u);
+  const manifests = useStageFiles<PassFrame[]>(manifestUrls, (raw) => (methaneDir ? parseManifest(raw, methaneDir) : null));
+  const framesFor = (call: ToolCall): PassFrame[] | null => {
+    const url = passManifestUrl(methaneDir, call);
+    return url ? manifests[url] ?? null : null;
+  };
+
   if (steps.length === 0) return null;
 
   const groups = groupSteps(steps);
-  const hasFilm = (g: StepGroup) => !!methaneDir && g.calls.some((c) => passManifestUrl(methaneDir, c) !== null);
-  // The end frame of a mission: the plan, the self-check (the cue's filmstrip) and the brief;
-  // the full list of steps is one click away. While working, the last steps, with the cue pinned
-  // so its filmstrip never scrolls away under "+N earlier".
+  const lastCue = steps.map((s) => s.name).lastIndexOf('check_recent_passes');
+  const chosen = chosenCue(cues, cues.map(framesFor), steps.slice(lastCue + 1));
+  const cuedAreas = tips.filter((t) => tipCued(t, cues)).map((t) => t.area.name);
+  const chosenArea = chosen !== null ? tips.find((t) => tipCued(t, [cues[chosen]]))?.area.name ?? null : null;
+
+  const hasFilm = (g: StepGroup) => g.name === 'check_recent_passes' && manifestUrls.length > 0;
+  const hasBoard = (g: StepGroup) => g.name === 'scan_tropomi' && tips.length > 0;
+  // The end frame of a mission: the plan, the tip board, the chosen site's filmstrip and the brief;
+  // the full list of steps is one click away. While working, the last steps, with the board and the
+  // cue pinned so they never scroll away under "+N earlier".
   const collapsed = compact && !live && !expanded;
   const tail = groups.slice(-MAX_VISIBLE);
-  const pinned = groups.slice(0, groups.length - tail.length).filter(hasFilm);
-  const visible = collapsed ? groups.filter(hasFilm) : [...pinned, ...tail];
+  const pinned = groups.slice(0, groups.length - tail.length).filter((g) => hasFilm(g) || hasBoard(g));
+  const visible = collapsed ? groups.filter((g) => hasFilm(g) || hasBoard(g)) : [...pinned, ...tail];
   const hidden = groups.length - visible.length;
   const litIndex = live ? visible.length - 1 : -1;
   const evidenceByTool = new Map(evidence.map((item) => [item.toolId, item]));
@@ -91,16 +129,17 @@ export function StepColumn({ steps, live, evidence = [], onOpenEvidence, methane
           const done = !lit;
           const at = groups.indexOf(group);
           const n = at + 1;
-          const fullDetail = groupDetail(group, groups.slice(0, at));
-          // The end frame shows the chosen site only (the first cue); the runner-up is in the full list.
-          const detail = fullDetail && collapsed && fullDetail.points?.length
-            ? { ...fullDetail, mono: fullDetail.points[0] }
-            : fullDetail;
+          const detail = groupDetail(group, groups.slice(0, at));
           const items = group.calls.map((c) => evidenceByTool.get(c.id)).filter((x): x is EvidenceItem => !!x);
-          const allFilms = group.calls
-            .map((c) => ({ call: c, url: passManifestUrl(methaneDir, c) }))
-            .filter((f): f is { call: ToolCall; url: string } => !!f.url);
-          const films = collapsed ? allFilms.slice(0, 1) : allFilms;
+          // The filmstrips under a cue step: every cued site while working and in the full list;
+          // only the site the agent followed in the end frame.
+          const allFilms = group.name === 'check_recent_passes'
+            ? group.calls.map((call) => ({ call, frames: framesFor(call) })).filter((f) => f.frames !== null)
+            : [];
+          const films = collapsed && chosen !== null
+            ? allFilms.filter((f) => f.call === cues[chosen])
+            : allFilms;
+          const board = hasBoard(group);
           return (
             <li
               key={group.id || `${group.name}-${n}`}
@@ -162,28 +201,32 @@ export function StepColumn({ steps, live, evidence = [], onOpenEvidence, methane
                   </span>
                 )}
               </span>
-              {detail && (
+              {/* The board replaces the scan's area list; two filmstrips label their own sites. */}
+              {detail && !board && (
                 <span className="step-detail">
                   {detail.text}
-                  {/* Two filmstrips label their own sites; one line of both points would say it twice. */}
                   {detail.mono && films.length < 2 && <span className="step-detail__mono">{detail.mono}</span>}
                 </span>
               )}
-              {methaneDir && films.map(({ call, url }, j) => (
-                <div key={call.id || url} style={{ gridColumn: '2 / -1' }}>
-                  {/* Two sites cued: each strip says whose passes it shows (points and films share the calls' order). */}
-                  {films.length > 1 && fullDetail?.points?.[j] && (
-                    <span className="step-detail__mono pass-film__site">{fullDetail.points[j]}</span>
-                  )}
-                  <PassFilmstrip
-                    toolId={call.id}
-                    manifestUrl={url}
-                    dir={methaneDir}
-                    ready={call.status === 'completed' || !live}
-                    onOpen={onOpenEvidence}
-                  />
+              {board && (
+                <div style={{ gridColumn: '2 / -1' }}>
+                  <TipBoard tips={rankTips(tips)} cued={cuedAreas} chosen={chosenArea} expected={group.calls.length} />
                 </div>
-              ))}
+              )}
+              {films.map(({ call, frames }) => {
+                const j = group.calls.indexOf(call);
+                const site = tips.find((t) => tipCued(t, [call]));
+                return (
+                  <div key={call.id || String(j)} style={{ gridColumn: '2 / -1' }}>
+                    {(films.length > 1 || collapsed) && (
+                      <span className="step-detail__mono pass-film__site">
+                        {site ? site.area.label : detail?.points?.[j] ?? ''}
+                      </span>
+                    )}
+                    <PassFilmstrip toolId={call.id} frames={frames!} onOpen={onOpenEvidence} />
+                  </div>
+                );
+              })}
               {onOpenEvidence && items.map((item) => (
                 <div key={item.toolId} style={{ gridColumn: '1 / -1' }}>
                   <EvidenceChip item={item} onOpen={onOpenEvidence} />

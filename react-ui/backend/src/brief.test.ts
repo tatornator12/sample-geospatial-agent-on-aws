@@ -87,6 +87,16 @@ describe('briefCard', () => {
     assert.ok(briefCard(draft({ session_id: 'recorded-session' }), BID, null));
   });
 
+  it('carries the ground checks\' own sentences and drops anything with markup', () => {
+    const checks = {
+      thermal: { verdict: 'no heat', line: 'VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.' },
+      infrastructure: { mapped: 3, line: 'OpenStreetMap maps within 2 km: 3 wells (0.4 km); <b>Acme</b>' },
+    };
+    const card = briefCard(draft({}, { checks }), BID, SID)!;
+    assert.deepEqual(card.checks, ['VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.']);
+    assert.deepEqual(briefCard(draft(), BID, SID)!.checks, []);
+  });
+
   it('drops hypotheses with an unknown assessment', () => {
     const card = briefCard(draft({}, { explanations: [{ label: 'Sabotage', assessment: 'confirmed' }] }), BID, SID)!;
     assert.deepEqual(card.hypotheses, []);

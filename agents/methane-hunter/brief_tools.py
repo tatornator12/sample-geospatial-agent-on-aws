@@ -14,6 +14,8 @@ The model fills the fields; this tool decides what a brief may say:
 from __future__ import annotations
 
 import json
+import logging
+import math
 import re
 import secrets
 from datetime import datetime, timezone
@@ -25,6 +27,8 @@ from strands import tool
 import config
 import methane_tools as mt
 from methane_tools import MethaneError, _finite, _int
+
+logger = logging.getLogger("methane_tools")
 
 EXPLANATIONS: dict[str, str] = {
     "routine_venting": "Routine venting",
@@ -140,8 +144,50 @@ def validate_brief(title, place, lat, lon, watch_area, observations, looks, cand
     return brief
 
 
+CHECK_RADIUS_KM = 2.0
+_CHECK_KEY = re.compile(r"^(thermal|infra)_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
+
+
+def find_checks(lat: float, lon: float) -> dict:
+    """The ground-record checks run for this site this session (ground_tools), nearest within 2 km.
+
+    Read from the tools' own records, never from the model, so the brief carries the tools' numbers.
+    Empty when a check was not run.
+    """
+    s3 = mt._s3()
+    prefix = mt.session_prefix()
+    found: dict[str, tuple[float, dict]] = {}
+    try:
+        for kind in ("thermal", "infra"):
+            listing = s3.list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=f"{prefix}{kind}_")
+            for obj in listing.get("Contents", []):
+                m = _CHECK_KEY.fullmatch(obj["Key"].rsplit("/", 1)[-1])
+                if not m:
+                    continue
+                d = math.hypot((float(m[2]) - lat) * 110.574, (float(m[3]) - lon) * 111.320 * math.cos(math.radians(lat)))
+                if d <= CHECK_RADIUS_KM and (kind not in found or d < found[kind][0]):
+                    body = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=obj["Key"])["Body"].read(200_000))
+                    if isinstance(body, dict) and isinstance(body.get("line"), str):
+                        found[kind] = (d, body)
+    except Exception as e:  # the checks are an addition to the brief, never a reason to fail it
+        logger.warning("checks lookup failed: %s", type(e).__name__)
+    out = {}
+    if "thermal" in found:
+        t = found["thermal"][1]
+        out["thermal"] = {k: t.get(k) for k in ("nights_checked", "detections", "nights_with_heat", "max_frp_mw",
+                                                 "static_source_detections", "verdict", "source", "line")}
+    if "infra" in found:
+        i = found["infra"][1]
+        out["infrastructure"] = {"radius_km": i.get("radius_km"), "mapped": i.get("mapped"), "groups": i.get("groups"),
+                                 "types": [{k: r.get(k) for k in ("type", "count", "nearest_km")} for r in (i.get("types") or [])[:6]],
+                                 "line": i.get("line")}
+    return out
+
+
 def render_markdown(brief: dict, brief_id: str) -> str:
     area = f", watch area {brief['watch_area']}" if brief["watch_area"] else ""
+    checks = brief.get("checks") or {}
+    check_lines = [f"- Check: {c['line']}" for c in (checks.get("thermal"), checks.get("infrastructure")) if c and c.get("line")]
     lines = [
         f"**Methane Watch brief: {brief['title']}** (draft `{brief_id}`, not filed)",
         "",
@@ -150,6 +196,7 @@ def render_markdown(brief: dict, brief_id: str) -> str:
         f"recent passes read are candidates.",
         "",
         *[f"- {o}" for o in brief["observations"]],
+        *check_lines,
         "",
         "| Hypothesis (unconfirmed) | Assessment | What would confirm or rule it out |",
         "|---|---|---|",
@@ -206,6 +253,7 @@ async def draft_brief(title: str, place: str, lat: float, lon: float, observatio
     except MethaneError as e:
         return json.dumps({"error": str(e)})
     brief_id = new_brief_id()
+    brief["checks"] = find_checks(brief["lat"], brief["lon"])
     markdown = render_markdown(brief, brief_id)
     record = {"brief_id": brief_id, "status": "draft", "created": datetime.now(timezone.utc).isoformat(),
               "session_id": mt._session_id(), "brief": brief, "markdown": markdown}

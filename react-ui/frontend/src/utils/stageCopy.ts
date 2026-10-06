@@ -3,8 +3,15 @@
  * caption, the speaker label, and plain-language names for the agent's steps.
  */
 
+export interface PreparedPrompt {
+  label: string;
+  prompt: string;
+  /** Put the prompt in the console for the presenter to finish (a place name) instead of sending it. */
+  fill?: boolean;
+}
+
 export interface AgentStageCopy {
-  prompts: Array<{ label: string; prompt: string }>;
+  prompts: PreparedPrompt[];
   placeholder: string;
   idle: string;
 }
@@ -34,14 +41,17 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
         label: 'Methane Watch brief',
         prompt: 'Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.',
       },
+      // The two beats work anywhere: the presenter names the region (a watch area, a basin the
+      // search tool knows, or any place the geocoder finds) and presses Enter.
       {
-        label: 'Find and rank Permian plumes',
-        prompt: 'Find the methane plumes EMIT detected over the Permian Basin in 2024 and rank them by how much methane they carry',
+        label: 'Find and rank plumes over…',
+        prompt: 'Find the methane plumes EMIT detected in 2024 and rank them by how much methane they carry over ',
+        fill: true,
       },
       { label: 'Strongest plume and the ground', prompt: 'Show me the strongest plume and what is on the ground beneath it' },
     ],
-    placeholder: 'Name a basin and a year',
-    idle: 'Name a basin and a year. The agent finds the methane plumes NASA EMIT saw, ranks them, and looks at the ground beneath the strongest.',
+    placeholder: 'Name a region and a year',
+    idle: 'Name a region and a year. The agent finds the methane plumes NASA EMIT saw, ranks them, and looks at the ground beneath the strongest.',
   },
 };
 
@@ -81,6 +91,8 @@ const STEP_NAMES: Record<string, string> = {
   site_history: 'Check the site history',
   draft_brief: 'Draft the brief',
   brief_status: 'Check the brief',
+  thermal_anomalies: 'Check for heat',
+  nearby_infrastructure: 'Check what is mapped nearby',
 };
 
 export function stepName(toolName: string): string {

@@ -16,7 +16,7 @@ import {
   isSimilarityLayer,
   type LayerMetadata,
 } from '../utils/layerFormatting';
-import { rampExpression, rampGradient, tileParamsFor, type RenderHint } from '../utils/render.ts';
+import { indexLegendFor, rampExpression, rampGradient, tileParamsFor, type RenderHint } from '../utils/render.ts';
 import {
   COLUMN_METRES_PER_PPM_M,
   METHANE_RASTER,
@@ -26,6 +26,7 @@ import {
   methaneLegend,
   methaneRasterHint,
 } from '../utils/methaneLayers.ts';
+import type { Tip } from '../utils/steps.ts';
 import { CompareView } from './CompareView';
 import { Icon } from './Icons.tsx';
 import { theme } from '../theme';
@@ -39,11 +40,11 @@ const STAGE_PADDING = { top: 90, bottom: 300, left: 340, right: 370 };
 
 // Ranks at or above this are lit and labelled; every other footprint is a hairline. 39 is the count; 3 is the story.
 const LIT_RANKS = 3;
-// The watch globe: how far out it sits (globe diameter ≈ 512·2^z/π px, so 2.3 is ~800 px: it
+// The watch globe: how far out it sits (globe diameter ≈ 512·2^z/π px, so 2.5 is ~920 px: it
 // fills the stage between the plates on a 1080p projector), where its centre sits (the middle
 // of the area the plates leave free, from STAGE_PADDING), how fast it turns while the agent
 // works (degrees of longitude per second), and the tilt the 3D columns are read at.
-const GLOBE_ZOOM = 2.3;
+const GLOBE_ZOOM = 2.5;
 const GLOBE_OFFSET: [number, number] = [
   (STAGE_PADDING.left - STAGE_PADDING.right) / 2,
   (STAGE_PADDING.top - STAGE_PADDING.bottom) / 2,
@@ -52,6 +53,8 @@ const GLOBE_DEG_PER_S = 4;
 const COLUMNS_PITCH = 55;
 // A coarse raster (TROPOMI) is dimmer than the finding so the EMIT candidate reads through it.
 const COARSE_RASTER_OPACITY = 0.75;
+
+const TIPS_SOURCE = 'watch-tips';
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -80,9 +83,11 @@ interface MapViewProps {
   onDrawnGeometry?: (geojson: any) => void;
   /** The agent is working this turn: the watch globe turns until the first finding lands. */
   working?: boolean;
+  /** The TROPOMI tips by watch area, drawn on the globe as they load. */
+  tips?: Tip[];
 }
 
-export function MapView({ geometry, rasters, onDrawnGeometry, working = false }: MapViewProps) {
+export function MapView({ geometry, rasters, onDrawnGeometry, working = false, tips = [] }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
@@ -151,6 +156,74 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false }:
       mapInstance.off('touchend', release);
     };
   }, [globeOn, working]);
+
+  // The tips on the globe: one mark per scanned watch area at its hotspot (or its centre when the
+  // scan found none), sized and coloured by the anomaly on the TROPOMI legend's own viridis ramp,
+  // labelled with the area's short name and "+86 ppb" in mono. Hidden once the camera dives
+  // (zoom 5), where the composite itself takes over. Fog stroke; nothing amber on the map.
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const features = tips.map((t) => ({
+      type: 'Feature' as const,
+      properties: {
+        short: t.area.short,
+        anomaly: t.anomalyPpb ?? 0,
+        label: t.anomalyPpb === null ? 'no hotspot' : `${t.anomalyPpb >= 0 ? '+' : ''}${t.anomalyPpb.toFixed(0)} ppb`,
+        emit: t.emit ? 1 : 0,
+      },
+      geometry: { type: 'Point' as const, coordinates: t.point ?? t.area.centre },
+    }));
+    const apply = () => {
+      const src = mapInstance.getSource(TIPS_SOURCE) as maplibregl.GeoJSONSource | undefined;
+      if (features.length === 0) {
+        [`${TIPS_SOURCE}-labels`, `${TIPS_SOURCE}-marks`].forEach((id) => { if (mapInstance.getLayer(id)) mapInstance.removeLayer(id); });
+        if (src) mapInstance.removeSource(TIPS_SOURCE);
+        return;
+      }
+      const data = { type: 'FeatureCollection' as const, features };
+      if (src) {
+        src.setData(data);
+        return;
+      }
+      mapInstance.addSource(TIPS_SOURCE, { type: 'geojson', data });
+      const ramp = rampExpression('viridis', 'anomaly', 0, 60) as maplibregl.ExpressionSpecification;
+      mapInstance.addLayer({
+        id: `${TIPS_SOURCE}-marks`,
+        type: 'circle',
+        source: TIPS_SOURCE,
+        maxzoom: 5,
+        paint: {
+          'circle-color': ramp,
+          'circle-opacity': 0.9,
+          'circle-radius': ['interpolate', ['linear'], ['get', 'anomaly'], 0, 6, 60, 16],
+          'circle-stroke-color': '#e9eef3',
+          'circle-stroke-width': ['case', ['==', ['get', 'emit'], 1], 1.5, 0.75],
+          'circle-stroke-opacity': 0.9,
+          'circle-pitch-alignment': 'map',
+        },
+      });
+      mapInstance.addLayer({
+        id: `${TIPS_SOURCE}-labels`,
+        type: 'symbol',
+        source: TIPS_SOURCE,
+        maxzoom: 5,
+        layout: {
+          'symbol-sort-key': ['-', 0, ['get', 'anomaly']],
+          'text-field': ['format', ['get', 'short'], { 'font-scale': 1 }, '\n', {}, ['get', 'label'], { 'font-scale': 0.85 }],
+          'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+          'text-size': 17,
+          'text-variable-anchor': ['right', 'left', 'top', 'bottom'],
+          'text-radial-offset': 1.3,
+          'text-justify': 'auto',
+          'text-padding': 6,
+        },
+        paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2.5 },
+      });
+    };
+    if (mapInstance.isStyleLoaded()) apply();
+    else mapInstance.once('styledata', apply);
+  }, [tips]);
 
   // The Dim Rule's current state, readable when a basemap layer is (re)created: the dim can be
   // decided before the basemap exists (a replay case lands every layer at once on load).
@@ -953,7 +1026,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false }:
         if (keepFrame) {
           console.log(`🖼️ Keeping the ranked map in frame; not fitting to`, name);
         } else {
-          currentMap.fitBounds(bounds, { padding: 50, duration: 1500, maxZoom: 15 });
+          // Every act frames its finding clear of the plates (the step column, the caption band,
+          // the layers plate), so what the camera lands on is what the room sees.
+          currentMap.fitBounds(bounds, { padding: STAGE_PADDING, duration: 1500, maxZoom: 15 });
           console.log(`🎯 fitBounds called`);
         }
       };
@@ -1019,7 +1094,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false }:
     mapInstance.fitBounds(
       [[west, south], [east, north]],
       {
-        padding: 50,
+        padding: STAGE_PADDING,
         duration: 1500,
         maxZoom: 15,
       }
@@ -1534,6 +1609,26 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false }:
     );
   };
 
+  // The Earth Analyst's legends: one row per index on the stage (NDVI, NBR, NDWI, change), the ramp
+  // TiTiler draws with its ends in words, so the room reads the colours without being told.
+  const renderIndexLegends = (layers: LayerMetadata[]) => {
+    const seen = new Set<string>();
+    const legends = layers
+      .filter((l) => rasterVisibility[l.id] !== false)
+      .map((l) => indexLegendFor(l.url))
+      .filter((lg): lg is NonNullable<typeof lg> => !!lg && !seen.has(lg.label) && !!seen.add(lg.label));
+    return legends.map((lg) => (
+      <div key={lg.label} className="map-legend map-legend--stacked">
+        <span className="map-legend__name">{lg.label}</span>
+        <div className="map-legend__bar" role="img" aria-label={`Colour ramp: ${lg.label}, ${lg.low} to ${lg.high}`}>
+          <span className="map-legend__label">{lg.low}</span>
+          <span className="map-legend__ramp" style={{ background: rampGradient(lg.ramp) ?? undefined }} aria-hidden="true" />
+          <span className="map-legend__label">{lg.high}</span>
+        </div>
+      </div>
+    ));
+  };
+
   const openCompare = () => {
     if (!comparePair) return;
     const currentMap = map.current;
@@ -1590,6 +1685,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false }:
                   {layerGroups.changeDetection.map((layer) =>
                     renderLayerRow(layer, formatLayerDisplayText(layer, 'spectral'))
                   )}
+                  {renderIndexLegends(layerGroups.changeDetection)}
                 </div>
               )}
 
@@ -1668,6 +1764,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false }:
                   {layerGroups.spectralIndices.map((layer) =>
                     renderLayerRow(layer, formatLayerDisplayText(layer, 'spectral'))
                   )}
+                  {renderIndexLegends(layerGroups.spectralIndices)}
                 </div>
               )}
 

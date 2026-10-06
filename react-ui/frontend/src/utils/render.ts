@@ -142,7 +142,38 @@ export const RAMP_ANCHORS: Partial<Record<ColormapName, string[]>> = {
   plasma: ['#0d0887', '#7e03a8', '#cc4778', '#f89540', '#f0f921'],
   viridis: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'],
   magma: ['#000004', '#51127c', '#b73779', '#fc8961', '#fcfdbf'],
+  rdylgn: ['#a50026', '#f46d43', '#ffffbf', '#66bd63', '#006837'],
+  rdylgn_r: ['#006837', '#66bd63', '#ffffbf', '#f46d43', '#a50026'],
+  blues: ['#f7fbff', '#c6dbef', '#6baed6', '#2171b5', '#08306b'],
+  spectral: ['#9e0142', '#f46d43', '#ffffbf', '#66c2a5', '#5e4fa2'],
 };
+
+/**
+ * The Earth Analyst's index legends: what TiTiler draws for a raster the map recognises by its
+ * file name (the same rules as the tile URLs in MapView), so the stage can show the ramp it is
+ * looking at. Null for true-colour and anything unknown.
+ */
+export interface IndexLegend {
+  label: string;
+  ramp: ColormapName;
+  lo: number;
+  hi: number;
+  /** What the two ends mean, in words, for the back row. */
+  low: string;
+  high: string;
+}
+export function indexLegendFor(url: string): IndexLegend | null {
+  const u = (url || '').toLowerCase();
+  if (u.includes('change_detection') || u.includes('change-detection')) {
+    return { label: 'Change', ramp: 'rdylgn_r', lo: 0, hi: 0.5, low: 'no change', high: 'most change' };
+  }
+  if (u.includes('ndvi_') || u.includes('ndvi-')) return { label: 'NDVI', ramp: 'rdylgn', lo: 0, hi: 1, low: 'bare', high: 'dense vegetation' };
+  if (u.includes('ndwi_') || u.includes('ndwi-')) return { label: 'NDWI', ramp: 'blues', lo: -1, hi: 1, low: 'dry', high: 'open water' };
+  if (u.includes('nbr_') || u.includes('nbr-') || u.includes('/nbr.')) {
+    return { label: 'NBR', ramp: 'spectral', lo: -1, hi: 1, low: 'severe burn', high: 'unburnt' };
+  }
+  return null;
+}
 
 /** A MapLibre `interpolate` colour expression over `property` from lo to hi with the ramp's anchors. */
 export function rampExpression(ramp: ColormapName, property: string, lo: number, hi: number): unknown[] | null {

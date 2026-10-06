@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { docentCaption } from './caption';
+import { docentCaption, stagePunctuation } from './caption';
 
 const REPORT = [
   '## 🌿 Vegetation Health — Hyde Park, London (2026-07-29)',
@@ -23,10 +23,17 @@ describe('docentCaption', () => {
 
   it('never speaks a table: trailing table rows are dropped, the prose before them stays', () => {
     const tableLast = REPORT.split('\n\n')[0];
+    // The em dash in the heading reads as a comma on the stage (stagePunctuation).
     expect(docentCaption(tableLast)).toBe(
-      '🌿 Vegetation Health — Hyde Park, London (2026-07-29)\n' +
+      '🌿 Vegetation Health, Hyde Park, London (2026-07-29)\n' +
         'The park is in excellent summer condition with a mean NDVI of **0.47**. Here is the breakdown:',
     );
+  });
+
+  it('turns an em dash into a comma on the stage', () => {
+    expect(stagePunctuation('Shanxi 6 of 7 — following Shanxi')).toBe('Shanxi 6 of 7, following Shanxi');
+    expect(stagePunctuation('2024–2025')).toBe('2024 to 2025');
+    expect(stagePunctuation('no dashes here')).toBe('no dashes here');
   });
 
   it('keeps showing the previous sentence while a table row is still being typed', () => {

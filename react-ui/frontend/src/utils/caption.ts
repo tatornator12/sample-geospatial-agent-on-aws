@@ -33,8 +33,18 @@ function completeSentences(paragraph: string): string {
   return end === -1 ? '' : paragraph.slice(0, end).trim();
 }
 
+/**
+ * The stage's punctuation: an em dash the model slipped in (the prompts forbid it, the habit
+ * survives) reads as a comma on the caption band and in the transcript. "A — B" becomes "A, B".
+ */
+export function stagePunctuation(text: string): string {
+  return text
+    .replace(/(\d)\s*[–—]\s*(\d)/g, '$1 to $2')   // a range: 2024–2025 reads "2024 to 2025"
+    .replace(/\s*[—–]\s*/g, ', ');
+}
+
 export function docentCaption(text: string, opts: { partial?: boolean } = {}): string {
-  const cleaned = text.replace(/\r/g, '').trim();
+  const cleaned = stagePunctuation(text.replace(/\r/g, '')).trim();
   if (!cleaned) return '';
   const spoken = cleaned
     .split(/\n\s*\n/)

@@ -114,3 +114,29 @@ def test_brief_status_is_the_only_source_for_filed(brief, fake_s3):
     assert json.loads(_run(brief.brief_status("brief-20260101T000000-abcdef")))["status"] == "not_found"
     for bad in ("../x", "brief-1", None):
         assert "error" in json.loads(_run(brief.brief_status(bad)))
+
+
+def test_the_brief_carries_the_ground_checks_from_their_own_records(brief, fake_s3):
+    """draft_brief embeds the tools' numbers, nearest within 2 km, never text from the model."""
+    prefix = f"session_data/{SESSION}/methane/"
+    fake_s3.put_object(Bucket=BUCKET, Key=f"{prefix}thermal_39.4700_53.6400.json", Body=json.dumps({
+        "nights_checked": 30, "detections": 0, "nights_with_heat": 0, "verdict": "no heat", "source": "firms-api",
+        "line": "VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed."}).encode())
+    fake_s3.put_object(Bucket=BUCKET, Key=f"{prefix}infra_39.4700_53.6400.json", Body=json.dumps({
+        "radius_km": 2.0, "mapped": 3, "groups": {"oil and gas": 3}, "types": [{"type": "well", "count": 3, "nearest_km": 0.4}],
+        "line": "OpenStreetMap maps within 2 km: 3 wells (0.4 km); nothing mapped for coal, waste, wetland."}).encode())
+    # A check for another site, 40 km away, must not be picked up.
+    fake_s3.put_object(Bucket=BUCKET, Key=f"{prefix}thermal_39.8000_53.6400.json", Body=json.dumps({
+        "verdict": "persistent heat", "line": "VIIRS saw heat on 9 of 30 nights."}).encode())
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert out["status"] == "draft"
+    assert "- Check: VIIRS saw no heat source" in out["markdown"] and "- Check: OpenStreetMap maps within 2 km: 3 wells" in out["markdown"]
+    assert "9 of 30" not in out["markdown"]
+    record = json.loads(fake_s3.objects[f"session_data/{SESSION}/briefs/{out['brief_id']}.draft.json"])
+    assert record["brief"]["checks"]["thermal"]["verdict"] == "no heat"
+    assert record["brief"]["checks"]["infrastructure"]["types"] == [{"type": "well", "count": 3, "nearest_km": 0.4}]
+
+
+def test_a_brief_without_checks_still_drafts(brief, fake_s3):
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert out["status"] == "draft" and "- Check:" not in out["markdown"]

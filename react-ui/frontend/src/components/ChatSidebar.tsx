@@ -5,7 +5,7 @@
  * at the right when the presenter wants the full record.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message, ToolCall, GeometryData, RasterData } from '../types.ts';
@@ -14,10 +14,11 @@ import { StepColumn } from './StepColumn.tsx';
 import { EvidencePlate } from './EvidencePlate.tsx';
 import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
-import { methaneDirFrom } from '../utils/steps.ts';
+import { methaneDirFrom, parseTip, tipManifestUrl, type Tip } from '../utils/steps.ts';
+import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { currentBriefId } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
-import { docentCaption } from '../utils/caption.ts';
+import { docentCaption, stagePunctuation } from '../utils/caption.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
   cleanStreamingText,
@@ -71,6 +72,8 @@ interface ChatSidebarProps {
   onToggleSidebar?: () => void;
   /** Told when the agent starts and stops working a turn (the map's watch globe turns meanwhile). */
   onWorkingChange?: (working: boolean) => void;
+  /** The TROPOMI tips as they load, for the globe. */
+  onTipsUpdate?: (tips: Tip[]) => void;
 }
 
 export function ChatSidebar({
@@ -87,6 +90,7 @@ export function ChatSidebar({
   drawnGeometryMessage,
   onDrawnGeometryMessageSent,
   onWorkingChange,
+  onTipsUpdate,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -487,6 +491,22 @@ export function ChatSidebar({
   const methaneDir = methaneDirFrom([...stepTools, ...messages.flatMap((m) => m.tools ?? [])], sessionId);
   // The draft brief on the stage, if the latest answer drafted one (or the decision on it is pending).
   const briefId = currentBriefId(messages);
+  // The TROPOMI tips: one manifest per scanned area, read as the scans finish. The step column lists
+  // them and the map draws them on the globe (via onTipsUpdate).
+  const scanCalls = stepTools.filter((t) => t.name === 'scan_tropomi');
+  const tipUrls = scanCalls.map((c) => tipManifestUrl(methaneDir, c)).filter((u): u is string => !!u);
+  const tipFiles = useStageFiles<Tip>(tipUrls, (raw, url) => {
+    const area = url.match(/tip_([a-z_]+)\.json$/)?.[1]?.replace(/_/g, ' ');
+    return area ? parseTip(raw, area) : null;
+  });
+  const tipKey = tipUrls.join('\n');
+  const tips = useMemo(
+    () => (tipKey ? tipKey.split('\n') : []).map((u) => tipFiles[u]).filter((t): t is Tip => !!t),
+    [tipFiles, tipKey]
+  );
+  useEffect(() => {
+    onTipsUpdate?.(tips);
+  }, [tips, onTipsUpdate]);
   // This act's prompts, placeholder and idle line; the room hears the act's name, not "(dev)".
   const copy = stageCopyFor(agentId);
   const speaker = stageAgentLabel(agentLabel) ?? 'Agent';
@@ -505,6 +525,7 @@ export function ChatSidebar({
             evidence={evidence}
             onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
             methaneDir={methaneDir}
+            tips={tips}
             compact={!!briefId && !isStreaming && stepTools.some((t) => t.name === 'draft_brief')}
             key={briefId ?? 'steps'}
           />
@@ -624,8 +645,20 @@ export function ChatSidebar({
               type="button"
               className="docent-plate"
               disabled={isProcessing}
-              onClick={() => void sendMessage(p.prompt)}
-              title={p.prompt}
+              onClick={() => {
+                if (p.fill) {
+                  // The presenter finishes the sentence (a region) and presses Enter.
+                  setUserInput(p.prompt);
+                  const el = inputRef.current;
+                  if (el) {
+                    el.focus();
+                    requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
+                  }
+                } else {
+                  void sendMessage(p.prompt);
+                }
+              }}
+              title={p.fill ? `${p.prompt}…` : p.prompt}
             >
               {p.label}
             </button>
@@ -661,7 +694,7 @@ export function ChatSidebar({
                 <span className="transcript-turn__who">{msg.role === 'user' ? 'You' : 'Agent'}</span>
                 <div className="transcript-turn__body">
                   <div className="markdown-content">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{stagePunctuation(msg.content)}</ReactMarkdown>
                   </div>
                   {msg.tools && msg.tools.length > 0 && (
                     <div className="transcript-turn__tools">

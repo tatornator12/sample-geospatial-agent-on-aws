@@ -66,6 +66,16 @@ export interface BriefCard {
   singleExplanation: string;
   /** Up to three unconfirmed hypotheses, "possible" first. */
   hypotheses: Array<{ label: string; assessment: string }>;
+  /** The ground-record checks, one sentence each, written by the tools from their own numbers. */
+  checks: string[];
+}
+
+/** A check's sentence, as the tool wrote it: bounded, plain, no markup or control characters. */
+function checkLine(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const line = value.trim();
+  // eslint-disable-next-line no-control-regex
+  return line.length > 0 && line.length <= 260 && !/[<>`|\u0000-\u001f\u007f]/.test(line) ? line : null;
 }
 
 function text(value: unknown, max: number): string | null {
@@ -125,6 +135,12 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     confidence: confidence as BriefCard['confidence'],
     singleExplanation: 'low without a ground or aircraft check',
     hypotheses,
+    checks: (() => {
+      const c = (b.checks ?? {}) as Record<string, unknown>;
+      return ['thermal', 'infrastructure']
+        .map((k) => checkLine((c[k] as { line?: unknown } | undefined)?.line))
+        .filter((l): l is string => l !== null);
+    })(),
   };
 }
 

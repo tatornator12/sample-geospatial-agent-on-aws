@@ -207,9 +207,13 @@ def resolve_extent(region: Any, bbox: Any, geometry_s3_url: Any) -> tuple[tuple[
     key = (region or "").lower().strip() if isinstance(region, str) else ""
     if key in BASINS:
         return BASINS[key], label
+    # The seven Methane Watch areas are regions too (watch_tools imports this module, hence lazily).
+    from watch_tools import WATCH_AREAS
+    if key in WATCH_AREAS:
+        return tuple(WATCH_AREAS[key]["bbox"]), WATCH_AREAS[key]["label"]
     raise MethaneError(
-        f"'{region}' is not a region I know by name ({', '.join(sorted(BASINS))}). Geocode it with "
-        f"find_location_boundary and pass geometry_s3_url, or pass bbox=[west, south, east, north]."
+        f"'{region}' is not a region I know by name ({', '.join(sorted(BASINS))}, {', '.join(WATCH_AREAS)}). "
+        f"Geocode it with find_location_boundary and pass geometry_s3_url, or pass bbox=[west, south, east, north]."
     )
 
 
@@ -521,8 +525,10 @@ async def search_methane_plumes(region: str, start_date: str = None, end_date: s
 
     Args:
         region: Region name, e.g. "Permian Basin". Known by name: Permian Basin, San Joaquin
-            Valley, Four Corners, Marcellus, Turkmenistan. For any other place, geocode it with
-            find_location_boundary and pass geometry_s3_url (or pass bbox).
+            Valley, Four Corners, Marcellus, Turkmenistan, and the seven watch areas (south caspian,
+            zagros foreland, shanxi coal basin, orenburg and lower volga, west siberia and yamal,
+            hassi messaoud). For any other place, geocode it with find_location_boundary and pass
+            geometry_s3_url (or pass bbox).
         start_date: Optional YYYY-MM-DD. Default: 12 months before end_date.
         end_date: Optional YYYY-MM-DD. Default: the date of EMIT's most recent plume.
         bbox: Optional [west, south, east, north] in degrees; overrides the region's extent.

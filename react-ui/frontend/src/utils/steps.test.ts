@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolCall } from '../types.ts';
 import {
+  chosenCue,
   filmstripSummary,
   groupDetail,
   groupName,
   groupSteps,
   methaneDirFrom,
   parseManifest,
+  parseTip,
   passManifestUrl,
   planStage,
+  rankTips,
+  tipCued,
+  tipManifestUrl,
+  type PassFrame,
 } from './steps.ts';
 
 let n = 0;
@@ -58,7 +64,49 @@ describe('planStage', () => {
     expect(planStage([call('search_methane_plumes')])).toBeNull();
     expect(planStage([call('watch_baseline')])).toBe(0);
     expect(planStage([call('watch_baseline'), call('scan_tropomi'), call('check_recent_passes')])).toBe(2);
-    expect(planStage([call('check_recent_passes'), call('draft_brief'), call('site_history')])).toBe(3);
+    expect(planStage([call('check_recent_passes'), call('thermal_anomalies'), call('nearby_infrastructure')])).toBe(3);
+    expect(planStage([call('check_recent_passes'), call('draft_brief'), call('site_history')])).toBe(4);
+  });
+});
+
+describe('tips', () => {
+  const dir = 's3://b/session_data/abc/methane/';
+  it('derives the tip manifest from the scan call and parses only its numbers', () => {
+    expect(tipManifestUrl(dir, call('scan_tropomi', { area: 'South Caspian' }))).toBe(`${dir}tip_south_caspian.json`);
+    expect(tipManifestUrl(dir, call('scan_tropomi', { area: 'Xinjiang' }))).toBeNull();
+    expect(tipManifestUrl(dir, call('scan_tropomi', { bbox: [1, 2, 3, 4] }))).toBeNull();
+    const tip = parseTip(
+      { area: 'south caspian', end: '2026-10-04', days: 14, emit_can_look: true, orbits: 28,
+        top: { lat: 39.4665, lon: 53.5411, anomaly_ppb: 85.7, valid_days: 6, emit_can_look: true, label: '<b>Acme</b>' } },
+      'south caspian'
+    )!;
+    expect(tip.area.label).toBe('South Caspian, Turkmenistan');
+    expect(tip.anomalyPpb).toBe(85.7);
+    expect(tip.point).toEqual([53.5411, 39.4665]);
+    expect(JSON.stringify(tip)).not.toContain('Acme');
+    expect(parseTip({ area: 'shanxi coal basin' }, 'south caspian')).toBeNull();
+    expect(parseTip({ area: 'west siberia and yamal', emit_can_look: false, top: null }, 'west siberia and yamal')?.anomalyPpb).toBeNull();
+  });
+
+  it('ranks strongest first and knows which tips were cued', () => {
+    const a = parseTip({ area: 'south caspian', emit_can_look: true, top: { lat: 39.4665, lon: 53.5411, anomaly_ppb: 85.7 } }, 'south caspian')!;
+    const b = parseTip({ area: 'shanxi coal basin', emit_can_look: true, top: { lat: 36.9782, lon: 114.2629, anomaly_ppb: 66.8 } }, 'shanxi coal basin')!;
+    const c = parseTip({ area: 'hassi messaoud', emit_can_look: true, top: null }, 'hassi messaoud')!;
+    expect(rankTips([c, b, a]).map((t) => t.area.short)).toEqual(['S. Caspian', 'Shanxi', 'Hassi Messaoud']);
+    const cues = [call('check_recent_passes', { lat: 39.4665, lon: 53.5411 }), call('check_recent_passes', { lat: '36.9782', lon: 114.2629 })];
+    expect(tipCued(a, cues)).toBe(true);
+    expect(tipCued(b, cues)).toBe(true);
+    expect(tipCued(c, cues)).toBe(false);
+  });
+
+  it('finds the site the agent followed from the scene it put on the map', () => {
+    const cues = [call('check_recent_passes', { lat: 39.4665, lon: 53.5411 }), call('check_recent_passes', { lat: 36.9782, lon: 114.2629 })];
+    const frames = (scene: string): PassFrame[] => [{ date: '2026-06-23', verdict: 'candidate', short: 'candidate', reason: null, peak: 3438.2, chipUrl: `${dir}passchip_${scene}.png` }];
+    const framesByCue = [frames('EMIT_L2B_CH4ENH_002_20250820T070851_2523205_009'), frames('EMIT_L2B_CH4ENH_002_20260623T031906_2617402_006')];
+    const later = [call('display_visual', { s3_url: `${dir}pass_EMIT_L2B_CH4ENH_002_20260623T031906_2617402_006.tif` })];
+    expect(chosenCue(cues, framesByCue, later)).toBe(1);
+    expect(chosenCue(cues, framesByCue, [])).toBeNull();
+    expect(chosenCue(cues, [null, null], later)).toBeNull();
   });
 });
 

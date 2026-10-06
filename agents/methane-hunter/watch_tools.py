@@ -417,11 +417,12 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     render (pass to display_visual unchanged), next_steps.
     """
     started = time.time()
+    area_key = None
     try:
         if bbox is not None:
             box, label, emit = parse_bbox(bbox), "custom area", None
         else:
-            _, spec = resolve_watch_area(area)
+            area_key, spec = resolve_watch_area(area)
             box, label, emit = spec["bbox"], spec["label"], spec["emit"]
         if (box[2] - box[0]) * (box[3] - box[1]) > TROPOMI_MAX_AREA_DEG2:
             raise MethaneError("the area is too large for a TROPOMI scan (keep it under ~20 x 20 degrees)")
@@ -446,6 +447,7 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
         # The styling is today's, not the cache's: a composite cached before a render change
         # (magma, no zoom cap) must not bring the old look back.
         cached["render"] = {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]}
+        write_tip(area_key, cached["summary"], cached.get("hotspots", []))
         return json.dumps({**cached, "anomaly_s3_url": url})
     except s3.exceptions.NoSuchKey:
         pass
@@ -511,7 +513,33 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
         s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.tif", Body=cog, ContentType="image/tiff")
         s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.json", Body=json.dumps(result).encode(),
                       ContentType="application/json")
+    write_tip(area_key, result["summary"], hotspots)
     return json.dumps({**result, "anomaly_s3_url": url})
+
+
+def write_tip(area_key: str | None, summary: dict, hotspots: list) -> None:
+    """The tip board's manifest for one watch area: numbers only, keyed by the area's own name.
+
+    Tool outputs never reach the UI, so the stage reads this file (session_data/<sid>/methane/
+    tip_<area_key>.json, the key derived from the scan call's `area`) to draw every area's anomaly
+    on the globe and list the tips before the agent commits to a site.
+    """
+    if not area_key:
+        return
+    top = hotspots[0] if hotspots else None
+    tip = {
+        "area": area_key,
+        "end": summary.get("end"),
+        "days": summary.get("days_requested"),
+        "background_ppb": summary.get("background_ppb"),
+        "emit_can_look": bool(summary.get("emit_can_look")),
+        "orbits": summary.get("orbits"),
+        "top": top and {k: top.get(k) for k in ("lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look")},
+    }
+    try:
+        mt._put_json(f"{mt.session_prefix()}tip_{area_key.replace(' ', '_')}.json", tip)
+    except Exception as e:  # the board is decoration: never fail the scan for it
+        logger.warning("tip manifest failed: %s", type(e).__name__)
 
 
 # --- EMIT cue: recent raw passes -------------------------------------------------------------

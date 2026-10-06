@@ -36,6 +36,7 @@ const GROUP_NAMES: Record<string, (n: number) => string> = {
   site_history: (n) => (n > 1 ? `Check ${n} site histories` : 'Check the site history'),
   inspect_image: (n) => (n > 1 ? `Look at ${n} images` : 'Look at the image'),
   display_visual: (n) => (n > 1 ? `Put ${n} layers on the map` : 'Put it on the map'),
+  reverse_geocode: (n) => (n > 1 ? `Name ${n} places` : 'Name the place'),
 };
 
 /** What the room reads for a step group. */
@@ -46,21 +47,112 @@ export function groupName(group: StepGroup): string {
   return n > 1 ? `${stepName(group.name)} ×${n}` : stepName(group.name);
 }
 
-/** The tool's own watch-area names (agents/methane-hunter/watch_tools.py WATCH_AREAS). */
-export const WATCH_AREA_NAMES = [
-  'permian basin',
-  'south caspian',
-  'zagros foreland',
-  'shanxi coal basin',
-  'orenburg and lower volga',
-  'west siberia and yamal',
-  'hassi messaoud',
-] as const;
+/**
+ * The watch areas, mirrored from the tool (agents/methane-hunter/watch_tools.py WATCH_AREAS): the
+ * tool's own key, the label the stage prints (country included: the room may hear any of them),
+ * a short form for the globe, and the area's centre. Nothing printed about an area comes from a
+ * model-written string or a manifest's text; only its numbers are read.
+ */
+export interface WatchArea {
+  name: string;
+  label: string;
+  short: string;
+  centre: [number, number];
+}
+export const WATCH_AREAS: readonly WatchArea[] = [
+  { name: 'permian basin', label: 'Permian Basin, United States', short: 'Permian', centre: [-102.75, 32.0] },
+  { name: 'south caspian', label: 'South Caspian, Turkmenistan', short: 'S. Caspian', centre: [57.25, 39.0] },
+  { name: 'zagros foreland', label: 'Zagros foreland, Iran', short: 'Zagros', centre: [50.0, 31.25] },
+  { name: 'shanxi coal basin', label: 'Shanxi coal basin, China', short: 'Shanxi', centre: [112.4, 37.65] },
+  { name: 'orenburg and lower volga', label: 'Orenburg and lower Volga, Russia', short: 'Orenburg', centre: [50.25, 48.75] },
+  { name: 'west siberia and yamal', label: 'West Siberia and Yamal, Russia', short: 'W. Siberia', centre: [72.5, 66.0] },
+  { name: 'hassi messaoud', label: 'Hassi Messaoud, Algeria', short: 'Hassi Messaoud', centre: [6.0, 31.75] },
+];
+export const WATCH_AREA_NAMES = WATCH_AREAS.map((a) => a.name);
 
 function knownArea(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const v = value.trim().toLowerCase();
-  return (WATCH_AREA_NAMES as readonly string[]).includes(v) ? v : null;
+  return WATCH_AREA_NAMES.includes(v) ? v : null;
+}
+
+export function watchArea(name: string): WatchArea | undefined {
+  return WATCH_AREAS.find((a) => a.name === name);
+}
+
+/** The tip manifest scan_tropomi wrote for this call (key from its `area`, spaces to underscores). */
+export function tipManifestUrl(dir: string | null, call: ToolCall): string | null {
+  if (!dir || call.name !== 'scan_tropomi') return null;
+  const area = knownArea(call.params?.area);
+  return area ? `${dir}tip_${area.replace(/ /g, '_')}.json` : null;
+}
+
+export interface Tip {
+  area: WatchArea;
+  /** The top hotspot's anomaly above the area's background, ppb; null when the scan found none. */
+  anomalyPpb: number | null;
+  validDays: number | null;
+  emit: boolean;
+  /** The top hotspot, where EMIT is cued. */
+  point: [number, number] | null;
+  end: string | null;
+  days: number | null;
+}
+
+function num(value: unknown, lo: number, hi: number): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= lo && value <= hi ? value : null;
+}
+
+/** A tip, field by field from the manifest's numbers; the words come from WATCH_AREAS. Null when not a tip. */
+export function parseTip(raw: unknown, areaName: string): Tip | null {
+  const area = watchArea(areaName);
+  if (!area || !raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (r.area !== areaName) return null;
+  const top = r.top && typeof r.top === 'object' ? (r.top as Record<string, unknown>) : null;
+  const lat = top ? num(top.lat, -90, 90) : null;
+  const lon = top ? num(top.lon, -180, 180) : null;
+  return {
+    area,
+    anomalyPpb: top ? num(top.anomaly_ppb, -1000, 1000) : null,
+    validDays: top ? num(top.valid_days, 0, 60) : null,
+    emit: r.emit_can_look === true,
+    point: lat !== null && lon !== null ? [lon, lat] : null,
+    end: typeof r.end === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.end) ? r.end : null,
+    days: num(r.days, 1, 60),
+  };
+}
+
+/** Tips strongest first; areas EMIT cannot look at keep their place (the board says so). */
+export function rankTips(tips: Tip[]): Tip[] {
+  return [...tips].sort((a, b) => (b.anomalyPpb ?? -Infinity) - (a.anomalyPpb ?? -Infinity));
+}
+
+/** Whether a tip's hotspot is one of the points EMIT was cued on this turn (same 2-decimal point). */
+export function tipCued(tip: Tip, cues: ToolCall[]): boolean {
+  if (!tip.point) return false;
+  const [lon, lat] = tip.point;
+  return cues.some((c) => coord(c.params?.lat, 2) === lat.toFixed(2) && coord(c.params?.lon, 2) === lon.toFixed(2));
+}
+
+const SCENE_IN_URL = /(EMIT_L2B_CH4ENH_002_\d{8}T\d{6}_\d{7}_\d{3})/;
+
+/**
+ * Which cued site the agent followed: the one whose passes include the EMIT scene it then put on the
+ * map or looked at (pass_<scene>.tif, columns_<scene>.geojson). Index into `cues`, or null before
+ * the agent commits.
+ */
+export function chosenCue(cues: ToolCall[], framesByCue: Array<PassFrame[] | null>, later: ToolCall[]): number | null {
+  const scenes = later
+    .filter((t) => t.name === 'display_visual' || t.name === 'inspect_image')
+    .map((t) => (typeof t.params?.s3_url === 'string' ? t.params.s3_url.match(SCENE_IN_URL)?.[1] : undefined))
+    .filter((s): s is string => !!s);
+  if (scenes.length === 0) return null;
+  for (let i = 0; i < cues.length; i++) {
+    const frames = framesByCue[i];
+    if (frames?.some((f) => f.chipUrl && scenes.some((s) => f.chipUrl!.includes(s)))) return i;
+  }
+  return null;
 }
 
 function coord(value: unknown, digits: number): string | null {
@@ -88,17 +180,27 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
     const text = tip ? 'Following the TROPOMI tip' : 'Recent EMIT passes';
     return { text, ...(points.length > 0 ? { mono: points.join(' · '), points } : {}) };
   }
+  if (group.name === 'thermal_anomalies') {
+    const nights = group.calls.map((c) => c.params?.nights).find((n) => typeof n === 'number' && n >= 1 && n <= 60);
+    return { text: `VIIRS night-time heat, last ${typeof nights === 'number' ? nights : 30} nights` };
+  }
+  if (group.name === 'nearby_infrastructure') {
+    const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 5);
+    return { text: `OpenStreetMap, by type, within ${typeof r === 'number' ? r : 2} km` };
+  }
   return null;
 }
 
-export const PLAN_STAGES = ['Baseline', 'Tip', 'Cue', 'Brief'] as const;
+export const PLAN_STAGES = ['Baseline', 'Tip', 'Cue', 'Check', 'Brief'] as const;
 const STAGE_OF: Record<string, number> = {
   watch_baseline: 0,
   scan_tropomi: 1,
   check_recent_passes: 2,
   site_history: 2,
-  draft_brief: 3,
-  brief_status: 3,
+  thermal_anomalies: 3,
+  nearby_infrastructure: 3,
+  draft_brief: 4,
+  brief_status: 4,
 };
 
 /** The furthest stage of the watch plan this turn reached, or null when this is not a watch turn. */

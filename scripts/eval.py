@@ -276,6 +276,9 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     for forbidden in case.get("forbidden_text", []):
         if forbidden in text:
             problems.append(f"forbidden text {forbidden!r} present")
+    # warn_text: wording the prompt forbids but the stage repairs itself (an em dash reads as a
+    # comma on the caption band); printed, never a failure.
+    warnings = [f"wording {w!r} present" for w in case.get("warn_text", []) if w in text]
     # required_text: phrases the agent must say (e.g. the Methane Hunter's confidence sentence).
     for required in case.get("required_text", []):
         if required not in text:
@@ -316,12 +319,14 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
         # Keep the TAIL: the closer is what matters, and a head cut made complete closers look truncated.
         "report_text": (text[spans[-1][1]:] if spans else text).strip()[-2000:],
         "detail": "; ".join(problems),
+        "warnings": warnings,
     }
     if problems:
         tail = text[-500:].replace("\n", " ")
         return False, "; ".join(problems) + f"\n      stream tail: ...{tail}", record
+    note = f"\n         warn: {'; '.join(warnings)}" if warnings else ""
     return True, (f"{elapsed:.0f}s (final report {report_seconds:.1f}s, {report_chars} chars), "
-                  f"tools: {tool_names}"), record
+                  f"tools: {tool_names}{note}"), record
 
 
 def main() -> int:

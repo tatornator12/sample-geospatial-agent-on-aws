@@ -14,6 +14,7 @@ import { ChatSidebar } from '../components/ChatSidebar';
 import type { GeometryData, RasterData } from '../types';
 import { getIdToken } from '../utils/auth';
 import { parseRenderHint } from '../utils/render';
+import type { Tip } from '../utils/steps';
 import '../stage.css';
 
 interface ScenarioToolCall {
@@ -77,6 +78,7 @@ export function Chat() {
   const [scenarioError, setScenarioError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(true); // Controls MapView render delay on scenario switch
   const [agentWorking, setAgentWorking] = useState(false);
+  const [tips, setTips] = useState<Tip[]>([]);
 
   // Track if this is the first run of the scenario effect
   const isFirstScenarioLoad = useRef(true);
@@ -287,6 +289,7 @@ export function Chat() {
     setScenarioConfig(null);
     setScenarioError(null);
     setIsLoadingScenario(false);
+    setTips([]);
   };
 
   // Switching acts on the rail starts a fresh session: new id, cleared map, empty transcript.
@@ -349,6 +352,7 @@ export function Chat() {
             rasters={currentRasters}
             onDrawnGeometry={handleDrawnGeometry}
             working={agentWorking}
+            tips={tips}
           />
         )}
       </div>
@@ -368,6 +372,7 @@ export function Chat() {
           drawnGeometryMessage={drawnGeometryMessage}
           onDrawnGeometryMessageSent={() => setDrawnGeometryMessage(null)}
           onWorkingChange={setAgentWorking}
+          onTipsUpdate={setTips}
         />
       </div>
     </div>

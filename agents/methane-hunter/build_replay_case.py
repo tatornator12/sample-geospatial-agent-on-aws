@@ -54,6 +54,8 @@ RESULTS = {
     "scan_tropomi": "TROPOMI composite scanned",
     "check_recent_passes": "Recent EMIT passes judged",
     "site_history": "Site history read",
+    "thermal_anomalies": "VIIRS heat checked",
+    "nearby_infrastructure": "OpenStreetMap checked, by type",
     "draft_brief": "Brief drafted (not filed)",
 }
 
@@ -69,7 +71,7 @@ CASES = {
         "needs_brief": False,
     },
     "watch": {
-        "id": "methane-watch-south-caspian",
+        "id": "methane-watch-mission",
         # The stage's "Methane Watch brief" plate (react-ui/frontend/src/utils/stageCopy.ts), word for word.
         "prompt": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
         "name": "Methane Watch brief",
@@ -198,6 +200,27 @@ def main() -> int:
             chip = p.get("chip")
             if isinstance(chip, str) and CHIP_RE.fullmatch(chip) and not (out / chip).exists():
                 fetch(bucket, f"{session_prefix}methane/{chip}", chip)
+
+    # The tip board: one manifest per scanned area (the UI derives its name from the call's `area`).
+    for t in tools:
+        area = tool_input(t).get("area") if t["name"] == "scan_tropomi" else None
+        if isinstance(area, str) and re.fullmatch(r"[a-z ]{3,40}", area.strip().lower()):
+            name = f"tip_{area.strip().lower().replace(' ', '_')}.json"
+            if name not in local_for.values() and fetch(bucket, f"{session_prefix}methane/{name}", name):
+                local_for[f"{session_prefix}methane/{name}"] = name
+
+    # The ground-record checks' records (draft_brief embedded them already; kept for completeness).
+    for t in tools:
+        if t["name"] not in ("thermal_anomalies", "nearby_infrastructure"):
+            continue
+        params = tool_input(t)
+        lat, lon = coord(params.get("lat")), coord(params.get("lon"))
+        if lat is None or lon is None:
+            continue
+        kind = "thermal" if t["name"] == "thermal_anomalies" else "infra"
+        name = f"{kind}_{lat}_{lon}.json"
+        if name not in local_for.values() and fetch(bucket, f"{session_prefix}methane/{name}", name):
+            local_for[f"{session_prefix}methane/{name}"] = name
 
     # The draft brief the card shows (never filed in a replay).
     for bid in dict.fromkeys(brief_ids):

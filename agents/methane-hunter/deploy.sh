@@ -58,6 +58,7 @@ echo "   Model: ${MODEL_ID}"
 echo "   Region: ${AWS_REGION}"
 echo "   ECR Repo: ${ECR_REPO_NAME}"
 echo "   Earthdata token: $([ -n "${EARTHDATA_TOKEN}" ] && echo present || echo MISSING)"
+echo "   FIRMS map key: $([ -n "${FIRMS_MAP_KEY:-}" ] && echo present || echo 'absent (flare check falls back to the public 7-day file)')"
 echo ""
 
 # Shared platform code + requirements + Dockerfile into this build context (gitignored).
@@ -89,6 +90,7 @@ run "${AGENTCORE_BIN}" launch \
     --env "ARCGIS_MCP_URL=${ARCGIS_MCP_URL}" \
     --env "ARCGIS_MCP_TOKEN=${ARCGIS_MCP_TOKEN}" \
     --env "EARTHDATA_TOKEN=${EARTHDATA_TOKEN}" \
+    --env "FIRMS_MAP_KEY=${FIRMS_MAP_KEY:-}" \
     --env "DISABLE_ADOT_OBSERVABILITY=${DISABLE_ADOT_OBSERVABILITY:-true}" \
     --auto-update-on-conflict
 

@@ -101,6 +101,16 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
           <dd>{card.singleExplanation}</dd>
         </div>
       </dl>
+      {(card.checks?.length ?? 0) > 0 && (
+        <>
+          <p className="brief-card__subhead">Ground record</p>
+          <ul className="brief-card__checks">
+            {card.checks!.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </>
+      )}
       {card.hypotheses.length > 0 && (
         <>
           <p className="brief-card__subhead">Unconfirmed hypotheses</p>

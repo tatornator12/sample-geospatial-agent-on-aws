@@ -1,0 +1,402 @@
+{
+  "name": "Methane Watch brief",
+  "description": "One prompt, the whole mission: a global baseline, a TROPOMI tip, EMIT cued on recent passes, a self-check, and a draft brief for the analyst",
+  "location": "Methane watch areas",
+  "user_question": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
+  "agent": "methane",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "methane_hunter_dev",
+  "tool_calls": [
+    {
+      "name": "watch_baseline",
+      "params": {},
+      "result": "Baseline built from NASA's plume record"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/watch_sites_v002.geojson",
+        "title": "EMIT Methane Repeat Sites, Global Baseline",
+        "description": "24 repeat sites seen on 5 or more dates, 1686 total detections",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "permian basin",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "south caspian",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "zagros foreland",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "shanxi coal basin",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "orenburg and lower volga",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "west siberia and yamal",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "hassi messaoud",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 39.4665,
+        "lon": 53.5411
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 36.9782,
+        "lon": 114.2629
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 39.4665,
+        "lon": 53.5411
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 36.9782,
+        "lon": 114.2629
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 53.5411,
+        "y": 39.4665
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 114.2629,
+        "y": 36.9782
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_shanxi_coal_basin_china_2026-10-04_14d.tif",
+        "title": "TROPOMI CH4 Anomaly, Shanxi Coal Basin, 14-day composite",
+        "description": "Top hotspot +66.8 ppb above background near Shahe City",
+        "render": {
+          "kind": "raster",
+          "colormap": "viridis",
+          "rescale": [
+            0,
+            60
+          ],
+          "units": "ppb",
+          "group": "methane",
+          "max_zoom": 8,
+          "legend": "CH4 anomaly",
+          "bounds": [
+            110.2,
+            34.5,
+            114.6,
+            40.8
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
+        "title": "EMIT CH4 enhancement, Shanxi coal basin, 2026-06-23",
+        "question": "What is the shape and extent of the methane enhancement?"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "description": "Strongest candidate pass, peak 3438.2 ppm·m, 2026-06-23",
+        "render": {
+          "bounds": [
+            114.22917,
+            36.95107,
+            114.29663,
+            37.00533
+          ],
+          "colormap": "plasma",
+          "group": "methane",
+          "kind": "raster",
+          "legend": "CH4 enhancement",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m"
+        },
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
+        "title": "EMIT CH4 Enhancement, Shahe City area, 2026-06-23"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "description": "Column footprints for strongest candidate, 2026-06-23",
+        "render": {
+          "group": "methane",
+          "kind": "columns",
+          "legend": "CH4 enhancement",
+          "property": "ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m"
+        },
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.geojson",
+        "title": "EMIT CH4 Column Footprints, Shahe City area, 2026-06-23"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[114.2629,36.9782]}",
+        "location": "Shahe City watch site",
+        "radius_meters": 3000
+      },
+      "result": "3 km frame around the site"
+    },
+    {
+      "name": "thermal_anomalies",
+      "params": {
+        "lat": 36.9782,
+        "lon": 114.2629
+      },
+      "result": "VIIRS heat checked"
+    },
+    {
+      "name": "nearby_infrastructure",
+      "params": {
+        "lat": 36.9782,
+        "lon": 114.2629
+      },
+      "result": "OpenStreetMap checked, by type"
+    },
+    {
+      "name": "get_rasters",
+      "params": {
+        "location": "Shahe City watch site",
+        "geometry_s3_url": "s3://bucket/use-cases/methane-watch-mission/plumes_detected.geojson",
+        "current_date_str": "2026-06-23"
+      },
+      "result": "Sentinel-2 scene fetched"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "question": "What land cover and structures are visible on the ground?",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_watch_site_2026-05-11.tif",
+        "title": "Sentinel-2 true colour, Shahe City watch site, 2026-05-11"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_watch_site_2026-05-11.tif",
+        "title": "Sentinel-2 true colour, Shahe City watch site, 2026-05-11",
+        "description": "Irrigated fields, disturbed ground with excavated terraces, settlement clusters and road networks"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "draft_brief",
+      "params": {
+        "title": "Recurring methane, Shanxi coal basin site near Shahe City",
+        "place": "Near Shahe City, Xingtai City, Hebei Province, China",
+        "lat": 36.9782,
+        "lon": 114.2629,
+        "observations": [
+          "TROPOMI recorded a +66.8 ppb anomaly above background over the Shanxi coal basin area on the 14-day composite ending 2026-10-04.",
+          "EMIT's recent passes show 6 candidate enhancements out of 7 looks since 2025-04-14, with peaks ranging from 1,474.3 to 3,438.2 ppm·m.",
+          "The strongest candidate pass on 2026-06-23 reached 3,438.2 ppm·m with 270 pixels at or above 1,000 ppm·m and 54 pixels above 3x uncertainty.",
+          "NASA's plume product (current through 2025-09-22) outlines 0 plumes at this site; the product is nearly empty after 2024.",
+          "Sentinel-2 imagery from 2026-05-11 shows irrigated fields, disturbed ground with excavated terraces, settlement clusters and road networks within 3 km.",
+          "EMIT looked 12 times at this site from 2024-04-05 to 2026-08-17."
+        ],
+        "looks": 12,
+        "candidates": 6,
+        "passes_read": 7,
+        "explanations": [
+          {
+            "id": "routine_venting",
+            "assessment": "possible",
+            "next_check": "Repeated EMIT passes on separate dates with consistent enhancement would support this; aircraft or ground survey would confirm."
+          },
+          {
+            "id": "equipment_failure_or_leak",
+            "assessment": "possible",
+            "next_check": "A sudden increase in enhancement magnitude or spatial extent on a new EMIT pass would indicate this."
+          },
+          {
+            "id": "maintenance_blowdown",
+            "assessment": "possible",
+            "next_check": "A single high-magnitude pass followed by absence on subsequent passes would support this hypothesis."
+          },
+          {
+            "id": "non_oil_gas_source",
+            "assessment": "cannot assess",
+            "next_check": "OSM maps nothing within 2 km; ground inspection or aircraft survey needed to identify source type."
+          }
+        ],
+        "confidence": "moderate",
+        "gaps": [
+          "NASA's plume product is nearly empty after 2024, so passes since then have not been independently verified for plumes.",
+          "EMIT only observes on its orbital passes, leaving gaps between looks.",
+          "VIIRS thermal check was limited to 7 nights due to missing FIRMS key; 30-night check not available.",
+          "OpenStreetMap has no relevant infrastructure mapped within 2 km, leaving source type uncharacterised."
+        ],
+        "next_collection": "A new EMIT pass over this site, followed by aircraft or ground inspection to characterise the source type.",
+        "watch_area": "Shanxi coal basin"
+      },
+      "result": "Brief drafted (not filed)"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "tropomi_anomaly_shanxi_coal_basin_china_2026-10-04_14d.tif",
+        "title": "TROPOMI CH4 Anomaly, Shanxi Coal Basin, 14-day composite",
+        "render": {
+          "kind": "raster",
+          "colormap": "viridis",
+          "rescale": [
+            0,
+            60
+          ],
+          "units": "ppb",
+          "group": "methane",
+          "max_zoom": 8,
+          "legend": "CH4 anomaly",
+          "bounds": [
+            110.2,
+            34.5,
+            114.6,
+            40.8
+          ]
+        }
+      },
+      {
+        "file": "pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
+        "title": "EMIT CH4 Enhancement, Shahe City area, 2026-06-23",
+        "render": {
+          "bounds": [
+            114.22917,
+            36.95107,
+            114.29663,
+            37.00533
+          ],
+          "colormap": "plasma",
+          "group": "methane",
+          "kind": "raster",
+          "legend": "CH4 enhancement",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m"
+        }
+      },
+      {
+        "file": "watch_sites_v002.geojson",
+        "title": "EMIT Methane Repeat Sites, Global Baseline",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      {
+        "file": "columns_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.geojson",
+        "title": "EMIT CH4 Column Footprints, Shahe City area, 2026-06-23",
+        "render": {
+          "group": "methane",
+          "kind": "columns",
+          "legend": "CH4 enhancement",
+          "property": "ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m"
+        }
+      },
+      {
+        "file": "tci_clipped_shahe_city_watch_site_2026-05-11.tif",
+        "title": "Sentinel-2 true colour, Shahe City watch site, 2026-05-11"
+      }
+    ]
+  }
+}

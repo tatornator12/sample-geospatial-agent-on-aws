@@ -4,61 +4,44 @@
  * are dimmed, and the line under the frames says why in words ("2 candidates · 1 too weak").
  *
  * Tool outputs never reach the UI, so check_recent_passes writes a manifest beside its chips;
- * its key comes from the call's lat/lon (utils/steps.ts). The manifest is read through the
- * backend's allowlisted geometry route and validated field by field; chips load by presigned GET.
- * Nothing here blocks the step column: it waits quietly, then settles to nothing if absent.
+ * the step column loads and validates it (utils/steps.ts) and hands the frames here. Chips load
+ * by presigned GET. Nothing here blocks the step column.
  */
 import { useEffect, useState } from 'react';
-import { getPresignedUrl, loadGeometry } from '../services/api.ts';
+import { getPresignedUrl } from '../services/api.ts';
 import type { EvidenceItem } from '../utils/evidence.ts';
-import { filmstripSummary, parseManifest, type PassFrame } from '../utils/steps.ts';
-
-const RETRY_MS = 2000;
-const GIVE_UP_MS = 45_000;
+import { filmstripSummary, type PassFrame } from '../utils/steps.ts';
 
 interface PassFilmstripProps {
   toolId: string;
-  manifestUrl: string;
-  /** The manifest's folder: chips are named relative to it. */
-  dir: string;
-  /** The call has finished (the manifest is written before the tool returns). */
-  ready: boolean;
+  frames: PassFrame[];
   onOpen?: (item: EvidenceItem, imageUrl: string) => void;
 }
 
-type Loaded = { frame: PassFrame; imageUrl: string | null };
-
-export function PassFilmstrip({ toolId, manifestUrl, dir, ready, onOpen }: PassFilmstripProps) {
-  const [frames, setFrames] = useState<Loaded[] | null>(null);
+export function PassFilmstrip({ toolId, frames, onOpen }: PassFilmstripProps) {
+  const [images, setImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!ready) return;
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const started = Date.now();
-    const attempt = async () => {
-      const raw = await loadGeometry(manifestUrl);
+    const missing = frames.filter((f) => f.chipUrl && !images[f.chipUrl]);
+    if (missing.length === 0) return;
+    void Promise.all(missing.map(async (f) => [f.chipUrl!, await getPresignedUrl(f.chipUrl!)] as const)).then((pairs) => {
       if (cancelled) return;
-      const parsed = raw ? parseManifest(raw, dir) : null;
-      if (!parsed) {
-        if (Date.now() - started < GIVE_UP_MS) timer = setTimeout(attempt, RETRY_MS);
-        return;
-      }
-      const loaded = await Promise.all(
-        parsed.map(async (frame) => ({ frame, imageUrl: frame.chipUrl ? await getPresignedUrl(frame.chipUrl) : null }))
-      );
-      if (!cancelled) setFrames(loaded);
-    };
-    void attempt();
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [manifestUrl, dir, ready]);
+      setImages((prev) => {
+        const next = { ...prev };
+        pairs.forEach(([k, v]) => { if (v) next[k] = v; });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+    // `frames` is the identity to watch; `images` is only read to skip work already done.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frames]);
 
-  if (!frames || frames.length === 0) return null;
+  if (frames.length === 0) return null;
 
-  const open = ({ frame, imageUrl }: Loaded) => {
+  const open = (frame: PassFrame) => {
+    const imageUrl = frame.chipUrl ? images[frame.chipUrl] : undefined;
     if (!imageUrl || !onOpen || !frame.chipUrl) return;
     const peak = frame.peak !== null ? `, peak ${frame.peak.toLocaleString('en-US', { maximumFractionDigits: 1 })} ppm·m` : '';
     onOpen(
@@ -77,24 +60,25 @@ export function PassFilmstrip({ toolId, manifestUrl, dir, ready, onOpen }: PassF
     <div className="pass-film">
       <ul className="pass-film__frames" aria-label="Recent EMIT passes, newest first">
         {frames.map((f) => {
-          const label = `${f.frame.date}: ${f.frame.short}`;
+          const label = `${f.date}: ${f.short}`;
+          const imageUrl = f.chipUrl ? images[f.chipUrl] : undefined;
           return (
-            <li key={f.frame.date + (f.frame.chipUrl ?? '')}>
+            <li key={f.date + (f.chipUrl ?? '')}>
               <button
                 type="button"
-                className={`pass-film__frame pass-film__frame--${f.frame.verdict}`}
+                className={`pass-film__frame pass-film__frame--${f.verdict}`}
                 onClick={() => open(f)}
-                disabled={!f.imageUrl || !onOpen}
+                disabled={!imageUrl || !onOpen}
                 aria-label={label}
                 title={label}
               >
-                {f.imageUrl ? <img src={f.imageUrl} alt="" /> : <span aria-hidden="true" />}
+                {imageUrl ? <img src={imageUrl} alt="" /> : <span aria-hidden="true" />}
               </button>
             </li>
           );
         })}
       </ul>
-      <p className="pass-film__summary">{filmstripSummary(frames.map((f) => f.frame))}</p>
+      <p className="pass-film__summary">{filmstripSummary(frames)}</p>
     </div>
   );
 }

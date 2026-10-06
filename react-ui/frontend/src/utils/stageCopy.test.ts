@@ -5,9 +5,13 @@ describe('stageCopyFor', () => {
   it('gives the Methane Hunter its mission, its two fallback beats and its own console copy', () => {
     const copy = stageCopyFor('methane');
     expect(copy.prompts.map((p) => p.label)).toEqual([
-      'Methane Watch brief', 'Find and rank Permian plumes', 'Strongest plume and the ground',
+      'Methane Watch brief', 'Find and rank plumes over…', 'Strongest plume and the ground',
     ]);
-    expect(copy.placeholder).toBe('Name a basin and a year');
+    // The rank plate is finished by the presenter (any region), so it fills the console instead of sending.
+    expect(copy.prompts[1].fill).toBe(true);
+    expect(copy.prompts[1].prompt.endsWith(' over ')).toBe(true);
+    expect(copy.prompts[0].fill).toBeUndefined();
+    expect(copy.placeholder).toBe('Name a region and a year');
   });
 
   it('falls back to the Earth Analyst for dev, stable, unknown and absent ids', () => {

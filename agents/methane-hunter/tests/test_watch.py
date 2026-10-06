@@ -197,12 +197,17 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     assert out["anomaly_s3_url"].startswith(f"s3://{BUCKET}/session_data/{SESSION}/methane/tropomi_anomaly_")
     assert out["render"]["colormap"] == "viridis" and out["render"]["units"] == "ppb" and out["render"]["max_zoom"] == 8
     assert out["hotspots"][0]["anomaly_ppb"] == 50.0
+    # The tip board's manifest: keyed by the area's own name, the top hotspot's numbers only.
+    tip = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_south_caspian.json"])
+    assert tip["area"] == "south caspian" and tip["emit_can_look"] is True and tip["top"]["anomaly_ppb"] == 50.0
+    assert set(tip["top"]) == {"lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look"}
     # Warm: same answer from the shared cache, nothing read from TROPOMI, a fresh session copy.
     monkeypatch.setattr(watch, "read_tropomi_window", lambda *a, **k: pytest.fail("should come from the cache"))
     monkeypatch.setenv("AGENT_SESSION_ID", "another-session-0002")
     again = json.loads(_run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-10")))
     assert again["summary"]["source"] == "cache" and again["hotspots"] == out["hotspots"]
     assert "/session_data/another-session-0002/methane/" in again["anomaly_s3_url"]
+    assert "session_data/another-session-0002/methane/tip_south_caspian.json" in fake_s3.objects   # the cache path writes it too
     # A composite cached under an older style comes back in today's style (viridis, zoom cap).
     key = next(k for k in fake_s3.objects if k.endswith("_1d.json") and k.startswith("methane/cache/tropomi_"))
     stale = json.loads(fake_s3.objects[key])
