@@ -17,8 +17,8 @@
       "name": "display_visual",
       "params": {
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/watch_sites_v002.geojson",
-        "title": "EMIT Methane Repeat Sites, Global Baseline",
-        "description": "24 repeat sites seen on 5 or more dates, 1686 total detections",
+        "title": "EMIT Methane Watch: Global Repeat Sites",
+        "description": "24 repeat sites seen on 5 or more dates, 2022-2025",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -137,8 +137,7 @@
       "name": "display_visual",
       "params": {
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_shanxi_coal_basin_china_2026-10-04_14d.tif",
-        "title": "TROPOMI CH4 Anomaly, Shanxi Coal Basin, 14-day composite",
-        "description": "Top hotspot +66.8 ppb above background near Shahe City",
+        "title": "TROPOMI CH4 Anomaly: Shanxi Coal Basin, 14-day composite to 2026-10-04",
         "render": {
           "kind": "raster",
           "colormap": "viridis",
@@ -165,14 +164,13 @@
       "params": {
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
         "title": "EMIT CH4 enhancement, Shanxi coal basin, 2026-06-23",
-        "question": "What is the shape and extent of the methane enhancement?"
+        "question": "What is the shape, direction and extent of the methane enhancement?"
       },
       "result": "Looked at the image"
     },
     {
       "name": "display_visual",
       "params": {
-        "description": "Strongest candidate pass, peak 3438.2 ppm·m, 2026-06-23",
         "render": {
           "bounds": [
             114.22917,
@@ -191,14 +189,13 @@
           "units": "ppm·m"
         },
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
-        "title": "EMIT CH4 Enhancement, Shahe City area, 2026-06-23"
+        "title": "EMIT CH4 Enhancement: Shanxi Coal Basin, 2026-06-23, peak 3,438.2 ppm·m"
       },
       "result": "Shown on the map"
     },
     {
       "name": "display_visual",
       "params": {
-        "description": "Column footprints for strongest candidate, 2026-06-23",
         "render": {
           "group": "methane",
           "kind": "columns",
@@ -212,7 +209,7 @@
           "units": "ppm·m"
         },
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.geojson",
-        "title": "EMIT CH4 Column Footprints, Shahe City area, 2026-06-23"
+        "title": "EMIT CH4 Column Enhancement: Shanxi Coal Basin, 2026-06-23"
       },
       "result": "Shown on the map"
     },
@@ -220,7 +217,7 @@
       "name": "create_bbox_from_coordinates",
       "params": {
         "geometry_json": "{\"type\":\"Point\",\"coordinates\":[114.2629,36.9782]}",
-        "location": "Shahe City watch site",
+        "location": "Shahe City Shanxi watch site",
         "radius_meters": 3000
       },
       "result": "3 km frame around the site"
@@ -239,12 +236,12 @@
         "lat": 36.9782,
         "lon": 114.2629
       },
-      "result": "OpenStreetMap checked, by type"
+      "result": "Overture Maps checked, by type"
     },
     {
       "name": "get_rasters",
       "params": {
-        "location": "Shahe City watch site",
+        "location": "Shahe City Shanxi watch site",
         "geometry_s3_url": "s3://bucket/use-cases/methane-watch-mission/plumes_detected.geojson",
         "current_date_str": "2026-06-23"
       },
@@ -254,17 +251,17 @@
       "name": "inspect_image",
       "params": {
         "question": "What land cover and structures are visible on the ground?",
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_watch_site_2026-05-11.tif",
-        "title": "Sentinel-2 true colour, Shahe City watch site, 2026-05-11"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_shanxi_watch_site_2026-05-11.tif",
+        "title": "Sentinel-2 true colour, Shahe City Shanxi watch site, 2026-05-11"
       },
       "result": "Looked at the image"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_watch_site_2026-05-11.tif",
-        "title": "Sentinel-2 true colour, Shahe City watch site, 2026-05-11",
-        "description": "Irrigated fields, disturbed ground with excavated terraces, settlement clusters and road networks"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_shanxi_watch_site_2026-05-11.tif",
+        "title": "Sentinel-2 True Colour: Shahe City, Xingtai, Hebei, 2026-05-11",
+        "description": "Ground beneath the Shanxi coal basin TROPOMI hotspot. Irrigated fields, settlement clusters, bare earthworks, industrial yards and a pipeline corridor visible in the valley."
       },
       "result": "Shown on the map"
     },
@@ -275,13 +272,14 @@
         "place": "Near Shahe City, Xingtai City, Hebei Province, China",
         "lat": 36.9782,
         "lon": 114.2629,
+        "watch_area": "Shanxi coal basin",
         "observations": [
-          "TROPOMI recorded a +66.8 ppb anomaly above background over the Shanxi coal basin area on the 14-day composite ending 2026-10-04.",
-          "EMIT's recent passes show 6 candidate enhancements out of 7 looks since 2025-04-14, with peaks ranging from 1,474.3 to 3,438.2 ppm·m.",
-          "The strongest candidate pass on 2026-06-23 reached 3,438.2 ppm·m with 270 pixels at or above 1,000 ppm·m and 54 pixels above 3x uncertainty.",
-          "NASA's plume product (current through 2025-09-22) outlines 0 plumes at this site; the product is nearly empty after 2024.",
-          "Sentinel-2 imagery from 2026-05-11 shows irrigated fields, disturbed ground with excavated terraces, settlement clusters and road networks within 3 km.",
-          "EMIT looked 12 times at this site from 2024-04-05 to 2026-08-17."
+          "TROPOMI 14-day composite (2026-09-20 to 2026-10-04) shows a top hotspot anomaly of +66.8 ppb above the area background of 1,942.0 ppb.",
+          "EMIT looked at this site 12 times (2024-04-05 to 2026-08-17); NASA outlined no plumes in the formal product, which is nearly empty after 2024.",
+          "Of 7 recent passes read since 2025-01-01, 6 met the candidate threshold (at least 5 pixels at or above 1,000 ppm·m and at least 5 above 3x uncertainty).",
+          "Candidate peaks: 3,438.2 ppm·m on 2026-06-23, 3,194.1 ppm·m on 2026-08-17, 2,405.3 ppm·m on 2025-07-31, 1,928.3 ppm·m on 2025-08-14, 1,740.5 ppm·m on 2026-02-01, 1,474.3 ppm·m on 2025-04-14.",
+          "One pass on 2025-07-31 was rejected due to cloud or gap; no other rejections.",
+          "Sentinel-2 true colour (2026-05-11) shows irrigated fields, settlement clusters, bare earthworks, industrial yard structures, large ponds, and a pipeline corridor in the valley."
         ],
         "looks": 12,
         "candidates": 6,
@@ -290,33 +288,37 @@
           {
             "id": "routine_venting",
             "assessment": "possible",
-            "next_check": "Repeated EMIT passes on separate dates with consistent enhancement would support this; aircraft or ground survey would confirm."
+            "next_check": "Repeated enhancement on 6 of 7 passes across multiple seasons supports this; ground inspection or aircraft measurement would confirm."
           },
           {
             "id": "equipment_failure_or_leak",
             "assessment": "possible",
-            "next_check": "A sudden increase in enhancement magnitude or spatial extent on a new EMIT pass would indicate this."
+            "next_check": "Persistence across 2025-2026 makes a single failure less likely but cannot be ruled out; a ground inspection would distinguish."
           },
           {
             "id": "maintenance_blowdown",
-            "assessment": "possible",
-            "next_check": "A single high-magnitude pass followed by absence on subsequent passes would support this hypothesis."
+            "assessment": "less likely",
+            "next_check": "Enhancement appears on 6 separate dates spanning over a year, inconsistent with a single blowdown event; repeated aircraft passes would confirm."
+          },
+          {
+            "id": "unlit_flare",
+            "assessment": "cannot assess",
+            "next_check": "VIIRS saw no heat within 1 km over 30 nights; no flare stack is mapped, so this hypothesis cannot be assessed."
           },
           {
             "id": "non_oil_gas_source",
-            "assessment": "cannot assess",
-            "next_check": "OSM maps nothing within 2 km; ground inspection or aircraft survey needed to identify source type."
+            "assessment": "less likely",
+            "next_check": "Overture Maps shows only a pipeline within 2 km and nothing mapped for mining, waste or wetland; a field survey would confirm source type."
           }
         ],
-        "confidence": "moderate",
+        "confidence": "high",
         "gaps": [
-          "NASA's plume product is nearly empty after 2024, so passes since then have not been independently verified for plumes.",
-          "EMIT only observes on its orbital passes, leaving gaps between looks.",
-          "VIIRS thermal check was limited to 7 nights due to missing FIRMS key; 30-night check not available.",
-          "OpenStreetMap has no relevant infrastructure mapped within 2 km, leaving source type uncharacterised."
+          "NASA's formal plume product is nearly empty after 2024-09-22, so passes since then have not been independently outlined.",
+          "EMIT only observes on its orbital passes; gaps between passes mean emissions between looks are not captured.",
+          "TROPOMI at ~4 km resolution provides a tip only, not a confirmed detection or source location.",
+          "No aircraft or ground measurement data are available to quantify flux or confirm source type."
         ],
-        "next_collection": "A new EMIT pass over this site, followed by aircraft or ground inspection to characterise the source type.",
-        "watch_area": "Shanxi coal basin"
+        "next_collection": "A dedicated EMIT tasking pass or airborne measurement campaign over the site near Shahe City to quantify flux and narrow the source footprint."
       },
       "result": "Brief drafted (not filed)"
     }
@@ -325,7 +327,7 @@
     "layers": [
       {
         "file": "tropomi_anomaly_shanxi_coal_basin_china_2026-10-04_14d.tif",
-        "title": "TROPOMI CH4 Anomaly, Shanxi Coal Basin, 14-day composite",
+        "title": "TROPOMI CH4 Anomaly: Shanxi Coal Basin, 14-day composite to 2026-10-04",
         "render": {
           "kind": "raster",
           "colormap": "viridis",
@@ -347,7 +349,7 @@
       },
       {
         "file": "pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
-        "title": "EMIT CH4 Enhancement, Shahe City area, 2026-06-23",
+        "title": "EMIT CH4 Enhancement: Shanxi Coal Basin, 2026-06-23, peak 3,438.2 ppm·m",
         "render": {
           "bounds": [
             114.22917,
@@ -368,7 +370,7 @@
       },
       {
         "file": "watch_sites_v002.geojson",
-        "title": "EMIT Methane Repeat Sites, Global Baseline",
+        "title": "EMIT Methane Watch: Global Repeat Sites",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -379,7 +381,7 @@
       },
       {
         "file": "columns_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.geojson",
-        "title": "EMIT CH4 Column Footprints, Shahe City area, 2026-06-23",
+        "title": "EMIT CH4 Column Enhancement: Shanxi Coal Basin, 2026-06-23",
         "render": {
           "group": "methane",
           "kind": "columns",
@@ -394,8 +396,8 @@
         }
       },
       {
-        "file": "tci_clipped_shahe_city_watch_site_2026-05-11.tif",
-        "title": "Sentinel-2 true colour, Shahe City watch site, 2026-05-11"
+        "file": "tci_clipped_shahe_city_shanxi_watch_site_2026-05-11.tif",
+        "title": "Sentinel-2 True Colour: Shahe City, Xingtai, Hebei, 2026-05-11"
       }
     ]
   }

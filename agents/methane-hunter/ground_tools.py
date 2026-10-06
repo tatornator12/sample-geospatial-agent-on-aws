@@ -4,11 +4,12 @@ thermal_anomalies      VIIRS active-fire detections (NASA FIRMS) within ~1 km of
                        last N nights. A persistent night-time heat source at an oil and gas site is
                        a lit flare; none means flaring was not observed. Tests the "unlit or
                        malfunctioning flare" hypothesis.
-nearby_infrastructure  What OpenStreetMap has mapped within R km, by TYPE only: wells, flares,
-                       pipelines, tanks, mines, landfills, wetlands, farmland. Names, operators,
-                       owners and brands never leave this module (only our own category words and
-                       numbers are returned), so no name can reach the model. Tests the
-                       "non-oil-and-gas source" hypothesis against the oil and gas ones.
+nearby_infrastructure  What Overture Maps (AWS Open Data, read straight from S3) has mapped within
+                       R km, by TYPE only: storage tanks, pipelines, oil and gas businesses, power
+                       plants, industrial areas, mines, landfills, wetlands, farmland. Names,
+                       operators, owners and brands are never selected from the parquet files (see
+                       overture.py), so no name can reach the model. Tests the "non-oil-and-gas
+                       source" hypothesis against the oil and gas ones.
 
 Both write a small numbers-only record beside the session's methane files
 (thermal_<lat>_<lon>.json, infra_<lat>_<lon>.json) so draft_brief can embed the checks in the
@@ -34,8 +35,9 @@ from strands import tool
 
 import config
 import methane_tools as mt
+import overture as ov
 from methane_tools import MethaneError, _finite, _int
-from watch_tools import box_around, parse_point
+from watch_tools import WATCH_AREAS, box_around, parse_point
 
 logger = logging.getLogger("methane_tools")
 
@@ -49,81 +51,14 @@ FIRMS_7D_FILES = {                                               # keyless fallb
 }
 FIRMS_TIMEOUT_S = 30.0
 FIRMS_CAP_BYTES = 80_000_000
-FIRMS_API_CHUNK_DAYS = 10                                        # the area API's longest range
+FIRMS_API_CHUNK_DAYS = 5                                         # the area API rejects longer ranges ("Expects [1..5]")
 THERMAL_RADIUS_KM = 1.0
 THERMAL_MAX_RADIUS_KM = 3.0
 THERMAL_DEFAULT_NIGHTS = 30
 THERMAL_MAX_NIGHTS = 60
 PERSISTENT_NIGHTS = 3                                            # heat on this many nights reads as a lit flare
 
-# --- OpenStreetMap (Overpass) ---------------------------------------------------------------------
-
-# Public Overpass servers, tried in turn. They are often "too busy" (504) or slow; the shared 7-day
-# cache (filled by scripts/warm_watch.py the day before a show) is what the stage relies on.
-OVERPASS_URLS = (
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-)
-# A tool that is silent for over a minute stalls the agent's stream (the client's read timeout), so
-# the whole Overpass attempt, every server and retry included, fits one budget well under that.
-OVERPASS_TIMEOUT_S = 15.0                                        # per request
-OVERPASS_BUDGET_S = 40.0                                         # for the whole check
-OVERPASS_RETRIES = 2                                             # rounds over the servers, with a short pause
-OVERPASS_CAP_BYTES = 5_000_000
-OVERPASS_MAX_ELEMENTS = 200
-INFRA_RADIUS_KM = 2.0
-INFRA_MAX_RADIUS_KM = 5.0
-INFRA_CACHE_TTL_S = 7 * 24 * 3600
 USER_AGENT = "agentic-earth-methane-watch/1.0 (open data check; no names kept)"
-
-# Our own category words, from allowlisted OSM key/value pairs. Nothing else from a tag is kept.
-OIL_GAS = "oil and gas"
-COAL = "coal"
-WASTE = "waste"
-AGRICULTURE = "agriculture"
-WETLAND = "wetland"
-OTHER = "other industry"
-# (key, value regex) -> (type, group). First match wins; order matters for the specific ones.
-TYPE_RULES: tuple[tuple[str, str, str, str], ...] = (
-    ("man_made", r"^(petroleum_well|oil_well|gas_well)$", "well", OIL_GAS),
-    ("man_made", r"^flare$", "flare stack", OIL_GAS),
-    ("man_made", r"^pipeline$", "pipeline", OIL_GAS),
-    ("pipeline", r".+", "pipeline", OIL_GAS),
-    ("man_made", r"^(storage_tank|gasometer)$", "storage tank", OIL_GAS),
-    ("industrial", r"^(oil|gas|oil_gas|refinery|petroleum_terminal|well_cluster|gas_processing)$", "oil or gas plant", OIL_GAS),
-    ("substance", r"^(oil|gas|natural_gas|lng|petroleum)$", "oil or gas facility", OIL_GAS),
-    ("resource", r"coal", "coal mine", COAL),
-    ("man_made", r"^(mineshaft|adit)$", "mine shaft", COAL),
-    ("man_made", r"^tailings_pond$", "tailings pond", COAL),
-    ("landuse", r"^quarry$", "quarry or surface mine", COAL),
-    ("industrial", r"^mine$", "mine", COAL),
-    ("landuse", r"^landfill$", "landfill", WASTE),
-    ("amenity", r"^waste_disposal$", "landfill", WASTE),
-    ("man_made", r"^wastewater_plant$", "wastewater plant", WASTE),
-    ("landuse", r"^(farmland|farmyard|orchard|meadow)$", "farmland", AGRICULTURE),
-    ("natural", r"^wetland$", "wetland", WETLAND),
-    ("landuse", r"^reservoir$", "reservoir", WETLAND),
-    ("power", r"^plant$", "power plant", OTHER),
-    ("landuse", r"^industrial$", "industrial area", OTHER),
-)
-_TYPE_RULES = tuple((k, re.compile(rx, re.IGNORECASE), t, g) for k, rx, t, g in TYPE_RULES)
-PLANT_SOURCES = ("coal", "gas", "oil", "hydro", "solar", "wind", "nuclear", "biomass", "waste")
-# Every clause names its values (open-ended key scans and farmland polygons made the query time out
-# on the public servers); farmland is not asked for, since a count of fields says nothing here.
-OVERPASS_QUERY = """[out:json][timeout:{timeout}];
-(
-  nwr(around:{r},{lat},{lon})["man_made"~"^(petroleum_well|oil_well|gas_well|flare|pipeline|storage_tank|gasometer|wastewater_plant|mineshaft|adit|tailings_pond)$"];
-  nwr(around:{r},{lat},{lon})["landuse"~"^(quarry|industrial|landfill|reservoir)$"];
-  nwr(around:{r},{lat},{lon})["industrial"~"^(oil|gas|oil_gas|refinery|petroleum_terminal|well_cluster|gas_processing|mine)$"];
-  nwr(around:{r},{lat},{lon})["substance"~"^(oil|gas|natural_gas|lng|petroleum)$"];
-  nwr(around:{r},{lat},{lon})["resource"~"coal"];
-  nwr(around:{r},{lat},{lon})["power"="plant"];
-  nwr(around:{r},{lat},{lon})["amenity"="waste_disposal"];
-  nwr(around:{r},{lat},{lon})["natural"="wetland"];
-);
-out tags center {cap};
-"""
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -290,7 +225,8 @@ async def thermal_anomalies(lat: float, lon: float, nights: int = THERMAL_DEFAUL
     except httpx.HTTPError as e:
         return json.dumps({"error": f"NASA FIRMS could not be reached ({type(e).__name__}); the flare check is unavailable."})
     except Exception as e:
-        logger.warning("FIRMS failed: %s", type(e).__name__)
+        # RuntimeError messages are our own short codes (firms_http_400 etc.), never a URL or the key.
+        logger.warning("FIRMS failed: %s %s", type(e).__name__, e if isinstance(e, RuntimeError) else "")
         return json.dumps({"error": "NASA FIRMS did not return usable data; the flare check is unavailable."})
     t = summarise_thermal(rows, lat, lon, radius_km, covered, source)
     t["line"] = thermal_line(t)
@@ -308,66 +244,31 @@ async def thermal_anomalies(lat: float, lon: float, nights: int = THERMAL_DEFAUL
                        "next_steps": "Use `line` as an observation in the brief and let it move the flare hypothesis."})
 
 
-# --- nearby infrastructure --------------------------------------------------------------------------
+# --- nearby infrastructure (Overture Maps) --------------------------------------------------------------
 
-def classify(tags: dict) -> tuple[str, str] | None:
-    """Our own (type, group) for an element, from allowlisted tags only; None when nothing matches."""
-    if not isinstance(tags, dict):
-        return None
-    for key, rx, typ, group in _TYPE_RULES:
-        value = tags.get(key)
-        if isinstance(value, str) and rx.search(value):
-            if typ == "power plant":
-                src = str(tags.get("plant:source", "")).lower()
-                if src in PLANT_SOURCES:
-                    return f"{src} power plant", (COAL if src == "coal" else OIL_GAS if src in ("gas", "oil") else OTHER)
-            if typ == "quarry or surface mine" and re.search("coal", str(tags.get("resource", "")), re.IGNORECASE):
-                return "coal mine", COAL
-            return typ, group
-    return None
+INFRA_RADIUS_KM = 2.0
+INFRA_MAX_RADIUS_KM = 5.0
 
 
-def element_point(el: dict) -> tuple[float, float] | None:
-    c = el.get("center") if isinstance(el.get("center"), dict) else el
-    try:
-        la, lo = float(c.get("lat")), float(c.get("lon"))
-    except (TypeError, ValueError, AttributeError):
-        return None
-    return (la, lo) if abs(la) <= 90 and abs(lo) <= 180 else None
-
-
-def summarise_infra(elements: list, lat: float, lon: float, radius_km: float) -> dict:
-    """Counts and nearest distance per type; groups; nothing from a tag but the matched category."""
-    by_type: dict[str, dict] = {}
-    for el in elements[:OVERPASS_MAX_ELEMENTS]:
-        if not isinstance(el, dict):
-            continue
-        hit = classify(el.get("tags"))
-        pt = element_point(el)
-        if not hit or not pt:
-            continue
-        typ, group = hit
-        d = haversine_km(lat, lon, *pt)
-        if d > radius_km * 1.5:   # Overpass `around` is generous with long ways; keep the honest radius
-            continue
-        row = by_type.setdefault(typ, {"type": typ, "group": group, "count": 0, "nearest_km": d})
-        row["count"] += 1
-        row["nearest_km"] = min(row["nearest_km"], d)
-    types = sorted(({**r, "nearest_km": round(r["nearest_km"], 1)} for r in by_type.values()), key=lambda r: r["nearest_km"])
-    groups = {g: sum(r["count"] for r in types if r["group"] == g) for g in (OIL_GAS, COAL, WASTE, AGRICULTURE, WETLAND, OTHER)}
-    return {"lat": round(lat, 4), "lon": round(lon, 4), "radius_km": radius_km, "types": types, "groups": groups,
-            "mapped": sum(groups.values())}
+def plural(n: int, typ: str) -> str:
+    if n == 1:
+        return typ
+    if typ.endswith("business"):
+        return typ + "es"
+    if typ.endswith(("quarry", "farmland", "wetland")):
+        return typ if typ.endswith("land") else typ[:-1] + "ies"
+    return typ + "s"
 
 
 def infra_line(i: dict) -> str:
+    """One sentence for the brief, written by code from the counts."""
     if i["mapped"] == 0:
-        return (f"OpenStreetMap has nothing relevant mapped within {i['radius_km']:g} km; "
+        return (f"Overture Maps has nothing relevant mapped within {i['radius_km']:g} km; "
                 "that is a mapping gap, not evidence of empty ground.")
-    parts = [f"{r['count']} {r['type']}{'s' if r['count'] != 1 and not r['type'].endswith('s') else ''} "
-             f"({r['nearest_km']:g} km)" for r in i["types"][:5]]
-    absent = [g for g in (OIL_GAS, COAL, WASTE, WETLAND) if i["groups"].get(g, 0) == 0]
+    parts = [f"{t['count']} {plural(t['count'], t['type'])} ({t['nearest_km']:g} km)" for t in i["types"][:5]]
+    absent = [g for g in (ov.OIL_GAS, ov.MINING, ov.WASTE, ov.WETLAND) if i["groups"].get(g, 0) == 0]
     tail = f"; nothing mapped for {', '.join(absent)}" if absent else ""
-    return f"OpenStreetMap maps within {i['radius_km']:g} km: {', '.join(parts)}{tail}."
+    return f"Overture Maps shows within {i['radius_km']:g} km: {', '.join(parts)}{tail}."
 
 
 def infra_hint(i: dict) -> str:
@@ -375,53 +276,30 @@ def infra_hint(i: dict) -> str:
     if i["mapped"] == 0:
         return "non_oil_gas_source: 'cannot assess' (nothing mapped); the oil and gas hypotheses stay possible."
     bits = []
-    if g[COAL]:
-        bits.append("non_oil_gas_source (coal): 'possible', supported by mapping")
-    if g[WASTE]:
+    if g[ov.MINING]:
+        bits.append("non_oil_gas_source (mining): 'possible', supported by mapping")
+    if g[ov.WASTE]:
         bits.append("non_oil_gas_source (landfill): 'possible', supported by mapping")
-    if g[OIL_GAS] and not (g[COAL] or g[WASTE] or g[WETLAND]):
+    if g[ov.WETLAND] or g[ov.AGRICULTURE]:
+        bits.append("non_oil_gas_source (wetland or agriculture): 'possible', supported by mapping")
+    if g[ov.OIL_GAS] and not (g[ov.MINING] or g[ov.WASTE] or g[ov.WETLAND]):
         bits.append("non_oil_gas_source: 'less likely' (only oil and gas infrastructure is mapped)")
-    if not g[OIL_GAS] and (g[COAL] or g[WASTE]):
+    if not g[ov.OIL_GAS] and (g[ov.MINING] or g[ov.WASTE]):
         bits.append("routine_venting, unlit_flare: 'less likely' (no oil and gas infrastructure is mapped)")
-    if any(r["type"] == "flare stack" for r in i["types"]):
-        bits.append("a flare stack is mapped: read it with the VIIRS check")
+    if any(t["type"] == "storage tank" for t in i["types"]):
+        bits.append("storage tanks are mapped: tank venting is a known methane source, read with the VIIRS check")
     return "; ".join(bits) or "the mapping neither supports nor argues against any hypothesis."
-
-
-def fetch_overpass(lat: float, lon: float, radius_km: float) -> list:
-    query = OVERPASS_QUERY.format(timeout=int(OVERPASS_TIMEOUT_S) - 5, r=int(radius_km * 1000),
-                                  lat=f"{lat:.5f}", lon=f"{lon:.5f}", cap=OVERPASS_MAX_ELEMENTS)
-    last: Exception | None = None
-    deadline = time.monotonic() + OVERPASS_BUDGET_S
-    with httpx.Client(timeout=OVERPASS_TIMEOUT_S, follow_redirects=False) as client:
-        for attempt in range(OVERPASS_RETRIES):
-            for url in OVERPASS_URLS:
-                left = deadline - time.monotonic()
-                if left < 3:
-                    raise last or RuntimeError("overpass_budget")
-                try:
-                    r = client.post(url, data={"data": query}, headers={"User-Agent": USER_AGENT},
-                                    timeout=min(OVERPASS_TIMEOUT_S, left))
-                    if r.status_code != 200 or len(r.content) > OVERPASS_CAP_BYTES:
-                        last = RuntimeError(f"overpass_{r.status_code}")
-                        continue
-                    body = r.json()
-                    return body.get("elements", []) if isinstance(body, dict) else []
-                except (httpx.HTTPError, ValueError) as e:
-                    last = e
-            if attempt + 1 < OVERPASS_RETRIES and deadline - time.monotonic() > 10:
-                time.sleep(3)
-    raise last or RuntimeError("overpass_unreachable")
 
 
 @tool
 async def nearby_infrastructure(lat: float, lon: float, radius_km: float = INFRA_RADIUS_KM) -> str:
-    """Check what is mapped around the site in OpenStreetMap, by type only (no names, no operators).
+    """Check what is mapped around the site, by type only (no names, no operators), from Overture Maps.
 
-    Counts wells, flare stacks, pipelines, storage tanks, oil or gas plants, mines and quarries, landfills,
-    wastewater plants, farmland, wetlands and power plants within the radius, with the nearest distance of
-    each. Tests the "non-oil-and-gas source" hypothesis against the oil and gas ones. Absence of mapping is
-    a mapping gap, never evidence that the ground is empty.
+    Counts storage tanks, pipelines, oil and gas businesses, power plants, industrial areas, quarries and
+    mines, landfills, wastewater plants, farmland and wetlands within the radius, with the nearest distance
+    of each (Overture Maps on AWS Open Data, read straight from S3). Tests the "non-oil-and-gas source"
+    hypothesis against the oil and gas ones. Absence of mapping is a mapping gap, never evidence that the
+    ground is empty. Wells are not in this map; a mapped tank or pipeline is the oil and gas signal.
 
     Args:
         lat, lon: The site in degrees.
@@ -437,32 +315,32 @@ async def nearby_infrastructure(lat: float, lon: float, radius_km: float = INFRA
     except MethaneError as e:
         return json.dumps({"error": str(e)})
     s3 = mt._s3()
-    cache = f"methane/cache/osm_{lat:.4f}_{lon:.4f}_{radius_km:g}km.json"
-    source = "cache"
-    try:
-        cached = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=cache)["Body"].read(1_000_000))
-        if time.time() - cached.get("fetched_at", 0) > INFRA_CACHE_TTL_S:
-            raise s3.exceptions.NoSuchKey(cache)
-        elements = cached["elements"]
-    except s3.exceptions.NoSuchKey:
+    # Inside a watch area the extract (one small S3 read, pulled once per release) answers; anywhere
+    # else, Overture is read live from S3 within the budget.
+    area = next((k for k, spec in WATCH_AREAS.items()
+                 if spec["bbox"][0] <= lon <= spec["bbox"][2] and spec["bbox"][1] <= lat <= spec["bbox"][3]), None)
+    rows, source, missed = None, None, []
+    if area:
         try:
-            elements = fetch_overpass(lat, lon, radius_km)
+            rows = ov.load_extract(area, s3)
+            source = f"extract:{area}"
         except Exception as e:
-            logger.warning("Overpass failed: %s", type(e).__name__)
-            return json.dumps({"error": "OpenStreetMap (Overpass) could not be reached; the infrastructure check is unavailable."})
-        # Cache only what we need to re-summarise: tags are reduced to the allowlisted keys plus position.
-        keep = ("man_made", "landuse", "industrial", "pipeline", "substance", "resource", "power", "plant:source",
-                "amenity", "natural")
-        elements = [{"center": element_point(el) and {"lat": element_point(el)[0], "lon": element_point(el)[1]},
-                     "tags": {k: v for k, v in (el.get("tags") or {}).items() if k in keep}}
-                    for el in elements[:OVERPASS_MAX_ELEMENTS] if isinstance(el, dict)]
-        source = "overpass"
-        s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=cache, ContentType="application/json",
-                      Body=json.dumps({"fetched_at": time.time(), "elements": elements}).encode())
-    i = summarise_infra(elements, lat, lon, radius_km)
+            logger.warning("Overture extract read failed: %s", type(e).__name__)
+    if rows is None:
+        try:
+            rows, missed = ov.live_rows(box_around(lat, lon, radius_km))
+            source = "live"
+        except Exception as e:
+            logger.warning("Overture live query failed: %s", type(e).__name__)
+            return json.dumps({"error": "Overture Maps could not be read; the infrastructure check is unavailable."})
+        if missed and len(missed) == len(ov.SOURCES):
+            return json.dumps({"error": "Overture Maps could not be read in time; the infrastructure check is unavailable."})
+    i = ov.summarise(rows, lat, lon, radius_km)
     i["line"] = infra_line(i)
     _record("infra", lat, lon, i)
-    i.update(source=source, seconds=round(time.time() - started, 1))
-    logger.info("INFRA: %.3f,%.3f %d mapped (%s)", lat, lon, i["mapped"], source)
+    i.update(read_from=source, seconds=round(time.time() - started, 1))
+    if missed:
+        i["note"] = f"{len(missed)} of {len(ov.SOURCES)} Overture layers did not answer in time; counts may be low."
+    logger.info("INFRA: %.3f,%.3f %d mapped (%s, %.1fs)", lat, lon, i["mapped"], source, i["seconds"])
     return json.dumps({**i, "hypothesis_hint": infra_hint(i),
                        "next_steps": "Use `line` in the brief; say what kinds of things are mapped, never who owns them."})

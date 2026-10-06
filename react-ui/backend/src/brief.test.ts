@@ -90,7 +90,7 @@ describe('briefCard', () => {
   it('carries the ground checks\' own sentences and drops anything with markup', () => {
     const checks = {
       thermal: { verdict: 'no heat', line: 'VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.' },
-      infrastructure: { mapped: 3, line: 'OpenStreetMap maps within 2 km: 3 wells (0.4 km); <b>Acme</b>' },
+      infrastructure: { mapped: 3, line: 'Overture Maps shows within 2 km: 3 storage tanks (0.4 km); <b>Acme</b>' },
     };
     const card = briefCard(draft({}, { checks }), BID, SID)!;
     assert.deepEqual(card.checks, ['VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.']);

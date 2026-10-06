@@ -82,6 +82,11 @@ export function Chat() {
 
   // Track if this is the first run of the scenario effect
   const isFirstScenarioLoad = useRef(true);
+  // The case already loading or loaded. React's StrictMode (the dev server) runs this effect
+  // twice on mount; two loads of the same case raced the map's same-kind layer replacement and
+  // left the baseline listed twice. Production builds never did, but the rehearsal view should
+  // match what the stage shows.
+  const scenarioLoadedFor = useRef<string | null>(null);
 
   // Load scenario when scenarioId is present
   useEffect(() => {
@@ -89,8 +94,11 @@ export function Chat() {
       setScenarioConfig(null);
       setScenarioError(null);
       isFirstScenarioLoad.current = true;
+      scenarioLoadedFor.current = null;
       return;
     }
+    if (scenarioLoadedFor.current === scenarioId) return;
+    scenarioLoadedFor.current = scenarioId;
 
     // Only reset state when SWITCHING scenarios (not on initial mount)
     if (!isFirstScenarioLoad.current) {

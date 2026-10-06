@@ -12,7 +12,8 @@ Sentinel-2. Spec: `.kiro/specs/methane-hunter/`. Data spike: `docs/spikes/emit.m
 | `methane_config.py` | Prompt and settings; re-exports the platform `config` (never name an agent file `config.py`) |
 | `methane_tools.py` | `search_methane_plumes` (CMR), `triage_plumes` (LP DAAC + stats + ranking), `show_plume` |
 | `watch_tools.py` | Methane Watch: `watch_baseline`, `scan_tropomi` (tip), `check_recent_passes` (cue), `site_history` |
-| `ground_tools.py` | The ground record: `thermal_anomalies` (VIIRS via FIRMS), `nearby_infrastructure` (OpenStreetMap, types only) |
+| `ground_tools.py` | The ground record: `thermal_anomalies` (VIIRS via FIRMS), `nearby_infrastructure` (Overture Maps, types only) |
+| `overture.py` | Overture Maps on AWS Open Data through DuckDB: the category vocabulary, the file index, area extracts, the live query |
 | `brief_tools.py` | `draft_brief` (a draft, never filed; embeds the checks) and `brief_status` (the only source for "filed") |
 | `build_replay_case.py` | Records a live run into `use-cases/<id>/` (`--case permian` or `--case watch`) |
 | `_paths.py` | Puts the shared platform code first on `sys.path`: `_geo_agent/` in the image, `../../geo_agent` in the repo |
@@ -45,9 +46,15 @@ of VIIRS detections through NASA FIRMS's area API with it, and only the public 7
 it. Register in a minute at https://firms.modaps.eosdis.nasa.gov/api/map_key/ and add the key to
 `.env.dev` and `.env`. Sent only to `firms.modaps.eosdis.nasa.gov`, never logged.
 
-The infrastructure check (`nearby_infrastructure`) reads OpenStreetMap through the public Overpass
-servers, which are often busy. Its results are cached for 7 days per site, so run
-`scripts/warm_watch.py` the day before a show (it now warms both checks for every watch hotspot).
+The infrastructure check (`nearby_infrastructure`) reads Overture Maps GeoParquet straight from the
+AWS Open Data bucket (`s3://overturemaps-us-west-2`, release pinned in `overture.py`) with DuckDB:
+no server in between, and only `subtype`, `class` and the bbox are ever selected, never a name.
+`scripts/warm_watch.py` builds, once per release, a file index (each parquet file's bbox) and an
+extract of everything mapped inside each watch area into `methane/cache/`, so a check inside a watch
+area is one small S3 read and a check anywhere else opens one to five files within a 40 s budget.
+Run it the day before a show (it warms both checks for every watch hotspot). `requirements-agent.txt`
+holds the agent-only pins (`duckdb`); `stage_shared.sh` appends them to the platform requirements and
+bakes DuckDB's `httpfs` extension into the image so the first read never downloads it.
 
 ## Data notes
 

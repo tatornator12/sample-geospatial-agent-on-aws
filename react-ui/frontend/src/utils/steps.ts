@@ -186,7 +186,7 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
   }
   if (group.name === 'nearby_infrastructure') {
     const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 5);
-    return { text: `OpenStreetMap, by type, within ${typeof r === 'number' ? r : 2} km` };
+    return { text: `Overture Maps, by type, within ${typeof r === 'number' ? r : 2} km` };
   }
   return null;
 }

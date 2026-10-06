@@ -298,7 +298,7 @@ export interface BriefCardData {
   confidence: 'low' | 'moderate' | 'high';
   singleExplanation: string;
   hypotheses: Array<{ label: string; assessment: string }>;
-  /** The ground-record checks' sentences (VIIRS heat, OpenStreetMap types), from the tools. */
+  /** The ground-record checks' sentences (VIIRS heat, Overture Maps types), from the tools. */
   checks?: string[];
 }
 

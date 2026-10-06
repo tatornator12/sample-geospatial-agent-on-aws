@@ -95,6 +95,34 @@ def main() -> int:
         return out
 
     print(f"Warming Methane Watch caches ({len(areas)} areas, days {day_counts})")
+    # Overture extracts: everything mapped of an allowlisted type inside each watch area, once per
+    # Overture release (minutes each, straight from AWS Open Data), so the infrastructure check inside
+    # a watch area is one small S3 read on the day.
+    import overture as ov
+    s3 = w.mt._s3()
+    # The file index first: each parquet file's bbox from its footer, so every later read (the
+    # extracts here, a live check on the day) opens only the few files that cover its box.
+    if ov.load_index(s3) is not None:
+        print(f"   cached  overture index ({ov.RELEASE})")
+    else:
+        t = time.time()
+        try:
+            files = ov.build_index(s3)
+            print(f"  {time.time() - t:5.1f}s  overture index: " + ", ".join(f"{k.split('/')[1]} {len(v)}" for k, v in files.items()))
+        except Exception as e:
+            failures += 1
+            print(f"  {time.time() - t:5.1f}s  overture index: ERROR {type(e).__name__} (extracts and live checks read every file)")
+    for area in areas:
+        if ov.load_extract(area, s3) is not None:
+            print(f"   cached  overture extract {area} ({ov.RELEASE})")
+            continue
+        t = time.time()
+        try:
+            out = ov.extract_area(area, w.WATCH_AREAS[area]["bbox"], s3)
+            print(f"  {time.time() - t:5.1f}s  overture extract {area}: {out['rows']} rows, {out['bytes'] // 1024} kB")
+        except Exception as e:
+            failures += 1
+            print(f"  {time.time() - t:5.1f}s  overture extract {area}: ERROR {type(e).__name__}")
     base = run("watch_baseline", w.watch_baseline())
     if "summary" in base:
         s = base["summary"]
@@ -110,8 +138,8 @@ def main() -> int:
                 s = passes["summary"]
                 print(f"         {s['read']} passes: {s['candidates']} candidates, {s['rejected']} rejected")
             run(f"site_history {where}", w.site_history(h["lat"], h["lon"]))
-            # The ground-record checks: OpenStreetMap's public Overpass servers are often busy, so the
-            # 7-day cache filled here is what the show relies on; VIIRS is quick but cached per day too.
+            # The ground-record checks: inside a watch area the Overture read comes from the extract
+            # above, and the VIIRS pull is quick but cached per day too.
             run(f"nearby_infrastructure {where}", w.nearby_infrastructure(h["lat"], h["lon"]))
             run(f"thermal_anomalies {where}", w.thermal_anomalies(h["lat"], h["lon"]))
 

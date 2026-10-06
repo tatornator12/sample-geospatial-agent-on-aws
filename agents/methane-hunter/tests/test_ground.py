@@ -1,6 +1,6 @@
-"""The ground-record checks (ground_tools): VIIRS heat near a site and what OpenStreetMap maps, by type.
+"""The ground-record checks (ground_tools): VIIRS heat near a site and what Overture Maps maps, by type.
 
-Hermetic: FIRMS and Overpass are patched; S3 is the in-memory fake. The checks must never let a name,
+Hermetic: FIRMS and the Overture reads are patched; S3 is the in-memory fake. The checks must never let a name,
 operator or free text through, must write their numbers-only record for the brief, and must fail soft.
 """
 import asyncio
@@ -72,7 +72,10 @@ def test_thermal_with_a_key_uses_the_area_api_and_never_leaks_the_key(ground, mo
     out = json.loads(_run(ground.thermal_anomalies(LAT, LON, nights=30)))
     assert out["source"] == "firms-api" and out["nights_checked"] == 30 and out["verdict"] == "no heat"
     assert "no heat source" in out["line"] and "flaring was not observed" in out["line"]
-    assert len(urls) == 6 and all("/api/area/csv/abc123secret/VIIRS_" in u for u in urls)   # 3 chunks x 2 sensors
+    assert len(urls) == 12 and all("/api/area/csv/abc123secret/VIIRS_" in u for u in urls)  # 6 chunks x 2 sensors
+    # The area API rejects a day range above 5 ("Invalid day range. Expects [1..5]").
+    spans = {int(u.rsplit("/", 2)[1]) for u in urls}
+    assert spans == {5}
     assert "abc123secret" not in json.dumps(out)
 
 
@@ -84,84 +87,158 @@ def test_thermal_fails_soft_and_validates_first(ground, monkeypatch):
     assert "error" in json.loads(_run(ground.thermal_anomalies(LAT, LON, nights=0)))
 
 
-# --- nearby_infrastructure --------------------------------------------------------------------------
+# --- nearby_infrastructure (Overture Maps) -------------------------------------------------------------
 
-def osm(elements):
-    return [{"type": "node", "id": i, **e} for i, e in enumerate(elements)]
+def row(typ, group, lat, lon, d=0.0005):
+    return {"type": typ, "group": group, "xmin": lon - d, "ymin": lat - d, "xmax": lon + d, "ymax": lat + d}
 
 
-def test_infra_counts_types_only_and_drops_every_name(ground, fake_s3, monkeypatch):
-    elements = osm([
-        {"lat": LAT + 0.003, "lon": LON, "tags": {"man_made": "petroleum_well", "operator": "Acme Oil LLC", "name": "Well 7"}},
-        {"lat": LAT + 0.004, "lon": LON, "tags": {"man_made": "petroleum_well", "operator": "Acme Oil LLC"}},
-        {"lat": LAT, "lon": LON + 0.006, "tags": {"man_made": "flare", "name": "Flare A"}},
-        {"center": {"lat": LAT - 0.01, "lon": LON}, "tags": {"man_made": "pipeline", "operator": "Pipeco"}},
-        {"center": {"lat": LAT + 0.012, "lon": LON}, "tags": {"landuse": "quarry", "resource": "coal", "name": "Big Mine"}},
-        {"center": {"lat": LAT, "lon": LON - 0.009}, "tags": {"power": "plant", "plant:source": "gas", "owner": "State Co"}},
-        {"center": {"lat": LAT, "lon": LON - 0.009}, "tags": {"landuse": "farmland"}},
-        {"lat": LAT + 0.2, "lon": LON, "tags": {"man_made": "petroleum_well"}},            # 22 km: outside
-        {"lat": LAT, "lon": LON, "tags": {"shop": "bakery", "name": "Nobody's Bakery"}},    # not a category
-    ])
-    monkeypatch.setattr(ground, "fetch_overpass", lambda lat, lon, r: elements)
+def test_infra_reads_the_watch_area_extract_and_counts_types_only(ground, fake_s3, monkeypatch):
+    import overture as ov
+    rows = [
+        row("storage tank", ov.OIL_GAS, LAT + 0.003, LON),
+        row("storage tank", ov.OIL_GAS, LAT + 0.004, LON),
+        row("pipeline", ov.OIL_GAS, LAT - 0.01, LON, d=0.2),            # a long way: its box reaches the site
+        row("quarry or surface mine", ov.MINING, LAT + 0.012, LON),
+        row("power plant", ov.OTHER, LAT, LON - 0.009),
+        row("farmland", ov.AGRICULTURE, LAT, LON - 0.009),
+        row("storage tank", ov.OIL_GAS, LAT + 0.2, LON),                  # 22 km: outside
+        {"type": "<b>Acme</b>", "group": "operators", "xmin": LON, "ymin": LAT, "xmax": LON, "ymax": LAT},  # not a group we know
+    ]
+    fake_s3.put_object(Bucket=BUCKET, Key=ov.extract_key("south caspian"),
+                       Body=json.dumps({"area": "south caspian", "release": ov.RELEASE, "rows": rows}).encode())
+    monkeypatch.setattr(ov, "live_rows", lambda *a, **k: pytest.fail("inside a watch area the extract answers"))
     out = json.loads(_run(ground.nearby_infrastructure(LAT, LON)))
-    types = {r["type"]: r for r in out["types"]}
-    assert types["well"]["count"] == 2 and types["well"]["nearest_km"] == 0.3
-    assert types["flare stack"]["count"] == 1 and types["coal mine"]["count"] == 1 and types["gas power plant"]["group"] == "oil and gas"
-    assert out["groups"]["oil and gas"] == 5 and out["groups"]["coal"] == 1 and out["groups"]["agriculture"] == 1
-    assert out["mapped"] == 7
-    blob = json.dumps(out)
-    for leaked in ("Acme", "Pipeco", "Well 7", "Flare A", "Big Mine", "State Co", "Bakery", "operator", "name"):
-        assert leaked not in blob, leaked
-    assert out["line"].startswith("OpenStreetMap maps within 2 km: 2 wells (0.3 km)")
-    assert "a flare stack is mapped" in out["hypothesis_hint"] and "non_oil_gas_source (coal): 'possible'" in out["hypothesis_hint"]
+    types = {t["type"]: t for t in out["types"]}
+    assert types["storage tank"]["count"] == 2 and types["storage tank"]["nearest_km"] == 0.3
+    assert types["pipeline"]["nearest_km"] == 0.0 and types["quarry or surface mine"]["count"] == 1
+    assert out["groups"]["oil and gas"] == 3 and out["groups"]["mining"] == 1 and out["groups"]["agriculture"] == 1
+    assert out["mapped"] == 6 and out["read_from"] == "extract:south caspian"
+    assert "Acme" not in json.dumps(out) and "operators" not in json.dumps(out)
+    assert out["line"].startswith("Overture Maps shows within 2 km: 1 pipeline (0 km), 2 storage tanks (0.3 km)")
+    assert "non_oil_gas_source (mining): 'possible'" in out["hypothesis_hint"] and "storage tanks are mapped" in out["hypothesis_hint"]
     rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/infra_{LAT:.4f}_{LON:.4f}.json"])
-    assert rec["mapped"] == 7 and "Acme" not in json.dumps(rec)
-    # The shared cache keeps only allowlisted tags and positions, so a re-read cannot resurface a name.
-    cache = json.loads(fake_s3.objects[f"methane/cache/osm_{LAT:.4f}_{LON:.4f}_2km.json"])
-    assert "Acme" not in json.dumps(cache) and cache["elements"][0]["tags"] == {"man_made": "petroleum_well"}
-    monkeypatch.setattr(ground, "fetch_overpass", lambda *a: pytest.fail("should come from the cache"))
-    assert json.loads(_run(ground.nearby_infrastructure(LAT, LON)))["source"] == "cache"
+    assert rec["mapped"] == 6
+
+
+def test_infra_outside_the_watch_areas_reads_overture_live(ground, monkeypatch):
+    import overture as ov
+    calls = []
+    monkeypatch.setattr(ov, "live_rows", lambda box, **k: calls.append(box) or ([row("landfill", ov.WASTE, 48.86, 2.35)], []))
+    out = json.loads(_run(ground.nearby_infrastructure(48.86, 2.35)))     # Paris: no watch area
+    assert out["read_from"] == "live" and out["groups"]["waste"] == 1 and len(calls) == 1
+    w, s, e, n = calls[0]
+    assert w < 2.35 < e and s < 48.86 < n
+    assert "non_oil_gas_source (landfill): 'possible'" in out["hypothesis_hint"]
 
 
 def test_infra_nothing_mapped_is_a_gap_not_evidence(ground, monkeypatch):
-    monkeypatch.setattr(ground, "fetch_overpass", lambda lat, lon, r: [])
-    out = json.loads(_run(ground.nearby_infrastructure(LAT, LON)))
+    import overture as ov
+    monkeypatch.setattr(ov, "live_rows", lambda box, **k: ([], []))
+    out = json.loads(_run(ground.nearby_infrastructure(48.86, 2.35)))
     assert out["mapped"] == 0 and "mapping gap" in out["line"] and "cannot assess" in out["hypothesis_hint"]
 
 
-def test_infra_fails_soft_when_overpass_is_down(ground, monkeypatch):
-    monkeypatch.setattr(ground, "fetch_overpass", lambda *a: (_ for _ in ()).throw(RuntimeError("overpass_504")))
-    out = json.loads(_run(ground.nearby_infrastructure(LAT, LON)))
+def test_infra_fails_soft_when_overture_cannot_be_read(ground, monkeypatch):
+    import overture as ov
+    monkeypatch.setattr(ov, "live_rows", lambda box, **k: (_ for _ in ()).throw(RuntimeError("s3 down")))
+    out = json.loads(_run(ground.nearby_infrastructure(48.86, 2.35)))
     assert "error" in out and "infrastructure check is unavailable" in out["error"]
+    monkeypatch.setattr(ov, "live_rows", lambda box, **k: ([], list(ov.SOURCES)))
+    assert "could not be read in time" in json.loads(_run(ground.nearby_infrastructure(48.86, 2.35)))["error"]
     assert "error" in json.loads(_run(ground.nearby_infrastructure(LAT, LON, radius_km=50)))
 
 
-def test_overpass_gives_up_within_its_budget(ground, monkeypatch):
-    """Every server busy: the check fails soft inside the budget, never stalling the agent's stream."""
-    import httpx
+def test_overture_vocabulary_is_fixed_and_the_query_selects_no_names(ground):
+    import overture as ov
+    assert ov.classify("base/infrastructure", "utility", "storage_tank") == ("storage tank", ov.OIL_GAS)
+    assert ov.classify("base/land_use", "resource_extraction", "mineshaft") == ("mine", ov.MINING)
+    assert ov.classify("base/land_use", "developed", "industrial") == ("industrial area", ov.OTHER)
+    assert ov.classify("base/land", "wetland", "marsh") == ("wetland", ov.WETLAND)
+    assert ov.classify("places/place", "b2b_oil_and_gas_equipment", None) == ("oil and gas business", ov.OIL_GAS)
+    assert ov.classify("places/place", "gastropub", None) is None
+    assert ov.classify("base/infrastructure", "power", "power_tower") is None
+    assert ov.bbox_distance_km(LAT, LON, LON - 1, LAT - 1, LON + 1, LAT + 1) == 0.0
+    assert 0.2 < ov.bbox_distance_km(LAT, LON, LON + 0.003, LAT, LON + 0.004, LAT + 0.001) < 0.3
+    # The parquet path and the where clause are built from the release and numbers only.
+    sql_src = ov._parquet("base/infrastructure")
+    assert sql_src == f"read_parquet('s3://overturemaps-us-west-2/release/{ov.RELEASE}/theme=base/type=infrastructure/*', hive_partitioning=1)"
+    assert ov._sql_in(("a", "b'c")) == "'a', 'bc'"
+    assert ov._parquet("base/infrastructure", ["s3://b/x.parquet", "s3://b/y.parquet"]) == "read_parquet(['s3://b/x.parquet', 's3://b/y.parquet'])"
 
-    class Busy:
-        def __init__(self, *a, **k):
+
+def test_overture_file_index_opens_only_the_files_that_cover_the_site(ground, fake_s3, monkeypatch):
+    """The files are spatially partitioned; the index (built once per release) is what keeps a live
+    check inside its budget: a site box opens one or two files, not all 128."""
+    import overture as ov
+    monkeypatch.setattr(ov, "_INDEX", None)
+    assert ov.load_index(fake_s3) is None                      # not built yet: read the whole type
+    assert ov.files_for(None, "base/land", (0, 0, 1, 1)) is None
+
+    index = {"base/infrastructure": [["s3://o/infra-a.parquet", -180, -85, -82, 31], ["s3://o/infra-b.parquet", 90, 27, 121, 47],
+                                     ["s3://o/infra-c.parquet", 109, 26, 122, 46]],
+             "base/land": [["s3://o/land-a.parquet", -180, -85, 0, 85]]}
+    fake_s3.put_object(Bucket=BUCKET, Key=ov.index_key(), Body=json.dumps({"release": ov.RELEASE, "files": index}).encode())
+    assert ov.load_index(fake_s3) == index
+    shanxi = (114.20, 36.93, 114.33, 37.03)
+    assert ov.files_for(index, "base/infrastructure", shanxi) == ["s3://o/infra-b.parquet", "s3://o/infra-c.parquet"]
+    assert ov.files_for(index, "base/land", shanxi) == []      # nothing to open: the source is skipped
+    assert ov.files_for(index, "places/place", shanxi) is None  # a source missing from the index reads the glob
+
+    # live_rows asks each source only for its files and never opens a source with none.
+    asked = {}
+
+    class Cursor:
+        def close(self):
             pass
-        def __enter__(self):
-            return self
-        def __exit__(self, *a):
-            return False
-        def post(self, url, **k):
-            raise httpx.ReadTimeout("busy")
-    monkeypatch.setattr(ground.httpx, "Client", Busy)
-    monkeypatch.setattr(ground.time, "sleep", lambda s: None)
-    started = time.monotonic()
-    with pytest.raises(httpx.ReadTimeout):
-        ground.fetch_overpass(LAT, LON, 2.0)
-    assert time.monotonic() - started < 2
+
+        def interrupt(self):
+            pass
+
+    monkeypatch.setattr(ov, "connect", lambda: Cursor())
+    def query(con, source, box, limit, files=None):
+        asked[source] = files
+        return []
+
+    monkeypatch.setattr(ov, "query_source", query)
+    rows, missed = ov.live_rows(shanxi, budget_s=5, s3=fake_s3)
+    assert rows == [] and missed == []
+    assert asked == {"base/infrastructure": ["s3://o/infra-b.parquet", "s3://o/infra-c.parquet"],
+                     "base/land_use": None, "places/place": None}
+
+    # A stale index (another release) is ignored.
+    monkeypatch.setattr(ov, "_INDEX", None)
+    fake_s3.put_object(Bucket=BUCKET, Key=ov.index_key(), Body=json.dumps({"release": "2020-01-01.0", "files": index}).encode())
+    assert ov.load_index(fake_s3) is None
 
 
-def test_overpass_query_is_built_from_numbers_only(ground):
-    q = ground.OVERPASS_QUERY.format(timeout=25, r=2000, lat="39.47410", lon="53.64350", cap=400)
-    assert "around:2000,39.47410,53.64350" in q and "out tags center 400;" in q
-    assert ground.classify({"man_made": "flare", "operator": "X"}) == ("flare stack", "oil and gas")
-    assert ground.classify({"landuse": "quarry", "resource": "Coal"}) == ("coal mine", "coal")
-    assert ground.classify({"power": "plant", "plant:source": "coal"}) == ("coal power plant", "coal")
-    assert ground.classify({"power": "plant", "plant:source": "<script>"}) == ("power plant", "other industry")
-    assert ground.classify({"name": "x"}) is None and ground.classify(None) is None
+def test_overture_live_rows_interrupts_a_source_that_outruns_the_budget(ground, monkeypatch):
+    import threading
+    import overture as ov
+    monkeypatch.setattr(ov, "_INDEX", {})                     # an empty index: every source reads its glob
+    interrupted = []
+    release = threading.Event()
+
+    class Cursor:
+        source = None
+
+        def close(self):
+            pass
+
+        def interrupt(self):
+            interrupted.append(self.source)
+            release.set()
+
+    def query(con, source, box, limit, files=None):
+        con.source = source
+        if source == "base/land":
+            release.wait(5)                                      # stuck until interrupted
+            raise RuntimeError("interrupted")
+        return [{"type": "storage tank", "group": ov.OIL_GAS, "xmin": 0, "ymin": 0, "xmax": 0, "ymax": 0}]
+
+    monkeypatch.setattr(ov, "connect", Cursor)
+    monkeypatch.setattr(ov, "query_source", query)
+    started = time.time()
+    rows, missed = ov.live_rows((0, 0, 1, 1), budget_s=0.6, s3=object())
+    assert time.time() - started < 3
+    assert len(rows) == 3 and missed == ["base/land"] and interrupted == ["base/land"]

@@ -55,7 +55,7 @@ RESULTS = {
     "check_recent_passes": "Recent EMIT passes judged",
     "site_history": "Site history read",
     "thermal_anomalies": "VIIRS heat checked",
-    "nearby_infrastructure": "OpenStreetMap checked, by type",
+    "nearby_infrastructure": "Overture Maps checked, by type",
     "draft_brief": "Brief drafted (not filed)",
 }
 

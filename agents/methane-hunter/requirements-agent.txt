@@ -1,0 +1,3 @@
+# Methane Hunter extras, appended to the shared platform requirements by stage_shared.sh.
+# DuckDB reads Overture Maps GeoParquet straight from AWS Open Data (overture.py).
+duckdb==1.5.3
