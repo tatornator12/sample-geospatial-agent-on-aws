@@ -39,9 +39,15 @@ const STAGE_PADDING = { top: 90, bottom: 300, left: 340, right: 370 };
 
 // Ranks at or above this are lit and labelled; every other footprint is a hairline. 39 is the count; 3 is the story.
 const LIT_RANKS = 3;
-// The watch globe: how far out it sits, how fast it turns while the agent works (degrees of
-// longitude per second), and the tilt the 3D columns are read at.
-const GLOBE_ZOOM = 1.6;
+// The watch globe: how far out it sits (globe diameter ≈ 512·2^z/π px, so 2.3 is ~800 px: it
+// fills the stage between the plates on a 1080p projector), where its centre sits (the middle
+// of the area the plates leave free, from STAGE_PADDING), how fast it turns while the agent
+// works (degrees of longitude per second), and the tilt the 3D columns are read at.
+const GLOBE_ZOOM = 2.3;
+const GLOBE_OFFSET: [number, number] = [
+  (STAGE_PADDING.left - STAGE_PADDING.right) / 2,
+  (STAGE_PADDING.top - STAGE_PADDING.bottom) / 2,
+];
 const GLOBE_DEG_PER_S = 4;
 const COLUMNS_PITCH = 55;
 // A coarse raster (TROPOMI) is dimmer than the finding so the EMIT candidate reads through it.
@@ -910,7 +916,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false }:
             setGlobeOn(true);
             if (!rasterOnStage) {
               const centre = globeCentre(geometry.features as Parameters<typeof globeCentre>[0]);
-              currentMap.easeTo({ center: centre ?? [40, 30], zoom: GLOBE_ZOOM, pitch: 0, bearing: 0, duration: 2000 });
+              currentMap.easeTo({
+                center: centre ?? [40, 30],
+                zoom: GLOBE_ZOOM,
+                offset: GLOBE_OFFSET,
+                pitch: 0,
+                bearing: 0,
+                duration: 2000,
+              });
             }
           } else if (methaneHint.kind === 'columns') {
             // The columns are read at a tilt, over the pass they were built from.
