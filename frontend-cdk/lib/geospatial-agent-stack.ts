@@ -233,6 +233,20 @@ export class GeospatialAgentStack extends cdk.Stack {
     // The actual header value used in CloudFront/ALB is generated at synth time
     // and embedded in the CloudFormation template (required by both resources)
 
+    // Slack incoming webhook for filed Methane Watch briefs (react-ui/backend/src/slack.ts). The
+    // stack creates the secret with a random placeholder the backend reads as "off" (anything but
+    // a hooks.slack.com URL is off); the operator sets the real URL once with
+    // `aws secretsmanager put-secret-value` and restarts the tasks
+    // (`aws ecs update-service --force-new-deployment`), since ECS injects secrets at task start.
+    // A later deploy leaves the value alone (the template's generate settings do not change).
+    // The URL is never in the task definition, the template or a log line.
+    const slackWebhookSecret = new secretsmanager.Secret(this, 'SlackWebhook', {
+      secretName: `geospatial-agent/${environment}/slack-webhook`,
+      description: 'Slack incoming-webhook URL the backend posts to when an analyst files a Methane Watch brief. A random placeholder until set; the backend treats anything but a hooks.slack.com URL as off.',
+      generateSecretString: { excludePunctuation: true, passwordLength: 32 },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // ========================================
     // ECS Cluster
     // ========================================
@@ -381,6 +395,10 @@ export class GeospatialAgentStack extends cdk.Stack {
           COGNITO_USER_POOL_ID: userPool.userPoolId,
           COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
           COGNITO_REGION: config.awsRegion,
+        },
+        // Injected by ECS at task start from Secrets Manager (the execution role is granted the read).
+        secrets: {
+          SLACK_WEBHOOK_URL: ecs.Secret.fromSecretsManager(slackWebhookSecret),
         },
         taskRole: taskRole,
         logDriver: ecs.LogDrivers.awsLogs({
@@ -713,6 +731,11 @@ export class GeospatialAgentStack extends cdk.Stack {
     // Note: Temporary password is emailed directly by Cognito to the admin user.
     // Check your email for the temporary password after deployment.
 
+    new cdk.CfnOutput(this, 'SlackWebhookSecretArn', {
+      value: slackWebhookSecret.secretArn,
+      description: 'Set the Slack incoming-webhook URL here (put-secret-value), then force a new ECS deployment',
+    });
+
     new cdk.CfnOutput(this, 'CustomHeaderSecretArn', {
       value: customHeaderSecret.secretArn,
       description: '🔒 CloudFront custom header secret (for ALB security)',
@@ -737,6 +760,12 @@ export class GeospatialAgentStack extends cdk.Stack {
         reason: 'CloudFront custom header is a static configuration value regenerated on each deployment. Rotation would require coordinated CloudFront + ALB updates.',
       },
     ]);
+    NagSuppressions.addResourceSuppressions(slackWebhookSecret, [
+      {
+        id: 'AwsSolutions-SMG4',
+        reason: 'A Slack incoming-webhook URL is issued by Slack and rotated there (regenerate the webhook, put the new value); Secrets Manager cannot rotate it.',
+      },
+    ]);
 
     // IAM5: Wildcard resources on task role - scoped to specific bucket and agent runtime
     NagSuppressions.addResourceSuppressions(
@@ -749,6 +778,11 @@ export class GeospatialAgentStack extends cdk.Stack {
             `Resource::arn:aws:s3:::${config.s3BucketName}/*`,
             ...Array.from(agentRuntimeArns).map(arn => `Resource::${arn}/*`),
           ],
+        },
+        {
+          id: 'AwsSolutions-IAM5',
+          reason: 'The only write the backend makes: the brief the analyst filed (<id>.md, <id>.png, <id>.filed.json) beside the agent\'s draft, under any session\'s briefs/ prefix. Session ids are per conversation, so the prefix cannot be enumerated at synth time.',
+          appliesTo: [`Resource::arn:aws:s3:::${config.s3BucketName}/session_data/*/briefs/*`],
         },
       ],
       true, // Apply to children

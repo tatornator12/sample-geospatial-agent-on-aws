@@ -25,6 +25,7 @@ import {
   isSessionId,
   sessionBriefKeys,
 } from './brief';
+import { notifyFiled, slackWebhookUrl } from './slack';
 
 const BRIEF_APPROVE_PATH = '/api/brief/approve';
 
@@ -835,6 +836,10 @@ app.post(BRIEF_APPROVE_PATH, express.json({ limit: Math.ceil(SNAPSHOT_MAX_BYTES 
                     markdown_key: keys.markdown, snapshot_key: shot.png ? keys.snapshot : null };
     await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: keys.filed, Body: JSON.stringify(filed), ContentType: 'application/json' }));
     console.log(`📝 Brief ${briefId} filed by ${by}`);
+    // Slack hears about the analyst's decision (only when a webhook is configured); the analyst
+    // never waits for it, and a Slack failure never unfiles anything.
+    const card = briefCard(record, briefId, sessionId);
+    if (card) notifyFiled({ card, sessionId, filedBy: by, filedAt: at, markdownKey: keys.markdown, bucket });
     return res.json({ status: 'filed', filedAt: at, filedBy: by });
   } catch (error) {
     console.error('Brief filing failed:', error instanceof Error ? error.message : error);
@@ -863,6 +868,8 @@ app.listen(PORT, () => {
     `Agents: ${Array.from(agentRuntimes.values()).map(a => `${a.id} (${a.region})`).join(', ') || 'none'}` +
     (defaultAgent ? `; default = ${defaultAgent.id}` : '')
   );
+  // On or off only; the webhook URL itself is never printed.
+  console.log(`Slack on filed briefs: ${slackWebhookUrl() ? 'on' : (process.env.SLACK_WEBHOOK_URL ? 'off (SLACK_WEBHOOK_URL is not a Slack incoming-webhook URL)' : 'off')}`);
   if (process.env.NODE_ENV === 'production') {
     console.log(`Frontend static files enabled`);
   }

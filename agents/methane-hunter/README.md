@@ -56,6 +56,24 @@ Run it the day before a show (it warms both checks for every watch hotspot). `re
 holds the agent-only pins (`duckdb`); `stage_shared.sh` appends them to the platform requirements and
 bakes DuckDB's `httpfs` extension into the image so the first read never downloads it.
 
+## Slack on a filed brief (optional)
+
+The UI backend posts one message to a Slack incoming webhook when the analyst clicks "Approve
+and file" (`react-ui/backend/src/slack.ts`): the card's title and place, the counts, the
+confidence, the two ground-record sentences, who filed it and the brief id. The agent never
+triggers it and never sees it; a Slack failure never unfiles anything.
+
+- Local: put `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` in `react-ui/backend/.env`
+  (gitignored) and restart the backend; it logs `Slack on filed briefs: on`.
+- CloudFront stack: the CDK creates the secret `geospatial-agent/<env>/slack-webhook` with a random
+  placeholder (read as off); the deployed stack's `<env>` is `dev` (the CDK default), whatever the
+  branch. Set it once and restart the tasks:
+  ```bash
+  aws secretsmanager put-secret-value --secret-id geospatial-agent/dev/slack-webhook --secret-string 'https://hooks.slack.com/services/...'
+  aws ecs update-service --cluster geospatial-agent-dev --service geospatial-agent-dev --force-new-deployment
+  ```
+  Anything but a `hooks.slack.com` URL leaves the feature off, and the URL is never logged.
+
 ## Data notes
 
 - Collection `EMITL2BCH4PLM.002`: 1,686 plume complexes from 2022-08-10; the most recent is
