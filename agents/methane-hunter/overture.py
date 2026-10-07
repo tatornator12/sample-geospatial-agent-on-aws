@@ -340,11 +340,17 @@ def extract_area(area_key: str, box: tuple[float, float, float, float], s3=None)
     return summary
 
 
-def load_extract(area_key: str, s3=None) -> list[dict] | None:
+def load_extract(area_key: str, s3=None, box: tuple[float, float, float, float] | None = None) -> list[dict] | None:
+    """The area's extract rows, or None when there is none for this release, or when `box` is given
+    and the extract was built for another box (a widened watch area must not read its old extract)."""
     s3 = s3 or mt._s3()
     try:
         body = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=extract_key(area_key))["Body"].read(EXTRACT_CAP_BYTES)
     except s3.exceptions.NoSuchKey:
         return None
     data = json.loads(body)
-    return data.get("rows") if isinstance(data, dict) and data.get("release") == RELEASE else None
+    if not isinstance(data, dict) or data.get("release") != RELEASE:
+        return None
+    if box is not None and [round(float(v), 4) for v in (data.get("bbox") or [])] != [round(float(v), 4) for v in box]:
+        return None
+    return data.get("rows")

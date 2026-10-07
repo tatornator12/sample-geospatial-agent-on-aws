@@ -67,7 +67,7 @@ const scenarios: Scenario[] = [
   {
     id: 'methane-watch-mission',
     name: 'Methane Watch brief',
-    description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over seven watch areas, EMIT cued on the two strongest, two ground-record checks and a draft brief for the analyst',
+    description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, two ground-record checks and a draft brief for the analyst',
     icon: '/methane_watch.png',
     metrics: [
       { label: 'Watch Areas', value: '7 scanned, 2 cued' },

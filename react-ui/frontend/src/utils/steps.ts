@@ -1,6 +1,6 @@
 /**
  * The step column's grammar for an agentic mission: consecutive calls of one tool read as one
- * step ("Scan 7 watch areas"), the watch mission shows where it is on its plan
+ * step ("Scan 9 watch areas"), the watch mission shows where it is on its plan
  * (Baseline · Tip · Cue · Brief), and the cue step says what it is following.
  *
  * Only tool INPUTS reach the UI over the stream, and they are model-written: nothing here prints
@@ -59,14 +59,18 @@ export interface WatchArea {
   short: string;
   centre: [number, number];
 }
+// Mirrors WATCH_AREAS in agents/methane-hunter/watch_tools.py (same keys; centres are the boxes'
+// centres). The tool writes the tip manifests by key; the stage prints these labels, never the model's.
 export const WATCH_AREAS: readonly WatchArea[] = [
   { name: 'permian basin', label: 'Permian Basin, United States', short: 'Permian', centre: [-102.75, 32.0] },
   { name: 'south caspian', label: 'South Caspian, Turkmenistan', short: 'S. Caspian', centre: [57.25, 39.0] },
+  { name: 'amu darya basin', label: 'Amu Darya basin, Turkmenistan and Uzbekistan', short: 'Amu Darya', centre: [64.75, 38.75] },
   { name: 'zagros foreland', label: 'Zagros foreland, Iran', short: 'Zagros', centre: [50.0, 31.25] },
-  { name: 'shanxi coal basin', label: 'Shanxi coal basin, China', short: 'Shanxi', centre: [112.4, 37.65] },
+  { name: 'shanxi coal basin', label: 'Shanxi and Ordos coal basins, China', short: 'Shanxi', centre: [111.3, 37.65] },
   { name: 'orenburg and lower volga', label: 'Orenburg and lower Volga, Russia', short: 'Orenburg', centre: [50.25, 48.75] },
   { name: 'west siberia and yamal', label: 'West Siberia and Yamal, Russia', short: 'W. Siberia', centre: [72.5, 66.0] },
-  { name: 'hassi messaoud', label: 'Hassi Messaoud, Algeria', short: 'Hassi Messaoud', centre: [6.0, 31.75] },
+  { name: 'hassi messaoud', label: 'Hassi Messaoud and Berkine, Algeria', short: 'Hassi Messaoud', centre: [7.0, 30.25] },
+  { name: 'amman', label: 'Amman, Jordan', short: 'Amman', centre: [36.1, 31.85] },
 ];
 export const WATCH_AREA_NAMES = WATCH_AREAS.map((a) => a.name);
 

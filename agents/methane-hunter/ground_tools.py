@@ -322,7 +322,7 @@ async def nearby_infrastructure(lat: float, lon: float, radius_km: float = INFRA
     rows, source, missed = None, None, []
     if area:
         try:
-            rows = ov.load_extract(area, s3)
+            rows = ov.load_extract(area, s3, box=tuple(WATCH_AREAS[area]["bbox"]))
             source = f"extract:{area}"
         except Exception as e:
             logger.warning("Overture extract read failed: %s", type(e).__name__)

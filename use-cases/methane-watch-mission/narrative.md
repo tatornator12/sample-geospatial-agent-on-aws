@@ -1,28 +1,27 @@
-**Methane Watch brief: Recurring methane, Shanxi coal basin site near Shahe City** (draft `brief-20261006T202541-fa062c`, not filed)
+**Methane Watch brief: Recurring methane, Shanxi coal basin site** (draft `brief-20261007T182930-68319c`, not filed)
 
-Site: Near Shahe City, Xingtai City, Hebei Province, China (36.9782, 114.2629), watch area Shanxi coal basin
-Looks: EMIT looked 12 times; 6 of 7 recent passes read are candidates.
+Site: Qin County, Changzhi City, Shanxi Province, China (36.7065, 112.6185), watch area shanxi coal basin
+Looks: EMIT looked 22 times; 5 of 8 recent passes read are candidates.
 
-- TROPOMI 14-day composite (2026-09-20 to 2026-10-04) shows a top hotspot anomaly of +66.8 ppb above the area background of 1,942.0 ppb.
-- EMIT looked at this site 12 times (2024-04-05 to 2026-08-17); NASA outlined no plumes in the formal product, which is nearly empty after 2024.
-- Of 7 recent passes read since 2025-01-01, 6 met the candidate threshold (at least 5 pixels at or above 1,000 ppm·m and at least 5 above 3x uncertainty).
-- Candidate peaks: 3,438.2 ppm·m on 2026-06-23, 3,194.1 ppm·m on 2026-08-17, 2,405.3 ppm·m on 2025-07-31, 1,928.3 ppm·m on 2025-08-14, 1,740.5 ppm·m on 2026-02-01, 1,474.3 ppm·m on 2025-04-14.
-- One pass on 2025-07-31 was rejected due to cloud or gap; no other rejections.
-- Sentinel-2 true colour (2026-05-11) shows irrigated fields, settlement clusters, bare earthworks, industrial yard structures, large ponds, and a pipeline corridor in the valley.
+- EMIT looked 22 times (2023-02-15 to 2026-04-17) and NASA outlined 0 plumes in the product (plume product latest 2025-09-22).
+- Reading raw passes since 2025-01-01: 5 candidates out of 8 passes, peaks 6388.9, 4818.5, 4019.4, 2900.1, 2300.3 ppm·m on 2026-04-17, 2025-07-27, 2025-09-29, 2025-06-22, 2025-06-08.
+- 3 passes rejected: 1 cloud or gap (2025-10-03), 1 within noise (2025-07-23), 1 too weak (2025-02-01).
+- TROPOMI 14-day composite (2026-09-21 to 2026-10-05) shows top hotspot anomaly of +61.4 ppb at this location.
+- Sentinel-2 true colour (2026-04-04) shows dissected loess terrain, villages, terraced fields, and a pipeline corridor; no flare stacks visible.
 - Check: VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed (small or brief flares can be missed).
 - Check: Overture Maps shows within 2 km: 1 pipeline (0 km); nothing mapped for mining, waste, wetland.
 
 | Hypothesis (unconfirmed) | Assessment | What would confirm or rule it out |
 |---|---|---|
-| Routine venting | possible | Repeated enhancement on 6 of 7 passes across multiple seasons supports this; ground inspection or aircraft measurement would confirm. |
-| Equipment failure or leak | possible | Persistence across 2025-2026 makes a single failure less likely but cannot be ruled out; a ground inspection would distinguish. |
-| Maintenance blowdown | less likely | Enhancement appears on 6 separate dates spanning over a year, inconsistent with a single blowdown event; repeated aircraft passes would confirm. |
-| Unlit or malfunctioning flare | cannot assess | VIIRS saw no heat within 1 km over 30 nights; no flare stack is mapped, so this hypothesis cannot be assessed. |
-| Non-oil-and-gas source (landfill, coal, agriculture) | less likely | Overture Maps shows only a pipeline within 2 km and nothing mapped for mining, waste or wetland; a field survey would confirm source type. |
+| Routine venting | possible | Repeated candidates across seasons suggest persistent release; aircraft or ground inspection would confirm venting versus intermittent release. |
+| Equipment failure or leak | possible | A follow-up EMIT pass or aircraft survey over the pipeline corridor could identify a discrete point source. |
+| Maintenance blowdown | possible | Temporal clustering of candidates would argue for scheduled maintenance; a longer pass record would test this. |
+| Unlit or malfunctioning flare | cannot assess | VIIRS saw no heat over 30 nights and no flare stack is mapped; a ground inspection would confirm or rule this out. |
+| Non-oil-and-gas source (landfill, coal, agriculture) | less likely | Overture Maps shows only a pipeline within 2 km; no mining, waste or wetland mapped, though mapping gaps exist. |
 
 Confidence that methane recurs at this site: high. Confidence in any single explanation: low without a ground or aircraft check.
-Gaps: NASA's formal plume product is nearly empty after 2024-09-22, so passes since then have not been independently outlined. EMIT only observes on its orbital passes; gaps between passes mean emissions between looks are not captured. TROPOMI at ~4 km resolution provides a tip only, not a confirmed detection or source location. No aircraft or ground measurement data are available to quantify flux or confirm source type.
-Next collection: A dedicated EMIT tasking pass or airborne measurement campaign over the site near Shahe City to quantify flux and narrow the source footprint.
+Gaps: NASA's plume product is nearly empty after 2024, so passes since late 2024 have not been independently outlined.; EMIT only sees the site on its orbital passes, leaving gaps between looks.; Overture Maps may not capture all infrastructure types, particularly subsurface coal mines.; TROPOMI at ~4 km resolution cannot resolve individual point sources.
+Next collection: A targeted EMIT pass or low-altitude aircraft survey over the pipeline corridor near Qin County would help resolve the source type and quantify flux.
 
 Status: DRAFT, awaiting the analyst's decision.
 
@@ -30,4 +29,4 @@ EMIT detects methane enhancement above background; it does not identify the sour
 
 Decision: analyst's.
 
-EMIT's recent passes show methane candidates near Shahe City, Xingtai City, Hebei Province on 6 of 7 looks since 2025, peaking at 3,438.2 ppm·m on 2026-06-23. EMIT sees the methane, not its source.
+EMIT's recent passes show methane at the site near Qin County, Changzhi City on 5 of 8 looks since 2025, peaking at 6,388.9 ppm·m on 2026-04-17. EMIT sees the methane, not its source.

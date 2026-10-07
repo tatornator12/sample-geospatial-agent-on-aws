@@ -129,6 +129,28 @@ def test_watch_areas_resolve_by_exact_name_only(watch):
         assert spec["emit"] == (s < watch.EMIT_MAX_LAT)
 
 
+def test_watch_areas_are_sound_boxes_the_stage_also_knows(watch):
+    """Every box is well formed, small enough for a TROPOMI scan, disjoint from the others (a site
+    belongs to one area: the extract and the tip are keyed by it), and the stage's own table
+    (react-ui/frontend/src/utils/steps.ts) names exactly the same keys."""
+    import re
+    boxes = {k: spec["bbox"] for k, spec in watch.WATCH_AREAS.items()}
+    for key, (w, s, e, n) in boxes.items():
+        assert -180 <= w < e <= 180 and -90 <= s < n <= 90, key
+        assert (e - w) * (n - s) <= watch.TROPOMI_MAX_AREA_DEG2, key
+        assert key == key.lower().strip() and "_" not in key, key   # the tip manifest key is derived from it
+    keys = list(boxes)
+    for i, a in enumerate(keys):
+        for b in keys[i + 1:]:
+            aw, as_, ae, an = boxes[a]
+            bw, bs, be, bn = boxes[b]
+            assert aw >= be or bw >= ae or as_ >= bn or bs >= an, f"{a} overlaps {b}"
+    from pathlib import Path
+    steps_ts = (Path(__file__).resolve().parents[3] / "react-ui" / "frontend" / "src" / "utils" / "steps.ts").read_text()
+    stage_keys = re.findall(r"\{ name: '([^']+)', label:", steps_ts)
+    assert stage_keys == keys, "the stage's WATCH_AREAS table must list the same keys in the same order"
+
+
 # --- 9.3 TROPOMI ---------------------------------------------------------------------------------
 
 STEM = "S5P_OFFL_L2__CH4____20260910T073351_20260910T091521_46165_03_020901_20260911T231512"

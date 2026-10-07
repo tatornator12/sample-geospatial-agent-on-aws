@@ -17,8 +17,8 @@
       "name": "display_visual",
       "params": {
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/watch_sites_v002.geojson",
-        "title": "EMIT Methane Watch: Global Repeat Sites",
-        "description": "24 repeat sites seen on 5 or more dates, 2022-2025",
+        "title": "EMIT Global Methane Repeat Sites",
+        "description": "24 sites seen on 5 or more dates, 1686 total detections",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -41,6 +41,14 @@
       "name": "scan_tropomi",
       "params": {
         "area": "south caspian",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "amu darya basin",
         "days": 14
       },
       "result": "TROPOMI composite scanned"
@@ -86,58 +94,70 @@
       "result": "TROPOMI composite scanned"
     },
     {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "amman",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
       "name": "check_recent_passes",
       "params": {
-        "lat": 39.4665,
-        "lon": 53.5411
+        "lat": 39.4728,
+        "lon": 53.5743,
+        "max_scenes": 8,
+        "since": "2025-01-01"
       },
       "result": "Recent EMIT passes judged"
     },
     {
       "name": "check_recent_passes",
       "params": {
-        "lat": 36.9782,
-        "lon": 114.2629
+        "lat": 36.7065,
+        "lon": 112.6185,
+        "max_scenes": 8,
+        "since": "2025-01-01"
       },
       "result": "Recent EMIT passes judged"
     },
     {
       "name": "site_history",
       "params": {
-        "lat": 39.4665,
-        "lon": 53.5411
+        "lat": 39.4728,
+        "lon": 53.5743
       },
       "result": "Site history read"
     },
     {
       "name": "site_history",
       "params": {
-        "lat": 36.9782,
-        "lon": 114.2629
+        "lat": 36.7065,
+        "lon": 112.6185
       },
       "result": "Site history read"
     },
     {
       "name": "reverse_geocode",
       "params": {
-        "x": 53.5411,
-        "y": 39.4665
+        "x": 53.5743,
+        "y": 39.4728
       },
       "result": "Place named"
     },
     {
       "name": "reverse_geocode",
       "params": {
-        "x": 114.2629,
-        "y": 36.9782
+        "x": 112.6185,
+        "y": 36.7065
       },
       "result": "Place named"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_shanxi_coal_basin_china_2026-10-04_14d.tif",
-        "title": "TROPOMI CH4 Anomaly: Shanxi Coal Basin, 14-day composite to 2026-10-04",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-05_14d.tif",
+        "title": "TROPOMI CH4 Anomaly, Shanxi and Ordos Coal Basins, 14-day composite",
         "render": {
           "kind": "raster",
           "colormap": "viridis",
@@ -150,7 +170,7 @@
           "max_zoom": 8,
           "legend": "CH4 anomaly",
           "bounds": [
-            110.2,
+            108.0,
             34.5,
             114.6,
             40.8
@@ -162,9 +182,9 @@
     {
       "name": "inspect_image",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
-        "title": "EMIT CH4 enhancement, Shanxi coal basin, 2026-06-23",
-        "question": "What is the shape, direction and extent of the methane enhancement?"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260417T043429_2610703_023.tif",
+        "title": "EMIT CH4 enhancement, Qin County Shanxi, 2026-04-17",
+        "question": "What is the shape, direction and extent of the methane plume?"
       },
       "result": "Looked at the image"
     },
@@ -173,10 +193,10 @@
       "params": {
         "render": {
           "bounds": [
-            114.22917,
-            36.95107,
-            114.29663,
-            37.00533
+            112.58489,
+            36.67937,
+            112.65211,
+            36.73363
           ],
           "colormap": "plasma",
           "group": "methane",
@@ -188,8 +208,8 @@
           ],
           "units": "ppm·m"
         },
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
-        "title": "EMIT CH4 Enhancement: Shanxi Coal Basin, 2026-06-23, peak 3,438.2 ppm·m"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20260417T043429_2610703_023.tif",
+        "title": "EMIT CH4 Enhancement, Qin County Shanxi, 2026-04-17, peak 6388.9 ppm·m"
       },
       "result": "Shown on the map"
     },
@@ -208,16 +228,16 @@
           ],
           "units": "ppm·m"
         },
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.geojson",
-        "title": "EMIT CH4 Column Enhancement: Shanxi Coal Basin, 2026-06-23"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20260417T043429_2610703_023.geojson",
+        "title": "EMIT CH4 Column Enhancement, Qin County Shanxi, 2026-04-17"
       },
       "result": "Shown on the map"
     },
     {
       "name": "create_bbox_from_coordinates",
       "params": {
-        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[114.2629,36.9782]}",
-        "location": "Shahe City Shanxi watch site",
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[112.6185,36.7065]}",
+        "location": "Qin County Shanxi watch site",
         "radius_meters": 3000
       },
       "result": "3 km frame around the site"
@@ -225,25 +245,27 @@
     {
       "name": "thermal_anomalies",
       "params": {
-        "lat": 36.9782,
-        "lon": 114.2629
+        "lat": 36.7065,
+        "lon": 112.6185,
+        "nights": 30
       },
       "result": "VIIRS heat checked"
     },
     {
       "name": "nearby_infrastructure",
       "params": {
-        "lat": 36.9782,
-        "lon": 114.2629
+        "lat": 36.7065,
+        "lon": 112.6185,
+        "radius_km": 2
       },
       "result": "Overture Maps checked, by type"
     },
     {
       "name": "get_rasters",
       "params": {
-        "location": "Shahe City Shanxi watch site",
+        "location": "Qin County Shanxi watch site",
         "geometry_s3_url": "s3://bucket/use-cases/methane-watch-mission/plumes_detected.geojson",
-        "current_date_str": "2026-06-23"
+        "current_date_str": "2026-04-17"
       },
       "result": "Sentinel-2 scene fetched"
     },
@@ -251,74 +273,73 @@
       "name": "inspect_image",
       "params": {
         "question": "What land cover and structures are visible on the ground?",
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_shanxi_watch_site_2026-05-11.tif",
-        "title": "Sentinel-2 true colour, Shahe City Shanxi watch site, 2026-05-11"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_qin_county_shanxi_watch_site_2026-04-04.tif",
+        "title": "Sentinel-2 true colour, Qin County Shanxi, 2026-04-04"
       },
       "result": "Looked at the image"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_shahe_city_shanxi_watch_site_2026-05-11.tif",
-        "title": "Sentinel-2 True Colour: Shahe City, Xingtai, Hebei, 2026-05-11",
-        "description": "Ground beneath the Shanxi coal basin TROPOMI hotspot. Irrigated fields, settlement clusters, bare earthworks, industrial yards and a pipeline corridor visible in the valley."
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_qin_county_shanxi_watch_site_2026-04-04.tif",
+        "title": "Sentinel-2 true colour, Qin County Shanxi, 2026-04-04",
+        "description": "Loess terrain, villages, terraced fields, pipeline corridor visible; no flare stacks observed"
       },
       "result": "Shown on the map"
     },
     {
       "name": "draft_brief",
       "params": {
-        "title": "Recurring methane, Shanxi coal basin site near Shahe City",
-        "place": "Near Shahe City, Xingtai City, Hebei Province, China",
-        "lat": 36.9782,
-        "lon": 114.2629,
-        "watch_area": "Shanxi coal basin",
+        "title": "Recurring methane, Shanxi coal basin site",
+        "place": "Qin County, Changzhi City, Shanxi Province, China",
+        "lat": 36.7065,
+        "lon": 112.6185,
         "observations": [
-          "TROPOMI 14-day composite (2026-09-20 to 2026-10-04) shows a top hotspot anomaly of +66.8 ppb above the area background of 1,942.0 ppb.",
-          "EMIT looked at this site 12 times (2024-04-05 to 2026-08-17); NASA outlined no plumes in the formal product, which is nearly empty after 2024.",
-          "Of 7 recent passes read since 2025-01-01, 6 met the candidate threshold (at least 5 pixels at or above 1,000 ppm·m and at least 5 above 3x uncertainty).",
-          "Candidate peaks: 3,438.2 ppm·m on 2026-06-23, 3,194.1 ppm·m on 2026-08-17, 2,405.3 ppm·m on 2025-07-31, 1,928.3 ppm·m on 2025-08-14, 1,740.5 ppm·m on 2026-02-01, 1,474.3 ppm·m on 2025-04-14.",
-          "One pass on 2025-07-31 was rejected due to cloud or gap; no other rejections.",
-          "Sentinel-2 true colour (2026-05-11) shows irrigated fields, settlement clusters, bare earthworks, industrial yard structures, large ponds, and a pipeline corridor in the valley."
+          "EMIT looked 22 times (2023-02-15 to 2026-04-17) and NASA outlined 0 plumes in the product (plume product latest 2025-09-22).",
+          "Reading raw passes since 2025-01-01: 5 candidates out of 8 passes, peaks 6388.9, 4818.5, 4019.4, 2900.1, 2300.3 ppm·m on 2026-04-17, 2025-07-27, 2025-09-29, 2025-06-22, 2025-06-08.",
+          "3 passes rejected: 1 cloud or gap (2025-10-03), 1 within noise (2025-07-23), 1 too weak (2025-02-01).",
+          "TROPOMI 14-day composite (2026-09-21 to 2026-10-05) shows top hotspot anomaly of +61.4 ppb at this location.",
+          "Sentinel-2 true colour (2026-04-04) shows dissected loess terrain, villages, terraced fields, and a pipeline corridor; no flare stacks visible."
         ],
-        "looks": 12,
-        "candidates": 6,
-        "passes_read": 7,
+        "looks": 22,
+        "candidates": 5,
+        "passes_read": 8,
         "explanations": [
           {
             "id": "routine_venting",
             "assessment": "possible",
-            "next_check": "Repeated enhancement on 6 of 7 passes across multiple seasons supports this; ground inspection or aircraft measurement would confirm."
+            "next_check": "Repeated candidates across seasons suggest persistent release; aircraft or ground inspection would confirm venting versus intermittent release."
           },
           {
             "id": "equipment_failure_or_leak",
             "assessment": "possible",
-            "next_check": "Persistence across 2025-2026 makes a single failure less likely but cannot be ruled out; a ground inspection would distinguish."
+            "next_check": "A follow-up EMIT pass or aircraft survey over the pipeline corridor could identify a discrete point source."
           },
           {
             "id": "maintenance_blowdown",
-            "assessment": "less likely",
-            "next_check": "Enhancement appears on 6 separate dates spanning over a year, inconsistent with a single blowdown event; repeated aircraft passes would confirm."
+            "assessment": "possible",
+            "next_check": "Temporal clustering of candidates would argue for scheduled maintenance; a longer pass record would test this."
           },
           {
             "id": "unlit_flare",
             "assessment": "cannot assess",
-            "next_check": "VIIRS saw no heat within 1 km over 30 nights; no flare stack is mapped, so this hypothesis cannot be assessed."
+            "next_check": "VIIRS saw no heat over 30 nights and no flare stack is mapped; a ground inspection would confirm or rule this out."
           },
           {
             "id": "non_oil_gas_source",
             "assessment": "less likely",
-            "next_check": "Overture Maps shows only a pipeline within 2 km and nothing mapped for mining, waste or wetland; a field survey would confirm source type."
+            "next_check": "Overture Maps shows only a pipeline within 2 km; no mining, waste or wetland mapped, though mapping gaps exist."
           }
         ],
         "confidence": "high",
         "gaps": [
-          "NASA's formal plume product is nearly empty after 2024-09-22, so passes since then have not been independently outlined.",
-          "EMIT only observes on its orbital passes; gaps between passes mean emissions between looks are not captured.",
-          "TROPOMI at ~4 km resolution provides a tip only, not a confirmed detection or source location.",
-          "No aircraft or ground measurement data are available to quantify flux or confirm source type."
+          "NASA's plume product is nearly empty after 2024, so passes since late 2024 have not been independently outlined.",
+          "EMIT only sees the site on its orbital passes, leaving gaps between looks.",
+          "Overture Maps may not capture all infrastructure types, particularly subsurface coal mines.",
+          "TROPOMI at ~4 km resolution cannot resolve individual point sources."
         ],
-        "next_collection": "A dedicated EMIT tasking pass or airborne measurement campaign over the site near Shahe City to quantify flux and narrow the source footprint."
+        "next_collection": "A targeted EMIT pass or low-altitude aircraft survey over the pipeline corridor near Qin County would help resolve the source type and quantify flux.",
+        "watch_area": "shanxi coal basin"
       },
       "result": "Brief drafted (not filed)"
     }
@@ -326,8 +347,8 @@
   "assets": {
     "layers": [
       {
-        "file": "tropomi_anomaly_shanxi_coal_basin_china_2026-10-04_14d.tif",
-        "title": "TROPOMI CH4 Anomaly: Shanxi Coal Basin, 14-day composite to 2026-10-04",
+        "file": "tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-05_14d.tif",
+        "title": "TROPOMI CH4 Anomaly, Shanxi and Ordos Coal Basins, 14-day composite",
         "render": {
           "kind": "raster",
           "colormap": "viridis",
@@ -340,7 +361,7 @@
           "max_zoom": 8,
           "legend": "CH4 anomaly",
           "bounds": [
-            110.2,
+            108.0,
             34.5,
             114.6,
             40.8
@@ -348,14 +369,14 @@
         }
       },
       {
-        "file": "pass_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.tif",
-        "title": "EMIT CH4 Enhancement: Shanxi Coal Basin, 2026-06-23, peak 3,438.2 ppm·m",
+        "file": "pass_EMIT_L2B_CH4ENH_002_20260417T043429_2610703_023.tif",
+        "title": "EMIT CH4 Enhancement, Qin County Shanxi, 2026-04-17, peak 6388.9 ppm·m",
         "render": {
           "bounds": [
-            114.22917,
-            36.95107,
-            114.29663,
-            37.00533
+            112.58489,
+            36.67937,
+            112.65211,
+            36.73363
           ],
           "colormap": "plasma",
           "group": "methane",
@@ -370,7 +391,7 @@
       },
       {
         "file": "watch_sites_v002.geojson",
-        "title": "EMIT Methane Watch: Global Repeat Sites",
+        "title": "EMIT Global Methane Repeat Sites",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -380,8 +401,8 @@
         }
       },
       {
-        "file": "columns_EMIT_L2B_CH4ENH_002_20260623T015847_2617401_015.geojson",
-        "title": "EMIT CH4 Column Enhancement: Shanxi Coal Basin, 2026-06-23",
+        "file": "columns_EMIT_L2B_CH4ENH_002_20260417T043429_2610703_023.geojson",
+        "title": "EMIT CH4 Column Enhancement, Qin County Shanxi, 2026-04-17",
         "render": {
           "group": "methane",
           "kind": "columns",
@@ -396,8 +417,8 @@
         }
       },
       {
-        "file": "tci_clipped_shahe_city_shanxi_watch_site_2026-05-11.tif",
-        "title": "Sentinel-2 True Colour: Shahe City, Xingtai, Hebei, 2026-05-11"
+        "file": "tci_clipped_qin_county_shanxi_watch_site_2026-04-04.tif",
+        "title": "Sentinel-2 true colour, Qin County Shanxi, 2026-04-04"
       }
     ]
   }

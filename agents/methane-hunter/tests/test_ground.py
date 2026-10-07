@@ -105,8 +105,16 @@ def test_infra_reads_the_watch_area_extract_and_counts_types_only(ground, fake_s
         row("storage tank", ov.OIL_GAS, LAT + 0.2, LON),                  # 22 km: outside
         {"type": "<b>Acme</b>", "group": "operators", "xmin": LON, "ymin": LAT, "xmax": LON, "ymax": LAT},  # not a group we know
     ]
+    from watch_tools import WATCH_AREAS
+    box = list(WATCH_AREAS["south caspian"]["bbox"])
+    # An extract built for another box (the area was widened since) is not this area's: live instead.
     fake_s3.put_object(Bucket=BUCKET, Key=ov.extract_key("south caspian"),
-                       Body=json.dumps({"area": "south caspian", "release": ov.RELEASE, "rows": rows}).encode())
+                       Body=json.dumps({"area": "south caspian", "release": ov.RELEASE, "bbox": [box[0], box[1], box[2] - 1, box[3]], "rows": rows}).encode())
+    live = []
+    monkeypatch.setattr(ov, "live_rows", lambda b, **k: live.append(b) or ([], []))
+    assert json.loads(_run(ground.nearby_infrastructure(LAT, LON)))["read_from"] == "live" and len(live) == 1
+    fake_s3.put_object(Bucket=BUCKET, Key=ov.extract_key("south caspian"),
+                       Body=json.dumps({"area": "south caspian", "release": ov.RELEASE, "bbox": box, "rows": rows}).encode())
     monkeypatch.setattr(ov, "live_rows", lambda *a, **k: pytest.fail("inside a watch area the extract answers"))
     out = json.loads(_run(ground.nearby_infrastructure(LAT, LON)))
     types = {t["type"]: t for t in out["types"]}

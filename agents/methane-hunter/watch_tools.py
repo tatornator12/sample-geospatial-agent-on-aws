@@ -76,14 +76,24 @@ SITES_TTL_S = 7 * 24 * 3600
 # Watch areas (w, s, e, n). The label is for the record, never drawn on the globe. North Korea
 # is not a watch area (EMIT has never detected a plume there; an empty result is not evidence);
 # neither is Xinjiang. `emit`: whether EMIT can look there at all (the ISS stays below ~52°N).
+#
+# Chosen against the EMIT baseline itself (Oct 7, 1,104 repeat sites): the nine boxes hold ~560 of
+# them. Amu Darya (54 sites) was the largest cluster outside the first seven; Hassi Messaoud and
+# Shanxi were widened to take the Berkine fields (+22) and the Ordos coal basin (+20); Amman is the
+# one area that is not oil, gas or coal: a landfill EMIT has outlined on seven dates, so the ground
+# record has something other than a pipeline to say. The two Russian areas are TROPOMI tips in
+# practice (3 and 0 EMIT sites): they are watched, they are never where the dive goes.
+# The same table, with the stage's labels, lives in react-ui/frontend/src/utils/steps.ts.
 WATCH_AREAS: dict[str, dict] = {
     "permian basin": {"bbox": (-104.5, 30.5, -101.0, 33.5), "label": "Permian Basin", "emit": True},
     "south caspian": {"bbox": (52.0, 36.5, 62.5, 41.5), "label": "south Caspian (Turkmenistan)", "emit": True},
+    "amu darya basin": {"bbox": (62.5, 36.5, 67.0, 41.0), "label": "Amu Darya basin (Turkmenistan and Uzbekistan)", "emit": True},
     "zagros foreland": {"bbox": (47.0, 29.0, 53.0, 33.5), "label": "Zagros foreland (south-west Iran)", "emit": True},
-    "shanxi coal basin": {"bbox": (110.2, 34.5, 114.6, 40.8), "label": "Shanxi coal basin (China)", "emit": True},
+    "shanxi coal basin": {"bbox": (108.0, 34.5, 114.6, 40.8), "label": "Shanxi and Ordos coal basins (China)", "emit": True},
     "orenburg and lower volga": {"bbox": (44.0, 45.5, 56.5, 52.0), "label": "Orenburg and lower Volga (southern Russia)", "emit": True},
     "west siberia and yamal": {"bbox": (65.0, 60.0, 80.0, 72.0), "label": "West Siberia and Yamal (Russia)", "emit": False},
-    "hassi messaoud": {"bbox": (4.5, 30.5, 7.5, 33.0), "label": "Hassi Messaoud (Algeria)", "emit": True},
+    "hassi messaoud": {"bbox": (4.5, 27.5, 9.5, 33.0), "label": "Hassi Messaoud and Berkine (Algeria)", "emit": True},
+    "amman": {"bbox": (35.4, 31.3, 36.8, 32.4), "label": "Amman (Jordan)", "emit": True},
 }
 
 RENDER_SITES = {"kind": "points", "group": "watch", "property": "repeat_dates", "label": "repeat_dates", "units": "dates"}
@@ -433,10 +443,12 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     except MethaneError as e:
         return json.dumps({"error": str(e)})
 
-    # A composite for (area, end day, days) never changes once TROPOMI has processed the days:
+    # A composite for (box, end day, days) never changes once TROPOMI has processed the days:
     # computed once into the shared cache, copied per session (the browser reads session copies).
-    slug = mt._slugify(label) if bbox is None else "bbox_" + "_".join(f"{v:.2f}" for v in box).replace("-", "m")
-    cache_base = f"methane/cache/tropomi_{slug}_{end.isoformat()}_{days}d"
+    # The cache key carries the box itself, so widening a watch area can never serve the old one.
+    box_sig = "_".join(f"{v:.2f}" for v in box).replace("-", "m")
+    slug = mt._slugify(label) if bbox is None else f"bbox_{box_sig}"
+    cache_base = f"methane/cache/tropomi_{slug}_{box_sig}_{end.isoformat()}_{days}d"
     session_key = f"{mt.session_prefix()}tropomi_anomaly_{slug}_{end.isoformat()}_{days}d.tif"
     s3 = mt._s3()
     try:

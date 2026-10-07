@@ -24,6 +24,7 @@ replay time.
 import argparse
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -134,6 +135,10 @@ def main() -> int:
         raise SystemExit("the recorded mission drafted no brief; not a usable Methane Watch case")
 
     s3 = boto3.client("s3", region_name=args.region)
+    # A fresh take replaces the previous one entirely: a stale chip, draft or window from an earlier
+    # recording must never ride along into the staged case (the stage would list it, or worse, show it).
+    if out.exists():
+        shutil.rmtree(out)
     (out / "inspections").mkdir(parents=True, exist_ok=True)
     session_prefix = f"session_data/{sid}/"
     url_re = re.compile(r"^s3://([^/]+)/(.+)$")

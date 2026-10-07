@@ -113,7 +113,8 @@ def main() -> int:
             failures += 1
             print(f"  {time.time() - t:5.1f}s  overture index: ERROR {type(e).__name__} (extracts and live checks read every file)")
     for area in areas:
-        if ov.load_extract(area, s3) is not None:
+        # The box is checked too: a widened watch area gets a fresh extract, never its old one.
+        if ov.load_extract(area, s3, box=tuple(w.WATCH_AREAS[area]["bbox"])) is not None:
             print(f"   cached  overture extract {area} ({ov.RELEASE})")
             continue
         t = time.time()
