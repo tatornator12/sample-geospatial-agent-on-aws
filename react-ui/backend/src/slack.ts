@@ -10,19 +10,36 @@
  * and the message is built from the card's validated fields, so none can reach Slack either.
  *
  * The webhook URL is a secret (`SLACK_WEBHOOK_URL`: the backend's .env locally, a Secrets
- * Manager secret injected by the ECS task in production). It is validated to be a Slack
- * incoming-webhook URL, never logged, and when it is absent or malformed the feature is simply
- * off: filing never waits on Slack and never fails because of it.
+ * Manager secret injected by the ECS task in production). It is validated to be one of Slack's two
+ * webhook shapes (an app's incoming webhook, or a Workflow Builder webhook trigger), never logged,
+ * and when it is absent or malformed the feature is simply off: filing never waits on Slack and
+ * never fails because of it.
  */
 import type { BriefCard } from './brief';
 
-/** An incoming-webhook URL and nothing else: this backend posts to Slack or to nowhere. */
-export const SLACK_WEBHOOK = /^https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]{5,}\/B[A-Z0-9]{5,}\/[A-Za-z0-9]{16,}$/;
+/**
+ * The two Slack webhook shapes, and nothing else: this backend posts to Slack or to nowhere.
+ *   - a Slack app's incoming webhook (`/services/T…/B…/…`): takes a Block Kit message;
+ *   - a Workflow Builder "From a webhook" trigger (`/triggers/T…/…/…`): takes a flat object of
+ *     the variables declared on the trigger (see WORKFLOW_VARIABLES), which the workflow's own
+ *     "Send a message" step lays out. This is the shape a workspace that does not let members
+ *     create apps can still use.
+ */
+export const SLACK_INCOMING_WEBHOOK = /^https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]{5,}\/B[A-Z0-9]{5,}\/[A-Za-z0-9]{16,}$/;
+export const SLACK_WORKFLOW_WEBHOOK = /^https:\/\/hooks\.slack\.com\/triggers\/[A-Za-z0-9]{5,}\/[A-Za-z0-9]{5,}\/[A-Za-z0-9]{16,}$/;
 export const SLACK_TIMEOUT_MS = 5000;
+
+export type WebhookKind = 'incoming' | 'workflow';
+
+export function webhookKind(url: string): WebhookKind | null {
+  if (SLACK_INCOMING_WEBHOOK.test(url)) return 'incoming';
+  if (SLACK_WORKFLOW_WEBHOOK.test(url)) return 'workflow';
+  return null;
+}
 
 export function slackWebhookUrl(env: Record<string, string | undefined> = process.env): string | null {
   const value = (env.SLACK_WEBHOOK_URL ?? '').trim();
-  return SLACK_WEBHOOK.test(value) ? value : null;
+  return webhookKind(value) ? value : null;
 }
 
 export interface FiledBrief {
@@ -73,6 +90,40 @@ export function filedMessage(filed: FiledBrief): Record<string, unknown> {
   };
 }
 
+/**
+ * The variables a Workflow Builder webhook trigger must declare (all of data type Text), with the
+ * exact keys: Slack matches the payload's keys to the trigger's variables by name. The README
+ * lists them for whoever sets the workflow up; the test pins the list so the two never drift.
+ */
+export const WORKFLOW_VARIABLES = [
+  'title', 'place', 'coordinates', 'evidence', 'confidence', 'single_explanation', 'hypotheses',
+  'ground_record', 'filed_by', 'filed_at', 'brief_id', 'markdown_key',
+] as const;
+
+/** The flat payload for a Workflow Builder trigger: plain text values, the workflow does the layout. */
+export function workflowPayload(filed: FiledBrief): Record<(typeof WORKFLOW_VARIABLES)[number], string> {
+  const { card } = filed;
+  return {
+    title: card.title,
+    place: card.place,
+    coordinates: `${card.lat.toFixed(4)}, ${card.lon.toFixed(4)}`,
+    evidence: `${card.candidates} of ${card.passesRead} recent passes are candidates; EMIT looked ${card.looks} times.`,
+    confidence: card.confidence,
+    single_explanation: card.singleExplanation,
+    hypotheses: card.hypotheses.length > 0 ? card.hypotheses.map((h) => `${h.label}: ${h.assessment}`).join('; ') : 'none listed',
+    ground_record: card.checks.length > 0 ? card.checks.join('\n') : 'No ground-record checks were run.',
+    filed_by: filed.filedBy,
+    filed_at: filed.filedAt,
+    brief_id: card.briefId,
+    markdown_key: `s3://${filed.bucket}/${filed.markdownKey}`,
+  };
+}
+
+/** What to post to this webhook: Block Kit to an app's incoming webhook, variables to a workflow trigger. */
+export function payloadFor(url: string, filed: FiledBrief): Record<string, unknown> {
+  return webhookKind(url) === 'workflow' ? workflowPayload(filed) : filedMessage(filed);
+}
+
 export type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ ok: boolean; status: number }>;
 
 /**
@@ -107,7 +158,7 @@ export async function postToSlack(url: string, payload: Record<string, unknown>,
 export function notifyFiled(filed: FiledBrief, env: Record<string, string | undefined> = process.env): void {
   const url = slackWebhookUrl(env);
   if (!url) return;
-  void postToSlack(url, filedMessage(filed)).then((ok) => {
+  void postToSlack(url, payloadFor(url, filed)).then((ok) => {
     if (ok) console.log(`📣 Slack told about ${filed.card.briefId}`);
   });
 }

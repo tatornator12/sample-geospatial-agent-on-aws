@@ -1,13 +1,27 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { BriefCard } from './brief';
-import { filedMessage, notifyFiled, postToSlack, slackWebhookUrl, type FiledBrief } from './slack';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  WORKFLOW_VARIABLES,
+  filedMessage,
+  notifyFiled,
+  payloadFor,
+  postToSlack,
+  slackWebhookUrl,
+  webhookKind,
+  workflowPayload,
+  type FiledBrief,
+} from './slack';
 
-// A well-formed, fake webhook assembled at run time: the literal must never sit in the source,
-// or GitHub's push protection reads it as a leaked Slack webhook.
+// Well-formed, fake webhooks assembled at run time: the literals must never sit in the source,
+// or GitHub's push protection reads them as leaked Slack webhooks.
 const HOST = 'hooks.slack.com';
 const PATH = ['services', 'T0123456789', 'B0123456789', 'abcdefghijklmnopqrstuvwx'].join('/');
 const URL = `https://${HOST}/${PATH}`;
+const WORKFLOW_PATH = ['triggers', 'T0123456789', '9876543210987', 'abcdef0123456789abcdef0123456789'].join('/');
+const WORKFLOW_URL = `https://${HOST}/${WORKFLOW_PATH}`;
 
 function card(over: Partial<BriefCard> = {}): BriefCard {
   return {
@@ -43,8 +57,11 @@ function filed(over: Partial<FiledBrief> = {}): FiledBrief {
 }
 
 describe('slackWebhookUrl', () => {
-  it('accepts only a Slack incoming-webhook URL, so the backend posts to Slack or to nowhere', () => {
+  it('accepts only the two Slack webhook shapes, so the backend posts to Slack or to nowhere', () => {
     assert.equal(slackWebhookUrl({ SLACK_WEBHOOK_URL: URL }), URL);
+    assert.equal(webhookKind(URL), 'incoming');
+    assert.equal(slackWebhookUrl({ SLACK_WEBHOOK_URL: WORKFLOW_URL }), WORKFLOW_URL);
+    assert.equal(webhookKind(WORKFLOW_URL), 'workflow');
     assert.equal(slackWebhookUrl({ SLACK_WEBHOOK_URL: ` ${URL}\n` }), URL);
     assert.equal(slackWebhookUrl({}), null);
     assert.equal(slackWebhookUrl({ SLACK_WEBHOOK_URL: '' }), null);
@@ -85,6 +102,35 @@ describe('filedMessage', () => {
     assert.ok(!text.includes('<b>'));
     assert.ok(text.includes('Filed by &lt;analyst&gt;'));
     assert.ok(text.includes('No ground-record checks were run.'));
+  });
+});
+
+describe('workflowPayload', () => {
+  it('is a flat object of plain-text variables, one per key the trigger declares, and nothing else', () => {
+    const payload = workflowPayload(filed());
+    assert.deepEqual(Object.keys(payload).sort(), [...WORKFLOW_VARIABLES].sort());
+    for (const value of Object.values(payload)) assert.equal(typeof value, 'string');
+    assert.equal(payload.title, 'Recurring methane, Shanxi coal basin site near Shahe City');
+    assert.equal(payload.coordinates, '36.9782, 114.2629');
+    assert.equal(payload.evidence, '6 of 7 recent passes are candidates; EMIT looked 12 times.');
+    assert.equal(payload.confidence, 'high');
+    assert.equal(payload.hypotheses, 'Routine venting: possible; Maintenance blowdown: less likely');
+    assert.ok(payload.ground_record.startsWith('VIIRS saw no heat source') && payload.ground_record.includes('\nOverture Maps shows'));
+    assert.equal(payload.filed_by, 'analyst@example.com');
+    assert.equal(payload.brief_id, 'brief-20260925T201500-a1b2c3');
+    assert.ok(payload.markdown_key.startsWith('s3://demo-bucket/session_data/'));
+    assert.equal(workflowPayload(filed({ card: card({ checks: [], hypotheses: [] }) })).ground_record, 'No ground-record checks were run.');
+    assert.equal(workflowPayload(filed({ card: card({ hypotheses: [] }) })).hypotheses, 'none listed');
+  });
+
+  it('is what a workflow trigger receives, while an incoming webhook receives the Block Kit message', () => {
+    assert.ok(!('blocks' in payloadFor(WORKFLOW_URL, filed())));
+    assert.ok('blocks' in payloadFor(URL, filed()));
+  });
+
+  it('declares every variable in the README so whoever builds the workflow types the same keys', () => {
+    const readme = readFileSync(join(__dirname, '..', '..', '..', 'agents', 'methane-hunter', 'README.md'), 'utf8');
+    for (const name of WORKFLOW_VARIABLES) assert.ok(readme.includes(`\`${name}\``), `README lacks ${name}`);
   });
 });
 

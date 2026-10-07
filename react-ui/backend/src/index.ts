@@ -25,7 +25,7 @@ import {
   isSessionId,
   sessionBriefKeys,
 } from './brief';
-import { notifyFiled, slackWebhookUrl } from './slack';
+import { notifyFiled, slackWebhookUrl, webhookKind } from './slack';
 
 const BRIEF_APPROVE_PATH = '/api/brief/approve';
 
@@ -869,7 +869,8 @@ app.listen(PORT, () => {
     (defaultAgent ? `; default = ${defaultAgent.id}` : '')
   );
   // On or off only; the webhook URL itself is never printed.
-  console.log(`Slack on filed briefs: ${slackWebhookUrl() ? 'on' : (process.env.SLACK_WEBHOOK_URL ? 'off (SLACK_WEBHOOK_URL is not a Slack incoming-webhook URL)' : 'off')}`);
+  const slackUrl = slackWebhookUrl();
+  console.log(`Slack on filed briefs: ${slackUrl ? `on (${webhookKind(slackUrl)} webhook)` : (process.env.SLACK_WEBHOOK_URL ? 'off (SLACK_WEBHOOK_URL is not a Slack webhook URL)' : 'off')}`);
   if (process.env.NODE_ENV === 'production') {
     console.log(`Frontend static files enabled`);
   }

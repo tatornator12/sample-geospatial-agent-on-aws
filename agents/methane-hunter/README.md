@@ -58,13 +58,67 @@ bakes DuckDB's `httpfs` extension into the image so the first read never downloa
 
 ## Slack on a filed brief (optional)
 
-The UI backend posts one message to a Slack incoming webhook when the analyst clicks "Approve
-and file" (`react-ui/backend/src/slack.ts`): the card's title and place, the counts, the
-confidence, the two ground-record sentences, who filed it and the brief id. The agent never
-triggers it and never sees it; a Slack failure never unfiles anything.
+The UI backend posts one message to Slack when the analyst clicks "Approve and file"
+(`react-ui/backend/src/slack.ts`): the card's title and place, the counts, the confidence, the two
+ground-record sentences, who filed it and the brief id. The agent never triggers it and never sees
+it; a Slack failure never unfiles anything. Two webhook shapes work, and the backend tells them
+apart by the URL:
 
-- Local: put `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...` in `react-ui/backend/.env`
-  (gitignored) and restart the backend; it logs `Slack on filed briefs: on`.
+- a Slack app's **incoming webhook** (`https://hooks.slack.com/services/T…/B…/…`): gets a Block
+  Kit message, laid out by the backend;
+- a **Workflow Builder** webhook trigger (`https://hooks.slack.com/triggers/T…/…/…`): gets a flat
+  set of variables, and the workflow's own "Send a message" step does the layout. This is the one
+  to use in a workspace that does not let members create apps.
+
+### Setting up the Workflow Builder webhook (no app needed)
+
+1. In Slack, open **Tools & settings → Workflow Builder** (or **More → Automations → Workflows**)
+   and click **New Workflow → Build Workflow**.
+2. For the start of the workflow, choose **From a webhook**.
+3. Under **Set up variables**, add these twelve, each with data type **Text**, keys exactly as
+   written (Slack matches the payload's keys to these names):
+   `title`, `place`, `coordinates`, `evidence`, `confidence`, `single_explanation`, `hypotheses`,
+   `ground_record`, `filed_by`, `filed_at`, `brief_id`, `markdown_key`.
+4. Click **Continue**. Slack shows the **Web request URL**: copy it. That URL is the secret; it
+   never goes in git.
+5. Add a step: **Messages → Send a message to a channel**, pick the channel, and compose the
+   message with **Insert a variable** for each field. A layout that reads well:
+
+   ```
+   Methane Watch brief filed: {title}
+   {place} · {coordinates}
+   Evidence: {evidence}
+   Methane recurs here: {confidence}. Any single explanation: {single_explanation}.
+   Unconfirmed hypotheses: {hypotheses}
+   Ground record:
+   {ground_record}
+   Filed by {filed_by} at {filed_at}. The analyst decided; the agent drafted.
+   {brief_id} · {markdown_key}
+   ```
+
+6. **Finish Up**: name it (for example "Methane Watch filed briefs"), then **Publish**.
+7. Test it before the backend does, from a terminal (fill the URL and keep every key present;
+   a missing variable is an error on Slack's side):
+
+   ```bash
+   curl -sS -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' -d '{
+     "title": "Test brief", "place": "nowhere", "coordinates": "0.0000, 0.0000",
+     "evidence": "0 of 0 recent passes are candidates; EMIT looked 0 times.",
+     "confidence": "low", "single_explanation": "low without a ground or aircraft check",
+     "hypotheses": "none listed", "ground_record": "No ground-record checks were run.",
+     "filed_by": "test", "filed_at": "2026-10-07T00:00:00Z",
+     "brief_id": "brief-00000000T000000-000000", "markdown_key": "s3://bucket/test.md"
+   }'
+   ```
+   Slack answers `{"ok":true}` and the message appears in the channel.
+
+Regenerating the webhook (Workflow Builder → the trigger → **Regenerate**) is how the URL is
+rotated; put the new value where the old one was.
+
+### Where the URL lives
+
+- Local: put `SLACK_WEBHOOK_URL=https://hooks.slack.com/...` in `react-ui/backend/.env`
+  (gitignored) and restart the backend; it logs `Slack on filed briefs: on (workflow webhook)`.
 - CloudFront stack: the CDK creates the secret `geospatial-agent/<env>/slack-webhook` with a random
   placeholder (read as off); the deployed stack's `<env>` is `dev` (the CDK default), whatever the
   branch. Set it once and restart the tasks:
