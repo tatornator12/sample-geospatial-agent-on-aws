@@ -35,11 +35,16 @@ function card(over: Partial<BriefCard> = {}): BriefCard {
     passesRead: 7,
     confidence: 'high',
     singleExplanation: 'low without a ground or aircraft check',
-    hypotheses: [{ label: 'Routine venting', assessment: 'possible' }, { label: 'Maintenance blowdown', assessment: 'less likely' }],
+    hypotheses: [
+      { label: 'Routine venting', assessment: 'possible', nextCheck: 'Operating logs for the dates would confirm it.' },
+      { label: 'Maintenance blowdown', assessment: 'less likely' },
+    ],
     checks: [
       'VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.',
       'Overture Maps shows within 2 km: 1 pipeline (0 km); nothing mapped for mining, waste, wetland.',
     ],
+    gaps: ['EMIT only sees the site on its passes.'],
+    nextCollection: 'Next EMIT pass and an aircraft survey.',
     ...over,
   };
 }
@@ -83,7 +88,10 @@ describe('filedMessage', () => {
       '6 of 7 recent passes are candidates; EMIT looked 12 times.',
       'high',
       'low without a ground or aircraft check',
-      'Routine venting: _possible_',
+      '• Routine venting: possible\\n    Operating logs for the dates would confirm it.',
+      '• Maintenance blowdown: less likely',
+      'Gaps:\\n• EMIT only sees the site on its passes.',
+      'Next look: Next EMIT pass and an aircraft survey.',
       'VIIRS saw no heat source',
       'Overture Maps shows within 2 km',
       'Filed by analyst@example.com at 2026-10-06T20:30:00.000Z',
@@ -114,13 +122,15 @@ describe('workflowPayload', () => {
     assert.equal(payload.coordinates, '36.9782, 114.2629');
     assert.equal(payload.evidence, '6 of 7 recent passes are candidates; EMIT looked 12 times.');
     assert.equal(payload.confidence, 'high');
-    assert.equal(payload.hypotheses, 'Routine venting: possible; Maintenance blowdown: less likely');
-    assert.ok(payload.ground_record.startsWith('VIIRS saw no heat source') && payload.ground_record.includes('\nOverture Maps shows'));
+    assert.equal(payload.hypotheses, '• Routine venting: possible\n    Operating logs for the dates would confirm it.\n• Maintenance blowdown: less likely');
+    assert.equal(payload.ground_record.split('\n').length, 5);                     // 2 checks, "Gaps:", 1 gap, the next look
+    assert.ok(payload.ground_record.startsWith('• VIIRS saw no heat source') && payload.ground_record.endsWith('Next look: Next EMIT pass and an aircraft survey.'));
+    assert.equal(payload.filed_at, '2026-10-06 20:30 UTC');
     assert.equal(payload.filed_by, 'analyst@example.com');
     assert.equal(payload.brief_id, 'brief-20260925T201500-a1b2c3');
     assert.ok(payload.markdown_key.startsWith('s3://demo-bucket/session_data/'));
-    assert.equal(workflowPayload(filed({ card: card({ checks: [], hypotheses: [] }) })).ground_record, 'No ground-record checks were run.');
-    assert.equal(workflowPayload(filed({ card: card({ hypotheses: [] }) })).hypotheses, 'none listed');
+    assert.equal(workflowPayload(filed({ card: card({ checks: [], hypotheses: [], gaps: [], nextCollection: undefined }) })).ground_record, '• No ground-record checks were run.');
+    assert.equal(workflowPayload(filed({ card: card({ hypotheses: [] }) })).hypotheses, '• none listed');
   });
 
   it('is what a workflow trigger receives, while an incoming webhook receives the Block Kit message', () => {

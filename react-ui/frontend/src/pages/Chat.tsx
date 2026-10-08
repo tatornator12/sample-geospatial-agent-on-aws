@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
-import { getApiUrl, prewarmSession } from '../services/api';
+import { getApiUrl, loadMethaneBaseline, prewarmSession } from '../services/api';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { MapView } from '../components/MapView';
@@ -343,6 +343,25 @@ export function Chat() {
     prewarmedSessions.current.add(key);
     void prewarmSession(sessionId, selectedAgentId);
   }, [sessionId, selectedAgentId]);
+
+  // The Methane Hunter's resting state is the globe with the baseline on it: every EMIT repeat site
+  // and the watch-area outlines, from the agent's own cache, shown the moment the act is chosen and
+  // after every reset, before any prompt. The mission's own baseline step then replaces it (same
+  // kind, same layer), so nothing is listed twice; a replay case brings its own.
+  useEffect(() => {
+    if (selectedAgentId !== 'methane' || scenarioId || !mapReady) return;
+    let cancelled = false;
+    void loadMethaneBaseline().then((baseline) => {
+      if (cancelled || !baseline) return;
+      setCurrentGeometry((current) => current ?? {
+        ...baseline,
+        locationName: 'EMIT Methane Watch: global repeat sites',
+        sourceUrl: 's3://methane-baseline/watch_sites_v002.geojson',
+        render: { kind: 'points', group: 'watch', property: 'repeat_dates', label: 'repeat_dates', units: 'dates' },
+      });
+    });
+    return () => { cancelled = true; };
+  }, [selectedAgentId, sessionId, scenarioId, mapReady]);
 
   const handleDrawnGeometry = (geojson: any) => {
     // Format the GeoJSON as a message to send to chat

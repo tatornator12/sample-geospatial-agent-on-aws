@@ -16,6 +16,8 @@ Security (design.md "Security"):
 """
 from __future__ import annotations
 
+import asyncio
+import functools
 import json
 import logging
 import math
@@ -83,6 +85,45 @@ RENDER_VECTOR = {
     "kind": "vector", "property": "max_ppm_m", "ramp": "plasma", "rescale": [0, 1500],
     "units": "ppm·m", "group": "methane", "label": "rank",
 }
+SCALE_FLOOR_PPM_M = 500          # the ramp starts where the display does: below it the ground shows through
+SCALE_MIN_TOP_PPM_M = 1500       # a weak plume still gets the whole ramp up to here
+SCALE_STEP_PPM_M = 500
+
+
+def enhancement_scale(peak: float | None) -> list[int]:
+    """The colour scale for one plume or pass, from its own peak: [500, a round number near the peak].
+
+    A fixed 0 to 1,500 ramp painted a 6,000 ppm·m plume one flat yellow: everything above 1,500
+    saturated and the shape was lost. Scaling to ~85% of the peak keeps the brightest pixels yellow
+    and gives the body of the plume the rest of the ramp; the legend shows the actual range.
+    """
+    try:
+        p = float(peak)
+    except (TypeError, ValueError):
+        return [SCALE_FLOOR_PPM_M, SCALE_MIN_TOP_PPM_M]
+    if not math.isfinite(p):
+        return [SCALE_FLOOR_PPM_M, SCALE_MIN_TOP_PPM_M]
+    top = int(math.ceil(0.85 * p / SCALE_STEP_PPM_M) * SCALE_STEP_PPM_M)
+    return [SCALE_FLOOR_PPM_M, max(SCALE_MIN_TOP_PPM_M, min(top, 20_000))]
+
+
+def scaled(render: dict, peak: float | None) -> dict:
+    """A render hint with its ramp fitted to this peak."""
+    return {**render, "rescale": enhancement_scale(peak)}
+
+
+def offload(fn):
+    """Run a tool's blocking body in a worker thread, so parallel tool calls really overlap.
+
+    The tools are `async def` for the framework but do blocking work (S3, rasterio, HTTP) and
+    never await: on the agent's event loop nine TROPOMI scans issued together ran one after
+    another (80 s of silence on the first mission of a day, and the stream timed out). Wrapped,
+    each body runs on its own thread and the nine take as long as the slowest.
+    """
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        return await asyncio.to_thread(asyncio.run, fn(*args, **kwargs))
+    return wrapper
 
 
 class MethaneError(ValueError):
@@ -518,6 +559,7 @@ def rank_key(p: dict):
 # --- tools ----------------------------------------------------------------------------------
 
 @tool
+@offload
 async def search_methane_plumes(region: str, start_date: str = None, end_date: str = None,
                                 bbox: list = None, geometry_s3_url: str = None,
                                 max_results: int = 50) -> str:
@@ -582,6 +624,7 @@ async def search_methane_plumes(region: str, start_date: str = None, end_date: s
 
 
 @tool
+@offload
 async def triage_plumes(plumes_geometry_s3_url: str, top_n: int = 10) -> str:
     """Rank the plumes from search_methane_plumes by how much methane they carry.
 
@@ -685,8 +728,9 @@ async def triage_plumes(plumes_geometry_s3_url: str, top_n: int = 10) -> str:
         "summary": summary,
         "ranked": top,
         "ranked_geometry_s3_url": ranked_url,
-        "render_vector": RENDER_VECTOR,
-        "render_raster": RENDER_RASTER,
+        # The footprints and any plume raster share one ramp, fitted to the strongest plume ranked.
+        "render_vector": scaled(RENDER_VECTOR, top[0].get("max_ppm_m") if top else None),
+        "render_raster": scaled(RENDER_RASTER, top[0].get("max_ppm_m") if top else None),
         "next_steps": ("display_visual(ranked_geometry_s3_url, title, description, render=render_vector) together "
                        "with reverse_geocode of the top 3 centres, then report. Call show_plume ONLY if the user asked "
                        "to see a plume or the ground beneath it; otherwise stop and offer it."),
@@ -694,6 +738,7 @@ async def triage_plumes(plumes_geometry_s3_url: str, top_n: int = 10) -> str:
 
 
 @tool
+@offload
 async def show_plume(granule_id: str) -> str:
     """Get the raster of one plume that triage_plumes measured this session, ready for the map.
 
@@ -719,7 +764,7 @@ async def show_plume(granule_id: str) -> str:
                     lons, lats = [p[0] for p in ring], [p[1] for p in ring]
                     bbox = [round(min(lons), 5), round(min(lats), 5), round(max(lons), 5), round(max(lats), 5)]
                     # The UI's camera fits the plume from these bounds (validated there as a lon/lat box).
-                    render = {**RENDER_RASTER, "bounds": bbox}
+                    render = {**scaled(RENDER_RASTER, props.get("max_ppm_m")), "bounds": bbox}
                     return json.dumps({
                         "granule_id": gid,
                         "rank": props["rank"],

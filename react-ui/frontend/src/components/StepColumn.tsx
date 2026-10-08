@@ -76,9 +76,10 @@ export function StepColumn({
   // the full list of steps is one click away. While working, the last steps, with the board and the
   // cue pinned so they never scroll away under "+N earlier".
   const collapsed = compact && !live && !expanded;
+  const showAll = compact && !live && expanded;   // "Show all N steps": every step, 01 included
   const tail = groups.slice(-MAX_VISIBLE);
   const pinned = groups.slice(0, groups.length - tail.length).filter((g) => hasFilm(g) || hasBoard(g));
-  const visible = collapsed ? groups.filter((g) => hasFilm(g) || hasBoard(g)) : [...pinned, ...tail];
+  const visible = collapsed ? groups.filter((g) => hasFilm(g) || hasBoard(g)) : showAll ? groups : [...pinned, ...tail];
   const hidden = groups.length - visible.length;
   const litIndex = live ? visible.length - 1 : -1;
   const evidenceByTool = new Map(evidence.map((item) => [item.toolId, item]));

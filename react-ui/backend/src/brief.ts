@@ -64,10 +64,14 @@ export interface BriefCard {
   passesRead: number;
   confidence: 'low' | 'moderate' | 'high';
   singleExplanation: string;
-  /** Up to three unconfirmed hypotheses, "possible" first. */
-  hypotheses: Array<{ label: string; assessment: string }>;
+  /** Every unconfirmed hypothesis the brief lists (2 to 6), "possible" first, each with what
+   *  would confirm or rule it out. The card shows the whole brief, not a sample of it. */
+  hypotheses: Array<{ label: string; assessment: string; nextCheck?: string }>;
   /** The ground-record checks, one sentence each, written by the tools from their own numbers. */
   checks: string[];
+  /** What the data cannot show (1 to 4 lines) and the recommended next look. */
+  gaps: string[];
+  nextCollection?: string;
 }
 
 /** A check's sentence, as the tool wrote it: bounded, plain, no markup or control characters. */
@@ -118,11 +122,14 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
       const row = (e ?? {}) as Record<string, unknown>;
       const label = text(row.label, 80);
       const assessment = typeof row.assessment === 'string' && ASSESSMENT_ORDER.includes(row.assessment) ? row.assessment : null;
-      return label && assessment ? { label, assessment } : null;
+      const nextCheck = checkLine(row.next_check);
+      return label && assessment ? { label, assessment, ...(nextCheck ? { nextCheck } : {}) } : null;
     })
-    .filter((h): h is { label: string; assessment: string } => h !== null)
+    .filter((h): h is { label: string; assessment: string; nextCheck?: string } => h !== null)
     .sort((a, c) => ASSESSMENT_ORDER.indexOf(a.assessment) - ASSESSMENT_ORDER.indexOf(c.assessment))
-    .slice(0, 3);
+    .slice(0, 6);
+  const gaps = (Array.isArray(b.gaps) ? b.gaps : []).map(checkLine).filter((l): l is string => l !== null).slice(0, 4);
+  const nextCollection = checkLine(b.next_collection);
   return {
     briefId,
     title,
@@ -141,6 +148,8 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
         .map((k) => checkLine((c[k] as { line?: unknown } | undefined)?.line))
         .filter((l): l is string => l !== null);
     })(),
+    gaps,
+    ...(nextCollection ? { nextCollection } : {}),
   };
 }
 

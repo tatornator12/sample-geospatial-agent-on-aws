@@ -69,12 +69,29 @@ describe('ids and keys', () => {
 });
 
 describe('briefCard', () => {
-  it('shows the counts, the confidence words and the top three hypotheses, possible first', () => {
-    const card = briefCard(draft(), BID, SID)!;
+  it('shows the counts, the confidence words and every hypothesis with its next check, possible first', () => {
+    const card = briefCard(draft({}, {
+      explanations: [
+        { id: 'unlit_flare', label: 'Unlit or malfunctioning flare', assessment: 'less likely', next_check: 'A flare stack mapped nearby would reopen this.' },
+        { id: 'routine_venting', label: 'Routine venting', assessment: 'possible', next_check: 'Operating logs for the dates.' },
+        { id: 'non_oil_gas_source', label: 'Non-oil-and-gas source (landfill, coal, agriculture)', assessment: 'cannot assess', next_check: 'x' },
+        { id: 'equipment_failure_or_leak', label: 'Equipment failure or leak', assessment: 'possible', next_check: '<b>bad</b>' },
+      ],
+      gaps: ['EMIT only sees the site on its passes.', 'The plume product is nearly empty after 2024.'],
+      next_collection: 'Next EMIT pass and an aircraft survey.',
+    }), BID, SID)!;
     assert.equal(card.candidates, 4);
     assert.equal(card.confidence, 'high');
     assert.equal(card.singleExplanation, 'low without a ground or aircraft check');
-    assert.deepEqual(card.hypotheses.map((h) => h.assessment), ['possible', 'possible', 'less likely']);
+    // All four, not a top three; "possible" first; the next-check line rides along when it is clean.
+    assert.deepEqual(card.hypotheses.map((h) => h.assessment), ['possible', 'possible', 'less likely', 'cannot assess']);
+    assert.equal(card.hypotheses[0].nextCheck, 'Operating logs for the dates.');
+    assert.equal(card.hypotheses[1].nextCheck, undefined);                 // markup never reaches the card
+    assert.deepEqual(card.gaps, ['EMIT only sees the site on its passes.', 'The plume product is nearly empty after 2024.']);
+    assert.equal(card.nextCollection, 'Next EMIT pass and an aircraft survey.');
+    const bare = briefCard(draft(), BID, SID)!;                             // a draft without gaps still makes a card
+    assert.deepEqual(bare.gaps, []);
+    assert.equal(bare.nextCollection, undefined);
   });
 
   it('refuses another session\'s draft, another id, or a malformed brief', () => {

@@ -90,7 +90,7 @@ apart by the URL:
    Evidence: {evidence}
    Methane recurs here: {confidence}. Any single explanation: {single_explanation}.
    Unconfirmed hypotheses: {hypotheses}
-   Ground record:
+   Ground record, gaps and next look:
    {ground_record}
    Filed by {filed_by} at {filed_at}. The analyst decided; the agent drafted.
    {brief_id} · {markdown_key}

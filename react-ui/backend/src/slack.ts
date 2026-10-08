@@ -56,14 +56,30 @@ function plain(value: string): string {
   return value.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
 }
 
+/** "6 of 8 recent passes are candidates; EMIT looked 12 times." */
+function evidenceLine(card: BriefCard): string {
+  return `${card.candidates} of ${card.passesRead} recent passes are candidates; EMIT looked ${card.looks} times.`;
+}
+
+/** One hypothesis per line, its assessment, then (indented) what would confirm or rule it out. */
+function hypothesisLines(card: BriefCard, mark: (s: string) => string): string {
+  if (card.hypotheses.length === 0) return '• none listed';
+  return card.hypotheses
+    .map((h) => `• ${mark(h.label)}: ${h.assessment}` + (h.nextCheck ? `\n    ${mark(h.nextCheck)}` : ''))
+    .join('\n');
+}
+
+/** The ground record as bullets, then the gaps and the next look. */
+function groundRecordLines(card: BriefCard, mark: (s: string) => string): string {
+  const checks = card.checks.length > 0 ? card.checks.map((c) => `• ${mark(c)}`) : ['• No ground-record checks were run.'];
+  const gaps = card.gaps.length > 0 ? ['Gaps:', ...card.gaps.map((g) => `• ${mark(g)}`)] : [];
+  const next = card.nextCollection ? [`Next look: ${mark(card.nextCollection)}`] : [];
+  return [...checks, ...gaps, ...next].join('\n');
+}
+
 /** The Block Kit payload for a filed brief. Pure, so the message is tested without Slack. */
 export function filedMessage(filed: FiledBrief): Record<string, unknown> {
   const { card } = filed;
-  const summary = `${card.candidates} of ${card.passesRead} recent passes are candidates; EMIT looked ${card.looks} times.`;
-  const record = card.checks.length > 0 ? card.checks.map((c) => `• ${plain(c)}`).join('\n') : '• No ground-record checks were run.';
-  const hypotheses = card.hypotheses.length > 0
-    ? card.hypotheses.map((h) => `${plain(h.label)}: _${h.assessment}_`).join('  ·  ')
-    : 'none listed';
   return {
     text: `Methane Watch brief filed: ${plain(card.title)} (${plain(card.place)})`,
     blocks: [
@@ -72,13 +88,12 @@ export function filedMessage(filed: FiledBrief): Record<string, unknown> {
       {
         type: 'section',
         fields: [
-          { type: 'mrkdwn', text: `*Evidence*\n${summary}` },
-          { type: 'mrkdwn', text: `*Methane recurs here*\n${card.confidence}` },
-          { type: 'mrkdwn', text: `*Any single explanation*\n${card.singleExplanation}` },
-          { type: 'mrkdwn', text: `*Unconfirmed hypotheses*\n${hypotheses}` },
+          { type: 'mrkdwn', text: `*Evidence*\n${evidenceLine(card)}` },
+          { type: 'mrkdwn', text: `*Confidence*\nMethane recurs here: ${card.confidence}\nAny single explanation: ${card.singleExplanation}` },
         ],
       },
-      { type: 'section', text: { type: 'mrkdwn', text: `*Ground record*\n${record}` } },
+      { type: 'section', text: { type: 'mrkdwn', text: `*Unconfirmed hypotheses*\n${hypothesisLines(card, plain)}` } },
+      { type: 'section', text: { type: 'mrkdwn', text: `*Ground record*\n${groundRecordLines(card, plain)}` } },
       {
         type: 'context',
         elements: [
@@ -100,20 +115,26 @@ export const WORKFLOW_VARIABLES = [
   'ground_record', 'filed_by', 'filed_at', 'brief_id', 'markdown_key',
 ] as const;
 
-/** The flat payload for a Workflow Builder trigger: plain text values, the workflow does the layout. */
+/**
+ * The flat payload for a Workflow Builder trigger. The workflow inserts each value as text, so the
+ * values that are lists arrive already laid out, one item per line with a bullet: `hypotheses`
+ * (label, assessment, then what would confirm it) and `ground_record` (the two checks, the gaps,
+ * the next look). The twelve keys are fixed: the workflow the user built declares exactly these.
+ */
 export function workflowPayload(filed: FiledBrief): Record<(typeof WORKFLOW_VARIABLES)[number], string> {
   const { card } = filed;
+  const asIs = (s: string) => s;
   return {
     title: card.title,
     place: card.place,
     coordinates: `${card.lat.toFixed(4)}, ${card.lon.toFixed(4)}`,
-    evidence: `${card.candidates} of ${card.passesRead} recent passes are candidates; EMIT looked ${card.looks} times.`,
+    evidence: evidenceLine(card),
     confidence: card.confidence,
     single_explanation: card.singleExplanation,
-    hypotheses: card.hypotheses.length > 0 ? card.hypotheses.map((h) => `${h.label}: ${h.assessment}`).join('; ') : 'none listed',
-    ground_record: card.checks.length > 0 ? card.checks.join('\n') : 'No ground-record checks were run.',
+    hypotheses: hypothesisLines(card, asIs),
+    ground_record: groundRecordLines(card, asIs),
     filed_by: filed.filedBy,
-    filed_at: filed.filedAt,
+    filed_at: filed.filedAt.slice(0, 16).replace('T', ' ') + ' UTC',
     brief_id: card.briefId,
     markdown_key: `s3://${filed.bucket}/${filed.markdownKey}`,
   };

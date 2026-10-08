@@ -93,8 +93,23 @@ def test_triage_ranks_stages_and_writes_the_ranked_footprints(tools, monkeypatch
     fc = json.loads(fake_s3.objects[out["ranked_geometry_s3_url"].split(f"{BUCKET}/", 1)[1]])
     tiers = {f["properties"]["granule_id"]: (f["properties"]["tier"], f["properties"]["rank"]) for f in fc["features"]}
     assert tiers == {PLUME_ID_2: ("ranked", 1), PLUME_ID_3: ("ranked", 2), PLUME_ID: ("detected", 3)}
-    assert out["render_raster"]["colormap"] == "plasma" and out["render_raster"]["rescale"] == [0, 1500]
+    # One ramp for the footprints and the raster, fitted to rank 1's peak (floor 500, top near 85% of the peak).
+    top_peak = out["ranked"][0]["max_ppm_m"]
+    assert out["render_raster"]["colormap"] == "plasma"
+    assert out["render_raster"]["rescale"] == out["render_vector"]["rescale"] == tools.enhancement_scale(top_peak)
+    assert out["render_raster"]["rescale"][0] == 500 and out["render_raster"]["rescale"][1] >= 1500
     assert TOKEN not in json.dumps(out)
+
+
+def test_enhancement_scale_fits_the_peak_and_never_collapses(tools):
+    assert tools.enhancement_scale(None) == [500, 1500]
+    assert tools.enhancement_scale("x") == [500, 1500]
+    assert tools.enhancement_scale(900) == [500, 1500]          # a weak plume keeps the whole ramp
+    assert tools.enhancement_scale(1500) == [500, 1500]
+    assert tools.enhancement_scale(6388.9) == [500, 5500]       # 0.85 x 6389 = 5431 -> up to the next 500
+    assert tools.enhancement_scale(9144.0) == [500, 8000]
+    assert tools.enhancement_scale(1e9) == [500, 20000]         # capped
+    assert tools.scaled({"kind": "raster", "rescale": [0, 1500]}, 4000) == {"kind": "raster", "rescale": [500, 3500]}
 
 
 def test_ties_break_by_pixels_then_granule_id(tools, monkeypatch, fake_s3):

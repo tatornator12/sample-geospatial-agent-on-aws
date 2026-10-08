@@ -71,6 +71,7 @@ SITE_KM = 3.0
 # 0 in 2026); recent passes are read from here on unless the caller says otherwise.
 PLUME_PRODUCT_DENSE_END = date(2024, 12, 31)
 SITES_CACHE_KEY = "methane/cache/sites_v002.geojson"
+WATCH_SITES_CACHE_KEY = "methane/cache/watch_sites_v002.geojson"   # sites + area outlines, for the idle globe
 SITES_TTL_S = 7 * 24 * 3600
 
 # Watch areas (w, s, e, n). The label is for the record, never drawn on the globe. North Korea
@@ -228,6 +229,7 @@ def load_sites(client: httpx.Client, s3) -> tuple[dict, str]:
 
 
 @tool
+@mt.offload
 async def watch_baseline(min_repeat_dates: int = 5) -> str:
     """The global baseline: every methane plume complex NASA EMIT outlined, grouped into sites.
 
@@ -257,8 +259,14 @@ async def watch_baseline(min_repeat_dates: int = 5) -> str:
     areas = [{"type": "Feature", "properties": {"tier": "watch_area", "emit": spec["emit"]},
               "geometry": {"type": "Polygon", "coordinates": [[[w, s], [e, s], [e, n], [w, n], [w, s]]]}}
              for spec in WATCH_AREAS.values() for (w, s, e, n) in [spec["bbox"]]]
-    url = mt._put_json(f"{mt.session_prefix()}watch_sites_v002.geojson",
-                       {"type": "FeatureCollection", "features": feats + areas})
+    collection = {"type": "FeatureCollection", "features": feats + areas}
+    url = mt._put_json(f"{mt.session_prefix()}watch_sites_v002.geojson", collection)
+    # The same collection at a fixed key: the stage shows this globe the moment the Methane Hunter is
+    # chosen (GET /api/methane/baseline), before any prompt, so the baseline is where the act starts.
+    try:
+        mt._put_json(WATCH_SITES_CACHE_KEY, collection)
+    except Exception as e:  # the idle globe is decoration for the stage; never fail the tool for it
+        logger.warning("watch sites cache write failed: %s", type(e).__name__)
     firsts = [f["properties"]["first"] for f in feats]
     return json.dumps({
         "summary": {"detections": fc.get("detections"), "sites": len(feats), "repeat_sites": len(repeat),
@@ -279,6 +287,7 @@ async def watch_baseline(min_repeat_dates: int = 5) -> str:
 # --- site history ---------------------------------------------------------------------------
 
 @tool
+@mt.offload
 async def site_history(lat: float, lon: float, radius_km: float = 2.0) -> str:
     """How often EMIT looked at a place, and how often NASA outlined a methane plume there.
 
@@ -413,6 +422,7 @@ def find_hotspots(anomaly: np.ndarray, days: np.ndarray, transform, n: int = 5,
 
 
 @tool
+@mt.offload
 async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_date: str = None) -> str:
     """Tip: scan an area with Sentinel-5P TROPOMI (daily, ~4 km) for methane above the area's background.
 
@@ -773,6 +783,7 @@ def columns_geojson(window_cog: bytes, floor: float = DISPLAY_FLOOR_PPM_M, cap: 
 
 
 @tool
+@mt.offload
 async def check_recent_passes(lat: float, lon: float, since: str = None, max_scenes: int = 8) -> str:
     """Cue: read EMIT's recent raw methane scenes over a site, where NASA outlines no plumes yet.
 
@@ -860,8 +871,10 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
         "summary": summary, "passes": passes,
         "strongest_candidate": best and {**{k: best[k] for k in ("scene_id", "date", "peak_ppm_m", "pixels_ge_1000",
                                                                 "window_s3_url")}, "columns_s3_url": columns_url},
-        "render": {**RENDER_PASS, "bounds": [round(v, 5) for v in box_around(lat, lon, WINDOW_KM / 2)]},
-        "render_columns": RENDER_COLUMNS,
+        # The window and its columns share one ramp, fitted to the strongest candidate's peak.
+        "render": {**mt.scaled(RENDER_PASS, best and best.get("peak_ppm_m")),
+                   "bounds": [round(v, 5) for v in box_around(lat, lon, WINDOW_KM / 2)]},
+        "render_columns": mt.scaled(RENDER_COLUMNS, best and best.get("peak_ppm_m")),
         "next_steps": ("Say how many passes were candidates and which were rejected and why (use the short reasons). "
                        "inspect_image the strongest candidate's window_s3_url, then display_visual it with "
                        "render=render and display_visual(columns_s3_url, render=render_columns)."),

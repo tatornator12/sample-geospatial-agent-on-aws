@@ -117,10 +117,23 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
           <ul className="brief-card__hypotheses">
             {card.hypotheses.map((h) => (
               <li key={h.label}>
-                <span>{h.label}</span>
+                <span className="brief-card__hypothesis">{h.label}</span>
                 <span className="brief-card__assessment">{h.assessment}</span>
+                {/* What would confirm or rule it out: the brief's own words, so the card is the whole brief. */}
+                {h.nextCheck && <span className="brief-card__next-check">{h.nextCheck}</span>}
               </li>
             ))}
+          </ul>
+        </>
+      )}
+      {((card.gaps?.length ?? 0) > 0 || card.nextCollection) && (
+        <>
+          <p className="brief-card__subhead">Gaps and next look</p>
+          <ul className="brief-card__checks">
+            {card.gaps?.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+            {card.nextCollection && <li className="brief-card__next">Next: {card.nextCollection}</li>}
           </ul>
         </>
       )}

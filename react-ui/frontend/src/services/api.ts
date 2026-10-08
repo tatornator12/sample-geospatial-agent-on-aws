@@ -244,6 +244,20 @@ export async function loadGeometry(s3Url: string): Promise<GeometryData | null> 
 }
 
 /**
+ * The Methane Watch baseline the agent last cached (every EMIT repeat site and the watch-area
+ * outlines), for the globe the stage shows before the first prompt. Null when none is cached yet.
+ */
+export async function loadMethaneBaseline(): Promise<GeometryData | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/methane/baseline`, { headers: getAuthHeaders() });
+    if (!response.ok) return null;
+    return (await response.json()) as GeometryData;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Ask the backend to boot the runtime for a session before the first prompt (fire and forget).
  * Returns true when the backend accepted the request; never throws.
  */
@@ -297,9 +311,13 @@ export interface BriefCardData {
   passesRead: number;
   confidence: 'low' | 'moderate' | 'high';
   singleExplanation: string;
-  hypotheses: Array<{ label: string; assessment: string }>;
+  /** Every hypothesis the brief lists, "possible" first, with what would confirm or rule it out. */
+  hypotheses: Array<{ label: string; assessment: string; nextCheck?: string }>;
   /** The ground-record checks' sentences (VIIRS heat, Overture Maps types), from the tools. */
   checks?: string[];
+  /** What the data cannot show, and the recommended next look. */
+  gaps?: string[];
+  nextCollection?: string;
 }
 
 export interface BriefState {

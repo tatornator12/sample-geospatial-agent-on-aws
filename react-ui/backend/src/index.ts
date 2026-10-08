@@ -781,6 +781,26 @@ function parseJson(text: string | null): unknown {
   }
 }
 
+// The Methane Watch baseline (every EMIT repeat site plus the watch-area outlines), as the agent's
+// watch_baseline tool last cached it. The stage puts it on the globe the moment the Methane Hunter
+// is chosen, before any prompt. 404 until the first warm run has written it.
+const WATCH_SITES_CACHE_KEY = 'methane/cache/watch_sites_v002.geojson';
+app.get('/api/methane/baseline', async (_req: Request, res: Response) => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  if (!bucket) return res.status(503).json({ error: 'S3 bucket not configured' });
+  try {
+    const collection = parseJson(await readS3Text(bucket, WATCH_SITES_CACHE_KEY, 5_000_000)) as { type?: unknown; features?: unknown } | null;
+    if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) {
+      return res.status(404).json({ error: 'No baseline cached yet' });
+    }
+    res.set('Cache-Control', 'private, max-age=300');
+    return res.json(collection);
+  } catch (error) {
+    console.error('Baseline read failed:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'Failed to read the baseline' });
+  }
+});
+
 // The card for a draft: the live session's (sessionId), or a replay case's (caseId, never filed).
 app.get('/api/brief', async (req: Request, res: Response) => {
   const bucket = process.env.S3_BUCKET_NAME;

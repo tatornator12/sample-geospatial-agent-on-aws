@@ -195,6 +195,7 @@ def thermal_line(t: dict) -> str:
 
 
 @tool
+@mt.offload
 async def thermal_anomalies(lat: float, lon: float, nights: int = THERMAL_DEFAULT_NIGHTS,
                             radius_km: float = THERMAL_RADIUS_KM) -> str:
     """Check the ground record for heat: VIIRS active-fire detections (NASA FIRMS) near the site.
@@ -292,6 +293,7 @@ def infra_hint(i: dict) -> str:
 
 
 @tool
+@mt.offload
 async def nearby_infrastructure(lat: float, lon: float, radius_km: float = INFRA_RADIUS_KM) -> str:
     """Check what is mapped around the site, by type only (no names, no operators), from Overture Maps.
 

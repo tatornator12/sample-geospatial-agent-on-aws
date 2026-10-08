@@ -10,6 +10,7 @@ export type IconName =
   | 'send'
   | 'trash'
   | 'chevron-down'
+  | 'chevron-up'
   | 'chevron-right'
   | 'close'
   | 'layers'
@@ -42,6 +43,7 @@ const paths: Record<IconName, ReactElement> = {
     </>
   ),
   'chevron-down': <path d="m4 6.5 4 4 4-4" />,
+  'chevron-up': <path d="m4 10.5 4-4 4 4" />,
   'chevron-right': <path d="m6.5 4 4 4-4 4" />,
   close: <path d="m4 4 8 8M12 4l-8 8" />,
   layers: (

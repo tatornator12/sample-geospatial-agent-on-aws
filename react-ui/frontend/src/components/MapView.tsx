@@ -334,11 +334,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     updateBaseMapLayer(baseMapStyle);
   }, [baseMapStyle]);
 
-  // Everything else dims while methane is on the stage: plasma only reads on dark ground. Runs
-  // after the basemap effect above, so a basemap switch mid-act comes back dimmed too.
+  // Everything else dims while methane is on the stage: plasma only reads on dark ground. The same
+  // for a regional change scan: its grid of squares vanished into the satellite basemap at state
+  // scale, so the ground dims while the scan is the finding. Runs after the basemap effect above,
+  // so a basemap switch mid-act comes back dimmed too.
   const methaneOnStage = useMemo(
-    () => layerGroups.methane.some((l) => rasterVisibility[l.id] !== false),
-    [layerGroups.methane, rasterVisibility]
+    () => layerGroups.methane.some((l) => rasterVisibility[l.id] !== false)
+      || layerGroups.changeDetection.some((l) => rasterVisibility[l.id] !== false)
+      // The regional scan's grid (scan_hotspots_*.geojson, cells with a change_score).
+      || layerGroups.geometries.some((l) => /scan_hotspots|change_score/.test(l.url) && rasterVisibility[l.id] !== false),
+    [layerGroups.methane, layerGroups.changeDetection, layerGroups.geometries, rasterVisibility]
   );
   useEffect(() => {
     methaneOnStageRef.current = methaneOnStage;
@@ -1036,7 +1041,17 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       if (currentMap.isStyleLoaded()) {
         doAdd();
       } else {
-        currentMap.once('styledata', doAdd);
+        // isStyleLoaded() is false while basemap tiles are still streaming in, and no further
+        // `styledata` may ever fire then (the idle globe arrives a second after load). `idle` is
+        // the backstop; whichever comes first adds the geometry once.
+        let added = false;
+        const run = () => {
+          if (added) return;
+          added = true;
+          doAdd();
+        };
+        currentMap.once('styledata', run);
+        currentMap.once('idle', run);
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1412,20 +1427,19 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           const isVisible = rasterVisibility[layerId] !== undefined ? rasterVisibility[layerId] : true;
           setRasterVisibility(prev => ({ ...prev, [layerId]: isVisible }));
 
-          // Find the correct insertion point for layer ordering
-          // Change detection layers go on TOP of all other rasters
-          // Other rasters (TCI, NDVI, etc.) go at the bottom of the COG stack
+          // Stacking: the finding sits on the ground. An index (NDVI, NBR, NDWI, change), a methane
+          // plume or anything the hint marks as an index or a change layer goes on TOP (no beforeId);
+          // true-colour imagery and other scenes go to the bottom of the COG stack, just above the
+          // basemap, so an NDVI displayed after its scene is never hidden under it.
           const mapLayers = mapInstance.getStyle().layers || [];
           const basemapLayerIds = ['dark-base', 'google-roads-base', 'google-satellite-base', 'esri-satellite-base'];
-          const isChangeDetection = urlLower.includes('change_detection') || urlLower.includes('change-detection');
+          const isFinding = isMethaneRaster || indexLegendFor(raster.url) !== null
+            || hint?.group === 'index' || hint?.group === 'change';
 
           let beforeId: string | undefined;
-          if (isChangeDetection || isMethaneRaster) {
-            // Change detection and methane plumes are the finding: on top (no beforeId = top of
-            // stack), so the ground scene that follows slides in beneath the plume.
+          if (isFinding) {
             beforeId = undefined;
           } else {
-            // Other rasters: add above basemaps but below existing COG layers
             const firstNonBasemapRaster = mapLayers.find((l: any) =>
               l.type === 'raster' &&
               !basemapLayerIds.includes(l.id)
@@ -1573,9 +1587,39 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   }, [geometry, rasters, allLayers]);
 
 
-  // One row per layer: visibility toggle, name (click to fly there), remove.
+  // The rasters' order on the map, bottom to top (the style's order), for the reorder arrows. The
+  // tick re-renders the rows after a move, since the map's order is not React state.
+  const [, setOrderTick] = useState(0);
+  const rasterStackOrder = (): string[] => {
+    const styleLayers = map.current?.getStyle()?.layers ?? [];
+    const known = new Set(allLayers.filter((l) => l.type === 'raster').map((l) => l.id));
+    return styleLayers.filter((l) => l.type === 'raster' && known.has(l.id)).map((l) => l.id);
+  };
+  // Move a raster one step up or down the stack. MapLibre's moveLayer(id, beforeId) puts `id`
+  // just beneath `beforeId` (or on top when beforeId is omitted), so "up" means "beneath the one
+  // above the neighbour above", and "down" means "beneath the neighbour below".
+  const nudgeLayer = (layerId: string, direction: 'up' | 'down') => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const order = rasterStackOrder();
+    const i = order.indexOf(layerId);
+    if (i < 0) return;
+    if (direction === 'up') {
+      if (i === order.length - 1) return;
+      mapInstance.moveLayer(layerId, order[i + 2]);
+    } else {
+      if (i === 0) return;
+      mapInstance.moveLayer(layerId, order[i - 1]);
+    }
+    setOrderTick((t) => t + 1);
+  };
+
+  // One row per layer: visibility toggle, name (click to fly there), order arrows (rasters), remove.
   const renderLayerRow = (layer: LayerMetadata, label: string) => {
     const isVisible = rasterVisibility[layer.id] !== false;
+    const order = layer.type === 'raster' ? rasterStackOrder() : [];
+    const at = order.indexOf(layer.id);
+    const canReorder = at >= 0 && order.length > 1;
     return (
       <div key={layer.id} className={`map-row${isVisible ? '' : ' map-row--off'}`}>
         <input
@@ -1596,6 +1640,30 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         >
           {label}
         </button>
+        {canReorder && (
+          <span className="map-row__order" role="group" aria-label={`Order of ${label} on the map`}>
+            <button
+              type="button"
+              className="map-row__nudge"
+              onClick={() => nudgeLayer(layer.id, 'up')}
+              disabled={at === order.length - 1}
+              aria-label={`Move ${label} up, above the layer over it`}
+              title="Move up on the map"
+            >
+              <Icon name="chevron-up" size={14} />
+            </button>
+            <button
+              type="button"
+              className="map-row__nudge"
+              onClick={() => nudgeLayer(layer.id, 'down')}
+              disabled={at === 0}
+              aria-label={`Move ${label} down, beneath the layer under it`}
+              title="Move down on the map"
+            >
+              <Icon name="chevron-down" size={14} />
+            </button>
+          </span>
+        )}
         <button
           type="button"
           className="map-row__remove"

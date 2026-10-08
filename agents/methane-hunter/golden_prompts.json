@@ -109,6 +109,7 @@
     },
     {
       "name": "strongest-followup",
+      "_comment": "A second turn in the same conversation: the record still ends with the full confidence sentence, but the spoken closer says the short caveat once per conversation (the first answer), so this closer must not repeat it.",
       "setup_prompt": "Find the methane plumes EMIT detected over the Permian Basin in 2024 and rank them by how much methane they carry",
       "prompt": "Show me the strongest plume and what is on the ground beneath it",
       "expected_tools": [
@@ -123,14 +124,13 @@
         " leak"
       ],
       "required_text": [
-        "does not identify the source",
-        "EMIT sees the methane, not its source."
+        "does not identify the source"
       ],
       "closer_max_chars": 280,
-      "closer_endswith": "EMIT sees the methane, not its source.",
       "closer_forbidden": [
         "°N",
-        "°W"
+        "°W",
+        "EMIT sees the methane, not its source."
       ]
     },
     {
@@ -405,11 +405,9 @@
         "was filed",
         "analyst filed"
       ],
-      "required_text": [
-        "EMIT sees the methane, not its source."
-      ],
+      "required_text": [],
       "closer_max_chars": 280,
-      "closer_endswith": "EMIT sees the methane, not its source."
+      "_comment": "The UI sends this after a draft, so in practice it is never a first turn: the once-per-conversation closer is not required here, and the answer must still never claim a filing it cannot see."
     }
   ]
 }
