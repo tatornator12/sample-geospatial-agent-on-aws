@@ -42,7 +42,7 @@ import methane_config  # noqa: E402
 from methane_tools import search_methane_plumes, show_plume, triage_plumes  # noqa: E402
 from watch_tools import check_recent_passes, scan_tropomi, site_history, watch_baseline  # noqa: E402
 from brief_tools import brief_status, draft_brief  # noqa: E402
-from ground_tools import nearby_infrastructure, thermal_anomalies  # noqa: E402
+from ground_tools import nearby_infrastructure, registry_lookup, thermal_anomalies  # noqa: E402
 
 app = BedrockAgentCoreApp()
 
@@ -76,6 +76,7 @@ LOCAL_TOOLS = [
     # The ground record: two open-data checks that test the brief's hypotheses.
     thermal_anomalies,
     nearby_infrastructure,
+    registry_lookup,
     draft_brief,
     brief_status,
 ]

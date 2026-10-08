@@ -93,6 +93,7 @@ const STEP_NAMES: Record<string, string> = {
   brief_status: 'Check the brief',
   thermal_anomalies: 'Check for heat',
   nearby_infrastructure: 'Check what is mapped nearby',
+  registry_lookup: 'Check the public registry',
 };
 
 export function stepName(toolName: string): string {

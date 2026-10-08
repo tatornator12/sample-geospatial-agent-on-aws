@@ -79,7 +79,8 @@ function checkLine(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const line = value.trim();
   // eslint-disable-next-line no-control-regex
-  return line.length > 0 && line.length <= 260 && !/[<>`|\u0000-\u001f\u007f]/.test(line) ? line : null;
+  // 320: the registry check's sentence names up to three operators of record (registry.LINE_CAP is 300).
+  return line.length > 0 && line.length <= 320 && !/[<>`|\u0000-\u001f\u007f]/.test(line) ? line : null;
 }
 
 function text(value: unknown, max: number): string | null {
@@ -144,7 +145,7 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     hypotheses,
     checks: (() => {
       const c = (b.checks ?? {}) as Record<string, unknown>;
-      return ['thermal', 'infrastructure']
+      return ['thermal', 'infrastructure', 'registry']
         .map((k) => checkLine((c[k] as { line?: unknown } | undefined)?.line))
         .filter((l): l is string => l !== null);
     })(),

@@ -105,13 +105,21 @@ describe('briefCard', () => {
   });
 
   it('carries the ground checks\' own sentences and drops anything with markup', () => {
+    const registry =
+      'The public registry lists within 2 km: 192 pipelines (0 km), 120 wells (0.2 km); operators of record: ' +
+      'EXAMPLE MIDSTREAM OPERATING LLC (94 facilities), SAMPLE ROCK OPERATING, LLC (78 facilities) and 26 more; ' +
+      '4 with no operator on record; records dated 2020 to 2025.';
     const checks = {
       thermal: { verdict: 'no heat', line: 'VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.' },
       infrastructure: { mapped: 3, line: 'Overture Maps shows within 2 km: 3 storage tanks (0.4 km); <b>Acme</b>' },
+      registry: { listed: 312, line: registry },
     };
     const card = briefCard(draft({}, { checks }), BID, SID)!;
-    assert.deepEqual(card.checks, ['VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.']);
+    assert.ok(registry.length > 260 && registry.length <= 320);              // the registry's longer sentence still fits
+    assert.deepEqual(card.checks, ['VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.', registry]);
     assert.deepEqual(briefCard(draft(), BID, SID)!.checks, []);
+    const tooLong = { registry: { line: 'x'.repeat(321) } };
+    assert.deepEqual(briefCard(draft({}, { checks: tooLong }), BID, SID)!.checks, []);
   });
 
   it('drops hypotheses with an unknown assessment', () => {

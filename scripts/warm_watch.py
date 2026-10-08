@@ -63,6 +63,7 @@ def import_tools():
     import ground_tools
     watch_tools.thermal_anomalies = ground_tools.thermal_anomalies
     watch_tools.nearby_infrastructure = ground_tools.nearby_infrastructure
+    watch_tools.registry_lookup = ground_tools.registry_lookup
     return watch_tools
 
 
@@ -143,12 +144,14 @@ def main() -> int:
             # above, and the VIIRS pull is quick but cached per day too.
             run(f"nearby_infrastructure {where}", w.nearby_infrastructure(h["lat"], h["lon"]))
             run(f"thermal_anomalies {where}", w.thermal_anomalies(h["lat"], h["lon"]))
+            run(f"registry_lookup {where}", w.registry_lookup(h["lat"], h["lon"]))
 
     for label, lat, lon in FIXED_SITES:
         run(f"check_recent_passes {label}", w.check_recent_passes(lat, lon))
         run(f"site_history {label}", w.site_history(lat, lon))
         run(f"nearby_infrastructure {label}", w.nearby_infrastructure(lat, lon))
         run(f"thermal_anomalies {label}", w.thermal_anomalies(lat, lon))
+        run(f"registry_lookup {label}", w.registry_lookup(lat, lon))
 
     print("Done." if not failures else f"Done with {failures} error(s): rerun, or check the token and the sources.")
     return 1 if failures else 0

@@ -40,6 +40,10 @@ AGENTS = {
         "yaml": REPO_ROOT / "agents" / "methane-hunter" / ".bedrock_agentcore.yaml",
         "targets": {"dev": "methane_hunter_dev", "stable": "methane_hunter"},
         "prompts": REPO_ROOT / "agents" / "methane-hunter" / "golden_prompts.json",
+        # The registry check records its fixed sentence per session; operator names are allowed
+        # only inside those exact sentences (see registry_lines).
+        "env": {"dev": REPO_ROOT / "agents" / "methane-hunter" / ".env.dev",
+                "stable": REPO_ROOT / "agents" / "methane-hunter" / ".env"},
     },
 }
 
@@ -125,6 +129,42 @@ def extract_tool_calls(text: str) -> list[dict]:
         else:
             pos = start + 1
     return tools
+
+
+def env_value(path: Path, name: str) -> str | None:
+    """One KEY=value from an env file (no shell expansion), or None."""
+    if not path.exists():
+        return None
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if line.startswith(f"{name}="):
+            return line.split("=", 1)[1].strip().strip('"').strip("'") or None
+    return None
+
+
+def registry_lines(s3, bucket: str, session_id: str) -> list[str]:
+    """The registry check's fixed sentences recorded in this session (registry_<lat>_<lon>.json).
+
+    Operator names may appear ONLY inside these exact sentences, so the forbidden-text checks run
+    on the stream with them removed: a name the agent quotes from the registry passes, the same
+    name in the agent's own words fails."""
+    prefix = f"session_data/{session_id}/methane/registry_"
+    lines: list[str] = []
+    try:
+        listing = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        for obj in listing.get("Contents", [])[:20]:
+            body = json.loads(s3.get_object(Bucket=bucket, Key=obj["Key"])["Body"].read(200_000))
+            if isinstance(body.get("line"), str) and body["line"]:
+                lines.append(body["line"])
+    except Exception as e:  # the gate must not pass on a failed read: no lines means nothing is scrubbed
+        print(f"         (registry lines unavailable: {type(e).__name__})", flush=True)
+    return lines
+
+
+def scrub(text: str, lines: list[str]) -> str:
+    for line in sorted(lines, key=len, reverse=True):
+        text = text.replace(line, " [registry line] ")
+    return text
 
 
 def is_subsequence(expected: list[str], actual: list[str]) -> bool:
@@ -241,8 +281,9 @@ def observations(text: str) -> list[str]:
     return out
 
 
-def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, dict]:
-    """Run one golden prompt; returns (passed, detail, record)."""
+def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str | None = None) -> tuple[bool, str, dict]:
+    """Run one golden prompt; returns (passed, detail, record). With `s3` and `bucket`, forbidden
+    text is checked with the session's registry sentences removed (see registry_lines)."""
     started = time.monotonic()
     try:
         # setup_prompt: a first turn in the same session (not checked), so a follow-up is tested as
@@ -273,9 +314,14 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
     if called:
         problems.append(f"forbidden tools {called} called")
 
+    quoted = registry_lines(s3, bucket, session_id) if (s3 is not None and bucket) else []
+    own_words = scrub(text, quoted)
     for forbidden in case.get("forbidden_text", []):
-        if forbidden in text:
+        if forbidden in own_words:
             problems.append(f"forbidden text {forbidden!r} present")
+    # registry_quoted: the registry's sentence must appear in the answer exactly as the tool wrote it.
+    if case.get("registry_quoted") and not any(line in text for line in quoted):
+        problems.append("no registry line quoted as written" + ("" if quoted else " (none recorded)"))
     # warn_text: wording the prompt forbids but the stage repairs itself (an em dash reads as a
     # comma on the caption band); printed, never a failure.
     warnings = [f"wording {w!r} present" for w in case.get("warn_text", []) if w in text]
@@ -320,6 +366,7 @@ def run_prompt(client, arn: str, case: dict, timeout: int) -> tuple[bool, str, d
         "report_text": (text[spans[-1][1]:] if spans else text).strip()[-2000:],
         "detail": "; ".join(problems),
         "warnings": warnings,
+        "registry_lines": quoted,
     }
     if problems:
         tail = text[-500:].replace("\n", " ")
@@ -367,11 +414,16 @@ def main() -> int:
 
     region = arn.split(":")[3]
     client = boto3.client("bedrock-agentcore", region_name=region)
+    env_file = AGENTS[args.agent].get("env", {}).get(args.target)
+    bucket = env_value(env_file, "S3_BUCKET_NAME") if env_file else None
+    s3 = boto3.client("s3", region_name=region) if bucket else None
+    if env_file:
+        print(f"Registry lines read from: {bucket or '(no S3_BUCKET_NAME; names are never scrubbed)'}")
 
     failures = 0
     records = []
     for case in cases:
-        ok, detail, record = run_prompt(client, arn, case, args.timeout)
+        ok, detail, record = run_prompt(client, arn, case, args.timeout, s3, bucket)
         records.append(record)
         status = "PASS" if ok else "FAIL"
         print(f"  [{status}] {case['name']}: {detail}", flush=True)

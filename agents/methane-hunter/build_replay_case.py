@@ -57,6 +57,7 @@ RESULTS = {
     "site_history": "Site history read",
     "thermal_anomalies": "VIIRS heat checked",
     "nearby_infrastructure": "Overture Maps checked, by type",
+    "registry_lookup": "Public registry checked",
     "draft_brief": "Brief drafted (not filed)",
 }
 
@@ -216,13 +217,13 @@ def main() -> int:
 
     # The ground-record checks' records (draft_brief embedded them already; kept for completeness).
     for t in tools:
-        if t["name"] not in ("thermal_anomalies", "nearby_infrastructure"):
+        if t["name"] not in ("thermal_anomalies", "nearby_infrastructure", "registry_lookup"):
             continue
         params = tool_input(t)
         lat, lon = coord(params.get("lat")), coord(params.get("lon"))
         if lat is None or lon is None:
             continue
-        kind = "thermal" if t["name"] == "thermal_anomalies" else "infra"
+        kind = {"thermal_anomalies": "thermal", "nearby_infrastructure": "infra", "registry_lookup": "registry"}[t["name"]]
         name = f"{kind}_{lat}_{lon}.json"
         if name not in local_for.values() and fetch(bucket, f"{session_prefix}methane/{name}", name):
             local_for[f"{session_prefix}methane/{name}"] = name

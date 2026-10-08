@@ -57,7 +57,9 @@ FORBIDDEN_PATTERNS: tuple[tuple[str, str], ...] = (
      "states an explanation as fact"),
     (r"\b(operated|owned|run|controlled) by\b", "names an owner or operator"),
     (r"\bbelongs? to\b", "names an owner or operator"),
-    (r"\b(Inc|LLC|Ltd|PLC|Corp|Corporation|PJSC|OJSC|JSC|GmbH|S\.A\.)\b\.?", "names a company"),
+    # A company's name may appear only as the registry check's own words ("operators of record: …"),
+    # which the tool writes; the model's free text must not bring one in as cause or owner.
+    (r"\b(Inc|LLC|Ltd|PLC|Corp|Corporation|PJSC|OJSC|JSC|GmbH|S\.A\.)\b\.?", "names a company outside the registry's words"),
     (r"\bstate[- ]owned\b|\bministry\b|\bregime\b|\bgovernment\b", "names a government"),
     (r"\b(sabotage|attack|deliberate(ly)?|intentional(ly)?|covert|military|weapon)\b", "asserts intent"),
 )
@@ -65,9 +67,18 @@ _COMPILED = tuple((re.compile(p, re.IGNORECASE), why) for p, why in FORBIDDEN_PA
 _CONTROL = re.compile(r"[\x00-\x1f\x7f<>`|]")
 
 
+_REGISTRY_WORDS = re.compile(r"\boperators? of record\b", re.IGNORECASE)
+
+
 def check_text(text: str) -> list[str]:
-    """Why a piece of brief text is not allowed (empty list: allowed)."""
-    return [f"'{m.group(0)}' {why}" for rx, why in _COMPILED for m in [rx.search(text)] if m]
+    """Why a piece of brief text is not allowed (empty list: allowed). A company's name is allowed in
+    one place only: text that quotes the registry ("operators of record: …", the tool's own words)."""
+    problems = []
+    for rx, why in _COMPILED:
+        m = rx.search(text)
+        if m and not (why.startswith("names a company") and _REGISTRY_WORDS.search(text)):
+            problems.append(f"'{m.group(0)}' {why}")
+    return problems
 
 
 def _clean(value: Any, name: str, limit: int = TEXT_MAX, required: bool = True) -> str:
@@ -145,7 +156,7 @@ def validate_brief(title, place, lat, lon, watch_area, observations, looks, cand
 
 
 CHECK_RADIUS_KM = 2.0
-_CHECK_KEY = re.compile(r"^(thermal|infra)_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
+_CHECK_KEY = re.compile(r"^(thermal|infra|registry)_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
 
 
 def find_checks(lat: float, lon: float) -> dict:
@@ -158,7 +169,7 @@ def find_checks(lat: float, lon: float) -> dict:
     prefix = mt.session_prefix()
     found: dict[str, tuple[float, dict]] = {}
     try:
-        for kind in ("thermal", "infra"):
+        for kind in ("thermal", "infra", "registry"):
             listing = s3.list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=f"{prefix}{kind}_")
             for obj in listing.get("Contents", []):
                 m = _CHECK_KEY.fullmatch(obj["Key"].rsplit("/", 1)[-1])
@@ -181,13 +192,20 @@ def find_checks(lat: float, lon: float) -> dict:
         out["infrastructure"] = {"radius_km": i.get("radius_km"), "mapped": i.get("mapped"), "groups": i.get("groups"),
                                  "types": [{k: r.get(k) for k in ("type", "count", "nearest_km")} for r in (i.get("types") or [])[:6]],
                                  "line": i.get("line")}
+    if "registry" in found:
+        g = found["registry"][1]
+        out["registry"] = {"radius_km": g.get("radius_km"), "listed": g.get("listed"), "operators_named": g.get("operators_named"),
+                           "facilities": [{k: r.get(k) for k in ("kind", "count", "nearest_km")} for r in (g.get("facilities") or [])[:6]],
+                           "operators": [{k: r.get(k) for k in ("operator", "facilities", "nearest_km")} for r in (g.get("operators") or [])[:3]],
+                           "source_dates": g.get("source_dates"), "source": g.get("source"), "line": g.get("line")}
     return out
 
 
 def render_markdown(brief: dict, brief_id: str) -> str:
     area = f", watch area {brief['watch_area']}" if brief["watch_area"] else ""
     checks = brief.get("checks") or {}
-    check_lines = [f"- Check: {c['line']}" for c in (checks.get("thermal"), checks.get("infrastructure")) if c and c.get("line")]
+    check_lines = [f"- Check: {c['line']}" for c in (checks.get("thermal"), checks.get("infrastructure"), checks.get("registry"))
+                   if c and c.get("line")]
     lines = [
         f"**Methane Watch brief: {brief['title']}** (draft `{brief_id}`, not filed)",
         "",

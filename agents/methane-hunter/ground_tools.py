@@ -346,3 +346,54 @@ async def nearby_infrastructure(lat: float, lon: float, radius_km: float = INFRA
     logger.info("INFRA: %.3f,%.3f %d mapped (%s, %.1fs)", lat, lon, i["mapped"], source, i["seconds"])
     return json.dumps({**i, "hypothesis_hint": infra_hint(i),
                        "next_steps": "Use `line` in the brief; say what kinds of things are mapped, never who owns them."})
+
+
+# --- the public registry ------------------------------------------------------------------------------
+
+REGISTRY_RADIUS_KM = 2.0
+REGISTRY_MAX_RADIUS_KM = 5.0
+
+
+@tool
+@mt.offload
+async def registry_lookup(lat: float, lon: float, radius_km: float = REGISTRY_RADIUS_KM) -> str:
+    """Check the public registry: what oil and gas infrastructure is on record near the site, and the
+    operators of record (OGIM v3.0: EDF and MethaneSAT's compilation of public records, CC BY 4.0).
+
+    Wells, compressor stations, processing plants, terminals, refineries, LNG, platforms, tank
+    batteries and pipelines within the radius, counted by kind with the nearest distance, and the
+    operators the public record names for them (by number of facilities), with the records' dates.
+    This is what a registry LISTS, as of its source dates: it is never who caused a plume. Quote
+    `line` as written; never say "behind", "responsible", "caused by" or "owned by".
+
+    Args:
+        lat, lon: The site in degrees.
+        radius_km: Search radius (default 2 km, max 5).
+
+    Returns: JSON with listed (total), facilities[] (kind, count, nearest_km, statuses), operators[]
+    (operator, facilities, nearest_km, kinds), nearest, source_dates, line (one sentence for the
+    brief), hypothesis_hint.
+    """
+    started = time.time()
+    try:
+        lat, lon = parse_point(lat, lon)
+        radius_km = _finite(radius_km, "radius_km", 0.5, REGISTRY_MAX_RADIUS_KM)
+    except MethaneError as e:
+        return json.dumps({"error": str(e)})
+    import registry as rg
+    box = box_around(lat, lon, radius_km)
+    try:
+        s3 = mt._s3()
+        paths = [p for p in (rg.cell_file(c, s3) for c in rg.cells_for(box)) if p is not None]
+        rows = rg.query_cells(paths, box)
+    except Exception as e:
+        logger.warning("registry read failed: %s", type(e).__name__)
+        return json.dumps({"error": "The public registry could not be read; the registry check is unavailable."})
+    r = rg.summarise(rows, lat, lon, radius_km)
+    r["line"] = rg.registry_line(r)
+    _record("registry", lat, lon, r)
+    r.update(cells_read=len(paths), seconds=round(time.time() - started, 1))
+    logger.info("REGISTRY: %.3f,%.3f %d listed, %d operators (%d cells, %.1fs)", lat, lon, r["listed"],
+                r["operators_named"], len(paths), r["seconds"])
+    return json.dumps({**r, "hypothesis_hint": rg.registry_hint(r),
+                       "next_steps": "Use `line` in the brief verbatim; it is the only place an operator is ever named."})

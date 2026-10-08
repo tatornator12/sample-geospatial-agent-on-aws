@@ -118,7 +118,7 @@ export const WORKFLOW_VARIABLES = [
 /**
  * The flat payload for a Workflow Builder trigger. The workflow inserts each value as text, so the
  * values that are lists arrive already laid out, one item per line with a bullet: `hypotheses`
- * (label, assessment, then what would confirm it) and `ground_record` (the two checks, the gaps,
+ * (label, assessment, then what would confirm it) and `ground_record` (the ground checks, the gaps,
  * the next look). The twelve keys are fixed: the workflow the user built declares exactly these.
  */
 export function workflowPayload(filed: FiledBrief): Record<(typeof WORKFLOW_VARIABLES)[number], string> {

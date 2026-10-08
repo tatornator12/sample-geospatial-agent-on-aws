@@ -12,8 +12,10 @@ Sentinel-2. Spec: `.kiro/specs/methane-hunter/`. Data spike: `docs/spikes/emit.m
 | `methane_config.py` | Prompt and settings; re-exports the platform `config` (never name an agent file `config.py`) |
 | `methane_tools.py` | `search_methane_plumes` (CMR), `triage_plumes` (LP DAAC + stats + ranking), `show_plume` |
 | `watch_tools.py` | Methane Watch: `watch_baseline`, `scan_tropomi` (tip), `check_recent_passes` (cue), `site_history` |
-| `ground_tools.py` | The ground record: `thermal_anomalies` (VIIRS via FIRMS), `nearby_infrastructure` (Overture Maps, types only) |
+| `ground_tools.py` | The ground record: `thermal_anomalies` (VIIRS via FIRMS), `nearby_infrastructure` (Overture Maps, types only), `registry_lookup` (OGIM public registry, operators of record) |
 | `overture.py` | Overture Maps on AWS Open Data through DuckDB: the category vocabulary, the file index, area extracts, the live query |
+| `registry.py` | The OGIM registry cells: cell keys, the disk cache, the DuckDB box query, chord distance, the fixed sentence |
+| `../../scripts/build_registry.py` | Turns the OGIM GeoPackage into per-cell Parquet under `methane/registry/<version>/` |
 | `brief_tools.py` | `draft_brief` (a draft, never filed; embeds the checks) and `brief_status` (the only source for "filed") |
 | `build_replay_case.py` | Records a live run into `use-cases/<id>/` (`--case permian` or `--case watch`) |
 | `../../scripts/warm_plumes.py` | Builds the whole-record plume index (`methane/cache/plume_index_v001.json`: every plume with NASA's max concentration and emission rate) so `search_methane_plumes(region="global")` answers "the strongest plume EMIT has ever seen"; `--top 50` caches those rasters |
@@ -57,11 +59,54 @@ Run it the day before a show (it warms both checks for every watch hotspot). `re
 holds the agent-only pins (`duckdb`); `stage_shared.sh` appends them to the platform requirements and
 bakes DuckDB's `httpfs` extension into the image so the first read never downloads it.
 
+## The public registry check (operators of record)
+
+`registry_lookup` answers "which company?" from open data, as a listing and never as a cause. It
+reads OGIM v3.0, the Oil and Gas Infrastructure Mapping database (Environmental Defense Fund and
+MethaneSAT LLC, a compilation of public records from governments, industry and others; 4.5 million
+wells, 1.9 million pipeline features and the plants, stations, terminals, platforms and tank
+batteries around them, in 193 countries). Licence CC BY 4.0, Zenodo DOI
+[10.5281/zenodo.7466757](https://doi.org/10.5281/zenodo.7466757). The attribution travels with every
+answer: the check's sentence says "the public registry", the record keeps the source and its dates.
+
+What it says: the facilities on record within 2 km by kind (nearest distance), the operators of
+record by facility count (up to three, then "and N more"), how many have no operator on record, and
+the years the source records are dated. Example from the Permian:
+
+> The public registry lists within 2 km: 192 pipelines (0 km), 120 wells (0.2 km); operators of
+> record: … (94 facilities), … (78 facilities) and 26 more; 4 with no operator on record; records
+> dated 2020 to 2025.
+
+What it does not say: who emitted, who owns a site today, or anything the registry does not list (a
+gap is not an empty site). Coverage is uneven, measured on the built cells: the United States has
+4.1 million facilities, 86% with an operator of record; Algeria 149 (19%), Iran 196 (7%),
+Turkmenistan 82 (1%), China 14,578 (1%). Outside North America expect "no operator on record" or
+nothing listed, and say so. An operator name
+appears in ONE place only, this tool's sentence, quoted as written; the prompt forbids "behind",
+"responsible", "caused by", "owned by" and "operated by", `draft_brief` rejects a company suffix in
+the model's own fields, and `scripts/eval.py` checks the operator tripwires on the stream with the
+session's recorded registry sentences removed, so the same name in the agent's own words fails.
+
+Build (once per OGIM release; about two minutes and 180 MB of output):
+
+```bash
+curl -L -o /tmp/ogim/OGIM_v3.0.gpkg https://zenodo.org/api/records/22835235/files/OGIM_v3.0.gpkg/content
+md5 -q /tmp/ogim/OGIM_v3.0.gpkg           # 99d94e96eefe4d7f561d1a2dbcc1a313 (3.4 GB)
+AWS_PROFILE=main ../../.venv/bin/python ../../scripts/build_registry.py /tmp/ogim/OGIM_v3.0.gpkg --upload
+```
+
+It writes one Parquet file per 5° × 5° cell to `methane/registry/ogim_v3.0/` (644 cells, the
+largest 28 MB, Alberta) with kind, type, status, operator of record, country, state, source date and
+a box per row; facility names are not carried. Pipelines are simplified to 20 m and cut into
+straight chords of at most 2 km, so the distance is to the pipe, not to a bounding box that can
+span a state. The build needs `pyogrio`, `shapely` and `pyarrow` locally; the runtime needs only
+`duckdb`: it copies the one to four cells a 2 km box touches to `/tmp` (kept a day) and queries them.
+
 ## Slack on a filed brief (optional)
 
 The UI backend posts one message to Slack when the analyst clicks "Approve and file"
-(`react-ui/backend/src/slack.ts`): the card's title and place, the counts, the confidence, the two
-ground-record sentences, who filed it and the brief id. The agent never triggers it and never sees
+(`react-ui/backend/src/slack.ts`): the card's title and place, the counts, the confidence, the
+ground-record sentences (heat, mapped infrastructure, public registry), who filed it and the brief id. The agent never triggers it and never sees
 it; a Slack failure never unfiles anything. Two webhook shapes work, and the backend tells them
 apart by the URL:
 

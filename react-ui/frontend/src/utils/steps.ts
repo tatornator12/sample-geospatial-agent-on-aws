@@ -192,6 +192,10 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
     const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 5);
     return { text: `Overture Maps, by type, within ${typeof r === 'number' ? r : 2} km` };
   }
+  if (group.name === 'registry_lookup') {
+    const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 5);
+    return { text: `OGIM public registry, operators of record, within ${typeof r === 'number' ? r : 2} km` };
+  }
   return null;
 }
 
@@ -203,6 +207,7 @@ const STAGE_OF: Record<string, number> = {
   site_history: 2,
   thermal_anomalies: 3,
   nearby_infrastructure: 3,
+  registry_lookup: 3,
   draft_brief: 4,
   brief_status: 4,
 };
