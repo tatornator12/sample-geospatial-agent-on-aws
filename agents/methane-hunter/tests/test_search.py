@@ -87,6 +87,46 @@ def test_default_window_ends_at_the_archive_latest_not_today(tools, monkeypatch,
     assert "most recent plume is 2025-09-22" in s["window"]
 
 
+def _indexed(gid, day, lon, lat, max_nasa, rate=None):
+    return {"type": "Feature",
+            "properties": {"granule_id": gid, "acquired": f"{day}T10:00:00Z", "center_lat": lat, "center_lon": lon,
+                           "tier": "detected", "max_ppm_m_nasa": max_nasa, "rate_kg_h": rate},
+            "geometry": {"type": "Polygon", "coordinates": [[[lon, lat], [lon + 0.01, lat], [lon + 0.01, lat + 0.01], [lon, lat]]]}}
+
+
+def test_global_search_ranks_the_whole_record_from_the_index_strongest_first(tools, monkeypatch, fake_s3, cmr_page):
+    fake = _install(tools, monkeypatch, FakeCMR(cmr_page))
+    # No index yet: a clear error, never a silent fallback to one basin.
+    out = json.loads(_run(tools.search_methane_plumes("global")))
+    assert "error" in out and "warm_plumes" in out["error"]
+
+    index = {"type": "FeatureCollection", "features": [
+        _indexed("EMIT_L2B_CH4PLM_002_20230101T000000_000001", "2023-01-01", 61.0, 37.5, 4200.0, 1500.0),
+        _indexed("EMIT_L2B_CH4PLM_002_20240501T000000_000002", "2024-05-01", -102.0, 32.0, 9144.0, 3300.0),
+        _indexed("EMIT_L2B_CH4PLM_002_20220910T000000_000003", "2022-09-10", 53.0, 39.5, None),          # NASA gave no number
+        _indexed("EMIT_L2B_CH4PLM_002_20250801T000000_000004", "2025-08-01", 112.0, 37.0, 6388.9, 2100.0),
+        {"type": "Feature", "properties": {"acquired": "2024-01-01T00:00:00Z"}, "geometry": None},   # malformed: skipped
+    ]}
+    fake_s3.put_object(Bucket=BUCKET, Key=tools.PLUME_INDEX_KEY, Body=json.dumps(index).encode())
+
+    out = json.loads(_run(tools.search_methane_plumes("anywhere", max_results=3)))
+    assert "error" not in out, out
+    s = out["summary"]
+    assert s["region"] == "the whole EMIT record" and (s["start"], s["end"]) == ("2022-08-01", "2025-09-22")
+    assert s["window"].startswith("the whole EMIT record (") and s["ranked_by"].startswith("NASA's published max concentration")
+    assert s["count"] == 3 and s["cmr_hits"] == 4 and s["skipped"] == {"malformed": 1}
+    assert [p["granule_id"][-6:] for p in out["plumes"]] == ["000002", "000004", "000001"]     # strongest first; no-number last
+    assert out["plumes"][0]["max_ppm_m_nasa"] == 9144.0 and out["plumes"][0]["rate_kg_h"] == 3300.0
+    assert "3 strongest" in out["note"] and "whole EMIT record" in out["next_steps"]
+    assert not [c for c in fake.calls if "bounding_box" in c], "the index answers; CMR is only asked for the archive date"
+    fc = json.loads(fake_s3.objects[out["plumes_geometry_s3_url"].split(f"{BUCKET}/", 1)[1]])
+    assert len(fc["features"]) == 3 and fc["features"][0]["properties"]["max_ppm_m_nasa"] == 9144.0
+
+    # A named window applies to the record too.
+    out = json.loads(_run(tools.search_methane_plumes("global", start_date="2025-01-01", end_date="2025-12-31")))
+    assert [p["granule_id"][-6:] for p in out["plumes"]] == ["000004"]
+
+
 def test_window_rules():
     import methane_tools as t
     today = date(2026, 9, 24)

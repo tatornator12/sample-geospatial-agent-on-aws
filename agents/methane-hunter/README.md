@@ -16,6 +16,7 @@ Sentinel-2. Spec: `.kiro/specs/methane-hunter/`. Data spike: `docs/spikes/emit.m
 | `overture.py` | Overture Maps on AWS Open Data through DuckDB: the category vocabulary, the file index, area extracts, the live query |
 | `brief_tools.py` | `draft_brief` (a draft, never filed; embeds the checks) and `brief_status` (the only source for "filed") |
 | `build_replay_case.py` | Records a live run into `use-cases/<id>/` (`--case permian` or `--case watch`) |
+| `../../scripts/warm_plumes.py` | Builds the whole-record plume index (`methane/cache/plume_index_v001.json`: every plume with NASA's max concentration and emission rate) so `search_methane_plumes(region="global")` answers "the strongest plume EMIT has ever seen"; `--top 50` caches those rasters |
 | `_paths.py` | Puts the shared platform code first on `sys.path`: `_geo_agent/` in the image, `../../geo_agent` in the repo |
 | `stage_shared.sh` | Copies the allowlisted platform code into `_geo_agent/`, copies `requirements.txt`, generates `Dockerfile` (all gitignored) |
 | `deploy.sh` | `DEPLOY_TARGET=dev|stable` deploy via `geo_agent/deploy_lib.sh` (`methane_hunter_dev` / `methane_hunter`) |

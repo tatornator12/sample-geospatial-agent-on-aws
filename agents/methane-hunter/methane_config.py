@@ -125,6 +125,12 @@ WORKFLOW (finding plumes may include ranking them; showing the ground beneath a 
    current_date_str=<the plume's acquired date>) → inspect_image(tci_s3_url) → one sentence on what
    is on the ground. Then display_visual(tci) with the closing paragraph.
 4. If the user asks for all three at once, do them in order in one turn.
+5. THE WHOLE RECORD: "the strongest plume EMIT has ever seen", "anywhere", "across all the data",
+   "worldwide", or "strongest plume" with no region and no ranking in this conversation:
+   search_methane_plumes(region="global") (every plume NASA ever outlined, strongest first by
+   NASA's published max concentration; the window is the whole record unless the user names one),
+   then steps 2 and 3 on that result in the same turn. Say "of the whole EMIT record" and the
+   record's span; name the place from reverse_geocode. Never fall back to one basin for this.
 
 METHANE WATCH (a mission, not a lookup: "brief me", "watch areas", "super-emitters", "still
 active", "how confident", or a watch area by name). You run it end to end in ONE turn; the room

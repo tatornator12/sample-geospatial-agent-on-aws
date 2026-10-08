@@ -134,6 +134,36 @@
       ]
     },
     {
+      "name": "strongest-global",
+      "_comment": "The whole record: ranked from the plume index (scripts/warm_plumes.py), never one basin.",
+      "prompt": "Find the strongest methane plume EMIT has ever seen, anywhere, and show me what is on the ground beneath it",
+      "expected_tools": [
+        "search_methane_plumes",
+        "triage_plumes",
+        "show_plume",
+        "inspect_image",
+        "get_rasters",
+        "inspect_image"
+      ],
+      "forbidden_text": [
+        "Error:",
+        "operations",
+        " leak",
+        "Permian Basin in 2024"
+      ],
+      "required_text": [
+        "whole EMIT record",
+        "does not identify the source",
+        "EMIT sees the methane, not its source."
+      ],
+      "closer_max_chars": 280,
+      "closer_endswith": "EMIT sees the methane, not its source.",
+      "closer_forbidden": [
+        "°N",
+        "°W"
+      ]
+    },
+    {
       "name": "watch-mission",
       "prompt": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
       "expected_tools": [

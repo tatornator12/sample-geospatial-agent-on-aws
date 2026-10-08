@@ -48,7 +48,7 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
         prompt: 'Find the methane plumes EMIT detected in 2024 and rank them by how much methane they carry over ',
         fill: true,
       },
-      { label: 'Strongest plume and the ground', prompt: 'Show me the strongest plume and what is on the ground beneath it' },
+      { label: 'Strongest plume ever, and the ground', prompt: 'Find the strongest methane plume EMIT has ever seen, anywhere, and show me what is on the ground beneath it' },
     ],
     placeholder: 'Name a region and a year',
     idle: 'Name a region and a year. The agent finds the methane plumes NASA EMIT saw, ranks them, and looks at the ground beneath the strongest.',

@@ -77,6 +77,16 @@ BASINS: dict[str, tuple[float, float, float, float]] = {
     "turkmenistan": (52.0, 36.5, 66.8, 42.8),
 }
 
+# The whole record at once. "Strongest plume EMIT has ever seen" cannot be answered from CMR alone
+# (footprints carry no strength), so scripts/warm_plumes.py builds an index of every plume with
+# NASA's published numbers (max concentration, emission rate) once; a global search ranks from it.
+GLOBAL_REGIONS = {"global", "world", "worldwide", "everywhere", "anywhere", "all", "the whole record",
+                  "whole record", "emit record", "all data"}
+GLOBAL_LABEL = "the whole EMIT record"
+WORLD_BBOX = (-180.0, -90.0, 180.0, 90.0)
+PLUME_INDEX_KEY = "methane/cache/plume_index_v001.json"
+PLUME_INDEX_CAP_BYTES = 20_000_000
+
 RENDER_RASTER = {
     "kind": "raster", "colormap": "plasma", "rescale": [0, 1500],
     "units": "ppm·m", "group": "methane", "legend": "CH4 enhancement",
@@ -246,6 +256,8 @@ def resolve_extent(region: Any, bbox: Any, geometry_s3_url: Any) -> tuple[tuple[
         gdf = download_geometry_from_s3(geometry_s3_url).to_crs("EPSG:4326")
         return parse_bbox([float(v) for v in gdf.total_bounds]), label
     key = (region or "").lower().strip() if isinstance(region, str) else ""
+    if key in GLOBAL_REGIONS:
+        return WORLD_BBOX, GLOBAL_LABEL
     if key in BASINS:
         return BASINS[key], label
     # The Methane Watch areas are regions too (watch_tools imports this module, hence lazily).
@@ -392,6 +404,37 @@ def search_cmr(client: httpx.Client, bbox, start_d: date, end_d: date, max_resul
             break
         page += 1
     return features, hits, skipped
+
+
+def load_plume_index(s3=None) -> dict | None:
+    """The whole-record index scripts/warm_plumes.py built (a FeatureCollection: every plume's
+    footprint with NASA's published numbers), or None when it has not been built."""
+    s3 = s3 or _s3()
+    try:
+        obj = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=PLUME_INDEX_KEY)
+    except s3.exceptions.NoSuchKey:
+        return None
+    if int(obj.get("ContentLength", 0)) > PLUME_INDEX_CAP_BYTES:
+        raise MethaneError("the plume index is unexpectedly large")
+    data = json.loads(obj["Body"].read(PLUME_INDEX_CAP_BYTES + 1))
+    return data if isinstance(data, dict) and isinstance(data.get("features"), list) else None
+
+
+def search_index(index: dict, start_d: date, end_d: date, max_results: int) -> tuple[list[dict], int, dict]:
+    """The strongest plumes of the whole record in the window, by NASA's published max
+    concentration (plumes NASA gave no number sort last): the same shape search_cmr returns."""
+    in_window, skipped = [], {}
+    for f in index["features"]:
+        props = f.get("properties") or {}
+        day = str(props.get("acquired") or "")[:10]
+        if not (start_d.isoformat() <= day <= end_d.isoformat()):
+            continue
+        if not isinstance(props.get("granule_id"), str) or not isinstance(f.get("geometry"), dict):
+            skipped["malformed"] = skipped.get("malformed", 0) + 1
+            continue
+        in_window.append(f)
+    in_window.sort(key=lambda f: (-(f["properties"].get("max_ppm_m_nasa") or -1.0), f["properties"]["granule_id"]))
+    return in_window[:max_results], len(in_window), skipped
 
 
 # --- plume download and stats ---------------------------------------------------------------
@@ -569,8 +612,11 @@ async def search_methane_plumes(region: str, start_date: str = None, end_date: s
         region: Region name, e.g. "Permian Basin". Known by name: Permian Basin, San Joaquin
             Valley, Four Corners, Marcellus, Turkmenistan, and the watch areas (south caspian,
             amu darya basin, zagros foreland, shanxi coal basin, orenburg and lower volga, west
-            siberia and yamal, hassi messaoud, amman). For any other place, geocode it with find_location_boundary and pass
-            geometry_s3_url (or pass bbox).
+            siberia and yamal, hassi messaoud, amman). "global" is the whole EMIT record: every
+            plume NASA ever outlined, STRONGEST first by NASA's published max concentration (the
+            default window is then the whole record), for "the strongest plume EMIT has ever seen".
+            For any other place, geocode it with find_location_boundary and pass geometry_s3_url
+            (or pass bbox).
         start_date: Optional YYYY-MM-DD. Default: 12 months before end_date.
         end_date: Optional YYYY-MM-DD. Default: the date of EMIT's most recent plume.
         bbox: Optional [west, south, east, north] in degrees; overrides the region's extent.
@@ -582,13 +628,28 @@ async def search_methane_plumes(region: str, start_date: str = None, end_date: s
     to display_visual unchanged), next_steps.
     """
     started = time.time()
+    ranked_by = None
     try:
         max_results = _int(max_results, "max_results", 1, MAX_RESULTS_CAP)
         extent, label = resolve_extent(region, bbox, geometry_s3_url)
         with httpx.Client(timeout=CMR_TIMEOUT_S) as client:
             latest = archive_latest(client)
-            start_d, end_d, window_note = resolve_window(start_date, end_date, latest)
-            features, hits, skipped = search_cmr(client, extent, start_d, end_d, max_results)
+            if label == GLOBAL_LABEL:
+                # The whole record: the default window is all of it, and the plumes come from the
+                # index, strongest first by NASA's published max concentration (CMR could only say
+                # "newest first", which is not what "the strongest EMIT has seen" asks).
+                index = load_plume_index()
+                if index is None:
+                    raise MethaneError("The whole-record plume index has not been built yet "
+                                       "(scripts/warm_plumes.py builds it once); name a region instead.")
+                start_d, end_d, window_note = resolve_window(start_date or MISSION_START.isoformat(), end_date, latest)
+                if start_date is None and end_date is None:
+                    window_note = f"the whole EMIT record ({start_d.isoformat()} to {end_d.isoformat()})"
+                features, hits, skipped = search_index(index, start_d, end_d, max_results)
+                ranked_by = "NASA's published max concentration (ppm·m), strongest first"
+            else:
+                start_d, end_d, window_note = resolve_window(start_date, end_date, latest)
+                features, hits, skipped = search_cmr(client, extent, start_d, end_d, max_results)
     except MethaneError as e:
         return json.dumps({"error": str(e)})
     except httpx.HTTPError as e:
@@ -614,11 +675,20 @@ async def search_methane_plumes(region: str, start_date: str = None, end_date: s
                        "count and window. Call triage_plumes ONLY if the user asked to rank, triage or find the "
                        "strongest; otherwise stop and offer it."),
     }
+    if ranked_by:
+        summary["ranked_by"] = ranked_by
+        for p, f in zip(out["plumes"], features):
+            props = f["properties"]
+            p.update(max_ppm_m_nasa=props.get("max_ppm_m_nasa"), rate_kg_h=props.get("rate_kg_h"))
+        out["next_steps"] = ("display_visual(plumes_geometry_s3_url, title, description, render=render): these are the "
+                             f"{n} strongest of {hits} plumes in the record by NASA's number. Then triage_plumes to measure "
+                             "them yourself and rank; say 'of the whole EMIT record'.")
     if n == 0:
         out["say"] = (f"EMIT recorded no methane plume complexes over {label} between "
                       f"{start_d.isoformat()} and {end_d.isoformat()}.")
     if hits > n:
-        out["note"] = f"{hits} plumes match; the {n} most recent are listed (max_results={max_results})."
+        out["note"] = (f"{hits} plumes match; the {n} strongest are listed (max_results={max_results})." if ranked_by
+                       else f"{hits} plumes match; the {n} most recent are listed (max_results={max_results}).")
     logger.info("SEARCH: %s %s..%s → %d plumes (%d hits) in %.1fs", label, start_d, end_d, n, hits, summary["seconds"])
     return json.dumps(out)
 

@@ -5,7 +5,7 @@ describe('stageCopyFor', () => {
   it('gives the Methane Hunter its mission, its two fallback beats and its own console copy', () => {
     const copy = stageCopyFor('methane');
     expect(copy.prompts.map((p) => p.label)).toEqual([
-      'Methane Watch brief', 'Find and rank plumes over…', 'Strongest plume and the ground',
+      'Methane Watch brief', 'Find and rank plumes over…', 'Strongest plume ever, and the ground',
     ]);
     // The rank plate is finished by the presenter (any region), so it fills the console instead of sending.
     expect(copy.prompts[1].fill).toBe(true);
