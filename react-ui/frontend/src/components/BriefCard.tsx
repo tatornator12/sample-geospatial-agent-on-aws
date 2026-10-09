@@ -1,11 +1,12 @@
 /**
  * The brief card: the mission's end frame and the human decision (requirement 12).
  *
- * The agent drafts; the analyst decides. The card shows what the draft says in the words the
- * room needs (the count, how confident, the leading unconfirmed hypotheses) and two choices:
- * "Approve and file", which the BACKEND executes (it reads the draft from S3 and writes the filed
- * record; the agent is told only afterwards and checks with brief_status), and "Request another
- * look", which asks the agent to read more passes. In a replay case the card is inert: a
+ * The agent drafts; the analyst decides. The card leads with what the room should restate (where,
+ * how many passes, does methane recur, is the cause known) and the decision, then the ground
+ * record; the hypotheses' "what would confirm it" and the gaps open on request so the decision is
+ * never below the fold. "Approve and file" is executed by the BACKEND (it reads the draft from S3
+ * and writes the filed record; the agent is told only afterwards and checks with brief_status);
+ * "Request another look" asks the agent to read more passes. In a replay case the card is inert: a
  * recorded decision would be theatre.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import { anotherLookMessage, approvedMessage } from '../utils/brief.ts';
 
 const RETRY_MS = 2000;
 const GIVE_UP_MS = 30_000;
+const SHOW_WAITING_MS = 1500;
 
 interface BriefCardProps {
   briefId: string;
@@ -33,10 +35,31 @@ const CONFIDENCE_WORDS: Record<string, string> = {
   low: 'Low',
 };
 
+/** The single-explanation line as the room reads it: the claim is the same, the words are plainer. */
+function causeWords(singleExplanation: string): string {
+  return singleExplanation === 'low without a ground or aircraft check'
+    ? 'unconfirmed until a ground or aircraft check'
+    : singleExplanation;
+}
+
+function WorkingDots() {
+  return (
+    <span className="docent-working" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
 export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: BriefCardProps) {
   const [state, setState] = useState<BriefState | null>(null);
+  const [load, setLoad] = useState<'loading' | 'waiting' | 'failed' | 'loaded'>('loading');
+  const [attempt, setAttempt] = useState(0);
   const [filing, setFiling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showChecks, setShowChecks] = useState(false);
+  const [showGaps, setShowGaps] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -44,28 +67,65 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
     let timer: ReturnType<typeof setTimeout> | undefined;
     const started = Date.now();
     setState(null);
-    const attempt = async () => {
+    setLoad('loading');
+    // Say the brief is coming if it takes longer than a beat; never a silent gap at the end frame.
+    const waiting = setTimeout(() => !cancelled && setLoad((l) => (l === 'loading' ? 'waiting' : l)), SHOW_WAITING_MS);
+    const tryOnce = async () => {
       const loaded = await getBrief(briefId, caseId ? { caseId } : { sessionId });
       if (cancelled) return;
-      if (loaded) setState(loaded);
-      else if (Date.now() - started < GIVE_UP_MS) timer = setTimeout(attempt, RETRY_MS);
+      if (loaded) {
+        setState(loaded);
+        setLoad('loaded');
+      } else if (Date.now() - started < GIVE_UP_MS) {
+        timer = setTimeout(tryOnce, RETRY_MS);
+      } else {
+        setLoad('failed');
+      }
     };
-    void attempt();
+    void tryOnce();
     return () => {
       cancelled = true;
+      clearTimeout(waiting);
       if (timer) clearTimeout(timer);
     };
-  }, [briefId, sessionId, caseId]);
+  }, [briefId, sessionId, caseId, attempt]);
 
-  // The end frame: bring the card into view when it lands.
+  // The end frame: bring the card's head (title through the decision) into view when it lands,
+  // and the waiting or failure line when that is what there is to see.
   useEffect(() => {
-    if (state) cardRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [state]);
+    if (state || load === 'waiting' || load === 'failed') cardRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [state, load]);
 
-  if (!state) return null;
+  if (!state) {
+    if (load === 'loading') return null;
+    return (
+      <section ref={cardRef} className="brief-card" aria-label="Draft brief" aria-busy={load === 'waiting'}>
+        {load === 'waiting' ? (
+          <p className="brief-card__line" role="status">
+            Drafting the brief
+            <WorkingDots />
+          </p>
+        ) : (
+          <>
+            <p className="brief-card__line" role="alert">
+              The draft did not load. It is saved as <span className="brief-card__num">{briefId}</span>.
+            </p>
+            <div className="brief-card__actions">
+              <button type="button" className="stage-btn stage-btn--quiet brief-card__retry" onClick={() => setAttempt((a) => a + 1)}>
+                Try again
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+    );
+  }
+
   const { card } = state;
   const replay = state.status === 'replay';
   const filed = state.status === 'filed';
+  const checksToShow = card.hypotheses.some((h) => h.nextCheck);
+  const gapCount = (card.gaps?.length ?? 0) + (card.nextCollection ? 1 : 0);
 
   const approve = async () => {
     setFiling(true);
@@ -98,52 +158,18 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
         passes read{card.passesSince ? <> since <span className="brief-card__num">{card.passesSince}</span></> : null} are candidates;
         EMIT looked <span className="brief-card__num">{card.looks}</span> times in all.
       </p>
-      <dl className="brief-card__confidence">
+      {/* The two lines the room restates, at the size it reads from the back. */}
+      <dl className="brief-card__verdict">
         <div>
           <dt>Methane recurs here</dt>
           <dd>{CONFIDENCE_WORDS[card.confidence]}</dd>
         </div>
         <div>
-          <dt>Any single explanation</dt>
-          <dd>{card.singleExplanation}</dd>
+          <dt>Cause</dt>
+          <dd>{causeWords(card.singleExplanation)}</dd>
         </div>
       </dl>
-      {(card.checks?.length ?? 0) > 0 && (
-        <>
-          <p className="brief-card__subhead">Ground record</p>
-          <ul className="brief-card__checks">
-            {card.checks!.map((line, i) => (
-              <li key={`check-${i}`}>{line}</li>
-            ))}
-          </ul>
-        </>
-      )}
-      {card.hypotheses.length > 0 && (
-        <>
-          <p className="brief-card__subhead">Unconfirmed hypotheses</p>
-          <ul className="brief-card__hypotheses">
-            {card.hypotheses.map((h) => (
-              <li key={h.label}>
-                <span className="brief-card__hypothesis">{h.label}</span>
-                <span className="brief-card__assessment">{h.assessment}</span>
-                {/* What would confirm or rule it out: the brief's own words, so the card is the whole brief. */}
-                {h.nextCheck && <span className="brief-card__next-check">{h.nextCheck}</span>}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {((card.gaps?.length ?? 0) > 0 || card.nextCollection) && (
-        <>
-          <p className="brief-card__subhead">Gaps and next look</p>
-          <ul className="brief-card__checks">
-            {card.gaps?.map((line, i) => (
-              <li key={`gap-${i}`}>{line}</li>
-            ))}
-            {card.nextCollection && <li className="brief-card__next">Next: {card.nextCollection}</li>}
-          </ul>
-        </>
-      )}
+
       {filed ? (
         <p className="brief-card__status" role="status">
           {/* Who filed it is in the S3 record; the stage says only that a person did. */}
@@ -160,7 +186,7 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
           <p className="brief-card__status">Decision: analyst's.</p>
           <div className="brief-card__actions">
             <button type="button" className="stage-btn stage-btn--primary" onClick={() => void approve()} disabled={busy || filing}>
-              {filing ? 'Filing' : 'Approve and file'}
+              {filing ? <>Filing<WorkingDots /></> : 'Approve and file'}
             </button>
             <button
               type="button"
@@ -172,6 +198,62 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
             </button>
           </div>
           {error && <p className="brief-card__error" role="alert">{error}</p>}
+        </>
+      )}
+
+      {(card.checks?.length ?? 0) > 0 && (
+        <>
+          <p className="brief-card__subhead">Ground record</p>
+          <ul className="brief-card__checks">
+            {card.checks!.map((line, i) => (
+              <li key={`check-${i}`}>{line}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {card.hypotheses.length > 0 && (
+        <>
+          <p className="brief-card__subhead">Unconfirmed hypotheses</p>
+          <ul className="brief-card__hypotheses" id={`${briefId}-hypotheses`}>
+            {card.hypotheses.map((h) => (
+              <li key={h.label}>
+                <span className="brief-card__hypothesis">{h.label}</span>
+                <span className="brief-card__assessment">{h.assessment}</span>
+                {/* What would confirm or rule it out: the brief's own words, on request. */}
+                {showChecks && h.nextCheck && <span className="brief-card__next-check">{h.nextCheck}</span>}
+              </li>
+            ))}
+          </ul>
+          {checksToShow && (
+            <button
+              type="button"
+              className="brief-card__toggle"
+              onClick={() => setShowChecks((s) => !s)}
+              aria-expanded={showChecks}
+              aria-controls={`${briefId}-hypotheses`}
+            >
+              {showChecks ? 'Hide what would confirm each' : 'What would confirm each'}
+            </button>
+          )}
+        </>
+      )}
+      {gapCount > 0 && (
+        <>
+          <button
+            type="button"
+            className="brief-card__toggle brief-card__toggle--section"
+            onClick={() => setShowGaps((s) => !s)}
+            aria-expanded={showGaps}
+            aria-controls={`${briefId}-gaps`}
+          >
+            Gaps and next look <span className="brief-card__num">{gapCount}</span>
+          </button>
+          <ul className="brief-card__checks" id={`${briefId}-gaps`} hidden={!showGaps}>
+            {card.gaps?.map((line, i) => (
+              <li key={`gap-${i}`}>{line}</li>
+            ))}
+            {card.nextCollection && <li className="brief-card__next">Next: {card.nextCollection}</li>}
+          </ul>
         </>
       )}
     </section>

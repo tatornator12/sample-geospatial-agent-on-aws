@@ -153,9 +153,13 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     hypotheses,
     checks: (() => {
       const c = (b.checks ?? {}) as Record<string, unknown>;
-      const registry = c.registry as { field_line?: unknown } | undefined;
-      // The registry's field sentence (the oil and gas field the site lies in) is its own line.
-      return [...['thermal', 'infrastructure', 'registry'].map((k) => (c[k] as { line?: unknown } | undefined)?.line), registry?.field_line]
+      const registry = (c.registry ?? {}) as Record<string, unknown>;
+      // The registry's sentences, one per line: the listing, the field the site lies in (OGIM or
+      // GEM's field tracker) and the coal mine on GEM's record.
+      return [
+        ...['thermal', 'infrastructure'].map((k) => (c[k] as { line?: unknown } | undefined)?.line),
+        ...['line', 'field_line', 'gem_field_line', 'mine_line'].map((k) => registry[k]),
+      ]
         .map(checkLine)
         .filter((l): l is string => l !== null);
     })(),

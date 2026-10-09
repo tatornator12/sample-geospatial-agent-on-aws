@@ -277,6 +277,11 @@ def plural(n: int, word: str) -> str:
     return f"{n} {word}s"
 
 
+def distance_words(km: float) -> str:
+    """"at the site" for a distance that rounds to 0, else "0.3 km"."""
+    return "at the site" if km < 0.05 else f"{km:g} km"
+
+
 def registry_line(r: dict) -> str:
     """The one sentence the brief and the stage print: the registry's listing, never a cause.
 
@@ -294,7 +299,7 @@ def registry_line(r: dict) -> str:
         dates = f"; records dated {first}" if first == last else f"; records dated {first} to {last}"
 
     def compose(n_kinds: int, n_ops: int) -> str:
-        kinds = ", ".join(f"{plural(k['count'], k['kind'])} ({k['nearest_km']:g} km)" for k in r["facilities"][:n_kinds])
+        kinds = ", ".join(f"{plural(k['count'], k['kind'])} ({distance_words(k['nearest_km'])})" for k in r["facilities"][:n_kinds])
         ops = r["operators"][:n_ops]
         if ops:
             names = ", ".join(f"{o['operator']} ({plural(o['facilities'], 'facility')})" for o in ops)
@@ -316,7 +321,7 @@ def registry_line(r: dict) -> str:
 
 
 def registry_hint(r: dict) -> str:
-    if r["listed"] == 0 and not r.get("field_line"):
+    if r["listed"] == 0 and not any(r.get(k) for k in ("field_line", "mine_line", "gem_field_line")):
         return ("Nothing on record here: say so, and that the registry may be incomplete. Do not name anyone.")
     return ("Quote `line` as written. An operator of record is who the public record names for a facility, "
             "not who caused the methane: never say 'behind', 'responsible', 'caused by' or 'owned by'. "

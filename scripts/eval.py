@@ -154,7 +154,7 @@ def registry_lines(s3, bucket: str, session_id: str) -> list[str]:
         listing = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
         for obj in listing.get("Contents", [])[:20]:
             body = json.loads(s3.get_object(Bucket=bucket, Key=obj["Key"])["Body"].read(200_000))
-            for key in ("line", "field_line"):        # the listing, and the field the site lies in
+            for key in ("line", "field_line", "gem_field_line", "mine_line"):   # every registry sentence
                 if isinstance(body.get(key), str) and body[key]:
                     lines.append(body[key])
     except Exception as e:  # the gate must not pass on a failed read: no lines means nothing is scrubbed

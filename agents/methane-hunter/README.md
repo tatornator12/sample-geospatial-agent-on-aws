@@ -105,6 +105,30 @@ record SONATRACH; record dated 2017." Field operators are filled for Algeria (45
 Egypt, Libya, the Netherlands, the UK and Norway (2,919 of 17,742 in all), and empty for the United
 States, Russia, Iran, Iraq and Turkmenistan.
 
+**Global Energy Monitor (coal mines and oil and gas fields abroad).** Four GEM downloads, all CC BY
+4.0 (cite "Global Energy Monitor, <tracker>, <release>"), fetched by hand through GEM's form and
+built with `scripts/build_gem.py ~/Downloads/data --ogim /tmp/ogim/OGIM_v3.0.gpkg --upload` into
+three small files under `methane/registry/gem_2026/` (2 MB in all):
+
+| GEM source | What the check uses |
+|---|---|
+| Global Coal Mine Tracker, August 2026 | 7,138 mines with a location: status, owners of record with shares, parent company |
+| Coal Mine Boundaries and Methane Sources v1.0.2 | 250 mines' boundaries and the ventilation shafts, vents, gas wells and drainage stations GEM maps |
+| Global Oil and Gas Extraction Tracker, March 2026 | 7,141 fields: operator, owners; 5,313 by point, 1,081 by outline, 747 placed by the OGIM outline of the same name; 532 have no location and are left out |
+| Global Energy Ownership Tracker, September 2026 | parents for mines the coal tracker leaves without one |
+
+The check adds up to two more sentences: the coal mine whose GEM boundary covers the site, or the
+nearest within 10 km, with its status, owners and parent of record and the vents and gas wells GEM
+maps within 2 km; and the GEM field the site lies in or the nearest within 10 km, with operator and
+owners. Government bodies listed among owners or parents are left out of the sentence. When OGIM and
+GEM name the same field, one line says it (OGIM's when it has the operator; otherwise GEM's operator
+placed by OGIM's outline). A mine within 3 km moves `non_oil_gas_source` (coal) to "possible" through
+the hint. Measured at the demo sites: Jincheng, Shanxi (the replay) has the Shanxi Yinjiagou Coal Mine
+2.2 km away and 13 more within 10 km; the south Caspian TROPOMI site has Goturdepe Gas Field 5.9 km
+away, operator of record Turkmennebit; Turkmenistan is thin otherwise (20 of GEM's 23 Turkmen fields
+have no coordinates; 4 match an OGIM outline by name). GEM's own plume-to-mine attribution (the
+Global Methane Emitters Tracker) is not used: the agent never attributes.
+
 The brief's title is the tool's, not the model's: "Recurring methane" (moderate or high), "Methane
 candidate" (at least one EMIT candidate) or "Unconfirmed methane tip" (none), then "near" and the
 reverse-geocoded place. `draft_brief` rejects a place that carries a watch-area phrase, the word

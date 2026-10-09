@@ -33,7 +33,7 @@
   width: 296px;
   max-height: calc(100% - 300px); /* stops short of the draw rail at bottom left */
   overflow: hidden auto;
-  padding: 14px 16px 10px;
+  padding: 14px 16px 0;
   background: color-mix(in srgb, var(--plate) 92%, transparent);
   border: 1px solid var(--hairline);
   border-radius: 10px;
@@ -41,6 +41,18 @@
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   animation: stage-rise 360ms var(--ease-out) both;
+}
+/* The column's foot: a fade that stays at the bottom edge while more lies below, so the room
+   (and the presenter) can see the column scrolls; it is also the column's bottom padding. */
+.stage-steps::after {
+  content: "";
+  position: sticky;
+  bottom: 0;
+  display: block;
+  height: 24px;
+  margin: 0 -16px;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--plate) 92%, transparent) 80%);
+  pointer-events: none;
 }
 .stage-steps__title {
   font-family: var(--font-display);
@@ -295,26 +307,22 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-.brief-card__confidence {
+/* The verdict: the two lines the room restates, the values at the size it reads from the back. */
+.brief-card__verdict {
   display: grid;
-  gap: 6px;
-  margin: 10px 0 0;
+  gap: 10px;
+  margin: 12px 0 0;
 }
-.brief-card__confidence div {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 8px;
-}
-.brief-card__confidence dt {
+.brief-card__verdict dt {
   font-size: 15px;
+  line-height: 1.3;
   color: var(--label);
 }
-.brief-card__confidence dd {
-  margin: 0;
-  font-size: 15px;
+.brief-card__verdict dd {
+  margin: 2px 0 0;
+  font-size: 19px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--fog);
 }
 .brief-card__hypotheses,
@@ -342,8 +350,45 @@
   color: var(--fog);
   border-bottom: 1px solid var(--hairline);
 }
+/* The verdict on each hypothesis carries the meaning, so it is fog, not label grey. */
 .brief-card__assessment {
+  color: var(--fog);
+  font-weight: 600;
+}
+/* Open the long parts on request: plain words, underlined, a full-height target. */
+.brief-card__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin: 2px 0 0;
+  padding: 0;
+  font: inherit;
+  font-size: 15px;
   color: var(--label);
+  text-decoration: underline;
+  text-decoration-color: var(--hairline-strong);
+  text-underline-offset: 4px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.brief-card__toggle:hover {
+  color: var(--fog);
+  text-decoration-color: currentColor;
+}
+.brief-card__toggle:focus-visible,
+.brief-card .stage-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.brief-card__toggle--section {
+  margin-top: 10px;
+}
+/* A lone quiet button lines its words up with the text above (like the step column's toggle). */
+.brief-card__retry {
+  margin-left: -14px;
 }
 .brief-card__next-check {
   grid-column: 1 / -1;

@@ -123,7 +123,7 @@ def test_infra_reads_the_watch_area_extract_and_counts_types_only(ground, fake_s
     assert out["groups"]["oil and gas"] == 3 and out["groups"]["mining"] == 1 and out["groups"]["agriculture"] == 1
     assert out["mapped"] == 6 and out["read_from"] == "extract:south caspian"
     assert "Acme" not in json.dumps(out) and "operators" not in json.dumps(out)
-    assert out["line"].startswith("Overture Maps shows within 2 km: 1 pipeline (0 km), 2 storage tanks (0.3 km)")
+    assert out["line"].startswith("Overture Maps shows within 2 km: 1 pipeline (at the site), 2 storage tanks (0.3 km)")
     assert "non_oil_gas_source (mining): 'possible'" in out["hypothesis_hint"] and "storage tanks are mapped" in out["hypothesis_hint"]
     rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/infra_{LAT:.4f}_{LON:.4f}.json"])
     assert rec["mapped"] == 6

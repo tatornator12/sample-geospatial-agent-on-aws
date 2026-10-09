@@ -10,6 +10,7 @@ target_fingerprint: "sha256:d4989a50d927ebb566da0767fa97d791e08a3d6c74f3d52de0ea
 target_path: /Users/tsteske/Documents/repos/sample-geospatial-agent-on-aws-main/react-ui/frontend/src/components/BriefCard.tsx
 timestamp: 2026-10-09T16-08-11Z
 slug: react-ui-frontend-src-components-briefcard-tsx
+closed: true
 ---
 Method: dual-agent (A: general-task-execution design review · B: general-task-execution detector + browser)
 

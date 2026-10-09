@@ -112,7 +112,7 @@ def test_registry_lookup_counts_by_kind_and_names_operators_of_record_in_the_too
     assert out["operators"][1]["kinds"] == ["pipeline", "well"]
     assert out["unnamed"] == 1 and out["source_dates"] == ["2021-01-10", "2024-03-01"]
     assert out["nearest"]["kind"] == "pipeline" and out["nearest"]["operator"] == "Basin Gas Corp"
-    assert out["line"] == ("The public registry lists within 2 km: 1 pipeline (0 km), 4 wells (0.2 km), 1 tank battery (0.7 km); "
+    assert out["line"] == ("The public registry lists within 2 km: 1 pipeline (at the site), 4 wells (0.2 km), 1 tank battery (0.7 km); "
                            "operators of record: Permian Holdings LLC (3 facilities), Basin Gas Corp (2 facilities); "
                            "1 with no operator on record; records dated 2021 to 2024.")
     assert "Far Away" not in json.dumps(out) and "Nobody" not in json.dumps(out)

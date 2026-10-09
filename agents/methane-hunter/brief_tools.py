@@ -285,17 +285,29 @@ def find_checks(lat: float, lon: float) -> dict:
         if isinstance(f, dict) and isinstance(g.get("field_line"), str):
             out["registry"]["field"] = {k: f.get(k) for k in ("name", "operator", "inside", "distance_km", "src_date")}
             out["registry"]["field_line"] = g["field_line"]
+        m = (g.get("mines") or {}).get("mine") if isinstance(g.get("mines"), dict) else None
+        if isinstance(m, dict) and isinstance(g.get("mine_line"), str):
+            out["registry"]["mine"] = {k: m.get(k) for k in ("name", "status", "owners", "parent", "inside", "distance_km")}
+            out["registry"]["mine_line"] = g["mine_line"]
+        gf = g.get("gem_field")
+        if isinstance(gf, dict) and isinstance(g.get("gem_field_line"), str):
+            out["registry"]["gem_field"] = {k: gf.get(k) for k in ("name", "status", "operator", "owners", "inside", "distance_km")}
+            out["registry"]["gem_field_line"] = g["gem_field_line"]
     return out
+
+
+# The registry check's sentences, in the order the brief and the card print them.
+REGISTRY_LINES = ("line", "field_line", "gem_field_line", "mine_line")
 
 
 def render_markdown(brief: dict, brief_id: str) -> str:
     area = f"; tipped by the {brief['watch_area']} watch area" if brief["watch_area"] else ""
     since = f" since {brief['passes_since']}" if brief.get("passes_since") else ""
     checks = brief.get("checks") or {}
-    check_lines = [f"- Check: {c['line']}" for c in (checks.get("thermal"), checks.get("infrastructure"), checks.get("registry"))
+    check_lines = [f"- Check: {c['line']}" for c in (checks.get("thermal"), checks.get("infrastructure"))
                    if c and c.get("line")]
-    if (checks.get("registry") or {}).get("field_line"):
-        check_lines.append(f"- Check: {checks['registry']['field_line']}")
+    registry = checks.get("registry") or {}
+    check_lines += [f"- Check: {registry[k]}" for k in REGISTRY_LINES if registry.get(k)]
     lines = [
         f"**Methane Watch brief: {brief['title']}** (draft `{brief_id}`, not filed)",
         "",

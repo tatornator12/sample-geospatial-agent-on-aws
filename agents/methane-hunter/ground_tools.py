@@ -266,7 +266,8 @@ def infra_line(i: dict) -> str:
     if i["mapped"] == 0:
         return (f"Overture Maps has nothing relevant mapped within {i['radius_km']:g} km; "
                 "that is a mapping gap, not evidence of empty ground.")
-    parts = [f"{t['count']} {plural(t['count'], t['type'])} ({t['nearest_km']:g} km)" for t in i["types"][:5]]
+    parts = [f"{t['count']} {plural(t['count'], t['type'])} "
+             f"({'at the site' if t['nearest_km'] < 0.05 else format(t['nearest_km'], 'g') + ' km'})" for t in i["types"][:5]]
     absent = [g for g in (ov.OIL_GAS, ov.MINING, ov.WASTE, ov.WETLAND) if i["groups"].get(g, 0) == 0]
     tail = f"; nothing mapped for {', '.join(absent)}" if absent else ""
     return f"Overture Maps shows within {i['radius_km']:g} km: {', '.join(parts)}{tail}."
@@ -363,8 +364,11 @@ async def registry_lookup(lat: float, lon: float, radius_km: float = REGISTRY_RA
     Wells, compressor stations, processing plants, terminals, refineries, LNG, platforms, tank
     batteries and pipelines within the radius, counted by kind with the nearest distance, and the
     operators the public record names for them (by number of facilities), with the records' dates.
-    This is what a registry LISTS, as of its source dates: it is never who caused a plume. Quote
-    `line` as written; never say "behind", "responsible", "caused by" or "owned by".
+    Also the oil and gas field the site lies in (OGIM outlines, GEM's field tracker with operator
+    and owners) and the coal mine whose boundary covers it or the nearest within 10 km (GEM's coal
+    mine tracker: status, owners and parent of record, the vents and gas wells GEM maps nearby).
+    This is what public records LIST, as of their dates: it is never who caused a plume. Quote the
+    lines as written; never say "behind", "responsible", "caused by" or "owned by".
 
     Args:
         lat, lon: The site in degrees.
@@ -372,7 +376,8 @@ async def registry_lookup(lat: float, lon: float, radius_km: float = REGISTRY_RA
 
     Returns: JSON with listed (total), facilities[] (kind, count, nearest_km, statuses), operators[]
     (operator, facilities, nearest_km, kinds), nearest, source_dates, line (one sentence for the
-    brief), hypothesis_hint.
+    brief), field/field_line, mines/mine_line, gem_field/gem_field_line (null when nothing is on
+    record nearby), hypothesis_hint.
     """
     started = time.time()
     try:
@@ -400,11 +405,20 @@ async def registry_lookup(lat: float, lon: float, radius_km: float = REGISTRY_RA
     except Exception as e:
         logger.warning("registry field read failed: %s", type(e).__name__)
         r["field"] = None
-    r["field_line"] = rg.field_line(r["field"])
+    # Global Energy Monitor's records (coal mines with their mapped vents and gas wells, oil and
+    # gas fields with operator and owners): two more fixed sentences, never a reason to fail.
+    import gem
+    g = gem.lookup(lat, lon, s3)
+    keep_ogim, gem_field = gem.merge_fields(r["field"], g["gem_field"])
+    r["field_line"] = rg.field_line(r["field"]) if keep_ogim else None
+    r.update(mines=g["mines"], gem_field=gem_field, mine_line=g["mine_line"], gem_field_line=gem.gem_field_line(gem_field))
     _record("registry", lat, lon, r)
     r.update(cells_read=len(paths), seconds=round(time.time() - started, 1))
-    logger.info("REGISTRY: %.3f,%.3f %d listed, %d operators (%d cells, %.1fs)", lat, lon, r["listed"],
-                r["operators_named"], len(paths), r["seconds"])
-    return json.dumps({**r, "hypothesis_hint": rg.registry_hint(r),
-                       "next_steps": ("Quote `line`, and `field_line` when it is not null, verbatim; they are the only "
-                                      "place an operator is ever named. draft_brief adds both to the brief itself.")})
+    logger.info("REGISTRY: %.3f,%.3f %d listed, %d operators, field %s, mine %s, gem field %s (%d cells, %.1fs)", lat, lon,
+                r["listed"], r["operators_named"], bool(r["field_line"]), bool(r["mine_line"]), bool(r["gem_field_line"]),
+                len(paths), r["seconds"])
+    hint = " ".join(h for h in (rg.registry_hint(r), gem.gem_hint(r)) if h)
+    return json.dumps({**r, "hypothesis_hint": hint,
+                       "next_steps": ("Quote `line` and every other *_line that is not null (field_line, mine_line, "
+                                      "gem_field_line) verbatim; they are the only place an owner or operator is ever "
+                                      "named. draft_brief adds them to the brief itself.")}, default=str)
