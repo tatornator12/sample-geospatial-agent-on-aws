@@ -40,6 +40,8 @@ CELL_DEG = 5
 CHUNK = 500_000
 SIMPLIFY_DEG = 0.0002     # ~20 m: takes the digitising jitter out of pipelines before they are cut into chords
 CHORD_DEG = 0.02          # ~2 km: the longest extent of one chord piece
+FIELD_LAYER = "Oil_and_Natural_Gas_Fields"
+FIELD_SIMPLIFY_DEG = 0.001   # ~100 m: a field outline is a licence-scale boundary, not a survey line
 
 
 def cell_of(lon: float, lat: float) -> tuple[int, int]:
@@ -102,6 +104,47 @@ def cells_touching(xmin, ymin, xmax, ymax):
     for x in range(x0, x1 + 1, CELL_DEG):
         for y in range(y0, y1 + 1, CELL_DEG):
             yield (x, y)
+
+
+def build_fields(gpkg: str, out: Path) -> int:
+    """OGIM's oil and gas field outlines, one Parquet per cell under `fields/`: the field's name, its
+    operator of record where the source names one, country, source date, its box and the outline as
+    WKB (simplified to ~100 m). The check asks whether the site is inside a field, or how far the
+    nearest one is; a field name is a place on the record, not a facility."""
+    import shapely
+
+    out.mkdir(parents=True, exist_ok=True)
+    gdf = pyogrio.read_dataframe(gpkg, layer=FIELD_LAYER, columns=["OGIM_ID", "COUNTRY", "NAME", "OPERATOR", "SRC_DATE"])
+    if gdf.crs is not None and gdf.crs.to_epsg() != 4326:
+        gdf = gdf.to_crs(4326)
+    geoms = shapely.make_valid(shapely.simplify(shapely.force_2d(gdf.geometry.values), FIELD_SIMPLIFY_DEG, preserve_topology=True))
+    bounds = shapely.bounds(geoms)
+    wkb = shapely.to_wkb(geoms)
+
+    def text(v, limit):
+        if v is None or (isinstance(v, float) and math.isnan(v)) or str(v).strip().upper() in ("N/A", "NA", ""):
+            return None
+        return str(v)[:limit]
+
+    schema = pa.schema([("name", pa.string()), ("operator", pa.string()), ("country", pa.string()), ("src_date", pa.string()),
+                        ("ogim_id", pa.int64()), ("xmin", pa.float32()), ("ymin", pa.float32()), ("xmax", pa.float32()),
+                        ("ymax", pa.float32()), ("wkb", pa.binary())])
+    per_cell: dict[tuple[int, int], list] = defaultdict(list)
+    for i, row in enumerate(gdf.itertuples(index=False)):
+        x0, y0, x1, y1 = (float(v) for v in bounds[i])
+        if not (math.isfinite(x0) and math.isfinite(y0)) or wkb[i] is None:
+            continue
+        rec = {"name": text(row.NAME, 80), "operator": text(row.OPERATOR, 120), "country": text(row.COUNTRY, 60),
+               "src_date": (text(row.SRC_DATE, 32) or "")[:10] or None,
+               "ogim_id": int(row.OGIM_ID) if row.OGIM_ID is not None else None,
+               "xmin": x0, "ymin": y0, "xmax": x1, "ymax": y1, "wkb": wkb[i]}
+        for cell in cells_touching(x0, y0, x1, y1):
+            per_cell[cell].append(rec)
+    for cell, rows in per_cell.items():
+        rows.sort(key=lambda r: r["ymin"])
+        pq.write_table(pa.Table.from_pylist(rows, schema=schema), out / f"cell={cell[0]}_{cell[1]}.parquet", compression="zstd")
+    print(f"  {FIELD_LAYER}: {len(gdf):,} outlines into {len(per_cell)} cells")
+    return len(gdf)
 
 
 def main() -> int:
@@ -194,9 +237,13 @@ def main() -> int:
             print(f"    {min(skip + CHUNK, n):,}/{n:,} in {time.time() - started:.0f}s")
     for w in writers.values():
         w.close()
+    if FIELD_LAYER in layers:
+        counts[FIELD_LAYER] = build_fields(args.gpkg, out / "fields")
     sizes = {p.name: p.stat().st_size for p in out.glob("cell=*.parquet")}
+    field_sizes = {p.name: p.stat().st_size for p in (out / "fields").glob("cell=*.parquet")}
     manifest = {"version": args.version, "source": "OGIM (EDF and MethaneSAT LLC), Zenodo DOI 10.5281/zenodo.7466757, CC BY 4.0",
                 "built_at": int(time.time()), "cell_deg": CELL_DEG, "cells": len(sizes), "bytes": sum(sizes.values()),
+                "field_cells": len(field_sizes), "field_bytes": sum(field_sizes.values()),
                 "features": dict(counts), "largest_cells": sorted(sizes.items(), key=lambda kv: -kv[1])[:5]}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1))
     print(f"{len(sizes)} cells, {sum(sizes.values()) // (1 << 20)} MB; largest: "

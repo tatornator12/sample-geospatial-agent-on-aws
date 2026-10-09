@@ -41,6 +41,7 @@ CACHE_TTL_S = 24 * 3600
 ROW_CAP = 20_000                 # a 2 km box in the Permian still fits with room
 OPERATORS_SHOWN = 3
 LINE_CAP = 300                   # the stage card and the backend's check-line bound (brief.ts, 320)
+FIELD_NEAR_KM = 5.0              # a field outline farther than this is not "near the site"
 SOURCE_LINE = "OGIM v3.0 (EDF and MethaneSAT, public records, CC BY 4.0)"
 SOURCE_SHORT = "OGIM v3.0"
 
@@ -92,16 +93,22 @@ def clean_text(value, limit: int = 80) -> str | None:
     return text[:limit] if text else None
 
 
-def cell_file(cell: tuple[int, int], s3=None) -> Path | None:
+def field_cell_key(cell: tuple[int, int]) -> str:
+    return f"{PREFIX}/fields/cell={cell[0]}_{cell[1]}.parquet"
+
+
+def cell_file(cell: tuple[int, int], s3=None, kind: str = "facilities") -> Path | None:
     """The cell's Parquet file on local disk (fetched from the bucket once a day), or None when the
-    registry has no file for that cell (open sea, ice, nothing on record)."""
+    registry has no file for that cell (open sea, ice, nothing on record). `kind` is "facilities"
+    (points and pipeline chords) or "fields" (field outlines)."""
     s3 = s3 or mt._s3()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    path = CACHE_DIR / f"{VERSION}_{cell[0]}_{cell[1]}.parquet"
+    tag = "" if kind == "facilities" else "fields_"
+    path = CACHE_DIR / f"{VERSION}_{tag}{cell[0]}_{cell[1]}.parquet"
     if path.exists() and time.time() - path.stat().st_mtime < CACHE_TTL_S:
         return path
     try:
-        obj = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=cell_key(cell))
+        obj = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=cell_key(cell) if kind == "facilities" else field_cell_key(cell))
     except s3.exceptions.NoSuchKey:
         return None
     if int(obj.get("ContentLength", 0)) > CELL_CAP_BYTES:
@@ -129,6 +136,68 @@ def query_cells(paths: list[Path], box: tuple[float, float, float, float]) -> li
         return [dict(zip(cols, row)) for row in con.execute(sql).fetchall()]
     finally:
         con.close()
+
+
+def query_fields(paths: list[Path], box: tuple[float, float, float, float]) -> list[dict]:
+    """Field outlines whose box touches `box` (name, operator of record, country, date, WKB)."""
+    if not paths:
+        return []
+    import duckdb
+    w, s, e, n = box
+    files = ", ".join("'" + str(p).replace("'", "") + "'" for p in paths)
+    cols = ("name", "operator", "country", "src_date", "ogim_id", "wkb")
+    sql = (f"SELECT {', '.join(cols)} FROM read_parquet([{files}]) "
+           f"WHERE xmin <= {e:.6f} AND xmax >= {w:.6f} AND ymin <= {n:.6f} AND ymax >= {s:.6f} LIMIT 200")
+    con = duckdb.connect()
+    try:
+        return [dict(zip(cols, row)) for row in con.execute(sql).fetchall()]
+    finally:
+        con.close()
+
+
+def field_at(rows: list[dict], lat: float, lon: float, near_km: float = FIELD_NEAR_KM) -> dict | None:
+    """The field the site lies inside (distance 0), else the nearest field outline within `near_km`,
+    measured on a flat km grid centred on the site. Inside beats near; when outlines overlap, the
+    smaller field (the more specific record) wins."""
+    import shapely
+    kx, ky = 111.32 * math.cos(math.radians(lat)), 110.57
+    origin = shapely.Point(0.0, 0.0)
+    best = None
+    for r in rows:
+        try:
+            geom = shapely.from_wkb(r["wkb"])
+            local = shapely.transform(geom, lambda c: (c - [lon, lat]) * [kx, ky])
+        except Exception:
+            continue
+        d = 0.0 if local.covers(origin) else float(local.distance(origin))
+        if d > near_km:
+            continue
+        name = clean_text(r.get("name"), 80)
+        if not name:
+            continue
+        op = clean_text(r.get("operator"), 80)
+        cand = {"name": name, "operator": op if op and op.upper() not in _MISSING else None,
+                "country": clean_text(r.get("country"), 60), "distance_km": round(d, 1),
+                "inside": d == 0.0, "area_km2": round(float(local.area), 1),
+                "src_date": str(r.get("src_date") or "")[:10] or None}
+        key = (not cand["inside"], cand["distance_km"], cand["area_km2"])
+        if best is None or key < (not best["inside"], best["distance_km"], best["area_km2"]):
+            best = cand
+    return best
+
+
+def field_line(f: dict | None) -> str | None:
+    """The registry's second sentence, about the oil and gas field the site lies in (or the nearest
+    outline within FIELD_NEAR_KM), or None when no field is on record nearby. Its own Check line, so
+    the room reads one fact per line."""
+    if not f:
+        return None
+    who = f"operator of record {f['operator']}" if f.get("operator") else "no operator on record"
+    year = f"; record dated {f['src_date'][:4]}" if f.get("src_date") else ""
+    if f["inside"]:
+        return f"The public registry places the site inside the {f['name']} oil and gas field; {who}{year}."
+    return (f"The public registry's nearest oil and gas field outline is {f['name']}, {f['distance_km']:g} km away; "
+            f"{who}{year}.")
 
 
 def chord_distance_km(lat: float, lon: float, xmin: float, ymin: float, xmax: float, ymax: float, diag) -> float:
@@ -247,7 +316,7 @@ def registry_line(r: dict) -> str:
 
 
 def registry_hint(r: dict) -> str:
-    if r["listed"] == 0:
+    if r["listed"] == 0 and not r.get("field_line"):
         return ("Nothing on record here: say so, and that the registry may be incomplete. Do not name anyone.")
     return ("Quote `line` as written. An operator of record is who the public record names for a facility, "
             "not who caused the methane: never say 'behind', 'responsible', 'caused by' or 'owned by'. "

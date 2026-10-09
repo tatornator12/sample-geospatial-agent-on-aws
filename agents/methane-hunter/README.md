@@ -97,7 +97,20 @@ AWS_PROFILE=main ../../.venv/bin/python ../../scripts/build_registry.py /tmp/ogi
 
 It writes one Parquet file per 5° × 5° cell to `methane/registry/ogim_v3.0/` (644 cells, the
 largest 28 MB, Alberta) with kind, type, status, operator of record, country, state, source date and
-a box per row; facility names are not carried. Pipelines are simplified to 20 m and cut into
+a box per row; facility names are not carried. OGIM's 17,742 oil and gas **field outlines** go to
+`fields/` beside them (214 cells, 10 MB; name, operator of record, date, outline simplified to
+~100 m), and the check adds a second sentence when the site lies inside a field or within 5 km of
+one: "The public registry places the site inside the HASSI MESSAOUD oil and gas field; operator of
+record SONATRACH; record dated 2017." Field operators are filled for Algeria (459 of 522 fields),
+Egypt, Libya, the Netherlands, the UK and Norway (2,919 of 17,742 in all), and empty for the United
+States, Russia, Iran, Iraq and Turkmenistan.
+
+The brief's title is the tool's, not the model's: "Recurring methane" (moderate or high), "Methane
+candidate" (at least one EMIT candidate) or "Unconfirmed methane tip" (none), then "near" and the
+reverse-geocoded place. `draft_brief` rejects a place that carries a watch-area phrase, the word
+"watch" or coordinates, records the watch area as provenance ("tipped by the Shanxi and Ordos coal
+basins (China) watch area"), and takes the pass counts and their window from the session's own
+`passes_<lat>_<lon>.json`, so a site at the edge of a watch box is never titled after the box. Pipelines are simplified to 20 m and cut into
 straight chords of at most 2 km, so the distance is to the pipe, not to a bounding box that can
 span a state. The build needs `pyogrio`, `shapely` and `pyarrow` locally; the runtime needs only
 `duckdb`: it copies the one to four cells a 2 km box touches to `/tmp` (kept a day) and queries them.

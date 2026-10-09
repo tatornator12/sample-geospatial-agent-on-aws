@@ -391,9 +391,20 @@ async def registry_lookup(lat: float, lon: float, radius_km: float = REGISTRY_RA
         return json.dumps({"error": "The public registry could not be read; the registry check is unavailable."})
     r = rg.summarise(rows, lat, lon, radius_km)
     r["line"] = rg.registry_line(r)
+    # The field outline the site lies in (or the nearest within 5 km): its own sentence. A failed
+    # field read leaves the facility check standing.
+    try:
+        fbox = box_around(lat, lon, rg.FIELD_NEAR_KM)
+        fpaths = [p for p in (rg.cell_file(c, s3, kind="fields") for c in rg.cells_for(fbox)) if p is not None]
+        r["field"] = rg.field_at(rg.query_fields(fpaths, fbox), lat, lon)
+    except Exception as e:
+        logger.warning("registry field read failed: %s", type(e).__name__)
+        r["field"] = None
+    r["field_line"] = rg.field_line(r["field"])
     _record("registry", lat, lon, r)
     r.update(cells_read=len(paths), seconds=round(time.time() - started, 1))
     logger.info("REGISTRY: %.3f,%.3f %d listed, %d operators (%d cells, %.1fs)", lat, lon, r["listed"],
                 r["operators_named"], len(paths), r["seconds"])
     return json.dumps({**r, "hypothesis_hint": rg.registry_hint(r),
-                       "next_steps": "Use `line` in the brief verbatim; it is the only place an operator is ever named."})
+                       "next_steps": ("Quote `line`, and `field_line` when it is not null, verbatim; they are the only "
+                                      "place an operator is ever named. draft_brief adds both to the brief itself.")})

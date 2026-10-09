@@ -120,6 +120,19 @@ describe('briefCard', () => {
     assert.deepEqual(briefCard(draft(), BID, SID)!.checks, []);
     const tooLong = { registry: { line: 'x'.repeat(321) } };
     assert.deepEqual(briefCard(draft({}, { checks: tooLong }), BID, SID)!.checks, []);
+    // The registry's field sentence is its own line, after the registry's listing.
+    const field = 'The public registry places the site inside the HASSI MESSAOUD oil and gas field; operator of record SONATRACH; record dated 2017.';
+    const withField = briefCard(draft({}, { checks: { registry: { line: registry, field_line: field } } }), BID, SID)!;
+    assert.deepEqual(withField.checks, [registry, field]);
+  });
+
+  it('carries the watch area as provenance and the window the passes were read in', () => {
+    const card = briefCard(draft({}, { watch_area: 'Shanxi and Ordos coal basins (China)', passes_since: '2025-01-01' }), BID, SID)!;
+    assert.equal(card.watchArea, 'Shanxi and Ordos coal basins (China)');
+    assert.equal(card.passesSince, '2025-01-01');
+    const bare = briefCard(draft({}, { watch_area: '<b>x</b>', passes_since: 'last year' }), BID, SID)!;
+    assert.equal(bare.watchArea, undefined);
+    assert.equal(bare.passesSince, undefined);
   });
 
   it('drops hypotheses with an unknown assessment', () => {

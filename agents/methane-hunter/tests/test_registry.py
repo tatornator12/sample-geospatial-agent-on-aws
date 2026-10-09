@@ -167,3 +167,55 @@ def test_the_brief_carries_the_registry_line_and_allows_a_company_only_in_the_re
     assert bt.check_text("Operators of record: Permian Holdings LLC (3 facilities).") == []
     assert bt.check_text("Permian Holdings LLC runs the pad.") == ["'LLC' names a company outside the registry's words"]
     assert any("owner or operator" in p for p in bt.check_text("The site is operated by Basin Gas Corp."))
+
+
+def write_field_cell(fake_s3, rg, cell, rows):
+    """A field-outline cell in the columns build_registry.build_fields writes."""
+    import io
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    import shapely
+    recs = []
+    for name, operator, day, poly in rows:
+        g = shapely.Polygon(poly)
+        x0, y0, x1, y1 = g.bounds
+        recs.append({"name": name, "operator": operator, "country": "ALGERIA", "src_date": day, "ogim_id": len(recs) + 1,
+                     "xmin": x0, "ymin": y0, "xmax": x1, "ymax": y1, "wkb": shapely.to_wkb(g)})
+    buf = io.BytesIO()
+    pq.write_table(pa.Table.from_pylist(recs), buf)
+    fake_s3.put_object(Bucket=BUCKET, Key=rg.field_cell_key(cell), Body=buf.getvalue())
+
+
+def test_the_field_the_site_lies_in_is_its_own_sentence_with_its_operator_of_record(ground, fake_s3):
+    import registry as rg
+    lat, lon = 31.67, 6.07
+    cell = rg.cell_of(lon, lat)
+    box = lambda x0, y0, x1, y1: [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    write_field_cell(fake_s3, rg, cell, [
+        ("HASSI MESSAOUD", "SONATRACH", "2017-06-24", box(lon - 0.3, lat - 0.3, lon + 0.3, lat + 0.3)),     # contains the site
+        ("BIG REGION", "SOMEONE ELSE", "2017-06-24", box(lon - 2, lat - 2, lon + 2, lat + 2)),             # contains it too, larger
+        ("NEIGHBOUR", None, "2017-06-24", box(lon + 0.02, lat - 0.1, lon + 0.1, lat + 0.1)),               # 1.9 km east
+    ])
+    write_cell(fake_s3, rg, cell, [well(lon + 0.002, lat, None)])
+    out = json.loads(_run(ground.registry_lookup(lat, lon)))
+    assert out["field"]["name"] == "HASSI MESSAOUD" and out["field"]["inside"] is True        # the smaller containing field
+    assert out["field_line"] == ("The public registry places the site inside the HASSI MESSAOUD oil and gas field; "
+                                 "operator of record SONATRACH; record dated 2017.")
+    assert "SOMEONE ELSE" not in json.dumps(out)
+    rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/registry_{lat:.4f}_{lon:.4f}.json"])
+    assert rec["field_line"] == out["field_line"]
+    # Outside every outline: the nearest within 5 km, with its distance; nothing beyond that.
+    near = rg.field_at([{"name": "NEIGHBOUR", "operator": None, "country": "ALGERIA", "src_date": "2017-06-24",
+                         "wkb": __import__("shapely").to_wkb(__import__("shapely").Polygon(box(lon + 0.02, lat - 0.1, lon + 0.1, lat + 0.1)))}],
+                       lat, lon)
+    assert near["inside"] is False and near["distance_km"] == 1.9
+    assert rg.field_line(near) == ("The public registry's nearest oil and gas field outline is NEIGHBOUR, 1.9 km away; "
+                                   "no operator on record; record dated 2017.")
+    assert rg.field_line(None) is None
+
+
+def test_a_missing_field_cell_leaves_the_facility_check_standing(ground, fake_s3):
+    import registry as rg
+    write_cell(fake_s3, rg, rg.cell_of(LON, LAT), [well(LON, LAT, "Permian Holdings LLC")])
+    out = json.loads(_run(ground.registry_lookup(LAT, LON)))
+    assert out["listed"] == 1 and out["field"] is None and out["field_line"] is None

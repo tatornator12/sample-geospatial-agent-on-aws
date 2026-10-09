@@ -247,7 +247,7 @@
   animation: stage-rise 360ms var(--ease-out) both;
 }
 .brief-card__subhead {
-  margin: 0;
+  margin: 12px 0 0;
   font-family: var(--font-display);
   font-size: 12px;
   font-weight: 600;
@@ -255,15 +255,15 @@
   text-transform: uppercase;
   color: var(--label);
 }
-.brief-card__subhead {
-  margin-top: 12px;
-}
-/* The brief's state leads its own heading (draft or filed) in label grey; the amber belongs to the decision. */
+/* The brief's state leads its own heading (draft or filed) in label grey at regular weight, so it
+   parts from the title by weight as well as colour on a washed-out projector; the amber belongs to
+   the decision. */
 .brief-card__state {
+  font-weight: 400;
   color: var(--label);
 }
 .brief-card__title {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   font-family: var(--font-display);
   font-size: 19px;
   font-weight: 600;
@@ -275,6 +275,20 @@
   margin: 0;
   font-size: 15px;
   line-height: 1.4;
+  color: var(--fog);
+}
+/* Where the site is (the step column's coordinates) and which scan tipped it, in label grey: the
+   title already names the place, this line is provenance. The pair never breaks. */
+.brief-card__where {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--label);
+}
+.brief-card__coords {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   color: var(--fog);
 }
 .brief-card__num {
@@ -333,7 +347,7 @@
 }
 .brief-card__next-check {
   grid-column: 1 / -1;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.35;
   color: var(--label);
 }

@@ -59,9 +59,13 @@ export interface BriefCard {
   place: string;
   lat: number;
   lon: number;
+  /** The watch area whose scan tipped the site, as the stage names it (provenance, not location). */
+  watchArea?: string;
   looks: number;
   candidates: number;
   passesRead: number;
+  /** The first day of the window the passes were read in (YYYY-MM-DD), from the tool's record. */
+  passesSince?: string;
   confidence: 'low' | 'moderate' | 'high';
   singleExplanation: string;
   /** Every unconfirmed hypothesis the brief lists (2 to 6), "possible" first, each with what
@@ -131,22 +135,28 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     .slice(0, 6);
   const gaps = (Array.isArray(b.gaps) ? b.gaps : []).map(checkLine).filter((l): l is string => l !== null).slice(0, 4);
   const nextCollection = checkLine(b.next_collection);
+  const watchArea = text(b.watch_area, 60);
+  const passesSince = typeof b.passes_since === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.passes_since) ? b.passes_since : null;
   return {
     briefId,
     title,
     place,
     lat,
     lon,
+    ...(watchArea && checkLine(watchArea) ? { watchArea } : {}),
     looks,
     candidates,
     passesRead,
+    ...(passesSince ? { passesSince } : {}),
     confidence: confidence as BriefCard['confidence'],
     singleExplanation: 'low without a ground or aircraft check',
     hypotheses,
     checks: (() => {
       const c = (b.checks ?? {}) as Record<string, unknown>;
-      return ['thermal', 'infrastructure', 'registry']
-        .map((k) => checkLine((c[k] as { line?: unknown } | undefined)?.line))
+      const registry = c.registry as { field_line?: unknown } | undefined;
+      // The registry's field sentence (the oil and gas field the site lies in) is its own line.
+      return [...['thermal', 'infrastructure', 'registry'].map((k) => (c[k] as { line?: unknown } | undefined)?.line), registry?.field_line]
+        .map(checkLine)
         .filter((l): l is string => l !== null);
     })(),
     gaps,

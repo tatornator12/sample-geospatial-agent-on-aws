@@ -83,13 +83,20 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
 
   return (
     <section ref={cardRef} className="brief-card" aria-label={filed ? 'Filed brief' : 'Draft brief'}>
+      {/* The title is the tool's: what the evidence supports, then the geocoded place. */}
       <h3 className="brief-card__title">
         <span className="brief-card__state">{filed ? 'Filed brief' : 'Draft brief'}</span> {card.title}
       </h3>
+      {/* Where, in the step column's own coordinate format, and which scan tipped it: provenance,
+          never location, so a site at the edge of a watch box is not read as inside its namesake. */}
+      <p className="brief-card__where">
+        <span className="brief-card__coords">{card.lat.toFixed(2)}, {card.lon.toFixed(2)}</span>
+        {card.watchArea && <span> · tipped by the {card.watchArea} watch area</span>}
+      </p>
       <p className="brief-card__line">
         <span className="brief-card__num">{card.candidates}</span> of <span className="brief-card__num">{card.passesRead}</span>{' '}
-        recent passes are candidates;
-        EMIT looked <span className="brief-card__num">{card.looks}</span> times.
+        passes read{card.passesSince ? <> since <span className="brief-card__num">{card.passesSince}</span></> : null} are candidates;
+        EMIT looked <span className="brief-card__num">{card.looks}</span> times in all.
       </p>
       <dl className="brief-card__confidence">
         <div>
@@ -105,8 +112,8 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
         <>
           <p className="brief-card__subhead">Ground record</p>
           <ul className="brief-card__checks">
-            {card.checks!.map((line) => (
-              <li key={line}>{line}</li>
+            {card.checks!.map((line, i) => (
+              <li key={`check-${i}`}>{line}</li>
             ))}
           </ul>
         </>
@@ -130,8 +137,8 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
         <>
           <p className="brief-card__subhead">Gaps and next look</p>
           <ul className="brief-card__checks">
-            {card.gaps?.map((line) => (
-              <li key={line}>{line}</li>
+            {card.gaps?.map((line, i) => (
+              <li key={`gap-${i}`}>{line}</li>
             ))}
             {card.nextCollection && <li className="brief-card__next">Next: {card.nextCollection}</li>}
           </ul>

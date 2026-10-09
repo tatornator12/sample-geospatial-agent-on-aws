@@ -17,8 +17,8 @@
       "name": "display_visual",
       "params": {
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/watch_sites_v002.geojson",
-        "title": "EMIT Global Methane Repeat Sites",
-        "description": "24 repeat sites seen on 5 or more dates, 2022-2025",
+        "title": "EMIT Global Methane Watch Sites (repeat detections)",
+        "description": "All 1,104 sites; 24 seen on 5 or more dates",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -104,54 +104,59 @@
     {
       "name": "check_recent_passes",
       "params": {
-        "lat": 39.4669,
-        "lon": 53.5422
+        "lat": 35.5111,
+        "lon": 112.4429,
+        "max_scenes": 8
       },
       "result": "Recent EMIT passes judged"
     },
     {
       "name": "check_recent_passes",
       "params": {
-        "lat": 35.4451,
-        "lon": 114.5779
+        "lat": 39.3628,
+        "lon": 53.3627,
+        "max_scenes": 8
       },
       "result": "Recent EMIT passes judged"
     },
     {
       "name": "site_history",
       "params": {
-        "lat": 39.4669,
-        "lon": 53.5422
+        "lat": 35.5111,
+        "lon": 112.4429
       },
       "result": "Site history read"
     },
     {
       "name": "site_history",
       "params": {
-        "lat": 35.4451,
-        "lon": 114.5779
+        "lat": 39.3628,
+        "lon": 53.3627
       },
       "result": "Site history read"
     },
     {
-      "name": "find_location_boundary",
+      "name": "reverse_geocode",
       "params": {
-        "location": "Hazar, Turkmenistan"
+        "x": 112.4429,
+        "y": 35.5111
       },
-      "result": "Done"
+      "result": "Place named"
     },
     {
-      "name": "find_location_boundary",
+      "name": "reverse_geocode",
       "params": {
-        "location": "Xinxiang, Henan, China"
+        "x": 53.3627,
+        "y": 39.3628
       },
-      "result": "Done"
+      "result": "Place named"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-06_14d.tif",
-        "title": "TROPOMI CH4 Anomaly, Shanxi and Ordos Coal Basins, 14-day composite",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-07_14d.tif",
+        "title": "TROPOMI CH4 anomaly: Shanxi and Ordos coal basins (China), 14-day composite",
+        "description": "Top hotspot +120.8 ppb above background near Jincheng City",
         "render": {
           "kind": "raster",
           "colormap": "viridis",
@@ -176,8 +181,8 @@
     {
       "name": "inspect_image",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250528T051812_2514804_032.tif",
-        "title": "EMIT strongest candidate, Shanxi coal basin, 2025-05-28",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250731T040632_2521203_025.tif",
+        "title": "EMIT CH4 enhancement, Jincheng City, Shanxi, 2025-07-31",
         "question": "What is the shape, direction and extent of the methane enhancement?"
       },
       "result": "Looked at the image"
@@ -185,12 +190,13 @@
     {
       "name": "display_visual",
       "params": {
+        "description": "Strongest candidate pass, 2025-07-31, peak 2,690.2 ppm·m, 379 pixels above 1,000 ppm·m",
         "render": {
           "bounds": [
-            114.54482,
-            35.41797,
-            114.61098,
-            35.47223
+            112.40979,
+            35.48397,
+            112.47601,
+            35.53823
           ],
           "colormap": "plasma",
           "group": "methane",
@@ -198,18 +204,19 @@
           "legend": "CH4 enhancement",
           "rescale": [
             500,
-            2000
+            2500
           ],
           "units": "ppm·m"
         },
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250528T051812_2514804_032.tif",
-        "title": "EMIT CH4 Enhancement, Shanxi coal basin, 2025-05-28"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250731T040632_2521203_025.tif",
+        "title": "EMIT CH4 enhancement: Jincheng City, Shanxi, 2025-07-31"
       },
       "result": "Shown on the map"
     },
     {
       "name": "display_visual",
       "params": {
+        "description": "Column-level CH4 enhancement, 2025-07-31",
         "render": {
           "group": "methane",
           "kind": "columns",
@@ -218,20 +225,20 @@
           "ramp": "plasma",
           "rescale": [
             500,
-            2000
+            2500
           ],
           "units": "ppm·m"
         },
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20250528T051812_2514804_032.geojson",
-        "title": "EMIT CH4 Columns, Shanxi coal basin, 2025-05-28"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20250731T040632_2521203_025.geojson",
+        "title": "EMIT CH4 columns: Jincheng City, Shanxi, 2025-07-31"
       },
       "result": "Shown on the map"
     },
     {
       "name": "create_bbox_from_coordinates",
       "params": {
-        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[114.5779, 35.4451]}",
-        "location": "Xinxiang Henan watch site",
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[112.4429,35.5111]}",
+        "location": "Jincheng City watch site",
         "radius_meters": 3000
       },
       "result": "3 km frame around the site"
@@ -239,154 +246,102 @@
     {
       "name": "thermal_anomalies",
       "params": {
-        "lat": 35.4451,
-        "lon": 114.5779
+        "lat": 35.5111,
+        "lon": 112.4429
       },
       "result": "VIIRS heat checked"
     },
     {
       "name": "nearby_infrastructure",
       "params": {
-        "lat": 35.4451,
-        "lon": 114.5779
+        "lat": 35.5111,
+        "lon": 112.4429
       },
       "result": "Overture Maps checked, by type"
     },
     {
       "name": "registry_lookup",
       "params": {
-        "lat": 35.4451,
-        "lon": 114.5779
+        "lat": 35.5111,
+        "lon": 112.4429
       },
       "result": "Public registry checked"
     },
     {
       "name": "get_rasters",
       "params": {
-        "location": "Xinxiang Henan watch site",
+        "location": "Jincheng City watch site",
         "geometry_s3_url": "s3://bucket/use-cases/methane-watch-mission/plumes_detected.geojson",
-        "current_date_str": "2025-05-28"
+        "current_date_str": "2025-07-31"
       },
       "result": "Sentinel-2 scene fetched"
     },
     {
       "name": "inspect_image",
       "params": {
-        "question": "What land cover and structures are visible? Look for industrial facilities, coal mines, pipelines, or agricultural land.",
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_xinxiang_henan_watch_site_2025-05-26.tif",
-        "title": "Sentinel-2 true colour, Xinxiang Henan watch site, 2025-05-26"
+        "question": "What land cover and structures are visible? Look for coal mines, industrial facilities, roads, or other infrastructure.",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_jincheng_city_watch_site_2025-07-05.tif",
+        "title": "Sentinel-2 true colour, Jincheng City watch site, 2025-07-05"
       },
       "result": "Looked at the image"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_xinxiang_henan_watch_site_2025-05-26.tif",
-        "title": "Sentinel-2 true colour, Xinxiang Henan watch site, 2025-05-26"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_jincheng_city_watch_site_2025-07-05.tif",
+        "title": "Sentinel-2 true colour: Jincheng City watch site, 2025-07-05",
+        "description": "Disturbed terrain, terraced cuts, spoil heaps and large industrial structures visible near the methane hotspot"
       },
       "result": "Shown on the map"
     },
     {
       "name": "draft_brief",
       "params": {
-        "title": "Recurring methane, Shanxi and Ordos coal basin site",
-        "place": "Near Xinxiang, Henan province, eastern edge of the Shanxi and Ordos coal basin region, China",
-        "lat": 35.4451,
-        "lon": 114.5779,
+        "place": "Jincheng City, Shanxi Province, China",
+        "lat": 35.5111,
+        "lon": 112.4429,
+        "watch_area": "shanxi coal basin",
         "observations": [
-          "TROPOMI 14-day composite (2026-09-22 to 2026-10-06) shows a top hotspot anomaly of +67.6 ppb above background at this location.",
-          "EMIT looked 21 times (2023-02-27 to 2026-06-05); NASA outlined 0 plumes here in the formal product.",
-          "5 of 8 recent passes read since 2025-01-01 are candidates, peaking at 1,841.6 ppm·m on 2025-05-28.",
-          "Candidates span 4 separate dates: 2025-03-31, 2025-05-28, 2025-06-22, 2026-06-01, and 2026-06-05.",
-          "3 passes were rejected: 1 too weak, 2 within noise.",
+          "TROPOMI recorded a 14-day CH4 anomaly of +120.8 ppb above background at this site (2026-09-23 to 2026-10-07).",
+          "EMIT read 6 passes since 2025-01-01; 2 were candidates: 2025-07-31 peak 2,690.2 ppm·m (379 pixels above 1,000 ppm·m, 23 significant) and 2026-02-01 peak 2,185.5 ppm·m (221 pixels above 1,000 ppm·m, 8 significant).",
+          "4 passes were rejected: 2 within noise, 1 too weak, 1 cloud or gap.",
+          "EMIT looked 11 times at this site (2024-02-17 to 2026-02-01); NASA outlined 0 plumes here in the plume product (latest 2025-09-22).",
+          "Sentinel-2 (2025-07-05) shows heavily disturbed terrain with terraced cuts, spoil heaps and large industrial structures connected by roads.",
           "VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed."
         ],
-        "looks": 21,
-        "candidates": 5,
-        "passes_read": 8,
+        "looks": 11,
+        "candidates": 2,
+        "passes_read": 6,
         "explanations": [
           {
             "id": "routine_venting",
             "assessment": "possible",
-            "next_check": "Repeated candidates on 5 separate dates support recurrence; a ground inspection or aircraft survey would confirm continuous venting."
+            "next_check": "Repeated EMIT candidates on additional dates would support this; ground inspection of ventilation infrastructure would confirm or rule it out."
           },
           {
             "id": "equipment_failure_or_leak",
             "assessment": "possible",
-            "next_check": "Persistent multi-date signal without NASA plume outlines; a follow-up EMIT pass or aircraft survey would distinguish a leak from routine venting."
+            "next_check": "A third candidate pass or aircraft survey over the site would help distinguish a persistent point source from a diffuse field."
           },
           {
             "id": "unlit_flare",
             "assessment": "cannot assess",
-            "next_check": "No heat detected by VIIRS and no flare stack mapped; a night-time VIIRS survey or ground visit would confirm or rule this out."
+            "next_check": "No flare stack is mapped within 2 km; VIIRS saw no heat, so this cannot be assessed without a mapped flare or ground survey."
           },
           {
             "id": "non_oil_gas_source",
             "assessment": "less likely",
-            "next_check": "Only a pipeline is mapped within 2 km; no mining or waste facilities in Overture Maps, though mapping gaps in this coal basin are possible."
+            "next_check": "Overture Maps shows only a pipeline within 2 km and no waste, wetland or agricultural infrastructure; ground survey would confirm source type."
           }
         ],
-        "confidence": "high",
+        "confidence": "moderate",
         "gaps": [
-          "NASA's plume product is nearly empty after 2024, so no formal plume outlines exist for the 5 candidate passes.",
-          "EMIT only sees the site on its passes; gaps between passes leave emissions unobserved.",
-          "Overture Maps and the public registry may have mapping gaps in this coal basin region.",
+          "NASA's plume product is nearly empty after 2024-09-22, so passes since then have not been independently outlined.",
+          "EMIT only sees this site on its passes; gaps between passes leave the record incomplete.",
+          "The public registry (OGIM v3.0) lists no oil and gas facility within 2 km, which may reflect a registry gap rather than an empty site.",
           "TROPOMI at ~4 km resolution cannot resolve individual sources within the hotspot."
         ],
-        "next_collection": "A targeted EMIT pass or airborne survey over this site to confirm recurrence and estimate flux.",
-        "watch_area": "shanxi coal basin"
-      },
-      "result": "Brief drafted (not filed)"
-    },
-    {
-      "name": "draft_brief",
-      "params": {
-        "candidates": 5,
-        "confidence": "high",
-        "explanations": [
-          {
-            "assessment": "possible",
-            "id": "routine_venting",
-            "next_check": "Repeated candidates on 5 separate dates support recurrence; a ground inspection or aircraft survey would confirm continuous venting."
-          },
-          {
-            "assessment": "possible",
-            "id": "equipment_failure_or_leak",
-            "next_check": "Persistent multi-date signal without NASA plume outlines; a follow-up EMIT pass or aircraft survey would distinguish a leak from routine venting."
-          },
-          {
-            "assessment": "cannot assess",
-            "id": "unlit_flare",
-            "next_check": "No heat detected by VIIRS and no flare stack mapped; a night-time VIIRS survey or ground visit would confirm or rule this out."
-          },
-          {
-            "assessment": "less likely",
-            "id": "non_oil_gas_source",
-            "next_check": "Only a pipeline is mapped within 2 km; no mining or waste facilities in Overture Maps, though mapping gaps in this coal basin are possible."
-          }
-        ],
-        "gaps": [
-          "NASA's plume product is nearly empty after 2024, so no formal plume outlines exist for the 5 candidate passes.",
-          "EMIT only sees the site on its passes; gaps between passes leave emissions unobserved.",
-          "Overture Maps and the public registry may have mapping gaps in this coal basin region.",
-          "TROPOMI at ~4 km resolution cannot resolve individual sources within the hotspot."
-        ],
-        "lat": 35.4451,
-        "lon": 114.5779,
-        "looks": 21,
-        "next_collection": "A targeted EMIT pass or airborne survey over this site to confirm recurrence and estimate flux.",
-        "observations": [
-          "TROPOMI 14-day composite (2026-09-22 to 2026-10-06) shows a top hotspot anomaly of +67.6 ppb above background at this location.",
-          "EMIT looked 21 times (2023-02-27 to 2026-06-05); NASA outlined 0 plumes here in the formal product.",
-          "5 of 8 recent passes read since 2025-01-01 are candidates, peaking at 1,841.6 ppm·m on 2025-05-28.",
-          "Candidates span 5 separate dates: 2025-03-31, 2025-05-28, 2025-06-22, 2026-06-01, and 2026-06-05.",
-          "3 passes were rejected: 1 too weak, 2 within noise.",
-          "VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed."
-        ],
-        "passes_read": 8,
-        "place": "Near Xinxiang, Henan, eastern Shanxi and Ordos coal basin, China",
-        "title": "Recurring methane, Shanxi and Ordos coal basin site",
-        "watch_area": "shanxi coal basin"
+        "next_collection": "A dedicated EMIT tasked pass or airborne survey over this site would resolve whether the enhancement is a point source or a diffuse field."
       },
       "result": "Brief drafted (not filed)"
     }
@@ -394,8 +349,8 @@
   "assets": {
     "layers": [
       {
-        "file": "tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-06_14d.tif",
-        "title": "TROPOMI CH4 Anomaly, Shanxi and Ordos Coal Basins, 14-day composite",
+        "file": "tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-07_14d.tif",
+        "title": "TROPOMI CH4 anomaly: Shanxi and Ordos coal basins (China), 14-day composite",
         "render": {
           "kind": "raster",
           "colormap": "viridis",
@@ -416,14 +371,14 @@
         }
       },
       {
-        "file": "pass_EMIT_L2B_CH4ENH_002_20250528T051812_2514804_032.tif",
-        "title": "EMIT CH4 Enhancement, Shanxi coal basin, 2025-05-28",
+        "file": "pass_EMIT_L2B_CH4ENH_002_20250731T040632_2521203_025.tif",
+        "title": "EMIT CH4 enhancement: Jincheng City, Shanxi, 2025-07-31",
         "render": {
           "bounds": [
-            114.54482,
-            35.41797,
-            114.61098,
-            35.47223
+            112.40979,
+            35.48397,
+            112.47601,
+            35.53823
           ],
           "colormap": "plasma",
           "group": "methane",
@@ -431,14 +386,14 @@
           "legend": "CH4 enhancement",
           "rescale": [
             500,
-            2000
+            2500
           ],
           "units": "ppm·m"
         }
       },
       {
         "file": "watch_sites_v002.geojson",
-        "title": "EMIT Global Methane Repeat Sites",
+        "title": "EMIT Global Methane Watch Sites (repeat detections)",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -448,8 +403,8 @@
         }
       },
       {
-        "file": "columns_EMIT_L2B_CH4ENH_002_20250528T051812_2514804_032.geojson",
-        "title": "EMIT CH4 Columns, Shanxi coal basin, 2025-05-28",
+        "file": "columns_EMIT_L2B_CH4ENH_002_20250731T040632_2521203_025.geojson",
+        "title": "EMIT CH4 columns: Jincheng City, Shanxi, 2025-07-31",
         "render": {
           "group": "methane",
           "kind": "columns",
@@ -458,14 +413,14 @@
           "ramp": "plasma",
           "rescale": [
             500,
-            2000
+            2500
           ],
           "units": "ppm·m"
         }
       },
       {
-        "file": "tci_clipped_xinxiang_henan_watch_site_2025-05-26.tif",
-        "title": "Sentinel-2 true colour, Xinxiang Henan watch site, 2025-05-26"
+        "file": "tci_clipped_jincheng_city_watch_site_2025-07-05.tif",
+        "title": "Sentinel-2 true colour: Jincheng City watch site, 2025-07-05"
       }
     ]
   }

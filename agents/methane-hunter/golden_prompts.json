@@ -431,8 +431,10 @@
         "draft_brief"
       ],
       "required_text": [
+        "Satellite data measures methane, not responsibility; nothing here can tie it to a government or anyone else.",
         "EMIT sees the methane, not its source."
       ],
+      "_comment": "v29 wrote 'not who is responsible for them' in its own closer; blame questions now get the fixed NO_BLAME and INSTRUMENTS sentences and a fixed closer shape.",
       "closer_max_chars": 280,
       "closer_endswith": "EMIT sees the methane, not its source."
     },

@@ -306,14 +306,19 @@ export interface BriefCardData {
   place: string;
   lat: number;
   lon: number;
+  /** The watch area whose scan tipped the site (provenance, not location). */
+  watchArea?: string;
   looks: number;
   candidates: number;
   passesRead: number;
+  /** First day of the window the passes were read in (YYYY-MM-DD). */
+  passesSince?: string;
   confidence: 'low' | 'moderate' | 'high';
   singleExplanation: string;
   /** Every hypothesis the brief lists, "possible" first, with what would confirm or rule it out. */
   hypotheses: Array<{ label: string; assessment: string; nextCheck?: string }>;
-  /** The ground-record checks' sentences (VIIRS heat, Overture Maps types), from the tools. */
+  /** The ground-record checks' sentences (VIIRS heat, Overture Maps types, the public registry and
+   *  the field the site lies in), from the tools. */
   checks?: string[];
   /** What the data cannot show, and the recommended next look. */
   gaps?: string[];

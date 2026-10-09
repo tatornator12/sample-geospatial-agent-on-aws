@@ -44,8 +44,11 @@ SINGLE_EXPLANATION_CONFIDENCE = "low without a ground or aircraft check"
 
 TEXT_MAX = 220
 TITLE_MAX = 90
+PLACE_MAX = 64          # "Recurring methane near " + the place stays inside TITLE_MAX
 MAX_OBSERVATIONS = 6
 MAX_GAPS = 4
+_NEAR = re.compile(r"^(near|close to|around|by)\s+", re.IGNORECASE)
+_COORDS = re.compile(r"\d+\.\d+|°")
 
 # Phrasing a brief never uses: a cause stated as fact, ownership, or intent. Checked on every free
 # text field (case-insensitive). Explanations are named only through the fixed list above.
@@ -102,15 +105,61 @@ def _list(value: Any, name: str, max_items: int) -> list[str]:
     return [_clean(v, f"{name}[{i}]") for i, v in enumerate(value)]
 
 
-def validate_brief(title, place, lat, lon, watch_area, observations, looks, candidates, passes_read,
+def _watch_areas() -> dict:
+    from watch_tools import WATCH_AREAS   # deferred: watch_tools is the heavier module
+    return WATCH_AREAS
+
+
+def watch_area_label(value: Any) -> str | None:
+    """The watch area as the stage names it ("Shanxi and Ordos coal basins (China)"), from its key
+    or its label; any other text is kept as given (bounded)."""
+    text = _clean(value, "watch_area", 60, required=False)
+    if not text:
+        return None
+    low = text.lower()
+    for key, spec in _watch_areas().items():
+        if low in (key, spec["label"].lower()):
+            return spec["label"]
+    return text
+
+
+def check_place(place: str) -> list[str]:
+    """Why `place` is not the geocoder's place name. The site's place comes from reverse_geocode
+    (town, region, country); the watch area that tipped it is a separate field, so a site near
+    Xinxiang, Henan is never titled after the Shanxi basin box it was found in."""
+    low = place.lower()
+    if "watch" in low:
+        return ["names the watch area; give the reverse_geocode place only (town, region, country)"]
+    for spec in _watch_areas().values():
+        phrase = re.sub(r"\s*\(.*\)$", "", spec["label"]).lower()
+        if len(phrase.split()) >= 2 and (phrase in low or phrase.rstrip("s") in low):
+            return [f"names the watch area ('{phrase}'); give the reverse_geocode place only (town, region, country)"]
+    if _COORDS.search(place):
+        return ["gives coordinates; name the place in words (lat and lon are separate fields)"]
+    return []
+
+
+def compose_title(place: str, confidence: str, candidates: int) -> str:
+    """The brief's title, written by the tool: what the evidence supports, then where. Recurrence
+    needs the moderate or high rule; one EMIT candidate is a candidate; none is only a tip."""
+    if confidence in ("high", "moderate"):
+        lead = "Recurring methane"
+    elif candidates > 0:
+        lead = "Methane candidate"
+    else:
+        lead = "Unconfirmed methane tip"
+    return f"{lead} near {place}"
+
+
+def validate_brief(place, lat, lon, watch_area, observations, looks, candidates, passes_read,
                    explanations, confidence, gaps, next_collection) -> dict:
     """The brief as data, or MethaneError naming what to fix."""
+    place = _NEAR.sub("", _clean(place, "place", PLACE_MAX + 10)).strip(" ,")
     brief = {
-        "title": _clean(title, "title", TITLE_MAX),
-        "place": _clean(place, "place", 80),
+        "place": _clean(place, "place", PLACE_MAX),
         "lat": round(_finite(lat, "lat", -90, 90), 4),
         "lon": round(_finite(lon, "lon", -180, 180), 4),
-        "watch_area": _clean(watch_area, "watch_area", 60, required=False) or None,
+        "watch_area": watch_area_label(watch_area),
         "observations": _list(observations, "observations", MAX_OBSERVATIONS),
         "looks": _int(looks, "looks", 0, 10000),
         "candidates": _int(candidates, "candidates", 0, 1000),
@@ -123,6 +172,7 @@ def validate_brief(title, place, lat, lon, watch_area, observations, looks, cand
     if confidence not in CONFIDENCE:
         raise MethaneError(f"confidence must be one of {', '.join(CONFIDENCE)}")
     brief["confidence"] = confidence
+    brief["title"] = compose_title(brief["place"], confidence, brief["candidates"])
     if not isinstance(explanations, list) or len(explanations) < 2:
         raise MethaneError("explanations must list at least two hypotheses from the fixed list")
     seen, rows = set(), []
@@ -141,8 +191,8 @@ def validate_brief(title, place, lat, lon, watch_area, observations, looks, cand
         rows.append({"id": eid, "label": EXPLANATIONS[eid], "assessment": assessment,
                      "next_check": _clean(e.get("next_check"), f"explanations[{i}].next_check")})
     brief["explanations"] = rows
-    problems = []
-    for field in ("title", "place", "watch_area", "next_collection"):
+    problems = [f"place: {p}" for p in check_place(brief["place"])]
+    for field in ("place", "watch_area", "next_collection"):
         if brief[field]:
             problems += [f"{field}: {p}" for p in check_text(brief[field])]
     for field in ("observations", "gaps"):
@@ -157,6 +207,39 @@ def validate_brief(title, place, lat, lon, watch_area, observations, looks, cand
 
 CHECK_RADIUS_KM = 2.0
 _CHECK_KEY = re.compile(r"^(thermal|infra|registry)_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
+
+
+_PASSES_KEY = re.compile(r"^passes_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def find_passes(lat: float, lon: float) -> dict | None:
+    """The newest pass record check_recent_passes wrote for this site this session (nearest within
+    2 km): its window start and the passes read and judged candidates. None when there is none."""
+    s3 = mt._s3()
+    best = None
+    try:
+        listing = s3.list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=f"{mt.session_prefix()}passes_")
+        for obj in listing.get("Contents", []):
+            m = _PASSES_KEY.fullmatch(obj["Key"].rsplit("/", 1)[-1])
+            if not m:
+                continue
+            d = math.hypot((float(m[1]) - lat) * 110.574, (float(m[2]) - lon) * 111.320 * math.cos(math.radians(lat)))
+            if d <= CHECK_RADIUS_KM and (best is None or d < best[0]):
+                best = (d, obj["Key"])
+        if best is None:
+            return None
+        body = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=best[1])["Body"].read(500_000))
+        passes = [p for p in body.get("passes") or [] if isinstance(p, dict)]
+        since = body.get("since")
+        if not passes or not isinstance(since, str) or not _DAY.fullmatch(since):
+            return None
+        cands = [p for p in passes if p.get("verdict") == "candidate"]
+        return {"since": since, "read": len(passes), "candidates": len(cands),
+                "candidate_dates": len({p.get("date") for p in cands if p.get("date")})}
+    except Exception as e:  # an addition to the brief, never a reason to fail it
+        logger.warning("passes lookup failed: %s", type(e).__name__)
+        return None
 
 
 def find_checks(lat: float, lon: float) -> dict:
@@ -198,20 +281,27 @@ def find_checks(lat: float, lon: float) -> dict:
                            "facilities": [{k: r.get(k) for k in ("kind", "count", "nearest_km")} for r in (g.get("facilities") or [])[:6]],
                            "operators": [{k: r.get(k) for k in ("operator", "facilities", "nearest_km")} for r in (g.get("operators") or [])[:3]],
                            "source_dates": g.get("source_dates"), "source": g.get("source"), "line": g.get("line")}
+        f = g.get("field")
+        if isinstance(f, dict) and isinstance(g.get("field_line"), str):
+            out["registry"]["field"] = {k: f.get(k) for k in ("name", "operator", "inside", "distance_km", "src_date")}
+            out["registry"]["field_line"] = g["field_line"]
     return out
 
 
 def render_markdown(brief: dict, brief_id: str) -> str:
-    area = f", watch area {brief['watch_area']}" if brief["watch_area"] else ""
+    area = f"; tipped by the {brief['watch_area']} watch area" if brief["watch_area"] else ""
+    since = f" since {brief['passes_since']}" if brief.get("passes_since") else ""
     checks = brief.get("checks") or {}
     check_lines = [f"- Check: {c['line']}" for c in (checks.get("thermal"), checks.get("infrastructure"), checks.get("registry"))
                    if c and c.get("line")]
+    if (checks.get("registry") or {}).get("field_line"):
+        check_lines.append(f"- Check: {checks['registry']['field_line']}")
     lines = [
         f"**Methane Watch brief: {brief['title']}** (draft `{brief_id}`, not filed)",
         "",
-        f"Site: {brief['place']} ({brief['lat']:.4f}, {brief['lon']:.4f}){area}",
-        f"Looks: EMIT looked {brief['looks']} times; {brief['candidates']} of {brief['passes_read']} "
-        f"recent passes read are candidates.",
+        f"Site: near {brief['place']} ({brief['lat']:.4f}, {brief['lon']:.4f}){area}.",
+        f"Looks: {brief['candidates']} of {brief['passes_read']} passes read{since} are candidates; "
+        f"EMIT looked {brief['looks']} times in all.",
         "",
         *[f"- {o}" for o in brief["observations"]],
         *check_lines,
@@ -236,17 +326,19 @@ def new_brief_id(now: datetime | None = None) -> str:
 
 
 @tool
-async def draft_brief(title: str, place: str, lat: float, lon: float, observations: list,
+async def draft_brief(place: str, lat: float, lon: float, observations: list,
                       looks: int, candidates: int, passes_read: int, explanations: list,
                       confidence: str, gaps: list, next_collection: str, watch_area: str = None) -> str:
     """Draft the Methane Watch brief for one site. A DRAFT only: nothing is filed until the analyst decides.
 
-    Every text field is ONE short sentence of at most 220 characters (title 90, place 80); no markdown,
-    pipes or angle brackets. Longer text is rejected.
+    Every text field is ONE short sentence of at most 220 characters (place 64); no markdown, pipes
+    or angle brackets. Longer text is rejected. The tool writes the title itself from the place and
+    the confidence ("Recurring methane near Xinxiang, Henan, China").
 
     Args:
-        title: Short title, e.g. "Recurring methane, south Caspian site".
-        place: The place in words (from reverse_geocode), never an owner or operator.
+        place: The site's place exactly as reverse_geocode gave it: town, region, country (e.g.
+            "Xinxiang, Henan, China"). Never the watch area or a basin, never coordinates, never an
+            owner or operator; the watch area goes in watch_area.
         lat, lon: The site in degrees.
         observations: 2-6 short sentences, every number from a tool result (ppm·m, ppb, dates, counts).
         looks: How many times EMIT looked (site_history.looks).
@@ -259,18 +351,22 @@ async def draft_brief(title: str, place: str, lat: float, lon: float, observatio
         confidence: "low" | "moderate" | "high": confidence that methane RECURS at this site.
         gaps: 1-4 things the data cannot show (coverage, the post-2024 plume product gap, ...).
         next_collection: The recommended next look (another EMIT pass, aircraft, ground inspection).
-        watch_area: Optional watch-area name.
+        watch_area: The watch area whose scan tipped this site (its key, e.g. "shanxi coal basin").
 
     Returns: JSON with brief_id, status "draft", markdown (paste it as the record, verbatim),
     draft_s3_url, next_steps. If the text breaks the brief's rules, an error naming the parts to
     rewrite: fix them and call again.
     """
     try:
-        brief = validate_brief(title, place, lat, lon, watch_area, observations, looks, candidates, passes_read,
+        brief = validate_brief(place, lat, lon, watch_area, observations, looks, candidates, passes_read,
                                explanations, confidence, gaps, next_collection)
     except MethaneError as e:
         return json.dumps({"error": str(e)})
     brief_id = new_brief_id()
+    passes = find_passes(brief["lat"], brief["lon"])
+    if passes:   # the pass counts and their window come from the tool's own record, not the model
+        brief.update(candidates=passes["candidates"], passes_read=passes["read"], passes_since=passes["since"])
+        brief["title"] = compose_title(brief["place"], brief["confidence"], brief["candidates"])
     brief["checks"] = find_checks(brief["lat"], brief["lon"])
     markdown = render_markdown(brief, brief_id)
     record = {"brief_id": brief_id, "status": "draft", "created": datetime.now(timezone.utc).isoformat(),

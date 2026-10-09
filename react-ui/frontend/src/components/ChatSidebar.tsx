@@ -527,7 +527,7 @@ export function ChatSidebar({
             methaneDir={methaneDir}
             tips={tips}
             compact={!!briefId && !isStreaming && stepTools.some((t) => t.name === 'draft_brief')}
-            key={briefId ?? 'steps'}
+            key={`steps-${briefId ?? 'live'}`}
           />
           {briefId && !isStreaming && (
             <BriefCard
