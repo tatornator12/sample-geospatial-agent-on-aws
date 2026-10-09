@@ -883,6 +883,13 @@
   flex-direction: column;
   animation: stage-rise 360ms var(--ease-out) both;
 }
+/* A short screen (720p): the caption band wraps to three lines and rises; the plate stops
+   above it and scrolls inside itself (a held row auto-scrolls the list). */
+@media (max-height: 800px) {
+  .map-layers {
+    max-height: calc(100% - 350px);
+  }
+}
 .map-layers__head {
   display: flex;
   align-items: center;
@@ -977,29 +984,150 @@
   color: var(--fog);
   background: rgba(233, 238, 243, 0.06);
 }
-/* The order arrows: a raster moves one step up or down the stack, and the map follows at once. */
-.map-row__order {
-  display: inline-flex;
+/* The name and, under an index or a plume, a ramp strip that ties the row to its legend. Long
+   names stop at two lines; the full name is the button's accessible name and its title. */
+.map-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.map-row__main .map-row__name {
+  flex: none;
+  width: 100%;
+}
+.map-row__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.map-row__ramp {
+  width: 56px;
+  height: 4px;
+  margin-bottom: 4px;
+  border-radius: 2px;
   flex: none;
 }
-.map-row__nudge {
-  width: 28px;
-  height: 18px;
+
+/* The lists: "On top" (vectors, fixed) and the imagery stack (drag to restack). */
+.map-stack-wrap {
+  position: relative;
+}
+.map-stack {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.map-row--stack {
+  position: relative;
+  padding-left: 0;
+  gap: 8px;
+}
+/* The grip: always visible, the row's full height, a 32px column. */
+.map-row__grip {
+  flex: none;
+  width: 32px;
+  height: 36px;
+  margin: -4px 0;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--label);
+  cursor: grab;
+  touch-action: none;
 }
-.map-row__nudge:hover:not(:disabled) {
+.map-row__grip:hover {
   color: var(--fog);
   background: rgba(233, 238, 243, 0.06);
 }
-.map-row__nudge:disabled {
-  opacity: 0.3;
-  cursor: default;
+.map-row__grip[aria-pressed='true'] {
+  color: var(--amber);
+  background: var(--amber-wash);
+}
+/* A row is lifted (click-to-place): every other grip is a place to put it. */
+.map-row__grip--target {
+  color: var(--amber);
+  box-shadow: inset 0 0 0 1px var(--hairline-strong);
+}
+.map-row__grip--target:hover {
+  color: var(--amber-hover);
+  background: var(--amber-wash);
+}
+/* The held row rides on a raised plate over its neighbours, vertically only. */
+.map-row--dragging,
+.map-row--lifted {
+  z-index: 2;
+  background: var(--plate-raised);
+  box-shadow: var(--shadow-2), inset 0 0 0 1px var(--hairline-strong);
+}
+.map-row--dragging,
+.map-row--dragging .map-row__grip {
+  cursor: grabbing;
+}
+.map-row--dragging .map-row__grip {
+  color: var(--amber);
+}
+.map-stack--dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.map-stack--dragging .map-row:not(.map-row--dragging):hover {
+  background: transparent;
+}
+/* The neighbours slide out of the way; the global reduced-motion rule makes this instant. */
+.map-stack--dragging .map-row--stack:not(.map-row--dragging) {
+  transition: transform 180ms var(--ease-out);
+}
+/* Where the row lands: a full-height amber wash with a 1px amber hairline. */
+.map-stack__slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  border-radius: 6px;
+  background: var(--amber-wash);
+  box-shadow: inset 0 0 0 1px var(--amber);
+  pointer-events: none;
+  transition: transform 180ms var(--ease-out);
+}
+/* The row that just landed: a 300ms amber wash that fades. */
+@keyframes map-row-settle {
+  from {
+    background-color: var(--amber-wash);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.map-row--settle {
+  animation: map-row-settle 300ms var(--ease-out);
+}
+/* For screen readers only: the stack's instructions and its announcements. */
+.map-stack__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+/* The legends sit under the list, one per ramp on the stage, top row's first. */
+.map-layers__legends {
+  display: flex;
+  flex-direction: column;
+  padding-top: 2px;
+  border-top: 1px solid var(--hairline);
 }
 /* Similar places: the one legend on the stage. Evidence colour (violet ramp), not the accent. */
 .map-legend {

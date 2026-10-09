@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useId, useRef, useState, useMemo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../utils/maplibreWorker.ts';
@@ -10,10 +10,10 @@ import { TITILER_URL, TITILER_API_KEY } from '../config.ts';
 import {
   boundsWithin,
   findComparePair,
-  formatLayerDisplayText,
   groupLayers,
   isMethaneLayer,
   isSimilarityLayer,
+  layerRowLabel,
   type LayerMetadata,
 } from '../utils/layerFormatting';
 import { indexLegendFor, rampExpression, rampGradient, tileParamsFor, type RenderHint } from '../utils/render.ts';
@@ -23,12 +23,13 @@ import {
   globeCentre,
   isoDay,
   methaneGeometryHint,
-  methaneLegend,
   methaneRasterHint,
 } from '../utils/methaneLayers.ts';
+import { insertInStack, layerLegend, rasterCeiling, stackLegends, stackMoves, type StackLegend } from '../utils/layerStack.ts';
 import type { Tip } from '../utils/steps.ts';
 import { CompareView } from './CompareView';
 import { Icon } from './Icons.tsx';
+import { LayerStack, type StackRow } from './LayerStack.tsx';
 import { theme } from '../theme';
 import '../stage.css';
 
@@ -99,6 +100,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const [hasDrawnFeatures, setHasDrawnFeatures] = useState(false);
   const [baseMapStyle, setBaseMapStyle] = useState<'dark' | 'google-roads' | 'google-satellite' | 'esri-satellite'>('esri-satellite');
   const [compareMode, setCompareMode] = useState<{ left: LayerMetadata; right: LayerMetadata; center?: [number, number]; zoom?: number } | null>(null);
+
+  // The imagery stack, top first: the layers plate lists it in this order and the map draws it in
+  // this order (applyRasterOrder). The ref is for the raster loader, which adds several layers
+  // before React commits the state.
+  const [rasterOrder, setRasterOrder] = useState<string[]>([]);
+  const rasterOrderRef = useRef<string[]>([]);
 
   // Memoize layer groups to avoid repeated filtering on each render
   const layerGroups = useMemo(() => groupLayers(allLayers), [allLayers]);
@@ -1123,6 +1130,36 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const geometryCompanionIds = (fillLayerId: string) =>
     ['-outline', '-query', '-labels', '-hairline'].map(suffix => fillLayerId.replace('-fill', suffix));
 
+  // The raster ceiling: the lowest vector above the basemap. Every raster sits beneath it, so the
+  // imagery never covers a boundary, a footprint, a label or a drawn shape.
+  const currentCeiling = (mapInstance: maplibregl.Map) =>
+    rasterCeiling(
+      mapInstance.getLayersOrder().map((id) => ({ id, type: mapInstance.getLayer(id)?.type })),
+      BASEMAP_IDS,
+    );
+
+  // Put the imagery stack (top first) on the map: bottom first, each directly beneath the
+  // ceiling. Also the live preview while a row is held in the layers plate.
+  const applyRasterOrder = (order: string[]) => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const onMap = order.filter((id) => mapInstance.getLayer(id));
+    for (const [id, beforeId] of stackMoves(onMap, currentCeiling(mapInstance))) {
+      mapInstance.moveLayer(id, beforeId);
+    }
+  };
+
+  // A reorder from the layers plate: the state, the ref and the map. A raster that landed while
+  // the row was held (not in `order`) keeps its place at the end.
+  const commitRasterOrder = (order: string[]) => {
+    const current = rasterOrderRef.current;
+    const kept = order.filter((id) => current.includes(id));
+    const next = [...kept, ...current.filter((id) => !kept.includes(id))];
+    rasterOrderRef.current = next;
+    setRasterOrder(next);
+    applyRasterOrder(next);
+  };
+
   // Remove a specific layer. Reads the ref, not the state, so the geometry loader (which closes
   // over an older render) can replace a layer it did not see in its own closure.
   const removeLayer = (layerId: string) => {
@@ -1154,6 +1191,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       }
       // Remove URL from tracking ref
       addedRasterUrls.current.delete(layer.url);
+      rasterOrderRef.current = rasterOrderRef.current.filter((id) => id !== layer.id);
+      setRasterOrder(rasterOrderRef.current);
     }
     
     setAllLayers(prev => prev.filter(l => l.id !== layerId));
@@ -1198,6 +1237,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     // Clear all layers (basemap is dynamic and not tracked here)
     setAllLayers([]);
     setRasterVisibility({});
+    rasterOrderRef.current = [];
+    setRasterOrder([]);
     addedRasterUrls.current.clear(); // Clear the URL tracking ref
     plumeFramed.current = false;
     // Back to the flat, upright map the other acts expect.
@@ -1428,26 +1469,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           setRasterVisibility(prev => ({ ...prev, [layerId]: isVisible }));
 
           // Stacking: the finding sits on the ground. An index (NDVI, NBR, NDWI, change), a methane
-          // plume or anything the hint marks as an index or a change layer goes on TOP (no beforeId);
-          // true-colour imagery and other scenes go to the bottom of the COG stack, just above the
-          // basemap, so an NDVI displayed after its scene is never hidden under it.
-          const mapLayers = mapInstance.getStyle().layers || [];
-          const basemapLayerIds = ['dark-base', 'google-roads-base', 'google-satellite-base', 'esri-satellite-base'];
+          // plume or anything the hint marks as an index or a change layer joins the TOP of the
+          // imagery; true-colour imagery and other scenes join the bottom, just above the basemap,
+          // so an NDVI displayed after its scene is never hidden under it. Either way the raster
+          // stays beneath the raster ceiling (every vector and label stays on top), and the
+          // layers plate lists the stack in the order the map draws it.
           const isFinding = isMethaneRaster || indexLegendFor(raster.url) !== null
             || hint?.group === 'index' || hint?.group === 'change';
+          const beforeId = currentCeiling(mapInstance);
 
-          let beforeId: string | undefined;
-          if (isFinding) {
-            beforeId = undefined;
-          } else {
-            const firstNonBasemapRaster = mapLayers.find((l: any) =>
-              l.type === 'raster' &&
-              !basemapLayerIds.includes(l.id)
-            );
-            beforeId = firstNonBasemapRaster ? firstNonBasemapRaster.id : undefined;
-          }
-
-          // Add raster layer (above basemaps, beforeId places new layers at bottom of COG stack)
           // A coarse raster (the hint caps its zoom: TROPOMI's ~4 km cells) is hidden above that
           // zoom and dimmed below it, so it tips the eye without walling off the finding.
           const coarse = typeof hint?.max_zoom === 'number';
@@ -1463,6 +1493,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               visibility: isVisible ? 'visible' : 'none',
             },
           }, beforeId);
+          rasterOrderRef.current = insertInStack(rasterOrderRef.current, layerId, isFinding);
+          applyRasterOrder(rasterOrderRef.current);
+          setRasterOrder(rasterOrderRef.current);
 
           // Track this layer with metadata
           newLayerMetadata.push({
@@ -1480,10 +1513,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // This prevents race condition where ref is updated but layer isn't added due to abort
           addedRasterUrls.current.add(raster.url);
 
-          // The ranking reads over the plume: the lit outlines and their "#1 · ppm·m" labels stay
-          // above the plume raster (which goes to the top of the stack).
-          // The watch areas, site dots and rings stay readable over the TROPOMI composite, and
-          // the columns stand over the pass window.
+          // The ranking reads over the plume: the raster ceiling already keeps every vector over
+          // the imagery; among the vectors, the methane outlines, "#1 · ppm·m" labels, watch areas,
+          // site dots, rings and columns come to the top once a methane raster lands.
           if (isMethaneRaster) {
             allLayersRef.current
               .filter((l) => l.type === 'geometry' && isMethaneLayer(l))
@@ -1587,41 +1619,48 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   }, [geometry, rasters, allLayers]);
 
 
-  // The rasters' order on the map, bottom to top (the style's order), for the reorder arrows. The
-  // tick re-renders the rows after a move, since the map's order is not React state.
-  const [, setOrderTick] = useState(0);
-  const rasterStackOrder = (): string[] => {
-    const styleLayers = map.current?.getStyle()?.layers ?? [];
-    const known = new Set(allLayers.filter((l) => l.type === 'raster').map((l) => l.id));
-    return styleLayers.filter((l) => l.type === 'raster' && known.has(l.id)).map((l) => l.id);
-  };
-  // Move a raster one step up or down the stack. MapLibre's moveLayer(id, beforeId) puts `id`
-  // just beneath `beforeId` (or on top when beforeId is omitted), so "up" means "beneath the one
-  // above the neighbour above", and "down" means "beneath the neighbour below".
-  const nudgeLayer = (layerId: string, direction: 'up' | 'down') => {
-    const mapInstance = map.current;
-    if (!mapInstance) return;
-    const order = rasterStackOrder();
-    const i = order.indexOf(layerId);
-    if (i < 0) return;
-    if (direction === 'up') {
-      if (i === order.length - 1) return;
-      mapInstance.moveLayer(layerId, order[i + 2]);
-    } else {
-      if (i === 0) return;
-      mapInstance.moveLayer(layerId, order[i - 1]);
-    }
-    setOrderTick((t) => t + 1);
-  };
+  // The imagery stack as rows, top first. A raster the order has not caught up with (none
+  // expected) is listed last rather than dropped.
+  const rasterRows = useMemo(() => {
+    const rasters = allLayers.filter((l) => l.type === 'raster');
+    const byId = new Map(rasters.map((l) => [l.id, l]));
+    const ordered = rasterOrder.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+    return [...ordered, ...rasters.filter((l) => !rasterOrder.includes(l.id))];
+  }, [allLayers, rasterOrder]);
+  const stackRows: StackRow[] = useMemo(
+    () => rasterRows.map((l) => ({ id: l.id, label: layerRowLabel(l) })),
+    [rasterRows],
+  );
 
-  // One row per layer: visibility toggle, name (click to fly there), order arrows (rasters), remove.
-  const renderLayerRow = (layer: LayerMetadata, label: string) => {
-    const isVisible = rasterVisibility[layer.id] !== false;
-    const order = layer.type === 'raster' ? rasterStackOrder() : [];
-    const at = order.indexOf(layer.id);
-    const canReorder = at >= 0 && order.length > 1;
+  // The vectors, top first, in the order the map draws them (a geometry's highest companion
+  // decides). Read from the map each render: the methane footprints are re-lifted when a plume
+  // lands. Without a map yet, the newest first (a new vector lands on top).
+  const vectorRows = (() => {
+    const vectors = allLayers.filter((l) => l.type === 'geometry');
+    let order: string[] = [];
+    try {
+      order = map.current?.getLayersOrder() ?? [];
+    } catch {
+      order = [];
+    }
+    const top = (l: LayerMetadata) => Math.max(...[l.id, ...geometryCompanionIds(l.id)].map((id) => order.indexOf(id)));
+    return vectors
+      .map((l, i) => ({ l, i, t: top(l) }))
+      .sort((a, b) => b.t - a.t || b.i - a.i)
+      .map((x) => x.l);
+  })();
+
+  const isShown = (id: string) => rasterVisibility[id] !== false;
+  const legends = stackLegends(rasterRows, vectorRows, isShown);
+
+  // A row's own controls: visibility, the name (click to fly there; a ramp strip under an index or
+  // a plume ties the row to its legend), remove. The imagery stack adds the grip in front.
+  const renderRowControls = (layer: LayerMetadata, label: string) => {
+    const isVisible = isShown(layer.id);
+    const legend = layer.type === 'raster' ? layerLegend(layer) : null;
+    const strip = legend && 'ramp' in legend ? rampGradient(legend.ramp) : null;
     return (
-      <div key={layer.id} className={`map-row${isVisible ? '' : ' map-row--off'}`}>
+      <>
         <input
           type="checkbox"
           className="map-row__check"
@@ -1632,38 +1671,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           }}
           aria-label={`${isVisible ? 'Hide' : 'Show'} ${label}`}
         />
-        <button
-          type="button"
-          className="map-row__name"
-          onClick={() => flyToLayer(layer.id)}
-          title="Fly to this layer"
-        >
-          {label}
-        </button>
-        {canReorder && (
-          <span className="map-row__order" role="group" aria-label={`Order of ${label} on the map`}>
-            <button
-              type="button"
-              className="map-row__nudge"
-              onClick={() => nudgeLayer(layer.id, 'up')}
-              disabled={at === order.length - 1}
-              aria-label={`Move ${label} up, above the layer over it`}
-              title="Move up on the map"
-            >
-              <Icon name="chevron-up" size={14} />
-            </button>
-            <button
-              type="button"
-              className="map-row__nudge"
-              onClick={() => nudgeLayer(layer.id, 'down')}
-              disabled={at === 0}
-              aria-label={`Move ${label} down, beneath the layer under it`}
-              title="Move down on the map"
-            >
-              <Icon name="chevron-down" size={14} />
-            </button>
-          </span>
-        )}
+        <span className="map-row__main">
+          <button type="button" className="map-row__name" onClick={() => flyToLayer(layer.id)} title={`Fly to ${label}`}>
+            <span className="map-row__text">{label}</span>
+          </button>
+          {strip && <span className="map-row__ramp" style={{ background: strip }} aria-hidden="true" />}
+        </span>
         <button
           type="button"
           className="map-row__remove"
@@ -1673,29 +1686,64 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         >
           <Icon name="close" size={14} />
         </button>
-      </div>
+      </>
     );
   };
 
-  // The Earth Analyst's legends: one row per index on the stage (NDVI, NBR, NDWI, change), the ramp
-  // TiTiler draws with its ends in words, so the room reads the colours without being told.
-  const renderIndexLegends = (layers: LayerMetadata[]) => {
-    const seen = new Set<string>();
-    const legends = layers
-      .filter((l) => rasterVisibility[l.id] !== false)
-      .map((l) => indexLegendFor(l.url))
-      .filter((lg): lg is NonNullable<typeof lg> => !!lg && !seen.has(lg.label) && !!seen.add(lg.label));
-    return legends.map((lg) => (
-      <div key={lg.label} className="map-legend map-legend--stacked">
-        <span className="map-legend__name">{lg.label}</span>
-        <div className="map-legend__bar" role="img" aria-label={`Colour ramp: ${lg.label}, ${lg.low} to ${lg.high}`}>
-          <span className="map-legend__label">{lg.low}</span>
-          <span className="map-legend__ramp" style={{ background: rampGradient(lg.ramp) ?? undefined }} aria-hidden="true" />
-          <span className="map-legend__label">{lg.high}</span>
+  // The legends under the list: the room reads the colours without being told. Index ends in
+  // words; methane ends in the mono face with their units; the sites key draws a dot and a ring.
+  const rampWords: Record<string, string> = { plasma: 'dark purple to yellow', viridis: 'dark violet to yellow-green' };
+  const renderLegend = (lg: StackLegend) => {
+    if (lg.kind === 'index') {
+      return (
+        <div key={lg.key} className="map-legend map-legend--stacked">
+          <span className="map-legend__name">{lg.label}</span>
+          <div className="map-legend__bar" role="img" aria-label={`Colour ramp: ${lg.label}, ${lg.low} to ${lg.high}`}>
+            <span className="map-legend__label">{lg.low}</span>
+            <span className="map-legend__ramp" style={{ background: rampGradient(lg.ramp) ?? undefined }} aria-hidden="true" />
+            <span className="map-legend__label">{lg.high}</span>
+          </div>
         </div>
+      );
+    }
+    if (lg.kind === 'measure') {
+      return (
+        <div key={lg.key} className="map-legend map-legend--stacked">
+          <span className="map-legend__name">{lg.label}</span>
+          <div
+            className="map-legend__bar"
+            role="img"
+            aria-label={`Colour ramp: ${lg.label} from ${lg.lo} to ${lg.hi} ${lg.units} and above, ${rampWords[lg.ramp] ?? 'low to high'}`}
+          >
+            <span className="map-legend__label map-legend__label--num">{lg.lo.toLocaleString('en-US')}</span>
+            <span className="map-legend__ramp" style={{ background: rampGradient(lg.ramp) ?? undefined }} aria-hidden="true" />
+            <span className="map-legend__label map-legend__label--num">
+              {lg.hi.toLocaleString('en-US')}+ {lg.units}
+            </span>
+          </div>
+        </div>
+      );
+    }
+    if (lg.kind === 'sites') {
+      return (
+        <div key={lg.key} className="map-legend map-legend--sites" role="img" aria-label="A dot is a site with a NASA plume; a ring marks a site seen on five or more dates">
+          <span className="map-legend__dot" aria-hidden="true" />
+          <span className="map-legend__label">site</span>
+          <span className="map-legend__ring" aria-hidden="true" />
+          <span className="map-legend__label">seen on 5+ dates</span>
+        </div>
+      );
+    }
+    return (
+      <div key={lg.key} className="map-legend" role="img" aria-label="Colour ramp: lighter violet is less alike, deeper violet is more alike">
+        <span className="map-legend__label">less alike</span>
+        <span className="map-legend__ramp" aria-hidden="true" />
+        <span className="map-legend__label">more alike</span>
       </div>
-    ));
+    );
   };
+  const onTopTitleId = useId();
+  const imageryTitleId = useId();
 
   const openCompare = () => {
     if (!comparePair) return;
@@ -1746,101 +1794,48 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
 
           {isLayerControlOpen && (
             <div className="map-layers__body">
-              {/* Change detection always leads: it is the finding. */}
-              {layerGroups.changeDetection.length > 0 && (
+              {/* One list in draw order: the vectors are always drawn over the imagery, and the
+                  imagery is drawn top row first. Only the imagery restacks. */}
+              {vectorRows.length > 0 && (
                 <div>
-                  <h3 className="map-group__title">Change detection</h3>
-                  {layerGroups.changeDetection.map((layer) =>
-                    renderLayerRow(layer, formatLayerDisplayText(layer, 'spectral'))
-                  )}
-                  {renderIndexLegends(layerGroups.changeDetection)}
+                  <h3 className="map-group__title" id={onTopTitleId}>On top</h3>
+                  <ul className="map-stack" aria-labelledby={onTopTitleId}>
+                    {vectorRows.map((layer) => {
+                      const label = layerRowLabel(layer);
+                      return (
+                        <li key={layer.id} className={`map-row${isShown(layer.id) ? '' : ' map-row--off'}`} data-layer-id={layer.id}>
+                          {renderRowControls(layer, label)}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
 
-              {/* Methane: the plume, its footprints, and the ramp that reads them. */}
-              {layerGroups.methane.length > 0 && (() => {
-                // One row per ramp: EMIT's plasma ppm·m and TROPOMI's viridis ppb are different
-                // instruments and units and never share a bar; the sites line explains the rings.
-                const legend = methaneLegend(layerGroups.methane.map((l) => l.render));
-                const ramps = legend.ramps.length > 0 || legend.sites
-                  ? legend.ramps
-                  : methaneLegend([METHANE_RASTER]).ramps;
-                const words: Record<string, string> = { plasma: 'dark purple to yellow', viridis: 'dark violet to yellow-green' };
-                return (
-                  <div>
-                    <h3 className="map-group__title">Methane</h3>
-                    {layerGroups.methane.map((layer) => renderLayerRow(layer, layer.name))}
-                    {ramps.map((r) => (
-                      <div key={`${r.ramp}-${r.units}`} className="map-legend map-legend--stacked">
-                        <span className="map-legend__name">{r.label}</span>
-                        <div
-                          className="map-legend__bar"
-                          role="img"
-                          aria-label={`Colour ramp: ${r.label} from ${r.lo} to ${r.hi} ${r.units} and above, ${words[r.ramp] ?? 'low to high'}`}
-                        >
-                          <span className="map-legend__label map-legend__label--num">{r.lo.toLocaleString('en-US')}</span>
-                          <span className="map-legend__ramp" style={{ background: rampGradient(r.ramp) ?? undefined }} aria-hidden="true" />
-                          <span className="map-legend__label map-legend__label--num">
-                            {r.hi.toLocaleString('en-US')}+ {r.units}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                    {legend.sites && (
-                      <div className="map-legend map-legend--sites" role="img" aria-label="A dot is a site with a NASA plume; a ring marks a site seen on five or more dates">
-                        <span className="map-legend__dot" aria-hidden="true" />
-                        <span className="map-legend__label">site</span>
-                        <span className="map-legend__ring" aria-hidden="true" />
-                        <span className="map-legend__label">seen on 5+ dates</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Search by example: ranked look-alikes, with the release's one legend. */}
-              {layerGroups.similarPlaces.length > 0 && (
+              {stackRows.length > 0 && (
                 <div>
-                  <h3 className="map-group__title">Similar places</h3>
-                  {layerGroups.similarPlaces.map((layer) =>
-                    renderLayerRow(layer, formatLayerDisplayText(layer, 'similar'))
-                  )}
-                  <div className="map-legend" role="img" aria-label="Colour ramp: lighter violet is less alike, deeper violet is more alike">
-                    <span className="map-legend__label">less alike</span>
-                    <span className="map-legend__ramp" aria-hidden="true" />
-                    <span className="map-legend__label">more alike</span>
-                  </div>
+                  <h3 className="map-group__title" id={imageryTitleId}>Imagery · top first</h3>
+                  <LayerStack
+                    rows={stackRows}
+                    labelledBy={imageryTitleId}
+                    onPreview={applyRasterOrder}
+                    onCommit={commitRasterOrder}
+                    rowClassName={(row) => (isShown(row.id) ? '' : 'map-row--off')}
+                    renderControls={(row) => {
+                      const layer = rasterRows.find((l) => l.id === row.id);
+                      return layer ? renderRowControls(layer, row.label) : null;
+                    }}
+                  />
                 </div>
               )}
 
-              {layerGroups.tci.length > 0 && (
-                <div>
-                  <h3 className="map-group__title">Satellite imagery</h3>
-                  {layerGroups.tci.map((layer) => renderLayerRow(layer, formatLayerDisplayText(layer, 'tci')))}
-                  {comparePair && (
-                    <button type="button" className="stage-btn map-group__action" onClick={openCompare}>
-                      <Icon name="compare" size={16} />
-                      Compare before and after
-                    </button>
-                  )}
-                </div>
-              )}
+              {legends.length > 0 && <div className="map-layers__legends">{legends.map(renderLegend)}</div>}
 
-              {layerGroups.spectralIndices.length > 0 && (
-                <div>
-                  <h3 className="map-group__title">Spectral indices</h3>
-                  {layerGroups.spectralIndices.map((layer) =>
-                    renderLayerRow(layer, formatLayerDisplayText(layer, 'spectral'))
-                  )}
-                  {renderIndexLegends(layerGroups.spectralIndices)}
-                </div>
-              )}
-
-              {layerGroups.geometries.length > 0 && (
-                <div>
-                  <h3 className="map-group__title">Boundaries</h3>
-                  {layerGroups.geometries.map((layer) => renderLayerRow(layer, layer.name))}
-                </div>
+              {comparePair && (
+                <button type="button" className="stage-btn map-group__action" onClick={openCompare}>
+                  <Icon name="compare" size={16} />
+                  Compare before and after
+                </button>
               )}
             </div>
           )}

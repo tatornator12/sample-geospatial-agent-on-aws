@@ -18,7 +18,8 @@ export type IconName =
   | 'stop'
   | 'reset'
   | 'compare'
-  | 'zoom';
+  | 'zoom'
+  | 'grip';
 
 const paths: Record<IconName, ReactElement> = {
   point: (
@@ -76,6 +77,17 @@ const paths: Record<IconName, ReactElement> = {
       <circle cx="7" cy="7" r="4" />
       <path d="m10 10 3.5 3.5M7 5v4M5 7h4" />
     </>
+  ),
+  // The reorder handle: two columns of three dots, filled, so it reads at 16px on a projector.
+  grip: (
+    <g fill="currentColor" stroke="none">
+      <circle cx="5.75" cy="3.5" r="1.35" />
+      <circle cx="10.25" cy="3.5" r="1.35" />
+      <circle cx="5.75" cy="8" r="1.35" />
+      <circle cx="10.25" cy="8" r="1.35" />
+      <circle cx="5.75" cy="12.5" r="1.35" />
+      <circle cx="10.25" cy="12.5" r="1.35" />
+    </g>
   ),
 };
 

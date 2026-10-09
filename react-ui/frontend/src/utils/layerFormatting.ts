@@ -242,6 +242,18 @@ export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 
 }
 
 /**
+ * The name a layer's row shows in the layers plate: the agent's title for methane layers,
+ * boundaries and drawn shapes; "Places like … · Mon YYYY" for a similarity map; the cleaned
+ * place and date for every other raster (true colour, indices, change maps).
+ */
+export function layerRowLabel(layer: LayerMetadata): string {
+  if (isMethaneLayer(layer)) return layer.name;
+  if (isSimilarityLayer(layer)) return formatSimilarityLabel(layer);
+  if (layer.type === 'geometry') return layer.name;
+  return formatLayerDisplayText(layer, 'tci');
+}
+
+/**
  * Group layers by type for organized display
  */
 export function groupLayers(layers: LayerMetadata[]) {
