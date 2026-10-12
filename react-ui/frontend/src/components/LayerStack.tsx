@@ -1,5 +1,5 @@
 /**
- * The imagery stack: a list in draw order (the top row is drawn on top) that the presenter
+ * The layer stack: a list in draw order (the top row is drawn on top) that the presenter
  * restacks by dragging a row's grip. The map follows live while a row is held; Escape, or a
  * drop outside the plate, puts everything back.
  *
@@ -387,7 +387,7 @@ export function LayerStack({ rows, labelledBy, onPreview, onCommit, renderContro
                   aria-label={
                     isTarget
                       ? `Put ${rows.find((r) => r.id === liftedId)?.label ?? 'the lifted layer'} here, ${index + 1} of ${count}`
-                      : `Reorder ${row.label}, ${index + 1} of ${count} in the imagery stack`
+                      : `Reorder ${row.label}, ${index + 1} of ${count} on the map`
                   }
                   aria-describedby={hintId}
                   aria-pressed={liftedId === row.id}

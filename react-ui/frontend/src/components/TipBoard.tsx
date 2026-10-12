@@ -1,11 +1,12 @@
 /**
  * The tip board: every watch area the agent scanned, strongest TROPOMI tip first, so the room sees
  * the whole field before the agent commits to a site. One row per area: its name and country (from
- * the stage's own table, never from the model), the anomaly in mono on a viridis bar (the TROPOMI
- * legend's own ramp, 0–60 ppb), and whether EMIT can look there. The sites EMIT was cued on carry a
- * ring; the one the agent followed is set in fog. Numbers come from the scan tools' manifests.
+ * the stage's own table, never from the model), the anomaly in mono on a bar in the TROPOMI
+ * legend's own ramp (ice, 0–60 ppb), and whether EMIT can look there. The sites EMIT was cued on
+ * carry a ring; the one the agent followed is set in fog. Numbers come from the scan tools' manifests.
  */
 import { rampGradient } from '../utils/render.ts';
+import { TROPOMI_RAMP } from '../utils/methaneLayers.ts';
 import type { Tip } from '../utils/steps.ts';
 
 const BAR_MAX_PPB = 60;
@@ -22,7 +23,7 @@ interface TipBoardProps {
 
 export function TipBoard({ tips, cued, chosen = null, expected }: TipBoardProps) {
   if (tips.length === 0) return null;
-  const gradient = rampGradient('viridis') ?? undefined;
+  const gradient = rampGradient(TROPOMI_RAMP) ?? undefined;
   const pending = Math.max(0, expected - tips.length);
   return (
     <div className="tip-board" role="table" aria-label="TROPOMI tips by watch area, strongest first">

@@ -1,11 +1,12 @@
 /**
- * The imagery stack in the layers plate: one list in draw order (top row drawn on top), held as
- * React state and mirrored to MapLibre. Pure functions, so the order rules and the drag geometry
- * are testable without WebGL or a pointer.
+ * The layer stack in the layers plate: one list in draw order (top row drawn on top), held as
+ * React state and mirrored to MapLibre. Every layer the agent put on the map restacks: imagery,
+ * boundaries, footprints, sites, columns. Pure functions, so the order rules and the drag
+ * geometry are testable without WebGL or a pointer.
  *
- * Every raster lives in one band of the map's style: above the basemap, beneath the lowest
- * vector (the "ceiling"). Vectors (boundaries, footprints, sites, drawn shapes, labels) are
- * always drawn over the imagery; only the imagery is reordered.
+ * The stack lives in one band of the map's style: above the basemap, beneath the "ceiling" (the
+ * lowest layer the plate does not list: the presenter's drawn shapes, the tips on the globe), so
+ * a restack never buries what the presenter just drew.
  */
 import { isMethaneLayer, isSimilarityLayer, type LayerMetadata } from './layerFormatting.ts';
 import { indexLegendFor, type ColormapName } from './render.ts';
@@ -21,42 +22,59 @@ export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
 }
 
 /**
- * Where a new raster joins the stack (top first): a finding (an index, a change map, a methane
- * raster) goes on top of the imagery, a scene (true colour) to the bottom, just above the basemap,
- * so an NDVI that lands after its scene is never hidden under it.
+ * Where a new layer joins the stack (top first):
+ * - `top`: a vector (a boundary, footprints, sites, columns) lands over everything;
+ * - `aboveImagery`: a finding raster (an index, a change map, a methane raster) lands on top of
+ *   the imagery, just under the vectors drawn over it, so an NDVI that lands after its scene is
+ *   never hidden under it and never hides the outline;
+ * - `bottom`: a scene (true colour) lands at the bottom, just above the basemap.
  */
-export function insertInStack(order: readonly string[], id: string, onTop: boolean): string[] {
+export type StackPlace = 'top' | 'aboveImagery' | 'bottom';
+export function insertInStack(
+  order: readonly string[],
+  id: string,
+  place: StackPlace,
+  isRaster: (id: string) => boolean = () => false,
+): string[] {
   const rest = order.filter((x) => x !== id);
-  return onTop ? [id, ...rest] : [...rest, id];
-}
-
-export interface StyleLayerRef {
-  id: string;
-  type?: string;
+  if (place === 'top') return [id, ...rest];
+  if (place === 'bottom') return [...rest, id];
+  const firstRaster = rest.findIndex(isRaster);
+  const at = firstRaster < 0 ? rest.length : firstRaster;
+  return [...rest.slice(0, at), id, ...rest.slice(at)];
 }
 
 /**
- * The raster ceiling: the lowest non-raster layer above the basemap, in the map's style order
- * (bottom first). Every raster is placed directly beneath it, so no raster ever covers a vector
- * or a label. Undefined when the map has no vectors yet (then the top is the ceiling).
+ * The stack's ceiling: the lowest layer above the basemap that the plate does not list, in the
+ * map's style order (bottom first). Every listed layer goes directly beneath it. Undefined when
+ * there is none (then the top of the style is the ceiling).
  */
-export function rasterCeiling(styleOrder: readonly StyleLayerRef[], basemapIds: readonly string[]): string | undefined {
+export function stackCeiling(
+  styleOrder: readonly string[],
+  tracked: ReadonlySet<string>,
+  basemapIds: readonly string[],
+): string | undefined {
   let floor = -1;
-  styleOrder.forEach((l, i) => {
-    if (basemapIds.includes(l.id)) floor = i;
+  styleOrder.forEach((id, i) => {
+    if (basemapIds.includes(id)) floor = i;
   });
-  return styleOrder.find((l, i) => i > floor && l.type !== undefined && l.type !== 'raster')?.id;
+  return styleOrder.find((id, i) => i > floor && !tracked.has(id) && !basemapIds.includes(id));
 }
 
 /**
- * The moveLayer calls that put the stack (top first) on the map: bottom first, each directly
- * beneath the ceiling, so the last one moved is the top of the imagery.
+ * The moveLayer calls that put the stack on the map. `groupsTopFirst` holds, per listed layer,
+ * its map layers bottom first (a geometry's fill, hairline, outline, labels). The moves run bottom
+ * group first, each layer directly beneath the ceiling, so a group keeps its own internal order
+ * and the last group moved is the top of the stack.
  */
-export function stackMoves(orderTopFirst: readonly string[], ceiling: string | undefined): Array<[string, string | undefined]> {
-  return orderTopFirst
+export function stackMoves(
+  groupsTopFirst: ReadonlyArray<readonly string[]>,
+  ceiling: string | undefined,
+): Array<[string, string | undefined]> {
+  return groupsTopFirst
     .slice()
     .reverse()
-    .map((id) => [id, ceiling] as [string, string | undefined]);
+    .flatMap((group) => group.map((id) => [id, ceiling] as [string, string | undefined]));
 }
 
 /**
@@ -157,37 +175,38 @@ export function layerLegend(layer: LayerMetadata): StackLegend | null {
 }
 
 /**
- * The plate's legends: the imagery's first, top row first, then the vectors' (methane columns
- * and footprints, the sites key, the similarity ramp). Hidden layers carry no legend; a ramp
- * two layers share is shown once, where its highest layer puts it.
+ * The plate's legends, in the stack's order (the top row's first). A layer that is hidden, or that
+ * the map cannot draw at this zoom, carries no legend; a ramp two layers share is shown once,
+ * where its highest layer puts it. The keys (the sites' dot and ring, the similarity ramp) follow
+ * the measure ramps.
  */
-export function stackLegends(
-  rastersTopFirst: readonly LayerMetadata[],
-  vectorsTopFirst: readonly LayerMetadata[],
-  visible: (id: string) => boolean,
-): StackLegend[] {
+export function stackLegends(layersTopFirst: readonly LayerMetadata[], shown: (id: string) => boolean): StackLegend[] {
   const seen = new Set<string>();
-  const collect = (layers: readonly LayerMetadata[]) => {
-    const out: StackLegend[] = [];
-    for (const layer of layers) {
-      if (!visible(layer.id)) continue;
-      const legend = layerLegend(layer);
-      if (!legend || seen.has(legend.key)) continue;
-      seen.add(legend.key);
-      out.push(legend);
-    }
-    return out;
-  };
-  const fromImagery = collect(rastersTopFirst);
-  // Among the vectors' legends the measure ramps come before the keys (a stable sort).
+  const out: StackLegend[] = [];
+  for (const layer of layersTopFirst) {
+    if (!shown(layer.id)) continue;
+    const legend = layerLegend(layer);
+    if (!legend || seen.has(legend.key)) continue;
+    seen.add(legend.key);
+    out.push(legend);
+  }
   const isKey = (l: StackLegend) => (l.kind === 'sites' || l.kind === 'similar' ? 1 : 0);
-  const fromVectors = collect(vectorsTopFirst).sort((a, b) => isKey(a) - isKey(b));
-  return [...fromImagery, ...fromVectors];
+  return out.sort((a, b) => isKey(a) - isKey(b));
+}
+
+/**
+ * A coarse raster (the hint caps its zoom: TROPOMI's ~4 km cells) the map cannot draw this close
+ * in: MapLibre hides a layer at and above its maxzoom. The plate says so instead of listing it as
+ * drawn.
+ */
+export function outOfRange(layer: Pick<LayerMetadata, 'type' | 'render'>, zoom: number): boolean {
+  const cap = layer.render?.max_zoom;
+  return layer.type === 'raster' && typeof cap === 'number' && Number.isFinite(zoom) && zoom >= cap;
 }
 
 /** The live region's sentence after a move: where the layer is now, in the room's words. */
 export function moveSentence(label: string, index: number, count: number): string {
   const where =
-    index === 0 ? 'the top, drawn over the other imagery' : index === count - 1 ? 'the bottom, just above the basemap' : `${index + 1} of ${count}`;
+    index === 0 ? 'the top, drawn over every other layer' : index === count - 1 ? 'the bottom, just above the basemap' : `${index + 1} of ${count}`;
   return `${label} moved to ${where}.`;
 }

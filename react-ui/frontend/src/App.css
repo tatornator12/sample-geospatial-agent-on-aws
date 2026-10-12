@@ -126,19 +126,19 @@ code {
   background-color: rgba(233, 238, 243, 0.04);
 }
 
-/* The docent caption strips headings down to a single spoken line. */
-.docent-caption .markdown-content p,
-.docent-caption .markdown-content li,
-.docent-caption .markdown-content h1,
-.docent-caption .markdown-content h2,
-.docent-caption .markdown-content h3 {
-  margin: 0;
+/* The answer in the step column reads at its own size: headings are bold lines, not page titles. */
+.stage-answer .markdown-content h1,
+.stage-answer .markdown-content h2,
+.stage-answer .markdown-content h3,
+.stage-answer .markdown-content h4 {
+  margin: 0 0 8px;
   font: inherit;
+  font-weight: 600;
   letter-spacing: inherit;
   max-width: none;
 }
-.docent-caption .markdown-content ul,
-.docent-caption .markdown-content ol {
-  margin: 0;
-  padding-left: 1.2em;
+.stage-answer .markdown-content p,
+.stage-answer .markdown-content li {
+  font: inherit;
+  max-width: none;
 }

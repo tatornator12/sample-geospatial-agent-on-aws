@@ -4,6 +4,8 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   tools?: ToolCall[];
+  /** What the agent said after its last tool call: the answer the stage shows (utils/parsing.ts finalAnswer). */
+  answer?: string;
 }
 
 export interface ToolCall {

@@ -18,22 +18,27 @@ export const METHANE_COLUMNS: RenderHint = {
   kind: 'columns', property: 'ppm_m', ramp: 'plasma', rescale: [0, 1500], units: 'ppm·m', group: 'methane', legend: 'CH4 enhancement',
 };
 
+/** The TROPOMI ppb ramp: cool (navy to pale cyan), never plasma's dark-purple-to-yellow family. */
+export const TROPOMI_RAMP = 'ice' as const;
 export const METHANE_TROPOMI: RenderHint = {
-  kind: 'raster', colormap: 'viridis', rescale: [0, 60], units: 'ppb', group: 'methane', legend: 'CH4 anomaly', max_zoom: 8,
+  kind: 'raster', colormap: TROPOMI_RAMP, rescale: [0, 60], units: 'ppb', group: 'methane', legend: 'CH4 anomaly', max_zoom: 8,
 };
 /** A ~4 km TROPOMI cell must never fill the screen over the EMIT finding and the ground. */
 export const TROPOMI_MAX_ZOOM = 8;
 
 /**
  * The style of a methane raster. The agent's hint wins, except that a TROPOMI composite
- * (`tropomi_anomaly_*.tif` in a methane folder) always carries a zoom cap: an older or
- * model-trimmed hint must not wall off the finding. Without a hint, the tool default by file
- * name; null for anything that is not a methane raster file.
+ * (`tropomi_anomaly_*.tif` in a methane folder) always carries a zoom cap and the TROPOMI ramp:
+ * an older or model-trimmed hint must not wall off the finding, and a recording or runtime from
+ * before the ramp change (viridis) must not read as plasma's twin. Without a hint, the tool
+ * default by file name; null for anything that is not a methane raster file.
  */
 export function methaneRasterHint(render: RenderHint | undefined, url: string | undefined): RenderHint | null {
   const name = basenameOf(url);
   const tropomi = inMethaneTree(url) && /^tropomi_anomaly_.+\.tiff?$/.test(name);
-  if (render) return tropomi && render.max_zoom === undefined ? { ...render, max_zoom: TROPOMI_MAX_ZOOM } : render;
+  if (render) {
+    return tropomi ? { ...render, colormap: TROPOMI_RAMP, max_zoom: render.max_zoom ?? TROPOMI_MAX_ZOOM } : render;
+  }
   if (tropomi) return METHANE_TROPOMI;
   if (/^ch4plm_.+\.tiff?$/.test(name) || (inMethaneTree(url) && /^pass_.+\.tiff?$/.test(name))) return METHANE_RASTER;
   return null;

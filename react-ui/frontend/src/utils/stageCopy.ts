@@ -1,6 +1,6 @@
 /**
- * What the stage says for each act: the prepared prompts, the console placeholder, the idle
- * caption, the speaker label, and plain-language names for the agent's steps.
+ * What the stage says for each act: the prepared prompts, the console placeholder, the speaker
+ * label, and plain-language names for the agent's steps.
  */
 
 export interface PreparedPrompt {
@@ -13,7 +13,6 @@ export interface PreparedPrompt {
 export interface AgentStageCopy {
   prompts: PreparedPrompt[];
   placeholder: string;
-  idle: string;
 }
 
 // Keyed by agent id (AGENT_RUNTIMES); `default` is the Earth Analyst (the `dev` and `stable`
@@ -31,7 +30,6 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
       { label: 'Places like Central Park', prompt: 'Find places across New York State that look like Central Park' },
     ],
     placeholder: 'Ask about any place on Earth',
-    idle: 'Name a place and a question. The agent finds the imagery, runs the analysis, and puts the result on the map.',
   },
   // The Methane Hunter's two beats (design.md, Act 2 run sheet); the prompts are the golden ones.
   methane: {
@@ -50,8 +48,7 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
       },
       { label: 'Strongest plume ever, and the ground', prompt: 'Find the strongest methane plume EMIT has ever seen, anywhere, and show me what is on the ground beneath it' },
     ],
-    placeholder: 'Name a region and a year',
-    idle: 'Name a region and a year. The agent finds the methane plumes NASA EMIT saw, ranks them, and looks at the ground beneath the strongest.',
+    placeholder: 'Ask for a Methane Watch brief, or name a region and a year',
   },
 };
 

@@ -223,14 +223,26 @@ def scl_quality(scl_path: str, aoi_gdf) -> dict:
     }
 
 
+# A scene covers the AOI when its data footprint (the STAC item geometry) holds this much of it.
+# Below it the clipped scene is part imagery, part no-data: a scene on the swath edge that shows
+# half the site is worse than a cloudier scene that shows all of it.
+FULL_COVERAGE_PCT = 99.0
+
+
 def rank_candidates(images: list[dict], exclude_dates=()) -> tuple[dict | None, list[dict]]:
     """Order scenes the way the selector does and drop excluded dates.
 
     Returns (best, other_candidates) where other_candidates are the next five as
-    {date, cloud_pct, coverage_pct}. Sort: lowest whole-tile cloud, then highest AOI coverage.
+    {date, cloud_pct, coverage_pct}. Sort: scenes that cover the whole AOI first, then lowest
+    whole-tile cloud, then highest AOI coverage.
     """
     excluded = {d.strip() for d in exclude_dates if d and d.strip()}
-    ranked = sorted(images, key=lambda x: (x.get("cloud_pct", 100), -x.get("coverage_pct", 0)))
+
+    def key(x):
+        coverage = x.get("coverage_pct") or 0
+        return (coverage < FULL_COVERAGE_PCT, x.get("cloud_pct", 100), -coverage)
+
+    ranked = sorted(images, key=key)
     survivors = [img for img in ranked if str(img.get("date", ""))[:10] not in excluded]
     if not survivors:
         return None, []

@@ -11,7 +11,7 @@ describe('stageCopyFor', () => {
     expect(copy.prompts[1].fill).toBe(true);
     expect(copy.prompts[1].prompt.endsWith(' over ')).toBe(true);
     expect(copy.prompts[0].fill).toBeUndefined();
-    expect(copy.placeholder).toBe('Name a region and a year');
+    expect(copy.placeholder).toBe('Ask for a Methane Watch brief, or name a region and a year');
   });
 
   it('falls back to the Earth Analyst for dev, stable, unknown and absent ids', () => {

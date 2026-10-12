@@ -24,8 +24,20 @@ import {
   isoDay,
   methaneGeometryHint,
   methaneRasterHint,
+  TROPOMI_RAMP,
 } from '../utils/methaneLayers.ts';
-import { insertInStack, layerLegend, rasterCeiling, stackLegends, stackMoves, type StackLegend } from '../utils/layerStack.ts';
+import {
+  insertInStack,
+  layerLegend,
+  outOfRange,
+  stackCeiling,
+  stackLegends,
+  stackMoves,
+  type StackLegend,
+  type StackPlace,
+} from '../utils/layerStack.ts';
+import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
+import { Starfield } from './Starfield.tsx';
 import type { Tip } from '../utils/steps.ts';
 import { CompareView } from './CompareView';
 import { Icon } from './Icons.tsx';
@@ -35,22 +47,18 @@ import '../stage.css';
 
 const BASEMAP_IDS = ['dark-base', 'google-roads-base', 'google-satellite-base', 'esri-satellite-base'];
 
-// The finding's frame: clear of the step column (left), the caption band and console (bottom)
-// and the layers plate (right), so what the camera lands on is what the room sees.
-const STAGE_PADDING = { top: 90, bottom: 300, left: 340, right: 370 };
+// The finding's frame: clear of the step column (left), the console (bottom) and the layers
+// plate (right), so what the camera lands on is what the room sees. Read at each frame: the step
+// column widens with the screen (utils/stageLayout.ts).
+const STAGE_PADDING_NOW = () => stagePadding(typeof window === 'undefined' ? 1920 : window.innerWidth);
 
 // Ranks at or above this are lit and labelled; every other footprint is a hairline. 39 is the count; 3 is the story.
 const LIT_RANKS = 3;
-// The watch globe: how far out it sits (globe diameter ≈ 512·2^z/π px, so 2.5 is ~920 px: it
-// fills the stage between the plates on a 1080p projector), where its centre sits (the middle
-// of the area the plates leave free, from STAGE_PADDING), how fast it turns while the agent
-// works (degrees of longitude per second), and the tilt the 3D columns are read at.
-const GLOBE_ZOOM = 2.5;
-const GLOBE_OFFSET: [number, number] = [
-  (STAGE_PADDING.left - STAGE_PADDING.right) / 2,
-  (STAGE_PADDING.top - STAGE_PADDING.bottom) / 2,
-];
-const GLOBE_DEG_PER_S = 4;
+// The watch globe: how fast it turns (degrees of longitude per second: slowly at rest, faster
+// while the agent works, so the speed-up itself says "working"), and the tilt the 3D columns are
+// read at. Its size and centre fit the area the plates leave free (utils/stageLayout.ts).
+const GLOBE_DEG_PER_S_WORKING = 4;
+const GLOBE_DEG_PER_S_RESTING = 1.5;
 const COLUMNS_PITCH = 55;
 // A coarse raster (TROPOMI) is dimmer than the finding so the EMIT candidate reads through it.
 const COARSE_RASTER_OPACITY = 0.75;
@@ -101,11 +109,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const [baseMapStyle, setBaseMapStyle] = useState<'dark' | 'google-roads' | 'google-satellite' | 'esri-satellite'>('esri-satellite');
   const [compareMode, setCompareMode] = useState<{ left: LayerMetadata; right: LayerMetadata; center?: [number, number]; zoom?: number } | null>(null);
 
-  // The imagery stack, top first: the layers plate lists it in this order and the map draws it in
-  // this order (applyRasterOrder). The ref is for the raster loader, which adds several layers
-  // before React commits the state.
-  const [rasterOrder, setRasterOrder] = useState<string[]>([]);
-  const rasterOrderRef = useRef<string[]>([]);
+  // The stack, top first: every layer the agent put on the map, in the order the layers plate
+  // lists it and the map draws it (applyLayerOrder). The ref is for the loaders, which add several
+  // layers before React commits the state.
+  const [layerOrder, setLayerOrder] = useState<string[]>([]);
+  const layerOrderRef = useRef<string[]>([]);
+  // The camera's zoom, for the rows of coarse rasters the map hides this close in.
+  const [zoom, setZoom] = useState(2);
 
   // Memoize layer groups to avoid repeated filtering on each render
   const layerGroups = useMemo(() => groupLayers(allLayers), [allLayers]);
@@ -121,21 +131,36 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     allLayersRef.current = allLayers;
   }, [allLayers]);
 
-  // The watch globe: on when a watch baseline lands, off when the map is cleared. It turns while
-  // the agent works, until a methane raster takes the frame, the presenter grabs the map, or
-  // the viewer asked for reduced motion.
+  // The watch globe: on when a watch baseline lands, off when the map is cleared. It sits in space
+  // (a still starfield behind the canvas, an atmosphere at its limb) and turns: slowly at rest,
+  // faster while the agent works, until a methane raster takes the frame, the presenter grabs the
+  // map, or the viewer asked for reduced motion.
   const [globeOn, setGlobeOn] = useState(false);
   const presenterHolding = useRef(false);
   useEffect(() => {
     const mapInstance = map.current;
     if (!mapInstance) return;
-    const apply = () => mapInstance.setProjection({ type: globeOn ? 'globe' : 'mercator' });
+    const apply = () => {
+      mapInstance.setProjection({ type: globeOn ? 'globe' : 'mercator' });
+      // A thin blue limb at globe zooms, gone by the dive (zoom 7), so the ground scene is never tinted.
+      mapInstance.setSky(
+        globeOn
+          ? {
+              'sky-color': '#0b1a2e',
+              'horizon-color': '#2b4a66',
+              'fog-color': '#0b1a2e',
+              'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 5, 0.9, 7, 0],
+            }
+          : { 'atmosphere-blend': 0 },
+      );
+    };
     if (mapInstance.isStyleLoaded()) apply();
     else mapInstance.once('styledata', apply);
   }, [globeOn]);
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !globeOn || !working || prefersReducedMotion()) return;
+    if (!mapInstance || !globeOn || prefersReducedMotion()) return;
+    const degPerS = working ? GLOBE_DEG_PER_S_WORKING : GLOBE_DEG_PER_S_RESTING;
     let frame = 0;
     let last = performance.now();
     const hold = () => { presenterHolding.current = true; };
@@ -150,7 +175,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       const idle = !presenterHolding.current && !plumeFramed.current && !mapInstance.isMoving();
       if (idle && mapInstance.getZoom() < 3) {
         const c = mapInstance.getCenter();
-        mapInstance.setCenter([c.lng + GLOBE_DEG_PER_S * dt, c.lat]);
+        mapInstance.setCenter([c.lng + degPerS * dt, c.lat]);
       }
       if (!plumeFramed.current) frame = requestAnimationFrame(turn);
     };
@@ -165,7 +190,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   }, [globeOn, working]);
 
   // The tips on the globe: one mark per scanned watch area at its hotspot (or its centre when the
-  // scan found none), sized and coloured by the anomaly on the TROPOMI legend's own viridis ramp,
+  // scan found none), sized and coloured by the anomaly on the TROPOMI legend's own ramp (ice),
   // labelled with the area's short name and "+86 ppb" in mono. Hidden once the camera dives
   // (zoom 5), where the composite itself takes over. Fog stroke; nothing amber on the map.
   useEffect(() => {
@@ -194,7 +219,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         return;
       }
       mapInstance.addSource(TIPS_SOURCE, { type: 'geojson', data });
-      const ramp = rampExpression('viridis', 'anomaly', 0, 60) as maplibregl.ExpressionSpecification;
+      const ramp = rampExpression(TROPOMI_RAMP, 'anomaly', 0, 60) as maplibregl.ExpressionSpecification;
       mapInstance.addLayer({
         id: `${TIPS_SOURCE}-marks`,
         type: 'circle',
@@ -399,6 +424,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     // Add global error listener
     map.current.on('error', (e) => {
       console.error('MapLibre error:', e);
+    });
+    // The layers plate tells a coarse raster's row when the map hides it this close in.
+    map.current.on('zoomend', () => {
+      if (map.current) setZoom(map.current.getZoom());
     });
 
     // Handle WebGL context loss - recreate map if context can't be restored
@@ -964,6 +993,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             type: 'geometry',
             bounds: undefined
           }]);
+          placeInStack(fillLayerId, 'top');
           return;
         }
 
@@ -982,6 +1012,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           bounds: boundsArray,
           ...(methaneHint ? { render: methaneHint } : {}),
         }]);
+        // A new vector lands on top; the watch baseline (sites, rings, watch areas) lands under the
+        // other vectors and over the imagery, so the columns and footprints read over it.
+        placeInStack(fillLayerId, isMethane && methaneHint?.kind === 'points' ? 'aboveImagery' : 'top');
         
         console.log(`✅ Geometry added:`, name, `bounds:`, boundsArray);
 
@@ -1001,10 +1034,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             setGlobeOn(true);
             if (!rasterOnStage) {
               const centre = globeCentre(geometry.features as Parameters<typeof globeCentre>[0]);
+              // The globe sits in space between the plates: the column and the layers plate at the
+              // sides, the console below, a margin at the top (no plate there at rest).
+              const globePad = { ...STAGE_PADDING_NOW(), top: 24 };
+              const box = currentMap.getContainer();
               currentMap.easeTo({
                 center: centre ?? [40, 30],
-                zoom: GLOBE_ZOOM,
-                offset: GLOBE_OFFSET,
+                zoom: globeZoom(box.clientWidth, box.clientHeight, globePad),
+                offset: globeOffset(globePad),
                 pitch: 0,
                 bearing: 0,
                 duration: 2000,
@@ -1012,7 +1049,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             }
           } else if (methaneHint.kind === 'columns') {
             // The columns are read at a tilt, over the pass they were built from.
-            const cam = currentMap.cameraForBounds(bounds, { padding: STAGE_PADDING });
+            const cam = currentMap.cameraForBounds(bounds, { padding: STAGE_PADDING_NOW() });
             plumeFramed.current = true;
             currentMap.easeTo({
               ...(cam?.center ? { center: cam.center } : {}),
@@ -1024,7 +1061,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           } else if (!rasterOnStage) {
             // The frame rule, methane edition: once a plume raster is on the stage it owns the frame
             // (a replay case lands the footprints and the plume together; the plume wins).
-            currentMap.fitBounds(bounds, { padding: STAGE_PADDING, duration: 1500, maxZoom: 11 });
+            currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 11 });
           }
           return;
         }
@@ -1040,7 +1077,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         } else {
           // Every act frames its finding clear of the plates (the step column, the caption band,
           // the layers plate), so what the camera lands on is what the room sees.
-          currentMap.fitBounds(bounds, { padding: STAGE_PADDING, duration: 1500, maxZoom: 15 });
+          currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 15 });
           console.log(`🎯 fitBounds called`);
         }
       };
@@ -1112,13 +1149,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     
     const mapInstance = map.current;
     const [west, south, east, north] = layer.bounds;
+    // A coarse raster is only drawn below its zoom cap: land half a level under it.
+    const cap = layer.type === 'raster' ? layer.render?.max_zoom : undefined;
     
     mapInstance.fitBounds(
       [[west, south], [east, north]],
       {
-        padding: STAGE_PADDING,
+        padding: STAGE_PADDING_NOW(),
         duration: 1500,
-        maxZoom: 15,
+        maxZoom: typeof cap === 'number' ? Math.max(1, cap - 0.5) : 15,
       }
     );
     
@@ -1130,34 +1169,51 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const geometryCompanionIds = (fillLayerId: string) =>
     ['-outline', '-query', '-labels', '-hairline'].map(suffix => fillLayerId.replace('-fill', suffix));
 
-  // The raster ceiling: the lowest vector above the basemap. Every raster sits beneath it, so the
-  // imagery never covers a boundary, a footprint, a label or a drawn shape.
-  const currentCeiling = (mapInstance: maplibregl.Map) =>
-    rasterCeiling(
-      mapInstance.getLayersOrder().map((id) => ({ id, type: mapInstance.getLayer(id)?.type })),
-      BASEMAP_IDS,
-    );
-
-  // Put the imagery stack (top first) on the map: bottom first, each directly beneath the
-  // ceiling. Also the live preview while a row is held in the layers plate.
-  const applyRasterOrder = (order: string[]) => {
+  // Put the stack (top first) on the map: per listed layer, its map layers in their current order
+  // (a geometry's fill, hairline, outline, labels travel together), bottom group first, each
+  // directly beneath the ceiling (the presenter's drawn shapes and the globe's tips stay on top).
+  // Also the live preview while a row is held in the layers plate.
+  const applyLayerOrder = (order: string[]) => {
     const mapInstance = map.current;
     if (!mapInstance) return;
-    const onMap = order.filter((id) => mapInstance.getLayer(id));
-    for (const [id, beforeId] of stackMoves(onMap, currentCeiling(mapInstance))) {
+    const style = mapInstance.getLayersOrder();
+    const groups = order
+      .map((id) => {
+        const members = new Set([id, ...geometryCompanionIds(id)]);
+        return style.filter((sid) => members.has(sid));
+      })
+      .filter((g) => g.length > 0);
+    const ceiling = stackCeiling(style, new Set(groups.flat()), BASEMAP_IDS);
+    for (const [id, beforeId] of stackMoves(groups, ceiling)) {
       mapInstance.moveLayer(id, beforeId);
     }
   };
 
-  // A reorder from the layers plate: the state, the ref and the map. A raster that landed while
-  // the row was held (not in `order`) keeps its place at the end.
-  const commitRasterOrder = (order: string[]) => {
-    const current = rasterOrderRef.current;
+  // A new layer joins the stack (see insertInStack for where), and the map follows.
+  const placeInStack = (id: string, place: StackPlace) => {
+    const rasterIds = new Set(allLayersRef.current.filter((l) => l.type === 'raster').map((l) => l.id));
+    const isRaster = (x: string) => rasterIds.has(x) || x.startsWith('cogLayer-');
+    layerOrderRef.current = insertInStack(layerOrderRef.current, id, place, isRaster);
+    applyLayerOrder(layerOrderRef.current);
+    setLayerOrder(layerOrderRef.current);
+  };
+  const dropFromStack = (id: string) => {
+    layerOrderRef.current = layerOrderRef.current.filter((x) => x !== id);
+    setLayerOrder(layerOrderRef.current);
+  };
+
+  // A reorder from the layers plate: the state, the ref and the map. A layer that landed while
+  // the row was held (not in `order`) keeps the place it was given.
+  const commitLayerOrder = (order: string[]) => {
+    const current = layerOrderRef.current;
     const kept = order.filter((id) => current.includes(id));
-    const next = [...kept, ...current.filter((id) => !kept.includes(id))];
-    rasterOrderRef.current = next;
-    setRasterOrder(next);
-    applyRasterOrder(next);
+    const next = [...kept];
+    current.forEach((id, i) => {
+      if (!kept.includes(id)) next.splice(Math.min(i, next.length), 0, id);
+    });
+    layerOrderRef.current = next;
+    setLayerOrder(next);
+    applyLayerOrder(next);
   };
 
   // Remove a specific layer. Reads the ref, not the state, so the geometry loader (which closes
@@ -1191,9 +1247,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       }
       // Remove URL from tracking ref
       addedRasterUrls.current.delete(layer.url);
-      rasterOrderRef.current = rasterOrderRef.current.filter((id) => id !== layer.id);
-      setRasterOrder(rasterOrderRef.current);
     }
+    dropFromStack(layer.id);
     
     setAllLayers(prev => prev.filter(l => l.id !== layerId));
     setRasterVisibility(prev => {
@@ -1237,8 +1292,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     // Clear all layers (basemap is dynamic and not tracked here)
     setAllLayers([]);
     setRasterVisibility({});
-    rasterOrderRef.current = [];
-    setRasterOrder([]);
+    layerOrderRef.current = [];
+    setLayerOrder([]);
     addedRasterUrls.current.clear(); // Clear the URL tracking ref
     plumeFramed.current = false;
     // Back to the flat, upright map the other acts expect.
@@ -1470,13 +1525,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
 
           // Stacking: the finding sits on the ground. An index (NDVI, NBR, NDWI, change), a methane
           // plume or anything the hint marks as an index or a change layer joins the TOP of the
-          // imagery; true-colour imagery and other scenes join the bottom, just above the basemap,
-          // so an NDVI displayed after its scene is never hidden under it. Either way the raster
-          // stays beneath the raster ceiling (every vector and label stays on top), and the
-          // layers plate lists the stack in the order the map draws it.
+          // imagery (under the boundaries, footprints and sites drawn over it); true-colour imagery
+          // and other scenes join the bottom, just above the basemap, so an NDVI displayed after
+          // its scene is never hidden under it. The layers plate lists the stack in the order the
+          // map draws it, and the presenter can restack anything from there.
           const isFinding = isMethaneRaster || indexLegendFor(raster.url) !== null
             || hint?.group === 'index' || hint?.group === 'change';
-          const beforeId = currentCeiling(mapInstance);
 
           // A coarse raster (the hint caps its zoom: TROPOMI's ~4 km cells) is hidden above that
           // zoom and dimmed below it, so it tips the eye without walling off the finding.
@@ -1492,10 +1546,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             layout: {
               visibility: isVisible ? 'visible' : 'none',
             },
-          }, beforeId);
-          rasterOrderRef.current = insertInStack(rasterOrderRef.current, layerId, isFinding);
-          applyRasterOrder(rasterOrderRef.current);
-          setRasterOrder(rasterOrderRef.current);
+          });
+          placeInStack(layerId, isFinding ? 'aboveImagery' : 'bottom');
 
           // Track this layer with metadata
           newLayerMetadata.push({
@@ -1513,21 +1565,6 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // This prevents race condition where ref is updated but layer isn't added due to abort
           addedRasterUrls.current.add(raster.url);
 
-          // The ranking reads over the plume: the raster ceiling already keeps every vector over
-          // the imagery; among the vectors, the methane outlines, "#1 · ppm·m" labels, watch areas,
-          // site dots, rings and columns come to the top once a methane raster lands.
-          if (isMethaneRaster) {
-            allLayersRef.current
-              .filter((l) => l.type === 'geometry' && isMethaneLayer(l))
-              .flatMap((l) => {
-                const kind = methaneGeometryHint(l.render, l.url)?.kind ?? 'vector';
-                const suffixes = kind === 'vector' ? ['-outline', '-labels'] : ['-hairline', '-fill', '-outline', '-labels'];
-                return suffixes.map((suffix) => l.id.replace('-fill', suffix));
-              })
-              .forEach((id) => {
-                if (mapInstance.getLayer(id)) mapInstance.moveLayer(id);
-              });
-          }
 
           // The camera moves to the finding: the plume fills the frame; the ground scene after it
           // tightens a little further. Only in the methane act; other acts keep today's framing.
@@ -1539,7 +1576,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             // With the 3D columns on the stage the frame keeps their tilt; otherwise it is flat.
             const columnsOnStage = allLayersRef.current.some((l) => methaneGeometryHint(l.render, l.url)?.kind === 'columns');
             mapInstance.fitBounds([[w, s], [e, n]], {
-              padding: STAGE_PADDING,
+              padding: STAGE_PADDING_NOW(),
               duration: 1800,
               maxZoom: cap,
               pitch: columnsOnStage ? COLUMNS_PITCH : 0,
@@ -1619,45 +1656,32 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   }, [geometry, rasters, allLayers]);
 
 
-  // The imagery stack as rows, top first. A raster the order has not caught up with (none
-  // expected) is listed last rather than dropped.
-  const rasterRows = useMemo(() => {
-    const rasters = allLayers.filter((l) => l.type === 'raster');
-    const byId = new Map(rasters.map((l) => [l.id, l]));
-    const ordered = rasterOrder.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
-    return [...ordered, ...rasters.filter((l) => !rasterOrder.includes(l.id))];
-  }, [allLayers, rasterOrder]);
+  // The stack as rows, top first. A layer the order has not caught up with (none expected) is
+  // listed at the top rather than dropped.
+  const stackLayers = useMemo(() => {
+    const byId = new Map(allLayers.map((l) => [l.id, l]));
+    const ordered = layerOrder.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+    return [...allLayers.filter((l) => !layerOrder.includes(l.id)), ...ordered];
+  }, [allLayers, layerOrder]);
   const stackRows: StackRow[] = useMemo(
-    () => rasterRows.map((l) => ({ id: l.id, label: layerRowLabel(l) })),
-    [rasterRows],
+    () => stackLayers.map((l) => ({ id: l.id, label: layerRowLabel(l) })),
+    [stackLayers],
   );
 
-  // The vectors, top first, in the order the map draws them (a geometry's highest companion
-  // decides). Read from the map each render: the methane footprints are re-lifted when a plume
-  // lands. Without a map yet, the newest first (a new vector lands on top).
-  const vectorRows = (() => {
-    const vectors = allLayers.filter((l) => l.type === 'geometry');
-    let order: string[] = [];
-    try {
-      order = map.current?.getLayersOrder() ?? [];
-    } catch {
-      order = [];
-    }
-    const top = (l: LayerMetadata) => Math.max(...[l.id, ...geometryCompanionIds(l.id)].map((id) => order.indexOf(id)));
-    return vectors
-      .map((l, i) => ({ l, i, t: top(l) }))
-      .sort((a, b) => b.t - a.t || b.i - a.i)
-      .map((x) => x.l);
-  })();
-
   const isShown = (id: string) => rasterVisibility[id] !== false;
-  const legends = stackLegends(rasterRows, vectorRows, isShown);
+  const isDrawn = (layer: LayerMetadata) => isShown(layer.id) && !outOfRange(layer, zoom);
+  const legends = stackLegends(stackLayers, (id) => {
+    const layer = stackLayers.find((l) => l.id === id);
+    return !!layer && isDrawn(layer);
+  });
 
-  // A row's own controls: visibility, the name (click to fly there; a ramp strip under an index or
-  // a plume ties the row to its legend), remove. The imagery stack adds the grip in front.
+  // A row's own controls: visibility, the name (click to fly there; a ramp strip under a measured
+  // layer ties the row to its legend; a coarse raster the map hides this close in says so),
+  // remove. The stack adds the grip in front.
   const renderRowControls = (layer: LayerMetadata, label: string) => {
     const isVisible = isShown(layer.id);
-    const legend = layer.type === 'raster' ? layerLegend(layer) : null;
+    const hiddenByZoom = isVisible && outOfRange(layer, zoom);
+    const legend = layerLegend(layer);
     const strip = legend && 'ramp' in legend ? rampGradient(legend.ramp) : null;
     return (
       <>
@@ -1672,10 +1696,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           aria-label={`${isVisible ? 'Hide' : 'Show'} ${label}`}
         />
         <span className="map-row__main">
-          <button type="button" className="map-row__name" onClick={() => flyToLayer(layer.id)} title={`Fly to ${label}`}>
+          <button
+            type="button"
+            className="map-row__name"
+            onClick={() => flyToLayer(layer.id)}
+            title={hiddenByZoom ? `Zoom out to ${label}` : `Fly to ${label}`}
+            aria-describedby={hiddenByZoom ? `${layer.id}-range` : undefined}
+          >
             <span className="map-row__text">{label}</span>
           </button>
-          {strip && <span className="map-row__ramp" style={{ background: strip }} aria-hidden="true" />}
+          {strip && !hiddenByZoom && <span className="map-row__ramp" style={{ background: strip }} aria-hidden="true" />}
+          {hiddenByZoom && (
+            <span className="map-row__note" id={`${layer.id}-range`}>
+              Shows only when zoomed out
+            </span>
+          )}
         </span>
         <button
           type="button"
@@ -1692,7 +1727,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
 
   // The legends under the list: the room reads the colours without being told. Index ends in
   // words; methane ends in the mono face with their units; the sites key draws a dot and a ring.
-  const rampWords: Record<string, string> = { plasma: 'dark purple to yellow', viridis: 'dark violet to yellow-green' };
+  const rampWords: Record<string, string> = {
+    plasma: 'dark purple to yellow',
+    ice: 'dark navy to pale cyan',
+    viridis: 'dark violet to yellow-green',
+  };
   const renderLegend = (lg: StackLegend) => {
     if (lg.kind === 'index') {
       return (
@@ -1742,8 +1781,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       </div>
     );
   };
-  const onTopTitleId = useId();
-  const imageryTitleId = useId();
+  const stackTitleId = useId();
 
   const openCompare = () => {
     if (!comparePair) return;
@@ -1766,6 +1804,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           onClose={() => setCompareMode(null)}
         />
       )}
+      {/* Space behind the watch globe; the canvas is transparent outside it. */}
+      {globeOn && <Starfield />}
       <div ref={mapContainer} className="map-canvas" />
 
       {/* Top right: the layers plate */}
@@ -1794,35 +1834,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
 
           {isLayerControlOpen && (
             <div className="map-layers__body">
-              {/* One list in draw order: the vectors are always drawn over the imagery, and the
-                  imagery is drawn top row first. Only the imagery restacks. */}
-              {vectorRows.length > 0 && (
-                <div>
-                  <h3 className="map-group__title" id={onTopTitleId}>On top</h3>
-                  <ul className="map-stack" aria-labelledby={onTopTitleId}>
-                    {vectorRows.map((layer) => {
-                      const label = layerRowLabel(layer);
-                      return (
-                        <li key={layer.id} className={`map-row${isShown(layer.id) ? '' : ' map-row--off'}`} data-layer-id={layer.id}>
-                          {renderRowControls(layer, label)}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-
+              {/* One list in draw order, top row drawn on top; every row restacks. */}
               {stackRows.length > 0 && (
                 <div>
-                  <h3 className="map-group__title" id={imageryTitleId}>Imagery · top first</h3>
+                  <h3 className="map-group__title" id={stackTitleId}>Drawn top first</h3>
                   <LayerStack
                     rows={stackRows}
-                    labelledBy={imageryTitleId}
-                    onPreview={applyRasterOrder}
-                    onCommit={commitRasterOrder}
-                    rowClassName={(row) => (isShown(row.id) ? '' : 'map-row--off')}
+                    labelledBy={stackTitleId}
+                    onPreview={applyLayerOrder}
+                    onCommit={commitLayerOrder}
+                    rowClassName={(row) => {
+                      const layer = stackLayers.find((l) => l.id === row.id);
+                      return layer && isDrawn(layer) ? '' : 'map-row--off';
+                    }}
                     renderControls={(row) => {
-                      const layer = rasterRows.find((l) => l.id === row.id);
+                      const layer = stackLayers.find((l) => l.id === row.id);
                       return layer ? renderRowControls(layer, row.label) : null;
                     }}
                   />

@@ -1,6 +1,6 @@
 ---
 name: Agentic AI for Earth
-description: A planetarium show for geospatial agents; one luminous Earth, a docent's captions, one amber spotlight.
+description: A planetarium show for geospatial agents; one luminous Earth in space, a docent's answers, one amber spotlight.
 colors:
   dome: "#0f141b"
   plate: "#161c25"
@@ -28,12 +28,11 @@ typography:
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: "-0.01em"
-  caption:
+  answer:
     fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
-    fontSize: "24px"
+    fontSize: "19px"
     fontWeight: 400
-    lineHeight: 1.35
-    letterSpacing: "-0.005em"
+    lineHeight: 1.4
   title:
     fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
     fontSize: "18px"
@@ -111,12 +110,10 @@ components:
     padding: "0 12px"
   label-plate-hover:
     textColor: "{colors.spotlight-amber}"
-  caption-band:
-    backgroundColor: "{colors.dome}"
+  stage-answer:
     textColor: "{colors.fog}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.lg}"
-    padding: "14px 20px"
+    typography: "{typography.answer}"
+    padding: "12px 0 8px"
   input-console:
     backgroundColor: "{colors.plate}"
     textColor: "{colors.fog}"
@@ -137,11 +134,11 @@ components:
 
 **Creative North Star: "The Planetarium Show"**
 
-An exhibit hall after hours. One luminous Earth fills the room, and the agent is the docent whose captions appear only when they add meaning. The screen is a stage read by an audience of technical leaders from the back of a room, not a workstation read by its operator: the map runs edge to edge, the rails around it never reflow, and everything the agent does lands as a numbered step or a spotlit finding pinned to the place it belongs. The presenter types one line or picks a prepared prompt; the room never needs the transcript.
+An exhibit hall after hours. One luminous Earth fills the room, and the agent is the docent whose answers appear only when they add meaning. The screen is a stage read by an audience of technical leaders from the back of a room, not a workstation read by its operator: the map runs edge to edge, the rails around it never reflow, and everything the agent does lands as a numbered step or a spotlit finding pinned to the place it belongs. The presenter types one line or picks a prepared prompt; the room never needs the transcript.
 
 The world refuses the two default arrangements of the category. It is not a dark dashboard of panels with a chat column, and it is not a light SaaS chat with a map in a card. It is also, by the presenter's own words, never a hacker console: no phosphor green, no monospace walls, no blinking cursors. Materials are a matte deep blue-grey surround, soft spotlight falloff, and exhibit label plates framed by hairlines. Colour is spent with discipline: one amber accent marks whatever is active, and data colour lives only on the layer being looked at.
 
-Density is low and sizes are large. Nothing on the stage sits below 15px, the docent's caption sits at 24px (32px on very large screens), and numerics are tabular so columns of coordinates and dates align. Motion follows one grammar: an exponential ease-out from a visible default, used where it shows the agent working and nowhere else.
+Density is low and sizes are large. Nothing on the stage sits below 15px, the agent's answer sits at 19px at the foot of the step column (22px on very large screens), and numerics are tabular so columns of coordinates and dates align. Motion follows one grammar: an exponential ease-out from a visible default, used where it shows the agent working and nowhere else. The one exception is the watch globe, which drifts slowly at rest (1.5° a second) and speeds up while the agent works, so the speed-up itself says "working".
 
 **Key Characteristics:**
 - Map-first: the canvas fills the frame; every control is a plate floating over it.
@@ -159,10 +156,10 @@ A deep blue-grey dome with fog-white text and a single warm accent; hairlines ra
 - **Spotlight Amber** (#f5a524): the only accent. The active section on the exhibit rail, the lit step marker, the primary Send button, the active draw mode, checked toggles, focus rings, drawn shapes on the map, and the docent's speaker label. Hover brightens to **Warm Amber** (#ffbd4f). **Amber Wash** (rgba(245, 165, 36, 0.16)) backs selected rows and "on" toggles so the accent can sit behind text without shouting.
 
 ### Neutral
-- **Dome** (#0f141b): the ground. Page background, the exhibit rail, the caption band, and the text colour on amber buttons.
+- **Dome** (#0f141b): the ground. Page background, the exhibit rail, and the text colour on amber buttons. Behind the watch globe the ground is space: a deep navy radial (`#0c1422` to `#070a10`) with 220 still stars (fog and a pale blue, 18–85% opacity, a seeded field so every load shows the same sky), and a thin `#2b4a66` atmosphere at the globe's limb that fades out by zoom 7.
 - **Plate** (#161c25): panels that float over the map (step column, console, layers, draw rail, basemap), usually at 88–96% opacity over a backdrop blur.
 - **Raised Plate** (#1d2530): popups and nested surfaces one level above a plate.
-- **Fog** (#e9eef3): primary text and icons; the docent's caption.
+- **Fog** (#e9eef3): primary text and icons; the agent's answer.
 - **Label Grey** (#8fa3b8): secondary text, plate titles, quiet controls, placeholders, and the names of hidden layers. Tinted from the dome, never a neutral grey.
 - **Hairline** (rgba(233, 238, 243, 0.14)) and **Strong Hairline** (rgba(233, 238, 243, 0.24)): etched rules and plate frames. The strong value marks focus-within on the console and the outline of secondary buttons.
 - **Hover Wash** (rgba(233, 238, 243, 0.06)): the only hover treatment on quiet controls and rows.
@@ -174,11 +171,11 @@ A deep blue-grey dome with fog-white text and a single warm accent; hairlines ra
 ### Data colour on the map
 Map layers keep their scientific palettes: the RdYlGn change-scan ramp, cyan boundaries and hotspot outlines, purple protected areas, and the similarity ramp (a single violet hue from `#e8dcf5` to `#5b2a86`, lighter = less alike, deeper = more alike, with the example drawn as a dashed cyan outline and white 24 px mono rank labels with a dark halo). These are evidence, not UI, and are not restyled to the accent. The layers plate carries the stage's legends, under its list: a ramp bar at 15 px, with "less alike" / "more alike" for similarity and `0` / `1,500+ ppm·m` in the mono face for methane.
 
-Methane (Act 2) uses matplotlib's plasma ramp (`#0d0887` → `#7e03a8` → `#cc4778` → `#f89540` → `#f0f921`) over a fixed 0–1,500 ppm·m, so every plume reads on one legend and anything stronger saturates to yellow. Plume rasters render through TiTiler with that ramp. The footprints show the ranking, not the count: ranks 1–3 are lit with a plasma outline graduated by peak enhancement, a 10% fill and 24 px mono labels (`#1  8,130.7 ppm·m`, fog on a dome halo, placed at the plume centre with collision checks); every other footprint is a fog hairline (40% opacity, brighter before triage). **The Dim Rule:** while a methane layer, a change-detection raster or a regional scan grid is visible the basemap dims (brightness 0.45, saturation −0.6, 600 ms), because plasma only reads on dark ground and a grid of half-transparent squares vanished into satellite imagery at state scale; it comes back when the last such layer is hidden or removed. **The ramp fits the plume:** a plume raster, its footprints and the EMIT pass window with its columns are scaled from 500 ppm·m to a round number near 85% of their own peak (never below 1,500), so a 6,000 ppm·m plume is not one flat yellow and the legend shows the actual range. The camera follows the act: footprints fit on arrival, the plume raster fits to its own bounds, the ground scene after it tightens further, always padded clear of the step column, caption band and layers plate.
+Methane (Act 2) uses matplotlib's plasma ramp (`#0d0887` → `#7e03a8` → `#cc4778` → `#f89540` → `#f0f921`) over a fixed 0–1,500 ppm·m, so every plume reads on one legend and anything stronger saturates to yellow. Plume rasters render through TiTiler with that ramp. The footprints show the ranking, not the count: ranks 1–3 are lit with a plasma outline graduated by peak enhancement, a 10% fill and 24 px mono labels (`#1  8,130.7 ppm·m`, fog on a dome halo, placed at the plume centre with collision checks); every other footprint is a fog hairline (40% opacity, brighter before triage). **The Dim Rule:** while a methane layer, a change-detection raster or a regional scan grid is visible the basemap dims (brightness 0.45, saturation −0.6, 600 ms), because plasma only reads on dark ground and a grid of half-transparent squares vanished into satellite imagery at state scale; it comes back when the last such layer is hidden or removed. **The ramp fits the plume:** a plume raster, its footprints and the EMIT pass window with its columns are scaled from 500 ppm·m to a round number near 85% of their own peak (never below 1,500), so a 6,000 ppm·m plume is not one flat yellow and the legend shows the actual range. The camera follows the act: footprints fit on arrival, the plume raster fits to its own bounds, the ground scene after it tightens further, always padded clear of the step column, console and layers plate.
 
-Methane Watch (Act 2, the mission) adds four data layers, each with its own legend row (**The One Ramp Per Unit Rule:** plasma is ppm·m, viridis is ppb; the two never share a bar, and magma is never used because it reads as plasma's twin). **The watch globe:** choosing the Methane Hunter (or resetting its session) puts the agent's last cached baseline on the globe before any prompt, so the act's resting state is the globe with every repeat site and the nine watch-area outlines; the mission's own baseline step then replaces it. When the baseline lands the map switches to MapLibre's globe projection facing the watch areas and turns slowly (4° a second) while the agent works; it stops when a methane raster takes the frame, when the presenter grabs the map, and never starts under `prefers-reduced-motion`. Sites are fog dots (2.5–6 px by dates seen); sites seen on five or more dates carry a 2 px fog ring and a `×N` mono label at 18 px; watch areas are dashed fog hairlines (50%). Dates are a count, not a measurement, so sites are fog, never a data ramp; the legend's sites key draws a dot and a ring. The **TROPOMI** composite renders in viridis over 0–60 ppb at 75% opacity and is hidden above zoom 8, so its ~4 km cells tip the eye without walling off the EMIT finding (the frontend enforces the cap even when a hint omits it). The **EMIT pass window** is plasma, masked below 500 ppm·m so the ground shows through. The **columns** stand one per enhanced pixel, 0.25 m per ppm·m, on the same plasma ramp at 90%, read at a 55° tilt with a −20° bearing; the ground scene that follows keeps the tilt. Clearing the map returns it to a flat, upright Mercator view.
+Methane Watch (Act 2, the mission) adds four data layers, each with its own legend row (**The One Ramp Per Unit Rule:** plasma is ppm·m, ice (cmocean, navy to pale cyan) is ppb; the two never share a bar, and neither magma nor viridis is used because both share plasma's dark-purple-to-yellow ends and read as one scale: ppb is cool, ppm·m is hot). **The watch globe:** choosing the Methane Hunter (or resetting its session) puts the agent's last cached baseline on the globe before any prompt, so the act's resting state is the globe with every repeat site and the nine watch-area outlines; the mission's own baseline step then replaces it. When the baseline lands the map switches to MapLibre's globe projection facing the watch areas, sized so the whole globe sits in space between the plates, and turns: 1.5° a second at rest, 4° while the agent works; it stops when a methane raster takes the frame and while the presenter holds the map, and never starts under `prefers-reduced-motion`. Sites are fog dots (2.5–6 px by dates seen); sites seen on five or more dates carry a 2 px fog ring and a `×N` mono label at 18 px; watch areas are dashed fog hairlines (50%). Dates are a count, not a measurement, so sites are fog, never a data ramp; the legend's sites key draws a dot and a ring. The **TROPOMI** composite renders in ice over 0–60 ppb at 75% opacity and is hidden above zoom 8, so its ~4 km cells tip the eye without walling off the EMIT finding (the frontend enforces the cap and the ramp even when a hint or a recording says otherwise). Past its cap its row in the layers plate says "Shows only when zoomed out" in label grey and its legend leaves the plate; selecting its name flies out to zoom 7.5, where it draws. The **EMIT pass window** is plasma, masked below 500 ppm·m so the ground shows through. The **columns** stand one per enhanced pixel, 0.25 m per ppm·m, on the same plasma ramp at 90%, read at a 55° tilt with a −20° bearing; the ground scene that follows keeps the tilt. Clearing the map returns it to a flat, upright Mercator view.
 
-**The tips on the globe.** As each TROPOMI scan finishes, its watch area gets a mark at its strongest hotspot: a viridis dot sized and coloured by the anomaly on the legend's own 0–60 ppb ramp (6–16 px), a fog stroke (heavier where EMIT can look), and a two-line mono label at 17 px: the area's short name and `+86 ppb`. The marks vanish above zoom 5, where the composite itself takes over. The step column carries the same nine as the **tip board** under the scan step: one row per area, strongest first, the label with its country (from the stage's own table, never the model), the anomaly in mono, a 4 px viridis bar, "TROPOMI only" where EMIT cannot look, a fog ring on the two sites EMIT was cued on and a filled dot plus "following" on the one the agent chose. Country names on the board and the globe are the stage's, printed from numbers; the model only ever adds a place name through the geocoder.
+**The tips on the globe.** As each TROPOMI scan finishes, its watch area gets a mark at its strongest hotspot: an ice dot sized and coloured by the anomaly on the legend's own 0–60 ppb ramp (6–16 px), a fog stroke (heavier where EMIT can look), and a two-line mono label at 17 px: the area's short name and `+86 ppb`. The marks vanish above zoom 5, where the composite itself takes over. The step column carries the same nine as the **tip board** under the scan step: one row per area, strongest first, the label with its country (from the stage's own table, never the model), the anomaly in mono, a 4 px bar in the same ice ramp, "TROPOMI only" where EMIT cannot look, a fog ring on the two sites EMIT was cued on and a filled dot plus "following" on the one the agent chose. Country names on the board and the globe are the stage's, printed from numbers; the model only ever adds a place name through the geocoder.
 
 The Earth Analyst's indices carry their legends the same way: one stacked row per index on the stage (NDVI red-yellow-green, NBR spectral, NDWI blues, change reversed red-yellow-green), the ends in words ("bare" to "dense vegetation", "no change" to "most change") rather than numbers. Every act now frames its finding clear of the plates (`STAGE_PADDING`), so a boundary or a scene lands in the window the room can see, not under the step column.
 
@@ -198,7 +195,7 @@ The Earth Analyst's indices carry their legends the same way: one stacked row pe
 ### Hierarchy
 - **Display** (500, 40px, 1.1): page titles on the gallery and technology pages; never on the stage.
 - **Headline** (500, 30px, 1.2): section headings on secondary pages.
-- **Caption** (400, 24px, 1.35, 32px above 2200px wide): the docent's current sentence in the caption band. Up to three lines; older text is clipped, not scrolled.
+- **Answer** (400, 19px, 1.4, 22px above 2200px wide): the agent's answer at the foot of the step column, its words after its last tool call; tables in it at 15px with tabular figures, scrolling sideways inside the column.
 - **Title** (600, 18px, 1.4): dense headings inside plates and on secondary pages.
 - **Body** (400, 16px, 1.5): running text; 15px is the floor for anything on the stage (layer names, transcript, buttons).
 - **Label** (600, 12px, 0.12em, uppercase, Bricolage Grotesque): plate titles ("Layers", "Transcript", "Prepared"), speaker labels, group titles (11px inside the layers plate).
@@ -206,8 +203,8 @@ The Earth Analyst's indices carry their legends the same way: one stacked row pe
 
 ### Named Rules
 **The Back Row Rule.** Nothing on the stage is set below 15px except tracked uppercase labels. If it must be read from the room, it is 24px or larger.
-**The Stage Punctuation Rule.** The agents are told not to write em dashes; when one slips through, the caption band and the transcript print it as a comma (a dash between two numbers reads "to"), so the room never sees a typographic habit stand in for a thought.
-**The Tabular Rule.** Every numeric value is set in Atkinson Hyperlegible Mono with tabular figures, including inside prose captions when a number is the point.
+**The Stage Punctuation Rule.** The agents are told not to write em dashes; when one slips through, the answer and the transcript print it as a comma (a dash between two numbers reads "to"), so the room never sees a typographic habit stand in for a thought.
+**The Tabular Rule.** Every numeric value is set in Atkinson Hyperlegible Mono with tabular figures, including inside prose answers when a number is the point.
 **The Two Voices Rule.** Bricolage Grotesque names; Atkinson Hyperlegible speaks. The display face never sets a sentence.
 
 ## Layout
@@ -215,9 +212,9 @@ The Earth Analyst's indices carry their legends the same way: one stacked row pe
 The stage is a fixed frame with one live window. The map fills the viewport below a 56px exhibit rail; every control floats over it in absolute-positioned plates, 16px from the edges, and nothing pushes the map around.
 
 - **Exhibit rail** (top, 56px): title left, sections centre, quiet sign-out right. The active section is lit amber with an underline.
-- **Step column** (left, 296px wide, 360px above 2200px): appears only while or after the agent works. Grows downward to `calc(100% - 300px)` and scrolls inside itself.
-- **Caption band and console** (bottom centre, `min(1040px, 100% - 480px)`): the docent's sentence, the presenter's single input line with Send / Stop, transcript toggle and new-session, then prepared prompts as label plates with the session id in mono at the right.
-- **Layers plate** (top right, 320px; `calc(100% - 350px)` tall below 800px of height so it stops above the caption band): one list in draw order, top row drawn on top. **On top** lists the vectors (boundaries, footprints, sites, columns, similarity maps) in the order the map draws them; they are always drawn over the imagery and do not restack. **Imagery · top first** lists every raster; a 2×3-dot grip (32×36, always visible) restacks it by drag, and the map follows live while a row is held. Each row is a checkbox, a name that flies the map to the layer (two lines at most; the full name is its title and accessible name), a 56×4px ramp strip under an index or a plume row that ties it to its legend, and a remove control. Legends sit under the list, one per ramp among the visible layers, the top row's first; the compare action is the plate's foot. **The finding sits on the ground:** an index raster (NDVI, NBR, NDWI, change) or a plume joins the top of the imagery; true-colour imagery joins the bottom, just above the basemap. **The Raster Ceiling Rule:** every raster sits beneath the lowest vector, so no reorder or arrival ever covers a boundary, a footprint, a label or a drawn shape.
+- **Step column** (left, `clamp(296px, 19vw, 380px)`): appears while the agent works and for the turn just finished. Its head is the plate's title and its minimize control (a chevron, the title, the step count in mono, the working dots while it works); minimized it is the head alone. Under the head: the presenter's question (15px fog, three lines at most), the plan strip on one line, the steps, then the end of the turn: the brief card when the turn drafted one, else the answer under a hairline with the agent's name as its label. A failed turn says "The agent stopped before it answered" in the error colour instead of printing the exception. It grows down to the draw rail, or stops above the console where the two overlap on a narrow screen (measured), and scrolls inside itself; the answer scrolls into view when the turn ends.
+- **Console** (bottom centre, `min(1040px, 100% - 480px)`): the presenter's single input line with Send / Stop, transcript toggle and new-session, then prepared prompts as label plates with the session id in mono at the right. There is no caption band: the answer lives in the step column, and the bottom of the stage stays map.
+- **Layers plate** (top right, 320px; `calc(100% - 190px)` tall below 800px of height so it stops above the console): one list, **Drawn top first**, in draw order. Every layer the agent put on the map restacks: imagery, boundaries, footprints, sites, columns. A 2×3-dot grip (32×36, always visible) leads each row, and the map follows live while a row is held. Each row is a checkbox, a name that flies the map to the layer (two lines at most; the full name is its title and accessible name), a 56×4px ramp strip under a measured layer (an index, a plume, the footprints, the columns, TROPOMI) that ties it to its legend, and a remove control. Legends sit under the list, one per ramp among the layers the map is drawing, the top row's first, keys last; the compare action is the plate's foot. **Where a new layer lands:** a vector on top of everything; the watch baseline under the other vectors and over the imagery; a finding raster (NDVI, NBR, NDWI, change, a plume) at the top of the imagery, under the vectors drawn over it; true-colour imagery at the bottom, just above the basemap. The presenter's own order is kept: a layer that lands later never moves the others. The stack always stays under the presenter's drawn shapes and the globe's tips.
 - **Draw rail** (bottom left, 40px icon buttons in a column) and **Basemap plate** (bottom right).
 - **Transcript drawer** (right, `min(520px, 100% - 360px)`): slides over the layers plate when opened; closes with the same control. Rails never reflow; only the map and its plates change.
 
@@ -230,7 +227,7 @@ Depth is layered and lit rather than stacked. Plates are semi-transparent (88–
 ### Shadow Vocabulary
 - **Level 1** (`box-shadow: 0 1px 2px rgba(3, 6, 10, 0.5)`): hairline-adjacent lift for inline chips.
 - **Level 2** (`box-shadow: 0 4px 12px rgba(3, 6, 10, 0.45)`): the console and basemap plate.
-- **Level 3** (`box-shadow: 0 10px 28px rgba(3, 6, 10, 0.5)`): the step column, caption band, layers plate, transcript drawer and popups.
+- **Level 3** (`box-shadow: 0 10px 28px rgba(3, 6, 10, 0.5)`): the step column, layers plate, transcript drawer and popups.
 - **Level 4** (`box-shadow: 0 18px 44px rgba(3, 6, 10, 0.55)`): modal overlays such as the compare view.
 
 ### Named Rules
@@ -258,8 +255,8 @@ Quiet by default, lit when primary or active. Same height everywhere (40px; 32�
 - **State:** hover turns border and text amber; disabled fades to 45%. Used for prepared prompts and small metadata.
 
 ### Plates (containers)
-- **Corner Style:** 10px (12px for the caption band, console and transcript).
-- **Background:** plate (#161c25) at 88–96% over blur; the caption band alone uses the dome at 88% so the sentence reads as projected text.
+- **Corner Style:** 10px (12px for the console and transcript).
+- **Background:** plate (#161c25) at 88–96% over blur.
 - **Shadow Strategy:** Level 3 for anything that holds content, Level 2 for single-line controls.
 - **Border:** 1px hairline; strong hairline on focus-within.
 - **Internal Padding:** 14–16px; 10–12px in dense lists.
@@ -281,13 +278,13 @@ A Methane Watch turn adds a **plan strip** above the steps (Baseline · Tip · C
 ### Brief card (signature, the end frame)
 When a turn drafts a brief, the step column becomes the end frame: the plan strip, the chosen site's filmstrip, then the brief card, with the full step list behind a quiet "Show all n steps". The card's heading leads with its state in label grey at regular weight ("Draft brief", "Filed brief"; it parts from the title by weight as well as colour; the amber belongs to the decision, and the plan strip turns all fog once the turn is done) and the title in the display face at 19px, written by the tool from the evidence and the geocoded place ("Recurring methane near Jincheng City, Shanxi Province, China"), never from the watch area; then the where line, the coordinates in mono in the step column's format (`35.51, 112.44`, never broken) and, in label grey, "tipped by the <watch area> watch area" as provenance, not location; then the count sentence with its window ("2 of 6 passes read since 2025-01-01 are candidates; EMIT looked 11 times in all", numbers in mono); then **the verdict**, the two lines the room restates with their values at 19px ("Methane recurs here" / **Moderate**, "Cause" / **unconfirmed until a ground or aircraft check**); then the decision, so title, verdict and decision fit the column's first screen at 1080p; then, below it, the **ground record** (the checks' sentences, written by the tools from their own numbers, never by the model; the registry's lines, the OGIM or GEM field and the GEM coal mine on record, are the only place an owner or operator of record is ever named), the unconfirmed hypotheses with their assessment in fog at weight 600 and "What would confirm each" as a quiet underlined toggle, and "Gaps and next look" with its count, closed until asked. The decision is "Approve and file" (primary, with the working dots while filing) and "Request another look" (quiet). If the draft takes longer than a beat the card says "Drafting the brief" with the working dots; if it never loads it names the brief id and offers "Try again", never a silent end frame. The column's foot fades while more lies below. The backend files the brief; the card then says "Filed by the analyst at … UTC. The agent did not file it." In a replay case the card is read-only and says the decision is made live. Its data comes from the draft in S3 through the backend, never from the model's text.
 
-### Caption band (signature)
-The docent's current sentence at 24px fog on a dome-tinted plate, up to three lines, with an amber speaker label ("Agent", "Ready") in the label style at the left and three breathing amber dots while streaming. It is the one thing the room is meant to read.
+### The answer (signature)
+The agent's own words after its last step, at 19px fog at the foot of the step column, under a hairline and the agent's name in the label style. It is the whole answer, not a tail of it: a ranking table, the registry's operators of record and the closing sentence all read on the stage, so the room never has to be pointed at the transcript. (It replaced the caption band, which showed only the last paragraph of a long answer, and cost 95 to 160px of the stage's middle.)
 
 ### Map furniture
 Layers plate, draw rail and basemap plate share the plate language. Rows are 36px with a checkbox, a name button (hover amber) and a 32px remove icon; hidden layers fall back to label grey. The compare action is an outline button. Drawn shapes on the map wear amber with a dome stroke; MapLibre popups and attribution take the plate and label colours.
 
-**Restacking the imagery.** A press on a grip becomes a drag after 4px of travel; below that it is a click. The held row rides vertically on a raised plate (`--plate-raised`, Level 2, a strong hairline); its neighbours slide out of the way on `transform` (180ms ease-out, instant under reduced motion); where it will land is a full-height amber-wash band with a 1px amber hairline. The list scrolls under a row held near the plate's top or bottom edge. Escape, or a drop off the plate (onto the map), puts the list and the map back; a drop that overshoots the list inside the plate lands at the clamped end. A landed row washes amber for 300ms. Every drag has a non-drag path: on a grip, the arrow keys move a row one place and Home / End to the top and the bottom, with focus kept on that row's grip; a click lifts a row (its grip turns amber and pressed) and a click on another row's grip, now amber-outlined as a target, puts it there; Escape or a press elsewhere puts it down. Each move is announced in words ("NDVI moved to the top, drawn over the other imagery.").
+**Restacking.** A press on a grip becomes a drag after 4px of travel; below that it is a click. The held row rides vertically on a raised plate (`--plate-raised`, Level 2, a strong hairline); its neighbours slide out of the way on `transform` (180ms ease-out, instant under reduced motion); where it will land is a full-height amber-wash band with a 1px amber hairline. The list scrolls under a row held near the plate's top or bottom edge. Escape, or a drop off the plate (onto the map), puts the list and the map back; a drop that overshoots the list inside the plate lands at the clamped end. A landed row washes amber for 300ms. Every drag has a non-drag path: on a grip, the arrow keys move a row one place and Home / End to the top and the bottom, with focus kept on that row's grip; a click lifts a row (its grip turns amber and pressed) and a click on another row's grip, now amber-outlined as a target, puts it there; Escape or a press elsewhere puts it down. Each move is announced in words ("NDVI moved to the top, drawn over every other layer.").
 
 ## Do's and Don'ts
 

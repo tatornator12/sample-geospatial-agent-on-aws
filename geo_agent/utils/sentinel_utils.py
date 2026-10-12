@@ -17,7 +17,11 @@ from shapely.geometry import shape as shapely_shape
 
 from .geocode_utils import get_polygon_of_aoi, convert_geometry_of_geojson
 from .raster_utils import get_raster_crs, clip_raster_v2
-from .inspection import rank_candidates, scl_quality
+from .inspection import FULL_COVERAGE_PCT, rank_candidates, scl_quality
+
+# How far back the selector looks for a scene that covers the whole area when none in the
+# requested window does (days before current_date_str).
+FULL_SCENE_LOOKBACK_DAYS = 120
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +198,23 @@ def get_filtered_images(aoi_gdf, bands=["red", "nir"], max_cloud=30, current_dat
         return []
 
     print(f"🔍 Found {len(all_images)} candidate images")
+
+    # No scene in the window covers the whole area (a site on a swath edge, where the orbit that
+    # sees all of it is cloudy): look further back for one that does, rather than clip half a
+    # scene. The ranking still prefers the closest clear full scene; partial ones stay as fallbacks.
+    if not any((img.get("coverage_pct") or 0) >= FULL_COVERAGE_PCT for img in all_images) and days_delta < FULL_SCENE_LOOKBACK_DAYS:
+        try:
+            older = get_all_images_from_gdf(aoi_gdf, bands=bands, max_cloud=max_cloud,
+                                            current_date_str=current_date_str, days_delta=FULL_SCENE_LOOKBACK_DAYS)
+        except Exception as e:
+            logger.warning(f"Longer look-back for a full-coverage scene failed: {e}")
+            older = []
+        seen = {(img.get("date"), img.get("tile_id")) for img in all_images}
+        extra = [img for img in older if (img.get("date"), img.get("tile_id")) not in seen
+                 and (img.get("coverage_pct") or 0) >= FULL_COVERAGE_PCT]
+        if extra:
+            print(f"🔭 No scene covered the area in {days_delta} days; {len(extra)} full-coverage scenes within {FULL_SCENE_LOOKBACK_DAYS} days")
+            all_images = all_images + extra
 
     if len(all_images) == 0:
         logger.warning(f"No images found with max_cloud={max_cloud} in last {days_delta} days")

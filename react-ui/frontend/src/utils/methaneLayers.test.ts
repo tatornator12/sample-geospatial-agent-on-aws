@@ -65,7 +65,12 @@ describe('methaneRasterHint', () => {
   it('always caps a TROPOMI composite\'s zoom, even under an old hint', () => {
     const old = parseRenderHint({ kind: 'raster', colormap: 'magma', rescale: [0, 60], units: 'ppb', group: 'methane' })!;
     expect(methaneRasterHint(old, tropomi)?.max_zoom).toBe(8);
-    expect(methaneRasterHint(old, tropomi)?.colormap).toBe('magma');
+    // The ppb ramp is the stage's, whatever an old hint or recording says (magma, viridis).
+    expect(methaneRasterHint(old, tropomi)?.colormap).toBe('ice');
+    const recorded = parseRenderHint({ kind: 'raster', colormap: 'viridis', rescale: [0, 60], units: 'ppb', group: 'methane', max_zoom: 7 })!;
+    expect(methaneRasterHint(recorded, tropomi)).toMatchObject({ colormap: 'ice', max_zoom: 7 });
+    // Not a TROPOMI file: the hint stands as sent.
+    expect(methaneRasterHint(recorded, 's3://b/session_data/s/methane/pass_x.tif')?.colormap).toBe('viridis');
     expect(methaneRasterHint(undefined, tropomi)).toBe(METHANE_TROPOMI);
   });
 

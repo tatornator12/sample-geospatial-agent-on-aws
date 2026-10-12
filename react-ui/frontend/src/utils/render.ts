@@ -15,7 +15,7 @@
 export type RenderKind = 'raster' | 'vector' | 'points' | 'columns';
 export const RENDER_KINDS: readonly RenderKind[] = ['raster', 'vector', 'points', 'columns'];
 
-export const COLORMAPS = ['plasma', 'viridis', 'magma', 'rdylgn', 'rdylgn_r', 'blues', 'spectral'] as const;
+export const COLORMAPS = ['plasma', 'viridis', 'magma', 'ice', 'rdylgn', 'rdylgn_r', 'blues', 'spectral'] as const;
 export type ColormapName = (typeof COLORMAPS)[number];
 
 export const RENDER_GROUPS = ['methane', 'watch', 'change', 'similar', 'imagery', 'index', 'boundary'] as const;
@@ -142,6 +142,9 @@ export const RAMP_ANCHORS: Partial<Record<ColormapName, string[]>> = {
   plasma: ['#0d0887', '#7e03a8', '#cc4778', '#f89540', '#f0f921'],
   viridis: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'],
   magma: ['#000004', '#51127c', '#b73779', '#fc8961', '#fcfdbf'],
+  // cmocean "ice" as TiTiler draws it (its colorMaps/ice entries 0, 64, 128, 191, 255): the cool
+  // TROPOMI ppb ramp, read against plasma's hot ppm·m.
+  ice: ['#030512', '#383874', '#427ab7', '#79bdd0', '#eafcfd'],
   rdylgn: ['#a50026', '#f46d43', '#ffffbf', '#66bd63', '#006837'],
   rdylgn_r: ['#006837', '#66bd63', '#ffffbf', '#f46d43', '#a50026'],
   blues: ['#f7fbff', '#c6dbef', '#6baed6', '#2171b5', '#08306b'],

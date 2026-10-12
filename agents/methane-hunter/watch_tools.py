@@ -98,9 +98,10 @@ WATCH_AREAS: dict[str, dict] = {
 }
 
 RENDER_SITES = {"kind": "points", "group": "watch", "property": "repeat_dates", "label": "repeat_dates", "units": "dates"}
-# viridis, not magma: magma is the same family as plasma and the two would read as one scale.
+# ice (cmocean: navy to pale cyan), not viridis or magma: both share plasma's dark-purple-to-yellow
+# ends and read as one scale on the stage. ppb is cool, ppm·m is hot.
 # max_zoom: a ~4 km TROPOMI cell must never fill the screen over the EMIT candidate and the ground.
-RENDER_TROPOMI = {"kind": "raster", "colormap": "viridis", "rescale": [0, 60], "units": "ppb", "group": "methane",
+RENDER_TROPOMI = {"kind": "raster", "colormap": "ice", "rescale": [0, 60], "units": "ppb", "group": "methane",
                   "max_zoom": 8,
                   "legend": "CH4 anomaly"}
 RENDER_COLUMNS = {"kind": "columns", "property": "ppm_m", "ramp": "plasma", "rescale": [0, 1500], "units": "ppm·m",

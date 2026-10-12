@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { ToolCall } from '../types.ts';
-import { extractAllVisualizationData, parseToolCalls } from './parsing.ts';
+import { extractAllVisualizationData, finalAnswer, parseToolCalls } from './parsing.ts';
 
 /** Build the exact wire format: a tool-call JSON object whose input is a JSON string. */
 function toolJson(id: string, name: string, params: Record<string, unknown>): string {
@@ -225,5 +225,30 @@ describe('extractAllVisualizationData', () => {
       }),
     ]);
     expect(rasters).toEqual([{ url: 's3://b/x.tif', title: 'X', date: undefined, cloudCoverage: undefined }]);
+  });
+});
+
+describe('finalAnswer', () => {
+  it('is what the agent said after its last tool call, not the narration before it', () => {
+    const raw = [
+      '39 plumes found. Now ranking them.',
+      toolJson('t1', 'triage_plumes', { plumes_geometry_s3_url: 's3://b/p.geojson' }),
+      'Now running the registry check.',
+      toolJson('t2', 'registry_lookup', { lat: 31.9, lon: -101.8 }),
+      'Here is the full record.\n\n| Rank | Max |\n|---|---|\n| 1 | 8,130.7 |\n\nThe public registry lists within 2 km: 136 pipelines.',
+    ].join('');
+    expect(finalAnswer(raw)).toBe(
+      'Here is the full record.\n\n| Rank | Max |\n|---|---|\n| 1 | 8,130.7 |\n\nThe public registry lists within 2 km: 136 pipelines.',
+    );
+  });
+
+  it('is everything it said when it called no tool', () => {
+    expect(finalAnswer('Satellite data measures methane, not intent.')).toBe('Satellite data measures methane, not intent.');
+  });
+
+  it('is empty while the last tool call is still streaming, or when nothing follows it', () => {
+    expect(finalAnswer('Looking now. {"toolUseId": "t1", "name": "get_ras')).toBe('');
+    expect(finalAnswer(`Looking now. ${toolJson('t1', 'get_rasters', { location: 'x' })}`)).toBe('');
+    expect(finalAnswer('')).toBe('');
   });
 });

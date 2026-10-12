@@ -39,7 +39,7 @@ function Harness({ onCommit, onPreview }: { onCommit?: (o: string[]) => void; on
   const [rows, setRows] = useState(ROWS);
   return (
     <>
-      <h3 id="t">Imagery · top first</h3>
+      <h3 id="t">Drawn top first</h3>
       <LayerStack
         rows={rows}
         labelledBy="t"
@@ -62,9 +62,9 @@ const status = () => screen.getByRole('status').textContent;
 describe('LayerStack', () => {
   it('lists the rows in draw order with a labelled grip each', () => {
     render(<Harness />);
-    expect(screen.getByRole('list', { name: 'Imagery · top first' })).toBeTruthy();
+    expect(screen.getByRole('list', { name: 'Drawn top first' })).toBeTruthy();
     expect(order()).toEqual(['NDVI Lake Mead', 'True colour, Jan 2025', 'True colour, Jan 2022']);
-    expect(grip('NDVI Lake Mead').getAttribute('aria-label')).toBe('Reorder NDVI Lake Mead, 1 of 3 in the imagery stack');
+    expect(grip('NDVI Lake Mead').getAttribute('aria-label')).toBe('Reorder NDVI Lake Mead, 1 of 3 on the map');
   });
 
   it('shows no grip when there is nothing to reorder', () => {
@@ -87,7 +87,7 @@ describe('LayerStack', () => {
 
     fireEvent.keyDown(document.activeElement!, { key: 'Home' });
     expect(onCommit).toHaveBeenLastCalledWith(['tci-old', 'ndvi', 'tci-new']);
-    expect(status()).toBe('True colour, Jan 2022 moved to the top, drawn over the other imagery.');
+    expect(status()).toBe('True colour, Jan 2022 moved to the top, drawn over every other layer.');
 
     fireEvent.keyDown(document.activeElement!, { key: 'End' });
     expect(onCommit).toHaveBeenLastCalledWith(['ndvi', 'tci-new', 'tci-old']);

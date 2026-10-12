@@ -1,11 +1,11 @@
 /**
  * The Docent. Owns the conversation with the agent (streaming, tool parsing, map updates)
- * and renders it as three overlays on the stage: a caption band with the presenter's input
- * at the bottom, a step column at the left while the agent works, and a transcript drawer
- * at the right when the presenter wants the full record.
+ * and renders it as three overlays on the stage: the presenter's console at the bottom, the
+ * step column at the left (the question, what the agent did, and its answer or brief), and a
+ * transcript drawer at the right when the presenter wants the full record.
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message, ToolCall, GeometryData, RasterData } from '../types.ts';
@@ -14,14 +14,16 @@ import { StepColumn } from './StepColumn.tsx';
 import { EvidencePlate } from './EvidencePlate.tsx';
 import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
-import { methaneDirFrom, parseTip, tipManifestUrl, type Tip } from '../utils/steps.ts';
+import { groupSteps, methaneDirFrom, parseTip, tipManifestUrl, type Tip } from '../utils/steps.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { currentBriefId } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
-import { docentCaption, stagePunctuation } from '../utils/caption.ts';
+import { stagePunctuation } from '../utils/caption.ts';
+import { stepColumnMaxHeight } from '../utils/stageLayout.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
   cleanStreamingText,
+  finalAnswer,
   parseToolCalls,
   extractAllVisualizationData,
   extractLocationChanged,
@@ -437,6 +439,7 @@ export function ChatSidebar({
         {
           role: 'assistant',
           content: cleanText,
+          answer: finalAnswer(fullResponse),
           tools: completedTools.length > 0 ? completedTools : undefined,
         },
       ]);
@@ -478,9 +481,12 @@ export function ChatSidebar({
 
   // What the room reads: the current streaming sentence, or the last thing the agent said.
   const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
-  const captionSource = isStreaming ? streamingText : lastAssistant?.content || '';
-  const caption = docentCaption(captionSource, { partial: isStreaming });
-  const idle = !isStreaming && !caption;
+  // The question on the stage: the presenter's last prompt (the console clears on send).
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  // The answer on the stage: what the agent said after its last tool call (a replay's recorded
+  // narrative, or a stopped or failed turn's one line, has no answer field and stands as is).
+  const answerText = !isStreaming && lastAssistant ? stagePunctuation((lastAssistant.answer ?? lastAssistant.content).trim()) : '';
+  const answerFailed = /^Error:/.test(answerText);
 
   // Where the agent is: this turn's tools while working, the last turn's when finished.
   const stepTools = isStreaming ? streamingTools : lastAssistant?.tools || [];
@@ -513,31 +519,126 @@ export function ChatSidebar({
 
   const canSend = !isProcessing && userInput.trim().length > 0;
 
+  // The step column: shown while the agent works and for the turn just finished. A turn that
+  // drafted the brief ends on the brief card (it is the answer); any other turn ends on the answer.
+  const draftedBrief = stepTools.some((t) => t.name === 'draft_brief');
+  const showBrief = !!briefId && !isStreaming;
+  const showAnswer = !isStreaming && !!answerText && !(showBrief && draftedBrief);
+  const showColumn = isStreaming || stepTools.length > 0 || showAnswer;
+  const columnTitle = isStreaming ? 'The agent is working' : stepTools.length > 0 ? 'What the agent did' : 'What the agent said';
+  const [stepsOpen, setStepsOpen] = useState(true);
+  // The same count the column's "Show all N steps" uses (consecutive calls of one tool are one step).
+  const stepCount = groupSteps(stepTools).length;
+
+  // The column grows to the draw rail, or stops above the console where the two overlap
+  // (a narrow screen); measured, since the console's height follows its wrapped prompts.
+  const columnRef = useRef<HTMLElement>(null);
+  const docentRef = useRef<HTMLDivElement>(null);
+  const [columnMax, setColumnMax] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const column = columnRef.current;
+    const docent = docentRef.current;
+    const stage = column?.offsetParent as HTMLElement | null;
+    if (!column || !docent || !stage) return;
+    const measure = () => {
+      const s = stage.getBoundingClientRect();
+      const d = docent.getBoundingClientRect();
+      const c = column.getBoundingClientRect();
+      const rail = stage.querySelector('.map-rail')?.getBoundingClientRect();
+      setColumnMax(
+        stepColumnMaxHeight({
+          stageHeight: s.height,
+          columnRight: c.right - s.left,
+          docentLeft: d.left - s.left,
+          docentTop: d.top - s.top,
+          railTop: rail ? rail.top - s.top : s.height - 120,
+        }),
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(docent);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [showColumn]);
+
+  // The answer lands in view when the turn ends (the brief card scrolls itself into view).
+  const answerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showAnswer && stepsOpen) answerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [showAnswer, stepsOpen, answerText]);
+
   return (
     <>
-      {/* Left: the step column */}
-      {stepTools.length > 0 && (
-        <section className="stage-steps" aria-label="Agent steps">
-          <h2 className="stage-steps__title">{isStreaming ? 'The agent is working' : 'What the agent did'}</h2>
-          <StepColumn
-            steps={stepTools}
-            live={isStreaming}
-            evidence={evidence}
-            onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
-            methaneDir={methaneDir}
-            tips={tips}
-            compact={!!briefId && !isStreaming && stepTools.some((t) => t.name === 'draft_brief')}
-            key={`steps-${briefId ?? 'live'}`}
-          />
-          {briefId && !isStreaming && (
-            <BriefCard
-              key={briefId}
-              briefId={briefId}
-              sessionId={sessionId}
-              caseId={scenarioId}
-              busy={isProcessing}
-              onDecision={(prompt) => void sendMessage(prompt)}
-            />
+      {/* Left: the step column. The question, what the agent did, and its answer or brief. */}
+      {showColumn && (
+        <section
+          ref={columnRef}
+          className={`stage-steps${stepsOpen ? '' : ' stage-steps--closed'}`}
+          aria-label="The agent's steps and answer"
+          style={columnMax ? { maxHeight: columnMax } : undefined}
+        >
+          <div className="stage-steps__head">
+            <button
+              type="button"
+              className="stage-steps__toggle"
+              onClick={() => setStepsOpen((o) => !o)}
+              aria-expanded={stepsOpen}
+              title={stepsOpen ? 'Minimize to see more of the map' : 'Show the steps and the answer'}
+            >
+              <Icon name={stepsOpen ? 'chevron-down' : 'chevron-right'} size={14} />
+              <h2 className="stage-steps__title">{columnTitle}</h2>
+              {stepCount > 0 && <span className="stage-steps__count">{stepCount}</span>}
+              {isStreaming && (
+                <span className="docent-working" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              )}
+            </button>
+          </div>
+          {stepsOpen && (
+            <>
+              {lastUser && <p className="stage-steps__ask" title={lastUser.content}>{lastUser.content}</p>}
+              {stepTools.length > 0 && (
+                <StepColumn
+                  steps={stepTools}
+                  live={isStreaming}
+                  evidence={evidence}
+                  onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
+                  methaneDir={methaneDir}
+                  tips={tips}
+                  compact={showBrief && draftedBrief}
+                  key={`steps-${briefId ?? 'live'}`}
+                />
+              )}
+              {isStreaming && stepTools.length === 0 && <p className="stage-steps__reading">Reading the request</p>}
+              {showBrief && (
+                <BriefCard
+                  key={briefId}
+                  briefId={briefId}
+                  sessionId={sessionId}
+                  caseId={scenarioId}
+                  busy={isProcessing}
+                  onDecision={(prompt) => void sendMessage(prompt)}
+                />
+              )}
+              {showAnswer && (
+                <div ref={answerRef} className={`stage-answer${answerFailed ? ' stage-answer--failed' : ''}`} aria-live="polite">
+                  <span className="stage-answer__who">{speaker}</span>
+                  {answerFailed ? (
+                    <p className="stage-answer__text">
+                      The agent stopped before it answered. Send the prompt again, or open the transcript for the error.
+                    </p>
+                  ) : (
+                    <div className="stage-answer__text markdown-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{answerText}</ReactMarkdown>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
@@ -551,35 +652,8 @@ export function ChatSidebar({
         />
       )}
 
-      {/* Bottom: the docent's caption and the presenter's console */}
-      <div className="stage-docent">
-        <div
-          className={`docent-caption${idle ? ' docent-caption--idle' : ''}`}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <span className="docent-caption__who">{idle ? 'Ready' : speaker}</span>
-          <div className="docent-caption__text">
-            {caption ? (
-              <span className="markdown-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{caption}</ReactMarkdown>
-              </span>
-            ) : isStreaming ? (
-              <span>Reading the request</span>
-            ) : (
-              <span>{copy.idle}</span>
-            )}
-            {isStreaming && (
-              <span className="docent-working" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-            )}
-          </div>
-        </div>
-
+      {/* Bottom: the presenter's console and the prepared prompts. The answer is in the step column. */}
+      <div className="stage-docent" ref={docentRef}>
         <form
           className="docent-console"
           onSubmit={(e) => {

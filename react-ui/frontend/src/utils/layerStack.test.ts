@@ -7,9 +7,10 @@ import {
   layerLegend,
   moveItem,
   moveSentence,
-  rasterCeiling,
+  outOfRange,
   slotIndex,
   slotLayout,
+  stackCeiling,
   stackLegends,
   stackMoves,
 } from './layerStack.ts';
@@ -60,56 +61,65 @@ describe('moveItem', () => {
 });
 
 describe('insertInStack', () => {
-  it('puts a finding on top and a scene at the bottom', () => {
-    expect(insertInStack(['tci'], 'ndvi', true)).toEqual(['ndvi', 'tci']);
-    expect(insertInStack(['ndvi'], 'tci', false)).toEqual(['ndvi', 'tci']);
-    expect(insertInStack(['ndvi', 'tci'], 'tci2', false)).toEqual(['ndvi', 'tci', 'tci2']);
+  const rasters = new Set(['tci', 'tci2', 'ndvi', 'ndvi2']);
+  const isRaster = (id: string) => rasters.has(id);
+  it('puts a vector on top, a finding over the imagery and a scene at the bottom', () => {
+    expect(insertInStack(['tci'], 'geom', 'top', isRaster)).toEqual(['geom', 'tci']);
+    // The finding lands under the boundary drawn over the imagery, above the scene.
+    expect(insertInStack(['geom', 'tci'], 'ndvi', 'aboveImagery', isRaster)).toEqual(['geom', 'ndvi', 'tci']);
+    expect(insertInStack(['geom', 'ndvi', 'tci'], 'ndvi2', 'aboveImagery', isRaster)).toEqual(['geom', 'ndvi2', 'ndvi', 'tci']);
+    expect(insertInStack(['geom', 'ndvi'], 'tci2', 'bottom', isRaster)).toEqual(['geom', 'ndvi', 'tci2']);
+  });
+  it('puts the first finding under every vector when there is no imagery yet', () => {
+    expect(insertInStack(['sites', 'footprints'], 'ndvi', 'aboveImagery', isRaster)).toEqual(['sites', 'footprints', 'ndvi']);
+  });
+  it('keeps the presenter\'s order: a raster moved over a vector stays there', () => {
+    expect(insertInStack(['tci', 'geom'], 'ndvi', 'aboveImagery', isRaster)).toEqual(['ndvi', 'tci', 'geom']);
   });
   it('never lists a layer twice', () => {
-    expect(insertInStack(['a', 'b'], 'a', false)).toEqual(['b', 'a']);
+    expect(insertInStack(['a', 'b'], 'a', 'bottom')).toEqual(['b', 'a']);
   });
 });
 
-describe('rasterCeiling', () => {
-  it('is the lowest vector above the basemap', () => {
-    const style = [
-      { id: 'esri-satellite-base', type: 'raster' },
-      { id: 'gl-draw-polygon-fill', type: 'fill' },
-      { id: 'cog-1', type: 'raster' },
-      { id: 'geom-fill', type: 'fill' },
-    ];
-    expect(rasterCeiling(style, BASEMAPS)).toBe('gl-draw-polygon-fill');
+describe('stackCeiling', () => {
+  it('is the lowest layer above the basemap that the plate does not list', () => {
+    const style = ['esri-satellite-base', 'cog-1', 'gl-draw-polygon-fill', 'geom-fill', 'watch-tips-marks'];
+    expect(stackCeiling(style, new Set(['cog-1', 'geom-fill']), BASEMAPS)).toBe('gl-draw-polygon-fill');
   });
-  it('skips anything under the basemap and is undefined with no vectors', () => {
-    expect(
-      rasterCeiling(
-        [
-          { id: 'bg', type: 'background' },
-          { id: 'dark-base', type: 'raster' },
-          { id: 'cog-1', type: 'raster' },
-        ],
-        BASEMAPS,
-      ),
-    ).toBeUndefined();
-    expect(rasterCeiling([], BASEMAPS)).toBeUndefined();
+  it('skips anything under the basemap and is undefined when everything is listed', () => {
+    expect(stackCeiling(['bg', 'dark-base', 'cog-1'], new Set(['cog-1']), BASEMAPS)).toBeUndefined();
+    expect(stackCeiling([], new Set(), BASEMAPS)).toBeUndefined();
   });
 });
 
 describe('stackMoves', () => {
-  it('draws the stack in list order, every raster under every vector', () => {
-    // The old escape: a raster moved "up" with no beforeId landed over the vectors and labels.
-    const style = ['esri-satellite-base', 'tci', 'ndvi', 'gl-draw-polygon-fill', 'geom-fill', 'geom-labels'];
-    const moves = stackMoves(['tci', 'ndvi'], 'gl-draw-polygon-fill');
-    expect(simulate(style, moves)).toEqual(['esri-satellite-base', 'ndvi', 'tci', 'gl-draw-polygon-fill', 'geom-fill', 'geom-labels']);
+  it('draws the stack in list order with each geometry\'s layers kept together and in order', () => {
+    const style = ['esri-satellite-base', 'geom-fill', 'geom-outline', 'geom-labels', 'tci', 'ndvi', 'gl-draw-polygon-fill'];
+    // The presenter put the scene on top, then the boundary, then the NDVI.
+    const moves = stackMoves([['tci'], ['geom-fill', 'geom-outline', 'geom-labels'], ['ndvi']], 'gl-draw-polygon-fill');
+    expect(simulate(style, moves)).toEqual([
+      'esri-satellite-base', 'ndvi', 'geom-fill', 'geom-outline', 'geom-labels', 'tci', 'gl-draw-polygon-fill',
+    ]);
   });
-  it('stacks at the top when the map has no vectors', () => {
-    const moves = stackMoves(['c', 'a', 'b'], undefined);
+  it('stacks at the top when nothing unlisted sits above the stack', () => {
+    const moves = stackMoves([['c'], ['a'], ['b']], undefined);
     expect(simulate(['dark-base', 'a', 'b', 'c'], moves)).toEqual(['dark-base', 'b', 'a', 'c']);
   });
-  it('lifts a raster that had escaped above the vectors back under them', () => {
-    const style = ['dark-base', 'tci', 'geom-fill', 'plume'];
-    const moves = stackMoves(['plume', 'tci'], 'geom-fill');
-    expect(simulate(style, moves)).toEqual(['dark-base', 'tci', 'plume', 'geom-fill']);
+  it('keeps the drawn shapes over a stack that had a layer above them', () => {
+    const style = ['dark-base', 'tci', 'gl-draw-polygon-fill', 'plume'];
+    const moves = stackMoves([['plume'], ['tci']], 'gl-draw-polygon-fill');
+    expect(simulate(style, moves)).toEqual(['dark-base', 'tci', 'plume', 'gl-draw-polygon-fill']);
+  });
+});
+
+describe('outOfRange', () => {
+  it('is true for a capped raster at or past its cap only', () => {
+    const tropomi = { type: 'raster' as const, render: METHANE_TROPOMI };
+    expect(outOfRange(tropomi, 7.9)).toBe(false);
+    expect(outOfRange(tropomi, 8)).toBe(true);
+    expect(outOfRange(tropomi, 12.7)).toBe(true);
+    expect(outOfRange({ type: 'raster', render: METHANE_RASTER }, 14)).toBe(false);
+    expect(outOfRange({ type: 'geometry', render: METHANE_TROPOMI }, 14)).toBe(false);
   });
 });
 
@@ -158,32 +168,33 @@ describe('legends', () => {
     expect(layerLegend(ndvi)).toMatchObject({ kind: 'index', label: 'NDVI', ramp: 'rdylgn' });
     expect(layerLegend(tci)).toBeNull();
     expect(layerLegend(plume)).toMatchObject({ kind: 'measure', ramp: 'plasma', units: 'ppm·m', lo: 0, hi: 1500 });
-    expect(layerLegend(tropomi)).toMatchObject({ kind: 'measure', ramp: 'viridis', units: 'ppb', label: 'CH4 anomaly' });
+    expect(layerLegend(tropomi)).toMatchObject({ kind: 'measure', ramp: 'ice', units: 'ppb', label: 'CH4 anomaly' });
     expect(layerLegend(sites)).toEqual({ kind: 'sites', key: 'sites' });
     expect(layerLegend(similar)).toEqual({ kind: 'similar', key: 'similar' });
   });
 
-  it('orders by the highest row using each ramp, then the vectors, keys last', () => {
-    expect(stackLegends([ndwi, tci, ndvi], [], all).map((l) => l.key)).toEqual(['NDWI', 'NDVI']);
-    expect(stackLegends([ndvi, tci, ndwi], [], all).map((l) => l.key)).toEqual(['NDVI', 'NDWI']);
-    expect(stackLegends([tropomi, plume], [sites, footprints], all).map((l) => l.key)).toEqual([
-      'viridis-ppb',
+  it('orders by the highest row using each ramp, keys last', () => {
+    expect(stackLegends([ndwi, tci, ndvi], all).map((l) => l.key)).toEqual(['NDWI', 'NDVI']);
+    expect(stackLegends([ndvi, tci, ndwi], all).map((l) => l.key)).toEqual(['NDVI', 'NDWI']);
+    expect(stackLegends([sites, footprints, tropomi, plume], all).map((l) => l.key)).toEqual([
       'plasma-ppm·m',
+      'ice-ppb',
       'sites',
     ]);
-    expect(stackLegends([], [similar, footprints], all).map((l) => l.key)).toEqual(['plasma-ppm·m', 'similar']);
+    expect(stackLegends([similar, footprints], all).map((l) => l.key)).toEqual(['plasma-ppm·m', 'similar']);
   });
 
-  it('shows no legend for a hidden layer, and a shared ramp once', () => {
-    const shown = (id: string) => id !== 'ndvi';
-    expect(stackLegends([ndvi, tci], [], shown)).toEqual([]);
-    expect(stackLegends([plume], [footprints], all)).toHaveLength(1);
+  it('shows no legend for a hidden or undrawable layer, and a shared ramp once', () => {
+    const shown = (id: string) => id !== 'ndvi' && id !== 'tropomi';
+    expect(stackLegends([ndvi, tci], shown)).toEqual([]);
+    expect(stackLegends([tropomi, plume], shown).map((l) => l.key)).toEqual(['plasma-ppm·m']);
+    expect(stackLegends([plume, footprints], all)).toHaveLength(1);
   });
 });
 
 describe('moveSentence', () => {
   it('says where the layer is now', () => {
-    expect(moveSentence('NDVI', 0, 3)).toBe('NDVI moved to the top, drawn over the other imagery.');
+    expect(moveSentence('NDVI', 0, 3)).toBe('NDVI moved to the top, drawn over every other layer.');
     expect(moveSentence('NDVI', 2, 3)).toBe('NDVI moved to the bottom, just above the basemap.');
     expect(moveSentence('NDVI', 1, 3)).toBe('NDVI moved to 2 of 3.');
   });

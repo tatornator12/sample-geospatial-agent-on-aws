@@ -511,3 +511,39 @@ export function extractLocationChanged(_responseText: string, _tools: ToolCall[]
 
   return false; // Default: don't clear (persistent layer management)
 }
+
+/**
+ * The agent's answer: what it said after its last tool call (the narration before and between
+ * tools, "Now ranking them...", is the step column's job). With no tool call, everything it said.
+ * Empty while the last tool call is still streaming.
+ */
+export function finalAnswer(raw: string): string {
+  if (!raw) return '';
+  const start = raw.lastIndexOf('{"toolUseId":');
+  if (start === -1) return parseToolCalls(raw).cleanText;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return parseToolCalls(raw.slice(i + 1)).cleanText;
+    }
+  }
+  return '';
+}

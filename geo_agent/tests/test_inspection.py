@@ -166,10 +166,28 @@ IMAGES = [
 ]
 
 
-def test_rank_candidates_prefers_low_cloud_then_high_coverage(inspection):
+def test_rank_candidates_prefers_full_coverage_then_low_cloud(inspection):
     best, others = inspection.rank_candidates(IMAGES)
     assert best["date"].startswith("2026-03-06")
-    assert [o["date"] for o in others] == ["2026-03-11", "2026-03-16", "2026-03-01"]
+    # The 60% scene (the swath edge) goes after every scene that covers the area, cloud or not.
+    assert [o["date"] for o in others] == ["2026-03-16", "2026-03-01", "2026-03-11"]
+
+
+def test_rank_candidates_a_half_scene_never_beats_a_whole_one(inspection):
+    # The Jincheng replay site in July 2025: a 0.06% cloud scene covering 31.6% of the area was
+    # picked over 0.01% scenes covering all of it.
+    images = [
+        {"date": "2025-07-05T03:00:00Z", "cloud_pct": 0.06, "coverage_pct": 31.6},
+        {"date": "2025-05-19T03:00:00Z", "cloud_pct": 0.01, "coverage_pct": 100.0},
+        {"date": "2025-05-11T03:00:00Z", "cloud_pct": 0.0, "coverage_pct": 26.6},
+        {"date": "2025-05-29T03:00:00Z", "cloud_pct": 3.96, "coverage_pct": 100.0},
+    ]
+    best, others = inspection.rank_candidates(images)
+    assert best["date"].startswith("2025-05-19")
+    assert [o["date"] for o in others] == ["2025-05-29", "2025-05-11", "2025-07-05"]
+    # When no scene covers the area, the old order holds among the partial ones: least cloud first.
+    partial, _ = inspection.rank_candidates([images[0], images[2]])
+    assert partial["date"].startswith("2025-05-11")
 
 
 def test_rank_candidates_skips_excluded_dates(inspection):

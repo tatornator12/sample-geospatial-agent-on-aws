@@ -93,3 +93,38 @@ def test_result_json_without_scl_has_null_facts(tools_module):
     payload = tools_module._raster_result_json({"date": "2026-03-06T10:00:00Z", "aoi_quality": None}, "x")
     assert payload["aoi_clear_pct"] is None and payload["aoi_cloud_pct"] is None
     assert payload["aoi_nodata_pct"] is None and payload["candidates"] == []
+
+
+def test_a_site_on_the_swath_edge_gets_a_whole_scene_from_further_back(sentinel, aoi, monkeypatch):
+    # The Jincheng replay site, July 2025: every clear scene in the 60-day window covers a third of
+    # the area (the swath edge); the orbit that sees all of it was clear in May.
+    def scenes(*_a, days_delta=60, **_k):
+        window = [
+            {"date": "2025-07-05T03:00:00Z", "cloud_pct": 0.06, "coverage_pct": 31.6, "tile_id": "49SFV",
+             "tci": "https://x/0705/TCI.tif", "thumbnail": "t", "scl": None, "red": "https://x/0705/B04.tif"},
+            {"date": "2025-07-17T03:00:00Z", "cloud_pct": 7.5, "coverage_pct": 32.7, "tile_id": "49SFV",
+             "tci": "https://x/0717/TCI.tif", "thumbnail": "t", "scl": None, "red": "https://x/0717/B04.tif"},
+        ]
+        older = [
+            {"date": "2025-05-29T03:00:00Z", "cloud_pct": 3.96, "coverage_pct": 100.0, "tile_id": "49SFV",
+             "tci": "https://x/0529/TCI.tif", "thumbnail": "t", "scl": None, "red": "https://x/0529/B04.tif"},
+        ]
+        return [dict(c) for c in window + (older if days_delta >= 120 else [])]
+
+    monkeypatch.setattr(sentinel, "get_all_images_from_gdf", scenes)
+    (result,) = sentinel.get_filtered_images(aoi, bands=["red"], location="Jincheng", current_date_str="2025-07-31")
+    assert result["date"].startswith("2025-05-29")
+    assert result["coverage_pct"] == 100.0
+    assert [c["date"] for c in result["candidates"]] == ["2025-07-05", "2025-07-17"]
+
+
+def test_no_longer_look_back_when_a_whole_scene_is_in_the_window(sentinel, aoi, monkeypatch):
+    calls = []
+
+    def scenes(*_a, days_delta=60, **_k):
+        calls.append(days_delta)
+        return [dict(c) for c in CANDIDATES]
+
+    monkeypatch.setattr(sentinel, "get_all_images_from_gdf", scenes)
+    sentinel.get_filtered_images(aoi, bands=["red"], location="Test Town", current_date_str="2026-03-20")
+    assert calls == [60]
