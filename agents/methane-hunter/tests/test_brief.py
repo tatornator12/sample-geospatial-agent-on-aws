@@ -99,6 +99,16 @@ def test_fields_are_bounded(brief, over, msg):
     assert msg in json.loads(_run(brief.draft_brief(**good(**over))))["error"]
 
 
+def test_a_rejected_character_is_named_with_its_plain_words_stand_in(brief):
+    # A vague rejection made the model rewrite ppm·m as ppm-m; the error names the one character.
+    obs = ["EMIT saw 98 pixels >= 1000 ppm·m on 2025-08-20.", "VIIRS saw no heat source within 1 km."]
+    err = json.loads(_run(brief.draft_brief(**good(observations=obs))))["error"]
+    assert "observations[0] contains '>'" in err and "'at least' or 'over'" in err and "ppm·m are fine" in err
+    assert "U+0007" in json.loads(_run(brief.draft_brief(**good(place="Krasnovodsk\x07, Turkmenistan"))))["error"]
+    ok = good(observations=["EMIT saw 98 pixels of at least 1000 ppm·m on 2025-08-20.", obs[1]])
+    assert "error" not in json.loads(_run(brief.draft_brief(**ok)))
+
+
 def test_hypothesis_labels_and_describing_what_is_seen_pass_the_checks(brief):
     assert brief.check_text("Pads, tanks and an access road are visible north of the candidate.") == []
     assert brief.check_text("A leak cannot be ruled out without an aircraft survey.") == []

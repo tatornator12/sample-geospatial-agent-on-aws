@@ -134,6 +134,13 @@ def main() -> int:
     brief_ids = BRIEF_RE.findall(narrative)
     if preset["needs_brief"] and not brief_ids:
         raise SystemExit("the recorded mission drafted no brief; not a usable Methane Watch case")
+    # The mission's cue step puts the pass window and its 3D columns on the map together; a take that
+    # dropped the columns is a partial mission (the model skips it now and then), so record it again.
+    def shows_columns(t: dict) -> bool:
+        render = tool_input(t).get("render")
+        return t["name"] == "display_visual" and isinstance(render, dict) and render.get("kind") == "columns"
+    if preset["needs_brief"] and not any(shows_columns(t) for t in tools):
+        raise SystemExit("the recorded mission never showed the 3D columns; record it again")
 
     s3 = boto3.client("s3", region_name=args.region)
     # A fresh take replaces the previous one entirely: a stale chip, draft or window from an earlier

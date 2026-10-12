@@ -68,6 +68,10 @@ FORBIDDEN_PATTERNS: tuple[tuple[str, str], ...] = (
 )
 _COMPILED = tuple((re.compile(p, re.IGNORECASE), why) for p, why in FORBIDDEN_PATTERNS)
 _CONTROL = re.compile(r"[\x00-\x1f\x7f<>`|]")
+# The rejection names the character and its plain-words stand-in: a vague "no markup" made the model
+# rewrite characters that were fine (ppm·m became ppm-m on the card after a ">=" was sent back).
+_INSTEAD = {"<": ("markup", "'under'"), ">": ("markup", "'at least' or 'over'"),
+            "`": ("markup", "plain text"), "|": ("pipes", "a comma or 'and'")}
 
 
 _REGISTRY_WORDS = re.compile(r"\boperators? of record\b", re.IGNORECASE)
@@ -92,8 +96,12 @@ def _clean(value: Any, name: str, limit: int = TEXT_MAX, required: bool = True) 
     text = " ".join(value.split())
     if len(text) > limit:
         raise MethaneError(f"{name} is longer than {limit} characters")
-    if _CONTROL.search(text):
-        raise MethaneError(f"{name} contains characters a brief does not use (markup, pipes, control characters)")
+    bad = _CONTROL.search(text)
+    if bad:
+        kind, instead = _INSTEAD.get(bad.group(0), ("control characters", "plain text"))
+        shown = bad.group(0) if bad.group(0) in _INSTEAD else f"U+{ord(bad.group(0)):04X}"
+        raise MethaneError(f"{name} contains '{shown}' ({kind}, which a brief does not use); write {instead} "
+                           "instead and keep everything else as it is (units such as ppm·m are fine)")
     return text
 
 

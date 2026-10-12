@@ -67,11 +67,12 @@ const scenarios: Scenario[] = [
   {
     id: 'methane-watch-mission',
     name: 'Methane Watch brief',
-    description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, two ground-record checks and a draft brief for the analyst',
+    description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, three ground-record checks and a draft brief for the analyst',
     icon: '/methane_watch.png',
+    // The recorded take (Oct 12, dev v36): south Caspian and Shanxi cued, the brief on Krasnovodsk.
     metrics: [
-      { label: 'Watch Areas', value: '7 scanned, 2 cued' },
-      { label: 'Candidate Passes', value: '6 of 7 since 2025' },
+      { label: 'Watch Areas', value: '9 scanned, 2 cued' },
+      { label: 'Candidate Passes', value: '4 of 10 since 2025' },
     ],
     status: 'available',
     agent: 'methane',

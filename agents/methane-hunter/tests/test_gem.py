@@ -12,7 +12,7 @@ import pytest
 
 from conftest import BUCKET, SESSION
 
-LAT, LON = 35.5111, 112.4429           # the Jincheng site the replay picked
+LAT, LON = 35.5111, 112.4429           # the Jincheng coal site (the Oct 9 replay take)
 
 
 def _run(coro):

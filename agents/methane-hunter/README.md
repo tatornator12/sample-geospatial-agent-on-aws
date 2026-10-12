@@ -123,9 +123,10 @@ maps within 2 km; and the GEM field the site lies in or the nearest within 10 km
 owners. Government bodies listed among owners or parents are left out of the sentence. When OGIM and
 GEM name the same field, one line says it (OGIM's when it has the operator; otherwise GEM's operator
 placed by OGIM's outline). A mine within 3 km moves `non_oil_gas_source` (coal) to "possible" through
-the hint. Measured at the demo sites: Jincheng, Shanxi (the replay) has the Shanxi Yinjiagou Coal Mine
-2.2 km away and 13 more within 10 km; the south Caspian TROPOMI site has Goturdepe Gas Field 5.9 km
-away, operator of record Turkmennebit; Turkmenistan is thin otherwise (20 of GEM's 23 Turkmen fields
+the hint. Measured at the demo sites: Jincheng, Shanxi (the Oct 9 take) has the Shanxi Yinjiagou Coal
+Mine 2.2 km away and 13 more within 10 km; Krasnovodsk, south Caspian (the replay since Oct 12, at
+39.4379, 53.5730) has Goturdepe Gas Field 6.4 km away, operator of record Turkmennebit; Turkmenistan
+is thin otherwise (20 of GEM's 23 Turkmen fields
 have no coordinates; 4 match an OGIM outline by name). GEM's own plume-to-mine attribution (the
 Global Methane Emitters Tracker) is not used: the agent never attributes.
 
