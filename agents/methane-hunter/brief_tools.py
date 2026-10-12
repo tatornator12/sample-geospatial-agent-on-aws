@@ -306,6 +306,44 @@ def find_checks(lat: float, lon: float) -> dict:
 
 # The registry check's sentences, in the order the brief and the card print them.
 REGISTRY_LINES = ("line", "field_line", "gem_field_line", "mine_line")
+_SHARE = re.compile(r"\s*\(\d+(?:\.\d+)?%\)\s*$")
+
+
+def record_names(checks: dict) -> list[str]:
+    """Every operator, owner and parent the session's registry record names near the site. They reach
+    the brief only through the tool's own sentences (REGISTRY_LINES); the model's fields never carry
+    one (a model-written "operator of record Turkmennebit" observation failed the Oct 12 gate)."""
+    reg = (checks or {}).get("registry") or {}
+    raw = [o.get("operator") for o in reg.get("operators") or [] if isinstance(o, dict)]
+    for key, fields in (("field", ("operator",)), ("gem_field", ("operator", "owners")), ("mine", ("owners", "parent"))):
+        rec = reg.get(key) if isinstance(reg.get(key), dict) else {}
+        raw += [rec.get(f) for f in fields]
+    names = set()
+    for value in raw:
+        for part in (value or "").split(", ") if isinstance(value, str) else ():
+            name = _SHARE.sub("", part).strip()
+            if len(name) >= 2:
+                names.add(name)
+    return sorted(names, key=len, reverse=True)
+
+
+def check_record_names(brief: dict, names: list[str]) -> list[str]:
+    """Which of the model's text fields name a party from the record (empty list: none). A name that
+    is also part of the place or the watch area (a town a company is named after) is left alone."""
+    where = f"{brief.get('place') or ''} {brief.get('watch_area') or ''}".lower()
+    # Short names ("BP") match as written only, so an ordinary word is never read as a company.
+    pats = [(n, re.compile(rf"(?<!\w){re.escape(n)}(?!\w)", re.IGNORECASE if len(n) >= 5 else 0))
+            for n in names if n.lower() not in where]
+    fields = [("next_collection", brief.get("next_collection") or "")]
+    fields += [(f"{k}[{i}]", t) for k in ("observations", "gaps") for i, t in enumerate(brief.get(k) or [])]
+    fields += [(f"explanations[{i}].next_check", r.get("next_check") or "") for i, r in enumerate(brief.get("explanations") or [])]
+    problems = []
+    for field, text in fields:
+        hit = next((n for n, rx in pats if rx.search(text)), None)
+        if hit:
+            problems.append(f"{field}: names '{hit}' from the public record; the tool adds the record's own "
+                            "sentences to the brief, so leave every operator, owner and parent out of your fields")
+    return problems
 
 
 def render_markdown(brief: dict, brief_id: str) -> str:
@@ -361,6 +399,8 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
             owner or operator; the watch area goes in watch_area.
         lat, lon: The site in degrees.
         observations: 2-6 short sentences, every number from a tool result (ppm·m, ppb, dates, counts).
+            No operator, owner or parent in any field: the tool adds the registry's own sentences
+            (with the names of record) to the brief, and rejects a field that repeats a name.
         looks: How many times EMIT looked (site_history.looks).
         candidates: Candidate passes (check_recent_passes.summary.candidates).
         passes_read: Passes read (check_recent_passes.summary.read).
@@ -388,6 +428,9 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
         brief.update(candidates=passes["candidates"], passes_read=passes["read"], passes_since=passes["since"])
         brief["title"] = compose_title(brief["place"], brief["confidence"], brief["candidates"])
     brief["checks"] = find_checks(brief["lat"], brief["lon"])
+    named = check_record_names(brief, record_names(brief["checks"]))
+    if named:   # nothing is written: the model rewrites its fields and calls again
+        return json.dumps({"error": "Rewrite these parts of the brief: " + "; ".join(named[:8])})
     markdown = render_markdown(brief, brief_id)
     record = {"brief_id": brief_id, "status": "draft", "created": datetime.now(timezone.utc).isoformat(),
               "session_id": mt._session_id(), "brief": brief, "markdown": markdown}
