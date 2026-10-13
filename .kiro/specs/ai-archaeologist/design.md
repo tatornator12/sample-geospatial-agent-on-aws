@@ -1,6 +1,6 @@
 # Design: ai-archaeologist
 
-Status: DRAFT for approval (Oct 12). Decisions at the end.
+Status: **APPROVED Oct 12** (the user approved all eight decisions at the end; work starts early).
 
 ## Overview
 

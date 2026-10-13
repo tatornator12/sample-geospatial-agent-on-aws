@@ -11,7 +11,7 @@ not all up front, so requirements reflect what the data spikes actually showed.
 |---|---|---|---|
 | 1 | Current agent + eyes + similarity | 7 | The agent sees imagery and finds places by example |
 | 2 | Methane Hunter (or Ground Motion Sentinel) | 7 | It senses the invisible and triages at scale |
-| 3 | Dark Vessels (or Ground Motion lite) | 8 | It investigates, gathers evidence, and acts with approval |
+| 3 | Dark Vessels (decided Oct 12; Ground Motion lite dropped) | 8 | It investigates, gathers evidence, and acts with approval |
 | 4 | AI Archaeologist | 4 | Same eyes and similarity, a new domain: discovery |
 | — | Intro 2 min, close 2 min (teaser of the act not shown + observability trace) | 4 | |
 
@@ -22,14 +22,15 @@ not all up front, so requirements reflect what the data spikes actually showed.
 | 1 | `demo-foundation` | Sep 15–19 | G1: dev runtime reachable from local UI via switcher; eval script runs; 4 spike notes | **G1 passed Sep 18** |
 | 2 | `eyes-inspect-image` | Sep 22–26 | tool + gallery + cloudy-scene golden prompt pass | built and verified Sep 18 (dev v19, eval 7/7); formal gate run Sep 26 |
 | 3 | `similarity-search` | Sep 29–Oct 3 | G2: Release 1 promoted to `demo-stable`; Act 1 rehearsed (7 min) | built Sep 24; **G2 promoted Sep 24** (`deployed-2026-09-24`, stable v70 + CloudFront; UI build fix `deployed-2026-09-24-1712`); Act 1 rehearsal pending |
-| 4 | `methane-hunter` | Oct 6–17 | G3: Release 2; two agents in switcher; Acts 1–2 rehearsed | **Release 2 promoted Oct 12** (`deployed-2026-10-12`: Earth stable v72, Methane stable v3, CloudFront UI); Acts 1–2 rehearsal and the stage-dive sign-off (task 13.1) pending |
-| 5 | `ai-archaeologist` | Oct 20–24 | closer works on a public site; **Act 3 decision written down Oct 24** | spec drafted Oct 12 (ahead of cadence); 8 decisions to approve |
-| 6 | `act3-dark-vessels` or `act3-ground-motion-lite` | Oct 27–31 | G4: Release 3; full 30-minute run-through | not started |
+| 4 | `methane-hunter` | Oct 6–17 | G3: Release 2; two agents in switcher; Acts 1–2 rehearsed | **Release 2 promoted Oct 12** (`deployed-2026-10-12`: Earth stable v72, Methane stable v3, CloudFront UI); user signed in and sees both agents; Turkmenistan cleared for the stage (13.1, Oct 12); Acts 1–2 rehearsal pending |
+| 5 | `ai-archaeologist` | Oct 20–24 (started early) | closer works on a public site; **Act 3 decision written down** | spec **approved Oct 12** (all 8 decisions); Act 3 decided Oct 12: Dark Vessels |
+| 6 | `act3-dark-vessels` | Oct 27–31 (earlier if Act 4 lands early) | G4: Release 3; full 30-minute run-through | not started; spike `docs/spikes/dark-vessels.md` |
 | 7 | `demo-readiness` | Nov 3–7 | freeze Nov 3; runbook, backup videos, prewarm, 2 timed rehearsals | not started |
 
 Cut list if behind (in this order, never touching the foundation, eyes, similarity, replay
-cases or rehearsal week): Ground Motion → live AIS (keep replay) → Archaeologist shrinks to
-a 90-second teaser → Methane keeps only the replay case.
+cases or rehearsal week): live AIS (keep replay) → Archaeologist shrinks to a 90-second
+teaser → Methane keeps only the replay case. (Ground Motion, first on the list, was dropped
+Oct 12 when Dark Vessels was chosen for Act 3.)
 
 ## Spec-driven cadence
 

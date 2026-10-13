@@ -1,7 +1,7 @@
 # Tasks: ai-archaeologist (Week 5, Oct 19–24)
 
-Cadence: requirements and design approved before code (drafted Oct 12; the eight design
-decisions await approval). Work may start early once approved; Week 4's gate is already met
+Cadence: requirements and design approved before code (drafted and approved Oct 12, all eight
+design decisions). Work starts early; if Act 4 lands early, Act 3 (Dark Vessels) starts early; Week 4's gate is already met
 (Release 2 promoted Oct 12). Tasks top to bottom; every task names its tests. Gate Friday Oct 24
 is dev-only: the archaeologist reaches stable with Release 3 at G4 (Oct 31). All deploys before
 then are `DEPLOY_TARGET=dev`. The Act 3 decision is also due Oct 24 (ROADMAP row 5).
@@ -55,7 +55,7 @@ then are `DEPLOY_TARGET=dev`. The Act 3 decision is also due Oct 24 (ROADMAP row
 - [ ] 7. Gate and rehearsal
   - [ ] 7.1 pytest (all three agents), vitest, backend tests, `npm run design:check`; evals for all three agents on dev; record counts below
   - [ ] 7.2 Act 4 timed twice on the local UI against dev (under 4:30), the 90-second teaser once; fallbacks applied if over and recorded
-  - [ ] 7.3 ROADMAP row 5 status and the Act 3 decision written down
+  - [ ] 7.3 ROADMAP row 5 status (the Act 3 decision is already written down: Dark Vessels, the user, Oct 12)
   - _Requirements: 8.3_
 
 ## Gate log

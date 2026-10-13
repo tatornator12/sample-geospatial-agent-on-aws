@@ -1,7 +1,7 @@
 # Requirements: ai-archaeologist (Week 5, Oct 19–24)
 
-Status: DRAFT for approval (written Oct 12, a week ahead of the Monday cadence). No code before
-the decisions in `design.md` are approved.
+Status: **APPROVED Oct 12** (written a week ahead of the Monday cadence; the user approved it and
+the eight design decisions the same day, and work starts early).
 
 ## Introduction
 

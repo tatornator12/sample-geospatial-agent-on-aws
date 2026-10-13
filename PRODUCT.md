@@ -45,8 +45,8 @@ authoritative GIS data arrives through an ArcGIS Enterprise MCP alongside AWS.
 
 - Format: four acts of 4–8 minutes plus a 2-minute intro and close. Act 1 is the existing
   Earth Analyst agent with two new capabilities (visual inspection of imagery, similarity
-  search on embeddings); Act 2 a Methane Hunter; Act 3 either Dark Vessels or Ground Motion
-  Sentinel (decided Oct 24); Act 4 an AI Archaeologist as the closer. The act not shown
+  search on embeddings); Act 2 a Methane Hunter; Act 3 Dark Vessels (decided Oct 12;
+  Ground Motion Sentinel dropped); Act 4 an AI Archaeologist as the closer. The act not shown
   appears as a short teaser in the close, alongside an observability trace of the agent's work.
 - Environment: projector or large display (resolution unconfirmed; assume 1080p, plan for
   4K), conference network that may be slow; every act has a replay case that loads without
