@@ -79,6 +79,14 @@ frontend_env_ok() {
     return 0
 }
 if [ "${PROMOTE_FRONTEND:-0}" = "1" ]; then
+    # cdk deploy builds the UI image locally, after demo-stable has moved and both runtimes are
+    # deployed; a stopped Docker daemon failed exactly there on Oct 12. Check it before anything moves.
+    CONTAINER_CLI="${CDK_DOCKER:-docker}"
+    if "$CONTAINER_CLI" info >/dev/null 2>&1; then
+        echo "  $CONTAINER_CLI is running (cdk deploy builds the UI image)"
+    else
+        fail "$CONTAINER_CLI is not running; cdk deploy needs it to build the UI image (start Docker Desktop, then rerun)."
+    fi
     echo "Frontend deploy requested (PROMOTE_FRONTEND=1); checking frontend-cdk/.env ..."
     if frontend_env_ok; then
         echo "  frontend-cdk/.env has AGENT_RUNTIME_ARN, AGENT_RUNTIMES (stable + dev), ADMIN_EMAIL, S3_BUCKET_NAME"
