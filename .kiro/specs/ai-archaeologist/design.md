@@ -43,6 +43,7 @@ agents/ai-archaeologist/
   ai_archaeologist.py   entrypoint (Methane Hunter's contract; tool list swapped)
   archaeo_config.py     prompt + model kwargs (named so the shared `import config` still works)
   site_tools.py         find_known_site, show_terrain, measure_profile, find_similar_sites
+  earthwork_profile.py  transect sampling and bank/ditch analysis (pure numpy; shared by the checks)
   data/sites_v1.json    the catalogue (curated, reviewed, versioned)
   deploy.sh             DEPLOY_TARGET=dev|stable → ai_archaeologist_dev | ai_archaeologist
   golden_prompts.json   3 act beats + 3 provocations
@@ -175,7 +176,7 @@ measured one.
 | 0:10 | From space | "Show me the Newark Octagon the way an archaeologist sees it" | Sentinel-2 true colour (the Octagon has long sat under a country club's golf course; day 1 checks what current imagery shows); chip; one sentence on what is visible from space |
 | 0:50 | Under the grass | (same turn) | Hillshade lands: the Octagon and its circle appear under the fairways; chip; one sentence |
 | 1:40 | Measure | "How big is the Great Circle, and how was it built?" | LRM (red bank, blue ditch), transect line; "363 m across (366 m documented), bank +2.7 m, ditch −2.6 m" |
-| 2:40 | Like this | "Where else did they build like this?" | Similar sites from the catalogue; the top match's LiDAR (High Bank Works: a circle joined to an octagon, to verify on day 1) |
+| 2:40 | Like this | "Where else did they build like this?" | Sites of the same form from the catalogue (option B); the top match's LiDAR. Candidate after the Oct 13 sheets: Hopeton Earthworks, a circle and a square ploughed down to tens of centimetres, still drawn by the LiDAR at ±0.3 m (High Bank Works' circle and octagon not yet convincing) |
 | 3:30 | Close | | "Both are already on the World Heritage list. I only work with sites on the public record." Hand-off to the close |
 
 Fallback if over 4:30 on rehearsal two: drop the measure beat. Cut-list fallback (90-second
@@ -196,6 +197,12 @@ teaser in the close): the replay's "under the grass" beat only.
    clipped to the catalogue frames: does it rank the other Hopewell components first?). If yes,
    option A (Clay, clipped); if not, option B (rank by the catalogue's published form, then one
    contact-sheet look with the model's eyes). Either way the results are catalogue sites only.
+   **Outcome (Oct 13): option B.** Clay ranked the landscape, not the form: from the Great Circle,
+   the Octagon (same town) first, then Grave Creek and Moundville (also towns); the other Hopewell
+   components 5th to 28th. The act says "same builders, same form" from the record and shows it
+   with the LiDAR, which is the honest version of "similarity" at 1 m. Each site carries an
+   `lrm_stretch_m` (±1 m for standing walls, ±0.3 m for ploughed ones such as Hopeton and Seip),
+   passed in the render hint's `rescale`.
 5. Measurement is a tool (`measure_profile` on the cached DEM along a verified transect), and the
    agent always states the documented value beside its own.
 6. Platform: one shared `stage_shared.sh` (entrypoint as an argument) and a per-agent table in

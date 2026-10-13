@@ -1,0 +1,975 @@
+{
+  "version": "v1",
+  "rule": "Known sites only (design decision 2): each location is already published by UNESCO, the National Park Service, or a state or tribal steward. Address-restricted records are excluded. Centres are approximate until verified on the LiDAR (centre.verified); frames are 3 km for the first build and shrink once verified. Town Creek Indian Mound (NC) was dropped on Oct 13: no 3DEP 1 m coverage.",
+  "compiled": "2026-10-12, from each steward's page (source_url) and the coordinate source named per site",
+  "sites": [
+    {
+      "id": "newark-great-circle",
+      "names": [
+        "Great Circle Earthworks",
+        "Newark Great Circle",
+        "Newark Earthworks"
+      ],
+      "culture": "Hopewell",
+      "period": "between 1 and 400 CE (UNESCO); built 2,000 to 1,600 years ago",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-002); National Historic Landmark (Newark Earthworks)",
+      "steward": "Ohio History Connection",
+      "source_url": "https://hopewellearthworks.org/site/great-circle-earthworks/",
+      "centre": {
+        "lat": 40.04101,
+        "lon": -82.431096,
+        "source": "docs/spikes/lidar.md (measured on the 3DEP 1 m DEM; UNESCO's component point is 160 m east)",
+        "verified": true
+      },
+      "frame_half_m": 1500,
+      "transect": {
+        "coords": [
+          [
+            -82.433615,
+            40.040979
+          ],
+          [
+            -82.428576,
+            40.041042
+          ]
+        ],
+        "label": "east-west through the centre (430 m)",
+        "measured": {
+          "outer_banks_span_m": 362.0,
+          "west_bank_m": 1.81,
+          "west_ditch_m": -2.54,
+          "east_ditch_m": -2.68,
+          "east_bank_m": 2.62,
+          "on": "2026-10-13"
+        }
+      },
+      "form": "a circular enclosure nearly 1,200 feet in diameter whose walls surround an interior ditch, with a gateway nearly 200 feet wide and Eagle Mound at the center",
+      "documented": [
+        {
+          "dimension": "diameter",
+          "value": 1200,
+          "unit": "ft (nearly)",
+          "source_url": "https://hopewellearthworks.org/site/great-circle-earthworks/"
+        },
+        {
+          "dimension": "wall height",
+          "value": "8-13",
+          "unit": "ft",
+          "source_url": "https://hopewellearthworks.org/site/great-circle-earthworks/"
+        }
+      ],
+      "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). The steward page also publishes 40.0402671, -82.4277555 (visitor info). Grounds open dawn to dusk; museum Wed-Sun. 455 Hebron Rd, Heath, OH. Interior ditch is 8-13 ft deep per steward.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "newark-octagon",
+      "names": [
+        "Octagon Earthworks",
+        "Newark Octagon",
+        "Newark Earthworks"
+      ],
+      "culture": "Hopewell",
+      "period": "between 1 and 400 CE (UNESCO); built 2,000 to 1,600 years ago",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-001); National Historic Landmark (Newark Earthworks)",
+      "steward": "Ohio History Connection",
+      "source_url": "https://hopewellearthworks.org/site/octagon-earthworks/",
+      "centre": {
+        "lat": 40.053658,
+        "lon": -82.446061,
+        "source": "https://whc.unesco.org/en/list/1689/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "two geometric enclosures, a large circle and a larger octagon, connected by an avenue; the Observatory Mound covers a former gateway in the circle",
+      "documented": [
+        {
+          "dimension": "area enclosed by octagon",
+          "value": 50,
+          "unit": "acres",
+          "source_url": "https://hopewellearthworks.org/site/octagon-earthworks/"
+        },
+        {
+          "dimension": "area enclosed by circle",
+          "value": 20,
+          "unit": "acres",
+          "source_url": "https://hopewellearthworks.org/site/octagon-earthworks/"
+        }
+      ],
+      "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). (Search snippet truncated the seconds of longitude at '45.'; 45.82 matches the Wikipedia transcription of the same table.) Steward page also publishes 40.0519828, -82.4463745. Leased to Moundbuilders Country Club as a golf course from 1910; Ohio History Connection bought out the lease and opened it for full public access on Jan 1, 2025 (https://www.ohiohistory.org/octagonsettlement). Now open during daylight hours; 125 N. 33rd St, Newark. Golf-course grading may still show in LiDAR.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "fort-ancient",
+      "names": [
+        "Fort Ancient Earthworks & Nature Preserve",
+        "Fort Ancient"
+      ],
+      "culture": "Hopewell",
+      "period": "between 1 and 400 CE (UNESCO); built 2,000 to 1,600 years ago; steward: built around 2,000 years ago",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-008); National Historic Landmark",
+      "steward": "Ohio History Connection",
+      "source_url": "https://hopewellearthworks.org/site/fort-ancient/",
+      "centre": {
+        "lat": 39.403361,
+        "lon": -84.09255,
+        "source": "https://whc.unesco.org/en/list/1689/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a hilltop enclosure of earthen embankments on a steep bluff over the Little Miami River, broken by more than 67 gateways; the largest hilltop enclosure in North America",
+      "documented": [
+        {
+          "dimension": "maximum embankment height",
+          "value": 23,
+          "unit": "ft",
+          "source_url": "https://hopewellearthworks.org/site/fort-ancient/"
+        }
+      ],
+      "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). Steward page also publishes 39.4067824, -84.0893218. Ohio's oldest state park. Open Wed-Sat 10-5, Sun noon-5; admission charged. Wooded bluff, so LiDAR bare-earth is the main way to see the walls.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "hopewell-mound-group",
+      "names": [
+        "Hopewell Mound Group"
+      ],
+      "culture": "Hopewell",
+      "period": "between 1 and 400 CE (UNESCO); built 2,000 to 1,600 years ago; steward: used as a ceremonial center for approximately 400 years",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-006); unit of Hopewell Culture National Historical Park",
+      "steward": "National Park Service (Hopewell Culture National Historical Park)",
+      "source_url": "https://hopewellearthworks.org/site/hopewell-mound-group/",
+      "centre": {
+        "lat": 39.360983,
+        "lon": -83.093372,
+        "source": "https://whc.unesco.org/en/list/1689/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a Great Enclosure in the general shape of a parallelogram; remnants of the eastern, western and northern walls remain visible",
+      "documented": [
+        {
+          "dimension": "Great Enclosure sides (east/west x north/south)",
+          "value": "1,800 x 2,800",
+          "unit": "ft",
+          "source_url": "https://hopewellearthworks.org/site/hopewell-mound-group/"
+        },
+        {
+          "dimension": "area enclosed",
+          "value": 111,
+          "unit": "acres",
+          "source_url": "https://hopewellearthworks.org/site/hopewell-mound-group/"
+        }
+      ],
+      "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). Steward page also publishes 39.3608166, -83.0844809. Type site of the Hopewell culture. Walls plow-reduced and nearly invisible on the ground; good LiDAR/magnetometry story. Grounds open dawn to dusk. NPS prohibits drones at all park units.",
+      "lrm_stretch_m": 0.3
+    },
+    {
+      "id": "mound-city-group",
+      "names": [
+        "Mound City Group",
+        "Mound City"
+      ],
+      "culture": "Hopewell",
+      "period": "between A.D. 1-400 (NPS)",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-004); unit of Hopewell Culture National Historical Park (proclaimed Mound City Group National Monument, 1923)",
+      "steward": "National Park Service (Hopewell Culture National Historical Park)",
+      "source_url": "https://www.nps.gov/hocu/learn/historyculture/mound-city-group.htm",
+      "centre": {
+        "lat": 39.376489,
+        "lon": -83.003989,
+        "source": "https://whc.unesco.org/en/list/1689/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "25 mounds inside a low earthen wall forming a slightly irregular square with rounded corners, with gateways in the east and west sides",
+      "documented": [
+        {
+          "dimension": "enclosure width",
+          "value": 260,
+          "unit": "m (about)",
+          "source_url": "https://www.nps.gov/hocu/learn/historyculture/mound-city-group.htm"
+        },
+        {
+          "dimension": "enclosure wall height",
+          "value": 1.2,
+          "unit": "m (about)",
+          "source_url": "https://www.nps.gov/hocu/learn/historyculture/mound-city-group.htm"
+        }
+      ],
+      "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). hopewellearthworks.org publishes 39.3744923, -83.0065767. All visible mounds and walls are modern restorations on intact bases (only fully restored Hopewell complex). Visitor center daily 9-4; grounds dawn to dusk. 16062 State Route 104, Chillicothe.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "high-bank-works",
+      "names": [
+        "High Bank Works",
+        "High Bank Earthworks"
+      ],
+      "culture": "Hopewell",
+      "period": "between 1 and 400 CE (UNESCO); built 2,000 to 1,600 years ago",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-005); unit of Hopewell Culture National Historical Park",
+      "steward": "National Park Service (Hopewell Culture National Historical Park)",
+      "source_url": "https://www.nps.gov/articles/000/high-bank-earthworks-to-be-nominated-to-the-world-heritage-list.htm",
+      "centre": {
+        "lat": 39.298561,
+        "lon": -82.918489,
+        "source": "https://whc.unesco.org/en/list/1689/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a circle joined to an octagon, the same geometry as Newark's Octagon Earthworks, where Paint Creek meets the Scioto River",
+      "documented": [],
+      "notes": "UNESCO publishes the component's location (N39 17 54.82 W82 55 6.56, read via the search index). An NPS research preserve, open to the public only by special arrangement: kept under decision 2 (location published by UNESCO), shown from LiDAR only. Form and dimensions to confirm on the LRM (task 1.3).",
+      "lrm_stretch_m": 0.3
+    },
+    {
+      "id": "hopeton-earthworks",
+      "names": [
+        "Hopeton Earthworks"
+      ],
+      "culture": "Hopewell",
+      "period": "between 1 and 400 CE (UNESCO); built 2,000 to 1,600 years ago",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-003); National Historic Landmark (1964); unit of Hopewell Culture National Historical Park",
+      "steward": "National Park Service (Hopewell Culture National Historical Park)",
+      "source_url": "https://www.nps.gov/hocu/learn/historyculture/hopeton-earthworks.htm",
+      "centre": {
+        "lat": 39.384792,
+        "lon": -82.979156,
+        "source": "https://whc.unesco.org/en/list/1689/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "an irregular square with rounded corners and a slightly overlapping circle of nearly equal area, with smaller circles and parallel walls running toward the Scioto River",
+      "documented": [
+        {
+          "dimension": "circle diameter",
+          "value": 320,
+          "unit": "m",
+          "source_url": "https://www.nps.gov/hocu/learn/historyculture/hopeton-earthworks.htm"
+        },
+        {
+          "dimension": "parallel walls length",
+          "value": 730,
+          "unit": "m (at least)",
+          "source_url": "https://www.nps.gov/hocu/learn/historyculture/hopeton-earthworks.htm"
+        }
+      ],
+      "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). hopewellearthworks.org publishes 39.3790743, -82.9809185. Reopened Aug 2016; open daylight hours with a 1.1 mi round-trip trail to an overlook. Walls are plow-leveled; NPS itself produced a 2012 LiDAR elevation map, so this is a strong LiDAR demo.",
+      "lrm_stretch_m": 0.3
+    },
+    {
+      "id": "seip-earthworks",
+      "names": [
+        "Seip Earthworks",
+        "Seip Mound"
+      ],
+      "culture": "Hopewell",
+      "period": "Between 1 - 400 A.D. (NPS)",
+      "designation": "UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component 1689-007); unit of Hopewell Culture National Historical Park",
+      "steward": "National Park Service (Hopewell Culture National Historical Park)",
+      "source_url": "https://www.nps.gov/hocu/learn/historyculture/seip-earthworks.htm",
+      "centre": {
+        "lat": 39.237469,
+        "lon": -83.219825,
+        "source": "https://whc.unesco.org/en/list/1689/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a tripartite enclosure: a large partial circle, a smaller circle attached on the west and a precise square attached on the southeast, with the reconstructed Central Mound inside the great circle",
+      "documented": [
+        {
+          "dimension": "large circle diameter",
+          "value": 494,
+          "unit": "m (1,620 ft)",
+          "source_url": "https://www.nps.gov/hocu/learn/historyculture/seip-earthworks.htm"
+        },
+        {
+          "dimension": "Central Mound size",
+          "value": "240 x 160 x 30",
+          "unit": "ft",
+          "source_url": "https://www.nps.gov/hocu/learn/historyculture/seip-earthworks.htm"
+        }
+      ],
+      "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). hopewellearthworks.org publishes 39.2416867, -83.2214086. Most walls are no longer visible; only the Central Mound is fully restored. Grounds open dawn to dusk. 7058 US 50 East, Bainbridge.",
+      "lrm_stretch_m": 0.3
+    },
+    {
+      "id": "serpent-mound",
+      "names": [
+        "Serpent Mound",
+        "Great Serpent Mound"
+      ],
+      "culture": "disputed: Ohio History Connection favors a Late Precontact builder (around AD 1100); other archaeologists argue Early Woodland (around 300 BC)",
+      "period": "around AD 1100 (Ohio History Connection's view) or around 300 BC (alternative view)",
+      "designation": "National Historic Landmark",
+      "steward": "Ohio History Connection",
+      "source_url": "https://www.ohiohistory.org/historical_sites/serpent-mound/",
+      "centre": {
+        "lat": 39.026389,
+        "lon": -83.430833,
+        "source": "https://en.wikipedia.org/wiki/Serpent_Mound",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "an effigy mound in the shape of a serpent, laid out in a crescent-like plan on a narrow bluff above the confluence of East Creek and Ohio Brush Creek",
+      "documented": [
+        {
+          "dimension": "length",
+          "value": 1348,
+          "unit": "ft",
+          "source_url": "https://ohiomemory.ohiohistory.org/archives/4816"
+        },
+        {
+          "dimension": "height",
+          "value": "1.2-1.5",
+          "unit": "m",
+          "source_url": "https://www.ohiohistory.org/the-snakes-tale-how-old-is-serpent-mound/"
+        }
+      ],
+      "notes": "COORDINATES FROM WIKIPEDIA INFOBOX (fallback); steward page publishes none. ohiohistory.org returns HTTP 403 to automated fetches, so steward content was read via search-index snippets; it loads in a browser. Open 10-5 with a museum; base width 6-7.6 m. Dating debate source: https://ohiohistory.org/ohios-serpent-mound-an-american-indian-story-written-in-the-earth. The Shawnee Tribe co-hosts solstice events here (https://shawnee-nsn.gov/news/summer-solstice-2024/).",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "miamisburg-mound",
+      "names": [
+        "Miamisburg Mound"
+      ],
+      "culture": "Adena",
+      "period": "Adena culture (800 B.C. to A.D. 100), built in several stages (Ohio History Connection)",
+      "designation": "National Register of Historic Places",
+      "steward": "City of Miamisburg (city park); listed as an Ohio History Connection site",
+      "source_url": "https://cityofmiamisburg.com/about/",
+      "centre": {
+        "lat": 39.6276,
+        "lon": -84.280896,
+        "source": "https://en.wikipedia.org/wiki/Miamisburg_Mound",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a conical burial mound, one of the two largest conical mounds in eastern North America, on a 100-foot ridge above the Great Miami River",
+      "documented": [
+        {
+          "dimension": "height",
+          "value": 65,
+          "unit": "ft",
+          "source_url": "https://www.ohiohistory.org/visit/museum-and-site-locator/miamisburg-mound"
+        },
+        {
+          "dimension": "circumference",
+          "value": 800,
+          "unit": "ft",
+          "source_url": "https://www.ohiohistory.org/visit/museum-and-site-locator/miamisburg-mound"
+        }
+      ],
+      "notes": "COORDINATES FROM WIKIPEDIA INFOBOX (fallback). City park at 900 Mound Ave; concrete steps lead to the top. Ohio History Connection locator page (bot-blocked, read via search index) gives the dimensions and dating and says the mound holds 54,000 cubic yards of earth.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "fort-hill",
+      "names": [
+        "Fort Hill Earthworks & Nature Preserve",
+        "Fort Hill"
+      ],
+      "culture": "Hopewell",
+      "period": "an estimated 2,000 years ago (steward)",
+      "designation": "National Register of Historic Places",
+      "steward": "Arc of Appalachia, managing on behalf of the Ohio History Connection",
+      "source_url": "https://www.arcofappalachia.org/fort-hill/",
+      "centre": {
+        "lat": 39.1131,
+        "lon": -83.4063,
+        "source": "https://en.wikipedia.org/wiki/Fort_Hill_State_Memorial",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a stone-and-earthen-walled hilltop enclosure following the rim of a flat-topped ridge, bordered on the inside by a substantial ditch, with a second small circular earthwork on the south side of the preserve",
+      "documented": [
+        {
+          "dimension": "wall circumference",
+          "value": 1.5,
+          "unit": "mi (more than)",
+          "source_url": "https://www.arcofappalachia.org/fort-hill/"
+        },
+        {
+          "dimension": "area enclosed",
+          "value": 35.3,
+          "unit": "acres",
+          "source_url": "https://www.arcofappalachia.org/fort-hill/"
+        }
+      ],
+      "notes": "COORDINATES FROM WIKIPEDIA INFOBOX (fallback); likely the preserve, not the enclosure itself. Wall 6-15 ft high with about 36 openings per Arc (Ohio History Connection says 33 gateways). Reached only by hiking; heavily forested, so LiDAR bare-earth is ideal.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "cahokia-mounds",
+      "names": [
+        "Cahokia Mounds State Historic Site",
+        "Cahokia Mounds",
+        "Cahokia"
+      ],
+      "culture": "Mississippian",
+      "period": "Mississippian period (800-1350 at this site) (UNESCO); occupied from 700 to 1400 (Illinois DNR)",
+      "designation": "UNESCO World Heritage (1982); National Historic Landmark; Illinois State Historic Site",
+      "steward": "Illinois Department of Natural Resources",
+      "source_url": "https://dnrhistoric.illinois.gov/experience/sites/site.cahokia-mounds.html",
+      "centre": {
+        "lat": 38.658611,
+        "lon": -90.061389,
+        "source": "https://whc.unesco.org/en/list/198/maps/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a city of platform, ridgetop and conical mounds dominated by Monks Mound, a terraced platform mound and the largest prehistoric earthen mound in the Americas, plus a reconstructed stockade and Woodhenge",
+      "documented": [
+        {
+          "dimension": "Monks Mound height",
+          "value": 100,
+          "unit": "ft",
+          "source_url": "https://dnrhistoric.illinois.gov/experience/sites/site.cahokia-mounds.html"
+        },
+        {
+          "dimension": "Monks Mound footprint",
+          "value": 6,
+          "unit": "ha",
+          "source_url": "https://whc.unesco.org/en/list/198"
+        }
+      ],
+      "notes": "Coordinates are the UNESCO property point (198bis), read via the search index. Grounds open daily dawn to dusk (https://cahokiamounds.org/); stairs to the top of Monks Mound. Preserves 70-72 of about 120 original mounds; some mounds sit on unprotected land outside the site.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "effigy-mounds",
+      "names": [
+        "Effigy Mounds National Monument"
+      ],
+      "culture": "Effigy Moundbuilders (Late Woodland); probably ancestors of the Ho-Chunk and other Midwestern tribes (NPS)",
+      "period": "effigy mounds date to about AD 650-1200 (NPS)",
+      "designation": "National Monument (1949)",
+      "steward": "National Park Service",
+      "source_url": "https://www.nps.gov/efmo/learn/historyculture/archeology.htm",
+      "centre": {
+        "lat": 43.0888,
+        "lon": -91.1856,
+        "source": "https://en.wikipedia.org/wiki/Effigy_Mounds_National_Monument",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "more than 200 mounds on bluffs above the Mississippi River, 31 of them bird- and bear-shaped effigies, including the 10-bear Marching Bear Group",
+      "documented": [
+        {
+          "dimension": "Little Bear Mound length",
+          "value": 87,
+          "unit": "ft",
+          "source_url": "http://home.nps.gov/efmo/learn/kidsyouth/upload/EFMO_Junior_Ranger_Book_Aug_2021_508.pdf"
+        },
+        {
+          "dimension": "Little Bear Mound height",
+          "value": 2,
+          "unit": "ft (about)",
+          "source_url": "http://home.nps.gov/efmo/learn/kidsyouth/upload/EFMO_Junior_Ranger_Book_Aug_2021_508.pdf"
+        }
+      ],
+      "notes": "COORDINATES FROM WIKIPEDIA INFOBOX (fallback); likely near the visitor center, and the mound groups spread over separate north and south units (Fire Point Trail has Little Bear and Great Bear; Marching Bear is a 4-mile guided hike). The NPS itself cites LiDAR as revealing mound extent. 20 culturally associated tribes consider the mounds sacred. Dimensions read from an NPS PDF via search snippet.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "aztalan",
+      "names": [
+        "Aztalan State Park",
+        "Aztalan"
+      ],
+      "culture": "Middle Mississippian (living alongside local Woodland people)",
+      "period": "thrived between A.D. 1000 and 1300 (DNR); fortified town established 1050-1100, abandoned about 1200 A.D. (DNR history)",
+      "designation": "National Historic Landmark",
+      "steward": "Wisconsin Department of Natural Resources",
+      "source_url": "https://dnr.wisconsin.gov/topic/parks/aztalan/history",
+      "centre": {
+        "lat": 43.0687,
+        "lon": -88.8635,
+        "source": "https://dnr.wisconsin.gov/topic/parks/aztalan",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "large flat-topped pyramidal (platform) mounds inside a log-and-clay stockade; two mounds and portions of the stockade have been reconstructed",
+      "documented": [
+        {
+          "dimension": "town extent",
+          "value": 35,
+          "unit": "acres (over)",
+          "source_url": "https://dnr.wisconsin.gov/topic/parks/aztalan/history"
+        }
+      ],
+      "notes": "Coordinates read from the DNR park page HTML (map point). Open 6 a.m.-11 p.m. year-round; vehicle sticker required. Three platform mounds originally; two survive restored.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "angel-mounds",
+      "names": [
+        "Angel Mounds State Historic Site",
+        "Angel Mounds"
+      ],
+      "culture": "Mississippian",
+      "period": "established by A.D. 1100; abandoned by 1450 (Indiana State Museum)",
+      "designation": "National Historic Landmark",
+      "steward": "Indiana State Museum and Historic Sites",
+      "source_url": "https://www.indianamuseum.org/historic-sites/angel-mounds-historic-site/",
+      "centre": {
+        "lat": 37.947735,
+        "lon": -87.452934,
+        "source": "https://www.indianamuseum.org/historic-sites/angel-mounds-historic-site/plan-your-visit/",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "11 earthen platform mounds built to elevate important buildings, on the Ohio River near Evansville, with a recreated palisade",
+      "documented": [
+        {
+          "dimension": "largest mound length x width",
+          "value": "600 x 400 (more than)",
+          "unit": "ft",
+          "source_url": "https://visitindiana.in.gov/blog/post/this-mystical-southern-indiana-attraction-just-got-an-upgrade/"
+        },
+        {
+          "dimension": "largest mound height",
+          "value": 40,
+          "unit": "ft",
+          "source_url": "https://visitindiana.in.gov/blog/post/this-mystical-southern-indiana-attraction-just-got-an-upgrade/"
+        }
+      ],
+      "notes": "Coordinates are the map-marker point on the steward's plan-your-visit page (probably the interpretive center); Wikipedia's infobox (37.9425, -87.4572) is about 0.7 km south-west. Dimensions are from Indiana's state tourism site, not the museum page. 600-acre site; self-guided outdoor tours 10-4:30. Sacred place to today's tribal nations.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "mounds-state-park-great-mound",
+      "names": [
+        "Great Mound (Mounds State Park)",
+        "Mounds State Park"
+      ],
+      "culture": "Adena-Hopewell (steward's term)",
+      "period": "Great Mound believed constructed around 160 B.C.; Early Woodland tradition, over 2,000 years old (Indiana DNR)",
+      "designation": "National Register of Historic Places",
+      "steward": "Indiana Department of Natural Resources, Division of State Parks",
+      "source_url": "https://www.in.gov/dnr/state-parks/parks-lakes/mounds-state-park/",
+      "centre": {
+        "lat": 40.094183,
+        "lon": -85.62265,
+        "source": "https://www.in.gov/dnr/state-parks/files/sp-Mounds_History.pdf",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "the largest of 10 earthworks, an earthwork with an outer embankment at the center of a ceremonial complex aligned to solstice sunsets over neighboring mounds",
+      "documented": [],
+      "notes": "Coordinates are waypoint 2 ('Great Mound') of the DNR's GPS History Adventure brochure. The steward pages give no dimensions, so none are listed. 4306 Mounds Rd, Anderson, IN.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "poverty-point",
+      "names": [
+        "Monumental Earthworks of Poverty Point",
+        "Poverty Point World Heritage Site",
+        "Poverty Point State Historic Site",
+        "Poverty Point National Monument"
+      ],
+      "culture": "Late Archaic (Poverty Point culture); built by hunter-fisher-gatherers",
+      "period": "constructed 3,700-3,100 years ago (UNESCO); between 1700 and 1100 B.C.E. (NPS)",
+      "designation": "UNESCO World Heritage (2014); National Monument; National Historic Landmark; Louisiana State Historic Site",
+      "steward": "Louisiana Office of State Parks (State of Louisiana)",
+      "source_url": "https://www.crt.louisiana.gov/dataprojects/archaeology/moundsguide/povertypoint.html",
+      "centre": {
+        "lat": 32.636944,
+        "lon": -91.406389,
+        "source": "https://whc.unesco.org/en/list/1435/maps",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "six concentric semi-elliptical (C-shaped) earthen ridges around a plaza, with large mounds including Mound A, possibly a bird effigy",
+      "documented": [
+        {
+          "dimension": "outer ridge diameter",
+          "value": 1.14,
+          "unit": "km",
+          "source_url": "https://whc.unesco.org/en/list/1435"
+        },
+        {
+          "dimension": "largest mound (Mound A) height",
+          "value": 70,
+          "unit": "ft (about)",
+          "source_url": "https://www.crt.louisiana.gov/dataprojects/archaeology/moundsguide/povertypoint.html"
+        }
+      ],
+      "notes": "Coordinates are the UNESCO property point (read via search index); the Louisiana Division of Archaeology page gives GPS 32.63622, -91.405026 for the site marker. lastateparks.com blocks automated fetches. One of the six mounds is privately owned and not accessible. 2.6-mile self-guided hike; museum and tram tours.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "moundville",
+      "names": [
+        "Moundville Archaeological Park",
+        "Moundville"
+      ],
+      "culture": "Mississippian",
+      "period": "occupied from around A.D. 1000 until A.D. 1450 (steward)",
+      "designation": "National Historic Landmark",
+      "steward": "The University of Alabama Museums",
+      "source_url": "https://moundville.museums.ua.edu/ancient-site/",
+      "centre": {
+        "lat": 33.00467,
+        "lon": -87.63107,
+        "source": "https://en.wikipedia.org/wiki/Moundville_Archaeological_Site",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "29 flat-topped earthen platform mounds arranged around a vast central plaza on a bluff over the Black Warrior River, once enclosed on three sides by a bastioned palisade",
+      "documented": [
+        {
+          "dimension": "extent of town at peak",
+          "value": 300,
+          "unit": "acres",
+          "source_url": "https://moundville.museums.ua.edu/ancient-site/"
+        }
+      ],
+      "notes": "COORDINATES FROM WIKIPEDIA INFOBOX (fallback). The steward pages give no mound heights (the often-cited 58 ft for Mound B is from non-steward sources, so it is omitted). Park preserves 326 acres (https://moundville.museums.ua.edu/about/). The ancient-site page says 26 mounds within the enclosure; the about page says 29. ua.edu returned HTTP 405 to one fetcher but loads normally.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "etowah-mounds",
+      "names": [
+        "Etowah Indian Mounds State Historic Site",
+        "Etowah Mounds"
+      ],
+      "culture": "Mississippian",
+      "period": "1000 A.D. to 1550 A.D. (steward)",
+      "designation": "National Historic Landmark; Georgia State Historic Site",
+      "steward": "Georgia Department of Natural Resources, State Parks & Historic Sites",
+      "source_url": "https://gastateparks.org/EtowahIndianMounds",
+      "centre": {
+        "lat": 34.127816,
+        "lon": -84.80655,
+        "source": "https://gastateparks.org/EtowahIndianMounds",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "six earthen mounds with a plaza, village site, borrow pits and defensive ditch; the tallest is a platform mound likely used for the priest-chief's home",
+      "documented": [
+        {
+          "dimension": "tallest mound height",
+          "value": 63,
+          "unit": "ft",
+          "source_url": "https://gastateparks.org/EtowahIndianMounds"
+        },
+        {
+          "dimension": "site area",
+          "value": 54,
+          "unit": "acres",
+          "source_url": "https://gastateparks.org/EtowahIndianMounds"
+        }
+      ],
+      "notes": "Coordinates are the 'GPS Coordinates' the steward page publishes (likely the visitor center/address, 813 Indian Mounds Rd SE, Cartersville). Steward calls it the most intact Mississippian site in the Southeast.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "ocmulgee-mounds",
+      "names": [
+        "Ocmulgee Mounds National Historical Park",
+        "Ocmulgee"
+      ],
+      "culture": "Mississippian (one of four precontact cultures at the park)",
+      "period": "mounds created by Mississippians in the 10th century CE (NPS); Earth Lodge floor carbon-dated to 1015 CE",
+      "designation": "National Historical Park",
+      "steward": "National Park Service",
+      "source_url": "https://www.nps.gov/places/great-temple-mound-complex.htm",
+      "centre": {
+        "lat": 32.83678,
+        "lon": -83.608116,
+        "source": "https://www.nps.gov/places/great-temple-mound-complex.htm",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "flat-topped pyramidal platform mounds (the Great and Lesser Temple Mounds) raised in stages, with a reconstructed earth lodge and other mounds",
+      "documented": [
+        {
+          "dimension": "Great Temple Mound height",
+          "value": 55,
+          "unit": "ft",
+          "source_url": "https://www.nps.gov/places/great-temple-mound-complex.htm"
+        }
+      ],
+      "notes": "Coordinates are the NPS place record for the Great Temple Mound Complex (NPS places API, which backs that page's map). Park has 7 mounds and 8 miles of trails; steps to the top of both temple mounds. Ancestral homeland of the Muscogee (Creek) Nation.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "plum-bayou-mounds",
+      "names": [
+        "Plum Bayou Mounds Archeological State Park",
+        "Toltec Mounds Archeological State Park (former name)"
+      ],
+      "culture": "Plum Bayou culture",
+      "period": "late-Woodland through early-Mississippian Period, inhabited from A.D. 650 to 1050 (Arkansas State Parks)",
+      "designation": "National Historic Landmark; Arkansas State Park",
+      "steward": "Arkansas State Parks (Arkansas Archeological Survey research station on site)",
+      "source_url": "https://www.arkansas.com/state-parks/explore/parks/plum-bayou-mounds-archeological-state-park",
+      "centre": {
+        "lat": 34.645878,
+        "lon": -92.060108,
+        "source": "https://www.arkansas.com/state-parks/explore/parks/plum-bayou-mounds-archeological-state-park",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a ceremonial complex of earthen mounds beside an oxbow lake, enclosed on its other three sides by a ditch and earthen embankment",
+      "documented": [
+        {
+          "dimension": "tallest mound height",
+          "value": 49,
+          "unit": "ft (14 m)",
+          "source_url": "http://archeology.uark.edu/wp-content/uploads/2015/06/Toltec-Mounds-Site-and-State-Park.pdf"
+        },
+        {
+          "dimension": "embankment length",
+          "value": 1615,
+          "unit": "m (more than one mile)",
+          "source_url": "http://archeology.uark.edu/wp-content/uploads/2015/06/Toltec-Mounds-Site-and-State-Park.pdf"
+        }
+      ],
+      "notes": "Renamed from Toltec Mounds. Coordinates read from the map data embedded in the steward page (Wikipedia's 34.6469, -92.0653 is about 0.5 km west). Dating read via search snippet of https://www.arkansasstateparks.com/articles/archeology-plum-bayou-mounds (blocks automated fetch). Visitor center Wed-Sat 8-5, Sun 1-5.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "grave-creek-mound",
+      "names": [
+        "Grave Creek Mound",
+        "Grave Creek Mound Archaeological Complex"
+      ],
+      "culture": "Adena",
+      "period": "construction from about 250-150 B.C. (steward)",
+      "designation": "National Historic Landmark",
+      "steward": "West Virginia Department of Arts, Culture & History",
+      "source_url": "https://wvculture.org/explore/grave-creek-mound/",
+      "centre": {
+        "lat": 39.916906,
+        "lon": -80.744581,
+        "source": "https://en.wikipedia.org/wiki/Grave_Creek_Mound",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a conical burial mound, one of the largest Adena mounds, originally encircled by a ditch crossed by at least one causeway",
+      "documented": [
+        {
+          "dimension": "height",
+          "value": 62,
+          "unit": "ft",
+          "source_url": "https://wvculture.org/stories/7-surprising-facts-you-may-not-know-about-west-virginia/"
+        },
+        {
+          "dimension": "base diameter",
+          "value": 240,
+          "unit": "ft",
+          "source_url": "https://wvculture.org/stories/7-surprising-facts-you-may-not-know-about-west-virginia/"
+        }
+      ],
+      "notes": "COORDINATES FROM WIKIPEDIA INFOBOX (fallback). In downtown Moundsville; the surrounding ditch was about 40 ft wide and 5 ft deep per the steward. Museum and research center on site.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "pinson-mounds",
+      "names": [
+        "Pinson Mounds State Archaeological Park",
+        "Pinson Mounds"
+      ],
+      "culture": "Middle Woodland",
+      "period": "Middle Woodland Period (200 B.C. to 500 A.D.) (Tennessee State Parks)",
+      "designation": "National Historic Landmark",
+      "steward": "Tennessee State Parks",
+      "source_url": "https://tnstateparks.com/parks/pinson-mounds/highlights",
+      "centre": {
+        "lat": 35.49663,
+        "lon": -88.689106,
+        "source": "https://tnstateparks.com/parks/pinson-mounds",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "at least 17 mounds, including Sauls Mound, one of the tallest Middle Woodland mounds in the United States",
+      "documented": [
+        {
+          "dimension": "Sauls Mound height",
+          "value": 72,
+          "unit": "ft",
+          "source_url": "https://tnstateparks.com/parks/pinson-mounds/highlights"
+        }
+      ],
+      "notes": "Coordinates read from the steward park page (probably the museum); Wikipedia's 35.4978, -88.6825 is about 0.6 km east. Stairs to an observation deck on Sauls Mound. The state archaeology program calls it the largest mound complex in Tennessee.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "emerald-mound",
+      "names": [
+        "Emerald Mound"
+      ],
+      "culture": "Mississippian",
+      "period": "built and used between 1200 C.E. and 1600 C.E. (NPS)",
+      "designation": "National Historic Landmark (1989); Natchez Trace Parkway, milepost 10.3",
+      "steward": "National Park Service (Natchez Trace Parkway)",
+      "source_url": "https://www.nps.gov/places/emerald-mound.htm",
+      "centre": {
+        "lat": 31.63753,
+        "lon": -91.255859,
+        "source": "https://www.nps.gov/places/emerald-mound.htm",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a large flat-topped platform mound with two secondary mounds on top; the second-largest Mississippian Period ceremonial mound in the United States",
+      "documented": [
+        {
+          "dimension": "primary mound height",
+          "value": 35,
+          "unit": "ft",
+          "source_url": "https://www.nps.gov/places/emerald-mound.htm"
+        },
+        {
+          "dimension": "base",
+          "value": "770 x 435",
+          "unit": "ft",
+          "source_url": "https://www.nps.gov/places/emerald-mound.htm"
+        }
+      ],
+      "notes": "Coordinates are the NPS place record (NPS places API). Covers eight acres; total height about 60 ft with the secondary mounds. NPS removed the summit stairs in 2017 at associated tribes' request (https://www.nps.gov/natr/learn/news/natchez-trace-parkway-removes-stairs-from-emerald-mound.htm); visit the grounds, do not climb.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "winterville-mounds",
+      "names": [
+        "Winterville Mounds"
+      ],
+      "culture": "Mississippian (MDAH: likely ancestral to the Natchez people)",
+      "period": "people thrived in this area from about AD 1000 to 1450 (MDAH)",
+      "designation": "National Historic Landmark",
+      "steward": "Mississippi Department of Archives and History",
+      "source_url": "https://www.mdah.ms.gov/explore-mississippi/winterville-mounds",
+      "centre": {
+        "lat": 33.485833,
+        "lon": -91.061111,
+        "source": "https://en.wikipedia.org/wiki/Winterville_site",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "platform mounds and two large plazas, dominated by Mound A, the Temple Mound",
+      "documented": [
+        {
+          "dimension": "Mound A height",
+          "value": 55,
+          "unit": "ft",
+          "source_url": "https://www.mdah.ms.gov/explore-mississippi/winterville-mounds"
+        }
+      ],
+      "notes": "COORDINATES FROM WIKIPEDIA INFOBOX (fallback). 12 of the original 23 mounds survive. MDAH asks visitors not to walk on the mounds. The MDAH Mound Trail page dates the Mississippian occupation ca. AD 1200-1600.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "kolomoki-mounds",
+      "names": [
+        "Kolomoki Mounds State Park",
+        "Kolomoki Mounds"
+      ],
+      "culture": "Woodland",
+      "period": "occupied by Native Americans from 350 to 900 C.E. (steward)",
+      "designation": "National Historic Landmark; Georgia State Park",
+      "steward": "Georgia Department of Natural Resources, State Parks & Historic Sites",
+      "source_url": "https://gastateparks.org/KolomokiMounds",
+      "centre": {
+        "lat": 31.468633,
+        "lon": -84.948533,
+        "source": "https://gastateparks.org/KolomokiMounds",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a platform mound (Mound A) dominating two smaller burial mounds and several ceremonial mounds",
+      "documented": [
+        {
+          "dimension": "Mound A height",
+          "value": 57,
+          "unit": "ft",
+          "source_url": "https://gastateparks.org/KolomokiMounds"
+        }
+      ],
+      "notes": "CHECK BEFORE LIDAR: the steward's 'GPS Coordinates' point is about 1.8 km west of Wikipedia's infobox point (31.471467, -84.929367) and is probably the park office/entrance, not the mound group. Steward calls Mound A the largest Woodland-period platform mound in Eastern North America.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "spiro-mounds",
+      "names": [
+        "Spiro Mounds Archaeological Center",
+        "Spiro Mounds"
+      ],
+      "culture": "Caddoan Mississippian",
+      "period": "between approximately AD 850 and 1450 (Oklahoma Historical Society)",
+      "designation": "National Register of Historic Places",
+      "steward": "Oklahoma Historical Society",
+      "source_url": "https://www.okhistory.org/sites/spiro-faq",
+      "centre": {
+        "lat": 35.311731,
+        "lon": -94.568431,
+        "source": "https://www.okhistory.org/sites/visit-spiro-mounds",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "a mound center of original earthworks along the Arkansas River, including Craig Mound, the site's only burial mound",
+      "documented": [
+        {
+          "dimension": "preserved area",
+          "value": 150,
+          "unit": "acres",
+          "source_url": "https://okhistory.org/sites/spiromounds.php"
+        }
+      ],
+      "notes": "Added candidate. Coordinates are embedded in the steward's visit page. Craig Mound was badly looted in the 1930s and reconstructed in the 1970s on its original location, so LiDAR shows the reconstruction. The only prehistoric American Indian archaeological site in Oklahoma open to the public.",
+      "lrm_stretch_m": 1.0
+    },
+    {
+      "id": "shiloh-indian-mounds",
+      "names": [
+        "Shiloh Indian Mounds",
+        "Shiloh Indian Mounds Site"
+      ],
+      "culture": "Mississippian (NPS documentation calls Mound A a Late Mississippian temple mound)",
+      "period": "about 800 years ago; inhabitants left around A.D. 1200 or 1300 (NPS)",
+      "designation": "National Historic Landmark (1989); within Shiloh National Military Park",
+      "steward": "National Park Service (Shiloh National Military Park)",
+      "source_url": "https://www.nps.gov/shil/moundshistory.htm",
+      "centre": {
+        "lat": 35.142178,
+        "lon": -88.322966,
+        "source": "https://www.nps.gov/places/the-center-of-town-tour-stop-3.htm",
+        "verified": false
+      },
+      "frame_half_m": 1500,
+      "transect": null,
+      "form": "seven earthen mounds inside a former palisade on a Tennessee River bluff between two ravines: six rectangular flat-topped platform mounds and one oval, round-topped burial mound",
+      "documented": [],
+      "notes": "Added candidate. Coordinates are the NPS place record for tour stop 3, 'The Center of Town' (NPS places API); the orientation shelter is at 35.14141, -88.32684. No steward mound dimensions found. 1.1-mile trail; park open daily.",
+      "lrm_stretch_m": 1.0
+    }
+  ]
+}
