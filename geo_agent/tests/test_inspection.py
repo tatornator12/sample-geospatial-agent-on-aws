@@ -103,6 +103,33 @@ def test_methane_watch_rasters_preview_like_the_map(inspection):
     assert tuple(inspection.build_ramp(anomaly.anchors)[-1]) == (0xfd, 0xe7, 0x25)
 
 
+def test_archaeologist_terrain_previews_like_the_map(inspection):
+    """Hillshade in grey over 1-255; local relief on rdbu_r, +-1 m, or +-0.3 m for ploughed walls."""
+    shade = inspection.index_style("s3://b/session_data/s/terrain/hillshade_newark-octagon.tif")
+    assert shade.name == "hillshade" and (shade.vmin, shade.vmax) == (1.0, 255.0)
+    relief = inspection.index_style("s3://b/session_data/s/terrain/lrm_newark-great-circle.tif")
+    assert relief.name == "lrm" and (relief.vmin, relief.vmax) == (-1.0, 1.0)
+    ploughed = inspection.index_style("s3://b/session_data/s/terrain/lrm03_hopeton-earthworks.tif")
+    assert ploughed.name == "lrm03" and (ploughed.vmin, ploughed.vmax) == (-0.3, 0.3)
+    ramp = inspection.build_ramp(relief.anchors)
+    assert tuple(ramp[0]) == (0x05, 0x30, 0x61) and tuple(ramp[-1]) == (0x67, 0x00, 0x1f)   # ditch blue, bank red
+    assert tuple(ramp[128])[0] > 240 and tuple(ramp[128])[2] > 240                            # level reads white
+
+
+def test_terrain_preview_paints_banks_red_and_ditches_blue(tmp_path, inspection):
+    band = np.zeros((1, 40, 40), dtype=np.float32)
+    band[0, :, :10] = -0.8      # a ditch
+    band[0, :, 30:] = 0.9       # a bank
+    band[0, :2, :2] = -9999.0   # nodata
+    path = _write(tmp_path / "lrm_test-site.tif", band, "float32", nodata=-9999.0)
+    out = inspection.render_preview(str(path))
+    assert out.fmt == "png" and out.meta["style"] == "lrm"
+    from PIL import Image
+    img = np.asarray(Image.open(io.BytesIO(out.data)).convert("RGBA"))
+    ditch, bank = img[20, 5], img[20, 35]
+    assert ditch[2] > ditch[0] and bank[0] > bank[2] and img[0, 0, 3] == 0
+
+
 def test_unknown_single_band_gets_percentile_grey_stretch(tmp_path, inspection):
     band = np.linspace(100, 900, 50 * 50, dtype=np.float32).reshape(1, 50, 50)
     path = _write(tmp_path / "elevation_dem.tif", band, "float32")

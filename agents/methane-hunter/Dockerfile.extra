@@ -1,0 +1,7 @@
+# Lines geo_agent/stage_shared.sh inserts into the generated Dockerfile just before the platform's
+# USER switch (so they run as root). Comment and blank lines are dropped.
+#
+# DuckDB's httpfs extension is installed at build time into a world-readable directory the runtime
+# user can load from, so the first Overture read on AgentCore never downloads it.
+RUN python -c 'import duckdb; duckdb.connect(config={"extension_directory": "/opt/duckdb_ext"}).execute("INSTALL httpfs")' && chmod -R a+rX /opt/duckdb_ext
+ENV DUCKDB_EXTENSION_DIR=/opt/duckdb_ext

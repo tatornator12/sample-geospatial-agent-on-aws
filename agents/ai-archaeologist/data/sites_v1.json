@@ -97,7 +97,8 @@
         }
       ],
       "notes": "Coordinates are the component's entry in the UNESCO component table (the table renders client-side; it was read via the search index, not a direct fetch). (Search snippet truncated the seconds of longitude at '45.'; 45.82 matches the Wikipedia transcription of the same table.) Steward page also publishes 40.0519828, -82.4463745. Leased to Moundbuilders Country Club as a golf course from 1910; Ohio History Connection bought out the lease and opened it for full public access on Jan 1, 2025 (https://www.ohiohistory.org/octagonsettlement). Now open during daylight hours; 125 N. 33rd St, Newark. Golf-course grading may still show in LiDAR.",
-      "lrm_stretch_m": 1.0
+      "lrm_stretch_m": 1.0,
+      "public_note": "A country club golf course from 1910 until 2025; open to the public every day since January 1, 2025 (Ohio History Connection). The old fairways still show from space."
     },
     {
       "id": "fort-ancient",

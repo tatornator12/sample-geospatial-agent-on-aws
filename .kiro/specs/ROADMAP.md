@@ -27,6 +27,16 @@ not all up front, so requirements reflect what the data spikes actually showed.
 | 6 | `act3-dark-vessels` | Oct 27–31 (earlier if Act 4 lands early) | G4: Release 3; full 30-minute run-through | not started; spike `docs/spikes/dark-vessels.md` |
 | 7 | `demo-readiness` | Nov 3–7 | freeze Nov 3; runbook, backup videos, prewarm, 2 timed rehearsals | not started |
 
+Act 3 carries a prediction component (the user, Oct 13), about one minute of its eight, written
+into the `act3-dark-vessels` spec as a requirement: (1) "where could it have gone": the area a
+vessel could reach from its last AIS position at a stated top speed through an AIS gap, tested
+against the Sentinel-1 detections inside it; (2) "when can we look again": the next Sentinel-1
+pass from ESA's published acquisition plan (availability to check in that spec's spike). No
+trained forecasting model and no accuracy claims.
+
+Backlog, strictly last (only if every act, the replay cases and rehearsal week are done):
+forecasting with weather data (the user, Oct 13). Not specced; nothing else waits on it.
+
 Cut list if behind (in this order, never touching the foundation, eyes, similarity, replay
 cases or rehearsal week): live AIS (keep replay) → Archaeologist shrinks to a 90-second
 teaser → Methane keeps only the replay case. (Ground Motion, first on the list, was dropped

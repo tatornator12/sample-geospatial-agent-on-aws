@@ -12,8 +12,11 @@ GEO_AGENT_DIR = AGENT_DIR.parents[1] / "geo_agent"
 AGENT_MODULES = ["_paths.py", "methane_config.py", "methane_hunter.py", "methane_tools.py"]
 
 
+STAGE = GEO_AGENT_DIR / "stage_shared.sh"     # one staging script for every agent
+
+
 def _allowlist():
-    text = (AGENT_DIR / "stage_shared.sh").read_text()
+    text = STAGE.read_text()
 
     def array(name):
         m = re.search(rf"^{name}=\(\n(.*?)^\)", text, re.S | re.M)
@@ -69,8 +72,11 @@ def test_the_agent_never_shadows_the_platform_config():
 def test_dockerfile_is_generated_from_the_platform_with_the_entrypoint_and_duckdb_changed():
     platform = (GEO_AGENT_DIR / "Dockerfile_geospatial_agent_on_aws").read_text()
     assert "python -m geospatial_agent_on_aws" in platform
-    script = (AGENT_DIR / "stage_shared.sh").read_text()
-    assert "s/python -m geospatial_agent_on_aws/python -m methane_hunter/g" in script
+    deploy = (AGENT_DIR / "deploy.sh").read_text()
+    assert "../../geo_agent/stage_shared.sh . methane_hunter\n" in deploy
+    assert "../../geo_agent/stage_shared.sh . methane_hunter dockerfile" in deploy
+    assert not (AGENT_DIR / "stage_shared.sh").exists(), "the agent stages through geo_agent/stage_shared.sh only"
+    assert "INSTALL httpfs" in (AGENT_DIR / "Dockerfile.extra").read_text()
 
     if not (AGENT_DIR / "Dockerfile").exists():   # generated, gitignored: a fresh clone has not staged yet
         pytest.skip("run ./stage_shared.sh to generate the Dockerfile")
@@ -102,4 +108,4 @@ def test_agent_requirements_are_appended_to_the_platform_requirements():
 def test_env_files_never_enter_the_build_context():
     ignore = (AGENT_DIR / ".dockerignore").read_text().splitlines()
     assert "**/.env" in ignore and "**/.env.*" in ignore
-    assert "--exclude '.env*'" in (AGENT_DIR / "stage_shared.sh").read_text()
+    assert "--exclude '.env*'" in STAGE.read_text()

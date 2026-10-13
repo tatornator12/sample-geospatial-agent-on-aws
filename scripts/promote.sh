@@ -26,13 +26,26 @@ cd "$REPO_ROOT"
 PYTHON="${PYTHON:-$REPO_ROOT/.venv/bin/python}"
 TAG="deployed-$(date +%F)"
 DRY="${DRY_RUN:-0}"
+# The archaeologist joins the default with Release 3 at G4 (Oct 31; ai-archaeologist decision 7).
 PROMOTE_AGENTS="${PROMOTE_AGENTS:-earth methane}"
 
-# Per agent: its directory and the prompt that smokes its stable runtime after the deploy.
-agent_dir() { case "$1" in earth) echo geo_agent ;; methane) echo agents/methane-hunter ;; *) return 1 ;; esac; }
-agent_smoke() { case "$1" in earth) echo similar-central-park ;; methane) echo strongest-plume ;; esac; }
+# One row per agent (a new agent is a new row; bash 3.2 has no associative arrays):
+#   id | directory | stable smoke prompt | keys its stable .env must set | AGENT_RUNTIMES id | label | description
+# The Earth Analyst's entries ("stable", "dev") are written by hand; the others are registered
+# from their stable deploy's ARN before the UI deploys.
+AGENT_TABLE='
+earth|geo_agent|similar-central-park|S3_BUCKET_NAME AGENTCORE_ARN ARCGIS_MCP_TOKEN|||
+methane|agents/methane-hunter|strongest-plume|S3_BUCKET_NAME AGENTCORE_ARN ARCGIS_MCP_TOKEN EARTHDATA_TOKEN|methane|Methane Hunter|EMIT methane plumes, deployed from demo-stable
+archaeologist|agents/ai-archaeologist|great-circle-measure|S3_BUCKET_NAME AGENTCORE_ARN ARCGIS_MCP_TOKEN|archaeologist|AI Archaeologist|Known earthworks in 1 m LiDAR, deployed from demo-stable
+'
+agent_field() { awk -F'|' -v id="$1" -v col="$2" '$1 == id { print $col; exit }' <<<"$AGENT_TABLE"; }
+agent_dir() { local d; d="$(agent_field "$1" 2)"; [ -n "$d" ] && echo "$d"; }
+agent_smoke() { agent_field "$1" 3; }
+agent_env_keys() { agent_field "$1" 4; }
+agent_register_id() { agent_field "$1" 5; }
+KNOWN_AGENTS="$(awk -F'|' 'NF > 1 { printf "%s%s", sep, $1; sep = ", " }' <<<"$AGENT_TABLE")"
 for agent in $PROMOTE_AGENTS; do
-    agent_dir "$agent" >/dev/null || { echo "ERROR: unknown agent '$agent' in PROMOTE_AGENTS (earth, methane)"; exit 1; }
+    agent_dir "$agent" >/dev/null || { echo "ERROR: unknown agent '$agent' in PROMOTE_AGENTS ($KNOWN_AGENTS)"; exit 1; }
 done
 
 echo "=== Promotion: develop -> demo-stable ($TAG) — agents: $PROMOTE_AGENTS ==="
@@ -60,8 +73,17 @@ for agent in $PROMOTE_AGENTS; do
     env_file="$(agent_dir "$agent")/.env"
     if [ ! -f "$env_file" ]; then
         fail "$env_file not found (the $agent stable deploy reads it)."
-    elif [ "$agent" = "methane" ] && ! grep -Eq '^EARTHDATA_TOKEN=.+' "$env_file"; then
-        fail "$env_file has no EARTHDATA_TOKEN (Methane Hunter triage needs it; tokens expire after 60 days)."
+        continue
+    fi
+    missing=""
+    bom="$(printf '\357\273\277')"   # a UTF-8 byte-order mark on line 1 must not hide the first key
+    for key in $(agent_env_keys "$agent"); do
+        LC_ALL=C sed "1s/^${bom}//" "$env_file" | grep -Eq "^(export )?${key}=.+" || missing="$missing $key"
+    done
+    if [ -n "$missing" ]; then
+        hint=""
+        [[ " $missing " == *" EARTHDATA_TOKEN "* ]] && hint=" (Methane Hunter triage needs EARTHDATA_TOKEN; tokens expire after 60 days)"
+        fail "$env_file has no${missing}${hint}."
     else
         echo "  $env_file present"
     fi
@@ -90,9 +112,12 @@ if [ "${PROMOTE_FRONTEND:-0}" = "1" ]; then
     echo "Frontend deploy requested (PROMOTE_FRONTEND=1); checking frontend-cdk/.env ..."
     if frontend_env_ok; then
         echo "  frontend-cdk/.env has AGENT_RUNTIME_ARN, AGENT_RUNTIMES (stable + dev), ADMIN_EMAIL, S3_BUCKET_NAME"
-        if [[ " $PROMOTE_AGENTS " == *" methane "* ]]; then
-            echo "  \"methane\" is (re)registered from the stable deploy's ARN before the UI deploys"
-        fi
+        for agent in $PROMOTE_AGENTS; do
+            rid="$(agent_register_id "$agent")"
+            if [ -n "$rid" ]; then
+                echo "  \"$rid\" is (re)registered from the stable deploy's ARN before the UI deploys"
+            fi
+        done
     else
         fail "frontend-cdk/.env is not ready for a deploy (see above)."
     fi
@@ -114,7 +139,7 @@ cat <<'CHECKLIST'
 
 --- Promotion checklist (verify each item) ---
   [ ] pytest green:            cd geo_agent && ../.venv/bin/python -m pytest -q
-                               cd agents/methane-hunter && ../../.venv/bin/python -m pytest -q
+                               cd agents/<each agent> && ../../.venv/bin/python -m pytest -q
   [ ] frontend tests green:    cd react-ui/frontend && npm test
   [ ] backend tests green:     cd react-ui/backend && npm test
   [ ] detector clean:          cd react-ui/frontend && npm run design:check
@@ -128,8 +153,11 @@ CHECKLIST
 echo ""
 
 FRONTEND_CMD='cd frontend-cdk && set -a && source .env && set +a && npx cdk deploy GeospatialAgentStack --require-approval never'
-REGISTER_ARGS=(--env frontend-cdk/.env --id methane --agent methane --target stable
-               --label "Methane Hunter" --description "EMIT methane plumes, deployed from demo-stable")
+# runtimes.py register arguments for an agent with an AGENT_RUNTIMES id (none for the Earth Analyst).
+register_args() {
+    REGISTER_ARGS=(--env frontend-cdk/.env --id "$(agent_register_id "$1")" --agent "$1" --target stable
+                   --label "$(agent_field "$1" 6)" --description "$(agent_field "$1" 7)")
+}
 
 if [ "$DRY" = "1" ]; then
     echo "[dry-run] would ask for confirmation, then:"
@@ -142,9 +170,11 @@ if [ "$DRY" = "1" ]; then
         echo "[dry-run]   $PYTHON scripts/eval.py --agent $agent --target stable --only $(agent_smoke "$agent")"
     done
     if [ "${PROMOTE_FRONTEND:-0}" = "1" ]; then
-        if [[ " $PROMOTE_AGENTS " == *" methane "* ]]; then
+        for agent in $PROMOTE_AGENTS; do
+            [ -n "$(agent_register_id "$agent")" ] || continue
+            register_args "$agent"
             echo "[dry-run]   $PYTHON scripts/runtimes.py register ${REGISTER_ARGS[*]}"
-        fi
+        done
         echo "[dry-run]   (only if every check above passed) $FRONTEND_CMD"
     else
         echo "[dry-run]   (frontend not deployed; PROMOTE_FRONTEND=1 adds: $FRONTEND_CMD)"
@@ -188,9 +218,11 @@ if [ "${PROMOTE_FRONTEND:-0}" = "1" ]; then
         echo "Frontend NOT deployed: a stable runtime check failed (see above). The previous UI stays live."
         echo "Fix or roll back the runtime, then run:  $FRONTEND_CMD"
     else
-        if [[ " $PROMOTE_AGENTS " == *" methane "* ]]; then
+        for agent in $PROMOTE_AGENTS; do
+            [ -n "$(agent_register_id "$agent")" ] || continue
+            register_args "$agent"
             "$PYTHON" scripts/runtimes.py register "${REGISTER_ARGS[@]}"
-        fi
+        done
         echo "--- Deploying the CloudFront/Fargate UI (frontend-cdk) ---"
         # The stack reads AGENT_RUNTIME_ARN / AGENT_RUNTIMES / ADMIN_EMAIL from the environment;
         # source the gitignored .env in a subshell so nothing leaks into this shell afterwards.

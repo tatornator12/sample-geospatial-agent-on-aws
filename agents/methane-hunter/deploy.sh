@@ -63,7 +63,7 @@ echo ""
 
 # Shared platform code + requirements + Dockerfile into this build context (gitignored).
 echo "Staging shared platform code..."
-run ./stage_shared.sh
+run ../../geo_agent/stage_shared.sh . methane_hunter
 
 echo "Configuring agent ${AGENT_NAME}..."
 run "${AGENTCORE_BIN}" configure \
@@ -77,7 +77,7 @@ run "${AGENTCORE_BIN}" configure \
     --non-interactive
 
 # `configure` overwrites the Dockerfile; regenerate it from the platform's.
-run ./stage_shared.sh dockerfile
+run ../../geo_agent/stage_shared.sh . methane_hunter dockerfile
 
 echo ""
 echo "Launching agent ${AGENT_NAME}..."

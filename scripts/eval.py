@@ -45,6 +45,11 @@ AGENTS = {
         "env": {"dev": REPO_ROOT / "agents" / "methane-hunter" / ".env.dev",
                 "stable": REPO_ROOT / "agents" / "methane-hunter" / ".env"},
     },
+    "archaeologist": {
+        "yaml": REPO_ROOT / "agents" / "ai-archaeologist" / ".bedrock_agentcore.yaml",
+        "targets": {"dev": "ai_archaeologist_dev", "stable": "ai_archaeologist"},
+        "prompts": REPO_ROOT / "agents" / "ai-archaeologist" / "golden_prompts.json",
+    },
 }
 
 # Backwards-compatible names for the Earth Analyst (scripts/prewarm.py and older callers).

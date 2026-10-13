@@ -42,6 +42,10 @@ _PLASMA = ["#0d0887", "#41049d", "#6a00a8", "#8f0da4", "#b12a90", "#cc4778",
 # matplotlib `viridis` sampled at 0.0, 0.25, ... 1.0 (TiTiler's viridis; the TROPOMI anomaly ramp,
 # chosen to read as a different scale from the plasma EMIT ramp).
 _VIRIDIS = ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"]
+# ColorBrewer RdBu reversed (TiTiler's rdbu_r): the AI Archaeologist's local relief model, blue
+# below the 21 m neighbourhood (ditches), white level, red above (banks and mounds).
+_RDBU_R = ["#053061", "#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#f7f7f7",
+           "#fddbc7", "#f4a582", "#d6604d", "#b2182b", "#67001f"]
 
 # Sentinel-2 scene classification (SCL) classes.
 SCL_NODATA = (0,)
@@ -70,6 +74,12 @@ INDEX_STYLES: tuple[tuple[tuple[str, ...], IndexStyle], ...] = (
     # the Sentinel-5P TROPOMI anomaly composite (ppb above the area's median) uses viridis, 0-60.
     (("ch4plm", "ch4enh"), IndexStyle("ch4", 0.0, 1500.0, tuple(_PLASMA))),
     (("tropomi_anomaly",), IndexStyle("tropomi", 0.0, 60.0, tuple(_VIRIDIS))),
+    # AI Archaeologist terrain (agents/ai-archaeologist/site_tools.session_name): the hillshade in
+    # grey (uint8 1-255, 0 is nodata), the local relief model on rdbu_r at +-1 m for standing walls
+    # and +-0.3 m (lrm03_) for walls ploughed down to tens of centimetres, as the map draws them.
+    (("hillshade_",), IndexStyle("hillshade", 1.0, 255.0, tuple(_GREYS))),
+    (("lrm03_",), IndexStyle("lrm03", -0.3, 0.3, tuple(_RDBU_R))),
+    (("lrm_",), IndexStyle("lrm", -1.0, 1.0, tuple(_RDBU_R))),
 )
 
 
