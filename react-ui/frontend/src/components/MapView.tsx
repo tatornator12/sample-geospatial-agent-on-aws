@@ -5,6 +5,7 @@ import '../utils/maplibreWorker.ts';
 import MapboxDraw from 'maplibre-gl-draw';
 import 'maplibre-gl-draw/dist/mapbox-gl-draw.css';
 import { getPresignedUrl } from '../services/api.ts';
+import type { FeatureCollection } from 'geojson';
 import type { GeometryData, RasterData } from '../types.ts';
 import { TITILER_URL, TITILER_API_KEY, TERRAIN_TILES_URL } from '../config.ts';
 import {
@@ -50,19 +51,33 @@ import {
   terrainGeometryHint,
   terrainRasterHint,
   transectParts,
+  LIGHT_ALTITUDE,
   LIGHT_AZIMUTH,
   LIGHT_EXAGGERATION,
   LIGHT_SWEEP_MS,
+  MAX_PITCH,
+  NO_SKY,
   PAPER_RESCALE,
+  REST_BASEMAP,
+  REST_BEARING,
+  REST_EXAGGERATION,
+  REST_LIGHT,
+  REST_PITCH,
+  REST_RELIEF_HIGHLIGHT,
+  REST_SKY,
   REVEAL_MS,
   compassName,
   demTilesUrl,
   isHillshadeHint,
-  lightStrength,
+  lightAltitude,
   lightSweep,
 } from '../utils/archaeoLayers.ts';
 import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
+import { fitPitched, type Camera } from '../utils/restCamera.ts';
+import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
+import { getSectionCursor, setSectionCursor, useSectionCursor } from '../utils/sectionCursor.ts';
 import { Starfield } from './Starfield.tsx';
+import { LightPlate } from './LightPlate.tsx';
 import type { Tip } from '../utils/steps.ts';
 import { CompareView } from './CompareView';
 import { Icon } from './Icons.tsx';
@@ -96,6 +111,11 @@ const GROUND_SOURCE = 'ground-dem';
 const RELIEF_LAYER = 'rest-relief';
 // A raster's companion (the live light over a hillshade) travels with it in the stack.
 const LIGHT_SUFFIX = '-light';
+// The section cursor on the map: an amber dot on the transect where the presenter points, and the
+// height there beside it. It sits above the stack (like the presenter's drawn shapes).
+const CURSOR_SOURCE = 'section-cursor';
+// How close (px) the pointer must come to the transect on the map for the section to follow it.
+const CURSOR_HIT_PX = 28;
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -239,6 +259,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     [groundOn, allLayers, rasterVisibility],
   );
   const reliefOnRef = useRef(false);
+  // The record at rest proper: nothing on the stage but the catalogue. The continent stands up
+  // (relief ×6), the camera stands low over the Gulf looking up the valleys, and the horizon has
+  // the last light on it. The first thing the agent lands (a site's frame, a scene) ends it.
+  const restOn = useMemo(
+    () => reliefOn && allLayers.every((l) => l.type === 'geometry' && terrainGeometryHint(l.render, l.url)?.kind === 'points'),
+    [reliefOn, allLayers],
+  );
+  const restOnRef = useRef(false);
   const ensureGroundSource = (mapInstance: maplibregl.Map) => {
     if (mapInstance.getSource(GROUND_SOURCE)) return;
     mapInstance.addSource(GROUND_SOURCE, {
@@ -251,7 +279,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     });
   };
   const dropGroundSource = (mapInstance: maplibregl.Map) => {
-    if (!groundOnRef.current && !reliefOnRef.current && mapInstance.getSource(GROUND_SOURCE)) {
+    // Never from under the terrain: the rest view's or the ground's must go first.
+    const terrainOnIt = mapInstance.getTerrain()?.source === GROUND_SOURCE;
+    if (!groundOnRef.current && !reliefOnRef.current && !restOnRef.current && !terrainOnIt && mapInstance.getSource(GROUND_SOURCE)) {
       mapInstance.removeSource(GROUND_SOURCE);
     }
   };
@@ -294,12 +324,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             type: 'hillshade',
             source: GROUND_SOURCE,
             paint: {
-              'hillshade-illumination-direction': LIGHT_AZIMUTH,
+              // A low sun from the west (the GDAL model: it knows the sun's height): west faces
+              // catch the last light in bone, east faces go to the dome, flat ground stays clear.
+              'hillshade-method': 'basic',
+              'hillshade-illumination-direction': REST_LIGHT.azimuth,
+              'hillshade-illumination-altitude': REST_LIGHT.altitude,
               'hillshade-illumination-anchor': 'map',
               'hillshade-exaggeration': 0.8,
               'hillshade-shadow-color': '#05070a',
-              // A soft highlight: full white makes the continental shelf louder than the sites.
-              'hillshade-highlight-color': 'rgba(233, 238, 243, 0.55)',
+              'hillshade-highlight-color': REST_RELIEF_HIGHLIGHT,
               'hillshade-accent-color': '#0f141b',
             },
           }, above);
@@ -312,50 +345,197 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     if (mapInstance.isStyleLoaded()) apply();
     else mapInstance.once('styledata', apply);
   }, [reliefOn]);
+  // The rest view's terrain and sky: on with the record alone, off (to flat, no sky) the moment
+  // anything else lands; the ground scene's own terrain (×3) is the groundOn effect's.
+  useEffect(() => {
+    restOnRef.current = restOn;
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const apply = () => {
+      if (restOn) {
+        ensureGroundSource(mapInstance);
+        mapInstance.setTerrain({ source: GROUND_SOURCE, exaggeration: REST_EXAGGERATION });
+        mapInstance.setSky({ ...REST_SKY });
+      } else {
+        if (!groundOnRef.current && mapInstance.getTerrain()) mapInstance.setTerrain(null);
+        mapInstance.setSky({ ...NO_SKY });
+        dropGroundSource(mapInstance);
+      }
+    };
+    if (mapInstance.isStyleLoaded()) apply();
+    else mapInstance.once('styledata', apply);
+  }, [restOn]);
 
   // The light over a hillshade: the live layers (one per hillshade on the stage), the sun's
   // azimuth the dial shows, and the sweep in flight when the LiDAR lands.
   const lightLayers = useRef<Set<string>>(new Set());
   const [lightCount, setLightCount] = useState(0);
   const [lightAzimuth, setLightAzimuth] = useState(LIGHT_AZIMUTH);
+  const [lightHeight, setLightHeight] = useState(LIGHT_ALTITUDE);
+  const [sweeping, setSweeping] = useState(false);
+  // The camera's bearing: the light plate's dial is drawn as the room sees the map.
+  const [bearing, setBearing] = useState(0);
   const sweepFrame = useRef(0);
-  const setLight = (azimuth: number) => {
+  const paintLight = (mapInstance: maplibregl.Map, id: string, azimuth: number, altitude: number) => {
+    mapInstance.setPaintProperty(id, 'hillshade-illumination-direction', azimuth);
+    mapInstance.setPaintProperty(id, 'hillshade-illumination-altitude', altitude);
+  };
+  const setLight = (azimuth: number, altitude: number) => {
     const mapInstance = map.current;
     if (!mapInstance) return;
     lightLayers.current.forEach((id) => {
-      if (mapInstance.getLayer(id)) {
-        mapInstance.setPaintProperty(id, 'hillshade-illumination-direction', azimuth);
-        mapInstance.setPaintProperty(id, 'hillshade-exaggeration', LIGHT_EXAGGERATION);
-      }
+      if (mapInstance.getLayer(id)) paintLight(mapInstance, id, azimuth, altitude);
     });
   };
   const stopSweep = () => {
     if (sweepFrame.current) cancelAnimationFrame(sweepFrame.current);
     sweepFrame.current = 0;
+    setSweeping(false);
   };
-  // One turn of the sun round the earthwork, then it settles where the baked hillshade was lit.
-  const sweepLight = (lightId: string) => {
+  // The sun sinks from high (the ground flat) to raking (the walls stand up), goes once round the
+  // earthwork, and settles where the baked hillshade was lit. The plate follows it as it moves.
+  const sweepLight = () => {
     const mapInstance = map.current;
-    if (!mapInstance) return;
+    if (!mapInstance || lightLayers.current.size === 0) return;
     stopSweep();
+    setSweeping(true);
     const t0 = performance.now();
+    let lastShown = 0;
     const step = (now: number) => {
-      if (!mapInstance.getLayer(lightId)) return;
+      const live = [...lightLayers.current].filter((id) => mapInstance.getLayer(id));
+      if (live.length === 0) {
+        stopSweep();
+        return;
+      }
       const t = (now - t0) / LIGHT_SWEEP_MS;
-      mapInstance.setPaintProperty(lightId, 'hillshade-illumination-direction', lightSweep(t));
-      mapInstance.setPaintProperty(lightId, 'hillshade-exaggeration', lightStrength(t));
+      const az = lightSweep(t);
+      const alt = lightAltitude(t);
+      live.forEach((id) => paintLight(mapInstance, id, az, alt));
+      // The plate's dial and readout at ~15 fps: enough to follow, cheap for React.
+      if (now - lastShown > 66) {
+        lastShown = now;
+        setLightAzimuth(az);
+        setLightHeight(alt);
+      }
       if (t < 1) {
         sweepFrame.current = requestAnimationFrame(step);
       } else {
         sweepFrame.current = 0;
+        setSweeping(false);
         setLightAzimuth(LIGHT_AZIMUTH);
-        setLight(LIGHT_AZIMUTH);
+        setLightHeight(LIGHT_ALTITUDE);
+        setLight(LIGHT_AZIMUTH, LIGHT_ALTITUDE);
       }
     };
     sweepFrame.current = requestAnimationFrame(step);
   };
   const forgetLight = (lightId: string) => {
     if (lightLayers.current.delete(lightId)) setLightCount(lightLayers.current.size);
+  };
+  // The presenter moves the sun from the light plate: the sweep stops where it is held.
+  const holdLight = (azimuth: number, altitude: number) => {
+    stopSweep();
+    setLightAzimuth(azimuth);
+    setLightHeight(altitude);
+    setLight(azimuth, altitude);
+  };
+
+  // The transects on the map, by site: their line (for the cursor's dot) and their section (for the
+  // height beside it), and the fill layer that draws the line (so a removed one is forgotten).
+  const transects = useRef<Map<string, { coords: Array<[number, number]>; profile: ProfileData; layerId: string }>>(new Map());
+
+  // The section cursor on the map: wherever the presenter points on the section, an amber dot on the
+  // transect and the height there in mono; pointing at the line on the map moves both.
+  const sectionCursor = useSectionCursor();
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const t = sectionCursor ? transects.current.get(sectionCursor.siteId) : undefined;
+    const at = sectionCursor && t ? pointAlong(t.coords, sectionCursor.atM / Math.max(1, t.profile.lengthM)) : null;
+    const data: FeatureCollection = {
+      type: 'FeatureCollection',
+      features: at && sectionCursor && t
+        ? [{
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: at },
+            properties: { label: cursorWords(sectionCursor.atM, heightAt(t.profile, sectionCursor.atM)).replace(/^at /, '') },
+          }]
+        : [],
+    };
+    // While the cursor stands on a transect its bank and ditch labels step aside, so the reading at
+    // the cursor is the one the room reads (the marks stay; the labels come back on letting go).
+    transects.current.forEach((tr, siteId) => {
+      const labels = tr.layerId.replace('-fill', '-labels');
+      if (mapInstance.getLayer(labels)) {
+        mapInstance.setPaintProperty(labels, 'text-opacity', at && sectionCursor?.siteId === siteId ? 0 : 1);
+      }
+    });
+    const source = mapInstance.getSource(CURSOR_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (source) {
+      source.setData(data);
+      // Keep it over anything that landed since.
+      [`${CURSOR_SOURCE}-dot`, `${CURSOR_SOURCE}-label`].forEach((id) => mapInstance.getLayer(id) && mapInstance.moveLayer(id));
+      return;
+    }
+    if (!at || !mapInstance.isStyleLoaded()) return;
+    mapInstance.addSource(CURSOR_SOURCE, { type: 'geojson', data });
+    mapInstance.addLayer({
+      id: `${CURSOR_SOURCE}-dot`,
+      type: 'circle',
+      source: CURSOR_SOURCE,
+      paint: {
+        'circle-color': theme.colors.primary,
+        'circle-radius': 7,
+        'circle-stroke-color': '#0f141b',
+        'circle-stroke-width': 2.5,
+        'circle-pitch-alignment': 'viewport',
+      },
+    });
+    mapInstance.addLayer({
+      id: `${CURSOR_SOURCE}-label`,
+      type: 'symbol',
+      source: CURSOR_SOURCE,
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+        'text-size': 18,
+        'text-anchor': 'bottom',
+        'text-offset': [0, -1.1],
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2.5 },
+    });
+  }, [sectionCursor]);
+
+  // The other way: the pointer near a transect on the map points the section at the same spot.
+  // Registered once when the map is made (see the init effect); reads refs only.
+  const listenForTransects = (mapInstance: maplibregl.Map) => {
+    const onMove = (e: maplibregl.MapMouseEvent) => {
+      let best: { siteId: string; atM: number; px: number } | null = null;
+      transects.current.forEach((t, siteId) => {
+        if (!mapInstance.getLayer(t.layerId) || mapInstance.getLayoutProperty(t.layerId, 'visibility') === 'none') return;
+        const f = nearestAlong(t.coords, [e.lngLat.lng, e.lngLat.lat]);
+        const on = f === null ? null : pointAlong(t.coords, f);
+        if (f === null || !on) return;
+        const p = mapInstance.project(on);
+        const px = Math.hypot(p.x - e.point.x, p.y - e.point.y);
+        if (px <= CURSOR_HIT_PX && (!best || px < best.px)) best = { siteId, atM: f * t.profile.lengthM, px };
+      });
+      const hit = best as { siteId: string; atM: number; px: number } | null;
+      if (hit) {
+        setSectionCursor({ siteId: hit.siteId, atM: hit.atM, from: 'map' });
+        mapInstance.getCanvas().style.cursor = 'crosshair';
+      } else if (getSectionCursor()?.from === 'map') {
+        setSectionCursor(null);
+        mapInstance.getCanvas().style.cursor = '';
+      }
+    };
+    const onLeave = () => {
+      if (getSectionCursor()?.from === 'map') setSectionCursor(null);
+    };
+    mapInstance.on('mousemove', onMove);
+    mapInstance.on('mouseout', onLeave);
   };
 
   // The tips on the globe: one mark per scanned watch area at its hotspot (or its centre when the
@@ -429,13 +609,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   // The Dim Rule's current state, readable when a basemap layer is (re)created: the dim can be
   // decided before the basemap exists (a replay case lands every layer at once on load).
   const methaneOnStageRef = useRef(false);
-  const applyBasemapDim = (mapInstance: maplibregl.Map, on: boolean) => {
+  // The archaeologist's rest goes further: the satellite ground nearly gone, grey, under the relief.
+  const applyBasemapDim = (mapInstance: maplibregl.Map, on: boolean, rest = restOnRef.current) => {
+    const brightness = rest ? REST_BASEMAP.brightness : on ? 0.45 : 1;
+    const saturation = rest ? REST_BASEMAP.saturation : on ? -0.6 : 0;
     BASEMAP_IDS.forEach((id) => {
       if (!mapInstance.getLayer(id)) return;
       mapInstance.setPaintProperty(id, 'raster-brightness-max-transition', { duration: 600, delay: 0 });
       mapInstance.setPaintProperty(id, 'raster-saturation-transition', { duration: 600, delay: 0 });
-      mapInstance.setPaintProperty(id, 'raster-brightness-max', on ? 0.45 : 1);
-      mapInstance.setPaintProperty(id, 'raster-saturation', on ? -0.6 : 0);
+      mapInstance.setPaintProperty(id, 'raster-brightness-max', brightness);
+      mapInstance.setPaintProperty(id, 'raster-saturation', saturation);
     });
   };
 
@@ -558,10 +741,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     // Paint properties apply to any layer that exists, loaded tiles or not; waiting for `idle`
     // alone left a cold replay load bright while its tiles streamed in. Idle is the backstop for
     // a basemap that is still being created.
-    const apply = () => applyBasemapDim(mapInstance, methaneOnStageRef.current);
+    const apply = () => applyBasemapDim(mapInstance, methaneOnStageRef.current, restOn);
     apply();
     mapInstance.once('idle', apply);
-  }, [methaneOnStage, baseMapStyle]);
+  }, [methaneOnStage, baseMapStyle, restOn]);
 
   // Initialize map
   useEffect(() => {
@@ -576,6 +759,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       },
       center: [0, 20],
       zoom: 2,
+      // The archaeologist's rest view stands at 70°; every other camera names its own pitch.
+      maxPitch: MAX_PITCH,
       // Compact attribution: a small info button in the corner instead of a white bar under the plates.
       attributionControl: { compact: true },
       // maplibre-gl >= 5 takes WebGL context attributes in one nested object.
@@ -603,8 +788,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     map.current.on('zoomend', () => {
       if (map.current) setZoom(map.current.getZoom());
     });
+    // The light plate's dial turns with the camera, once a move has settled.
+    map.current.on('moveend', () => {
+      if (map.current) setBearing(Math.round(map.current.getBearing()));
+    });
+    listenForTransects(map.current);
     // The headless capture harness reads the camera through this in a dev build; never in production.
     if (import.meta.env.DEV) {
+      (window as unknown as { __stageMap?: maplibregl.Map }).__stageMap = map.current;
       (window as unknown as { __stageCamera?: () => unknown }).__stageCamera = () => {
         const m = map.current;
         if (!m) return null;
@@ -612,11 +803,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         const light = [...lightLayers.current].filter((id) => m.getLayer(id)).map((id) => ({
           id,
           azimuth: m.getPaintProperty(id, 'hillshade-illumination-direction'),
-          strength: m.getPaintProperty(id, 'hillshade-exaggeration'),
+          altitude: m.getPaintProperty(id, 'hillshade-illumination-altitude'),
         }));
+        const cursor = m.getSource(CURSOR_SOURCE) as maplibregl.GeoJSONSource | undefined;
         return {
           zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing(), lon: c.lng, lat: c.lat,
-          terrain: !!m.getTerrain(), relief: !!m.getLayer(RELIEF_LAYER), light,
+          terrain: m.getTerrain()?.exaggeration ?? null, relief: !!m.getLayer(RELIEF_LAYER), rest: restOnRef.current,
+          light, cursor: !!cursor, transects: [...transects.current.keys()],
         };
       };
     }
@@ -786,7 +979,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
                 'circle-color': '#e9eef3',
                 'circle-opacity': 0.9,
                 'circle-radius': 4,
-                'circle-pitch-alignment': 'map',
+                // Upright to the room: at the rest view's 70° a ground-aligned dot is a dash.
+                'circle-pitch-alignment': 'viewport',
               },
               layout: { visibility: 'visible' },
             });
@@ -802,7 +996,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
                 'circle-stroke-color': '#e9eef3',
                 'circle-stroke-width': 2,
                 'circle-stroke-opacity': 0.9,
-                'circle-pitch-alignment': 'map',
+                'circle-pitch-alignment': 'viewport',
               },
               layout: { visibility: 'visible' },
             });
@@ -828,7 +1022,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           } else if (isTerrain && terrainHint.label) {
             // The transect: a fog line across the earthwork, a mark where each bank and ditch was
             // read, and the tool's own label beside it ("bank +1.8 m", "ditch −2.5 m") in mono.
-            const { marks } = transectParts(geometry.features as Parameters<typeof transectParts>[0]);
+            const { line, marks } = transectParts(geometry.features as Parameters<typeof transectParts>[0]);
+            // The section cursor's line: where on the map a distance along the section falls.
+            const profile = profileFromFeatures(geometry.features as Parameters<typeof profileFromFeatures>[0], geometry.sourceUrl);
+            const lineCoords = (line?.geometry?.coordinates as Array<[number, number]> | undefined)
+              ?.filter((c) => Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1]));
+            if (profile && lineCoords && lineCoords.length >= 2) {
+              transects.current.set(profile.siteId, { coords: lineCoords.map((c) => [c[0], c[1]]), profile, layerId: fillLayerId });
+            }
             const isLine: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'LineString'];
             const isBank: maplibregl.FilterSpecification = ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'bank']];
             const isDitch: maplibregl.FilterSpecification = ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'ditch']];
@@ -1348,11 +1549,20 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               (terrainHint.kind === 'points' || !!terrainGeometryHint(l.render, l.url)?.label === !!terrainHint.label))
             .forEach((l) => removeLayer(l.id));
           if (terrainHint.kind === 'points') {
-            // The record at rest: the whole catalogue in the frame, flat and north-up, clear of the plates.
-            const all = marksBounds(geometry.features as Parameters<typeof marksBounds>[0]) ?? boundsArray;
-            currentMap.fitBounds([[all[0], all[1]], [all[2], all[3]]], {
-              padding: STAGE_PADDING_NOW(), duration: 1800, maxZoom: 6, pitch: 0, bearing: 0,
-            });
+            // The record at rest: the whole catalogue in the frame, clear of the plates, seen from
+            // low over the Gulf with the horizon in view (see restCameraFor). With anything else
+            // already on the stage (a record re-landed mid-act) it frames flat, as before.
+            const onlyRecord = allLayersRef.current.every((l) => l.id === fillLayerId ||
+              (l.type === 'geometry' && terrainGeometryHint(l.render, l.url)?.kind === 'points'));
+            const cam = onlyRecord && !groundOnRef.current ? restCameraFor(currentMap, geometry.features) : null;
+            if (cam) {
+              currentMap.flyTo({ ...cam, duration: 2400 });
+            } else {
+              const all = marksBounds(geometry.features as Parameters<typeof marksBounds>[0]) ?? boundsArray;
+              currentMap.fitBounds([[all[0], all[1]], [all[2], all[3]]], {
+                padding: STAGE_PADDING_NOW(), duration: 1800, maxZoom: 6, pitch: 0, bearing: 0,
+              });
+            }
           } else if (terrainHint.label) {
             // The transect: the camera comes down to the earthwork, on the ground's own tilt.
             currentMap.fitBounds(bounds, {
@@ -1360,8 +1570,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               pitch: groundOnRef.current ? GROUND_PITCH : 0, bearing: groundOnRef.current ? GROUND_BEARING : 0,
             });
           } else if (!groundOnRef.current) {
-            // A site's frame before any terrain: frame it flat; the terrain that follows tilts the view.
-            currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: FRAME_MAX_ZOOM });
+            // A site's frame before any terrain: frame it flat (out of the rest view's tilt); the
+            // terrain that follows tilts the view.
+            currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: FRAME_MAX_ZOOM, pitch: 0, bearing: 0 });
           }
           return;
         }
@@ -1492,6 +1703,51 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   };
 
   // Fly to a specific layer's bounds
+  // The rest view's camera for the record: pitched 70°, looking up the valleys, fitted by looking
+  // (fitBounds picks its zoom as if flat). The sites keep to the lower two-thirds of the window so
+  // the land runs on to a horizon above them; the jumps are undone before anything is drawn.
+  const restCameraFor = (mapInstance: maplibregl.Map, features: GeometryData['features']): Camera | null => {
+    const points = (features ?? [])
+      .flatMap((f) => (f?.geometry?.type === 'Point' ? [f.geometry.coordinates as [number, number]] : []))
+      .filter((c) => Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1]));
+    const b = marksBounds(features as Parameters<typeof marksBounds>[0]);
+    if (points.length < 2 || !b) return null;
+    const box = mapInstance.getContainer();
+    const size = { width: box.clientWidth, height: box.clientHeight };
+    const stage = STAGE_PADDING_NOW();
+    // Room for the names beside the dots, and the sky band over the farthest site.
+    const pad = { top: Math.max(stage.top, Math.round(size.height * 0.3)), bottom: stage.bottom, left: stage.left + 40, right: stage.right + 40 };
+    const flat = mapInstance.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: stage, bearing: REST_BEARING });
+    if (!flat?.center || typeof flat.zoom !== 'number') return null;
+    const c = maplibregl.LngLat.convert(flat.center);
+    const start: Camera = { center: [c.lng, c.lat], zoom: flat.zoom, pitch: REST_PITCH, bearing: REST_BEARING };
+    const before = { center: mapInstance.getCenter(), zoom: mapInstance.getZoom(), pitch: mapInstance.getPitch(), bearing: mapInstance.getBearing() };
+    const lens = (cam: Camera) => {
+      mapInstance.jumpTo(cam);
+      return {
+        project: (p: [number, number]): [number, number] => {
+          const q = mapInstance.project(p);
+          return [q.x, q.y];
+        },
+        unproject: (px: [number, number]): [number, number] => {
+          const q = mapInstance.unproject(px);
+          return [q.lng, q.lat];
+        },
+      };
+    };
+    let cam: Camera;
+    try {
+      cam = fitPitched(points, start, size, pad, lens);
+    } finally {
+      mapInstance.jumpTo(before);
+    }
+    // A fit that ran off (a point projected past the horizon on the way) falls back to the flat
+    // fit's centre, a little closer in: the view is still pitched and still holds the record.
+    const sane = Number.isFinite(cam.zoom) && cam.zoom > flat.zoom - 1 && cam.zoom < flat.zoom + 2.5 &&
+      Number.isFinite(cam.center[0]) && Number.isFinite(cam.center[1]);
+    return sane ? cam : { ...start, zoom: flat.zoom + 0.5 };
+  };
+
   const flyToLayer = (layerId: string) => {
     if (!map.current) return;
     
@@ -1499,6 +1755,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     if (!layer || !layer.bounds) return;
     
     const mapInstance = map.current;
+    // The record's row at rest goes back to the rest view, not to a flat fit of its bounds.
+    if (restOnRef.current && layer.type === 'geometry' && terrainGeometryHint(layer.render, layer.url)?.kind === 'points') {
+      const src = mapInstance.getSource(layer.sourceId) as maplibregl.GeoJSONSource | undefined;
+      const data = src?.serialize().data as GeometryData | undefined;
+      const cam = data && typeof data === 'object' && Array.isArray(data.features) ? restCameraFor(mapInstance, data.features) : null;
+      if (cam) {
+        mapInstance.flyTo({ ...cam, duration: 1500 });
+        return;
+      }
+    }
     const [west, south, east, north] = layer.bounds;
     // A coarse raster is only drawn below its zoom cap: land half a level under it.
     const cap = layer.type === 'raster' ? layer.render?.max_zoom : undefined;
@@ -1593,6 +1859,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       [layer.sourceId, `${layer.sourceId}-points`].forEach(id => {
         if (mapInstance.getSource(id)) mapInstance.removeSource(id);
       });
+      // A transect that leaves takes the section cursor's line with it.
+      transects.current.forEach((t, siteId) => {
+        if (t.layerId === layer.id) {
+          transects.current.delete(siteId);
+          if (getSectionCursor()?.siteId === siteId) setSectionCursor(null);
+        }
+      });
     } else {
       // Raster layer, and the live light over a hillshade with its DEM source.
       [layer.id, `${layer.id}${LIGHT_SUFFIX}`].forEach((id) => {
@@ -1649,6 +1922,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     lightLayers.current.clear();
     setLightCount(0);
     setLightAzimuth(LIGHT_AZIMUTH);
+    setLightHeight(LIGHT_ALTITUDE);
+    transects.current.clear();
+    setSectionCursor(null);
 
     // Clear all layers (basemap is dynamic and not tracked here)
     setAllLayers([]);
@@ -1955,11 +2231,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               type: 'hillshade',
               source: demSourceId,
               paint: {
+                // The GDAL model: a sun with a height, so a low one rakes. Flat ground at the
+                // settled 25° goes a shade darker than the paper; a bank's lit face goes to fog
+                // and its far face to the dome.
+                'hillshade-method': 'basic',
                 'hillshade-illumination-direction': LIGHT_AZIMUTH,
+                'hillshade-illumination-altitude': still ? LIGHT_ALTITUDE : lightAltitude(0),
                 'hillshade-illumination-anchor': 'map',
-                'hillshade-exaggeration': still ? LIGHT_EXAGGERATION : 0,
+                'hillshade-exaggeration': LIGHT_EXAGGERATION,
                 'hillshade-shadow-color': '#0f141b',
-                'hillshade-highlight-color': '#ffffff',
+                'hillshade-highlight-color': 'rgba(233, 238, 243, 0.9)',
                 'hillshade-accent-color': '#0f141b',
               },
               layout: { visibility: isVisible ? 'visible' : 'none' },
@@ -1967,14 +2248,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             lightLayers.current.add(lightId);
             setLightCount(lightLayers.current.size);
             setLightAzimuth(LIGHT_AZIMUTH);
+            setLightHeight(still ? LIGHT_ALTITUDE : lightAltitude(0));
             if (!still) {
-              // The sun goes round once the camera has landed and the ground has loaded (idle),
-              // or after four seconds regardless, so a slow tile never holds the act.
+              // The sun moves once the camera has landed and the ground has loaded (idle), or
+              // after four seconds regardless, so a slow tile never holds the act.
               let started = false;
               const start = () => {
                 if (started) return;
                 started = true;
-                sweepLight(lightId);
+                sweepLight();
               };
               mapInstance.once('idle', start);
               setTimeout(start, 4000);
@@ -2244,37 +2526,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       );
     }
     if (lg.kind === 'hillshade') {
-      // With a live light the sentence follows the sun, and the dial moves it: raking light is how
-      // LiDAR archaeology reads a wall, so the presenter can show it from any side on a question.
-      const live = lightCount > 0;
-      const from = live ? compassName(lightAzimuth) : 'north-west';
+      // With a live light the sentence follows the sun; the light plate moves it.
+      const from = lightCount > 0 ? compassName(lightAzimuth) : 'north-west';
       return (
         <div key={lg.key} className="map-legend map-legend--stacked">
           <span className="map-legend__name">Hillshade</span>
           <span className="map-legend__label">1 m LiDAR, lit from the {from}: banks cast shadows, ditches catch them</span>
-          {live && (
-            <label className="map-dial">
-              <span className="map-dial__label">
-                light from <span className="map-legend__num">{Math.round(lightAzimuth)}°</span>
-              </span>
-              <input
-                type="range"
-                className="map-dial__input"
-                min={0}
-                max={359}
-                step={1}
-                value={Math.round(lightAzimuth)}
-                onChange={(e) => {
-                  stopSweep();
-                  const az = Number(e.target.value);
-                  setLightAzimuth(az);
-                  setLight(az);
-                }}
-                aria-label="Direction the light comes from, in degrees from north"
-                aria-valuetext={`${Math.round(lightAzimuth)} degrees, from the ${from}`}
-              />
-            </label>
-          )}
         </div>
       );
     }
@@ -2307,7 +2564,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   };
 
   return (
-    <div className="map-frame">
+    <div className={`map-frame${lightCount > 0 ? ' map-frame--light' : ''}${restOn ? ' map-frame--dusk' : ''}`}>
       {/* Compare overlay */}
       {compareMode && (
         <CompareView
@@ -2370,9 +2627,17 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
                 </div>
               )}
 
-              {(legends.length > 0 || groundOn) && (
+              {(legends.length > 0 || groundOn || restOn) && (
                 <div className="map-layers__legends">
                   {legends.map(renderLegend)}
+                  {restOn && (
+                    // The rest view says what it is: the continent's relief stood up, lit at dusk.
+                    <div className="map-legend map-legend--ground">
+                      <span className="map-legend__label">
+                        relief <span className="map-legend__num">×{REST_EXAGGERATION}</span>, a low sun from the west
+                      </span>
+                    </div>
+                  )}
                   {groundOn && (
                     // The archaeologist's ground is a stated viewing aid: the 3D relief is exaggerated,
                     // the hillshade and relief draped on it are not.
@@ -2394,6 +2659,18 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             </div>
           )}
         </section>
+      )}
+
+      {/* Bottom right, over the metre scale: the raking light, while a live hillshade is on the stage. */}
+      {lightCount > 0 && (
+        <LightPlate
+          azimuth={lightAzimuth}
+          altitude={lightHeight}
+          bearing={bearing}
+          sweeping={sweeping}
+          onChange={holdLight}
+          onSweep={sweepLight}
+        />
       )}
 
       {/* Bottom left: the draw rail */}

@@ -950,6 +950,12 @@
   width: 100%;
   height: 100%;
 }
+/* The archaeologist's rest view looks into the dusk: behind the (transparent) canvas the top of
+   the frame is the horizon's own colour, so the sliver of sky past the edge of the drawn world
+   (the Web Mercator limit, a 70° view's far corner) reads as more sky, not as a hole. */
+.map-frame--dusk {
+  background: linear-gradient(to bottom, #4b3326 0%, #4b3326 18%, var(--dome) 34%);
+}
 .map-canvas {
   width: 100%;
   height: 100%;
@@ -1328,31 +1334,140 @@
 .map-legend--ground {
   margin-top: 10px;
 }
-/* The sun dial under the hillshade's key: where the light comes from, in degrees from north. The
-   thumb is the one thing on the plate that may be amber while it is held (it is what is active). */
-.map-dial {
+/* The light plate: the raking light as a control the presenter holds, bottom right above the metre
+   scale while a live hillshade is on the stage. The sun is fog; it goes amber while it is held or
+   focused (it is then what is active). */
+.map-light {
+  position: absolute;
+  right: 16px;
+  bottom: 116px;
+  z-index: 2;
+  width: 320px;
+  padding: 12px 14px 14px;
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+/* With the light plate up, the layers plate stops above it. */
+.map-frame--light .map-layers {
+  max-height: calc(100% - 340px);
+}
+.map-light__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.map-light__sweep {
+  height: 36px;
+  border: 1px solid var(--hairline-strong);
+}
+.map-light__sweep:hover:not(:disabled) {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.map-light__sweep:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+.map-light__body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.map-light__dial {
+  flex: none;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+}
+.map-light__dial--held {
+  cursor: grabbing;
+}
+.map-light__dial:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+.map-light__dial svg {
+  display: block;
+  overflow: visible;
+}
+.map-light__rim {
+  fill: rgba(233, 238, 243, 0.04);
+  stroke: var(--hairline-strong);
+  stroke-width: 1.5;
+}
+.map-light__tick {
+  stroke: var(--label);
+  stroke-width: 1.5;
+}
+.map-light__tick--north {
+  stroke: var(--fog);
+  stroke-width: 2;
+}
+.map-light__north {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  fill: var(--fog);
+}
+.map-light__ray {
+  stroke: var(--fog);
+  stroke-width: 1.5;
+  stroke-opacity: 0.6;
+}
+.map-light__sun {
+  fill: var(--fog);
+  stroke: var(--plate);
+  stroke-width: 3;
+}
+.map-light__dial--held .map-light__sun,
+.map-light__dial:focus-visible .map-light__sun {
+  fill: var(--amber);
+}
+.map-light__read {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  width: 100%;
-}
-.map-dial__label {
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
   font-size: 15px;
   line-height: 1.3;
   color: var(--label);
 }
-.map-dial__input {
+.map-light__from {
+  color: var(--fog);
+}
+.map-light__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fog);
+}
+.map-light__height {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.map-light__input {
   width: 100%;
   height: 24px;
   margin: 0;
   accent-color: var(--amber);
   cursor: pointer;
 }
-.map-dial__input:focus-visible {
+.map-light__input:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 3px;
   border-radius: 4px;
+}
+/* Two lines held, so the words changing under the slider never move the plate. */
+.map-light__words {
+  min-height: 2.6em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-light {
+    animation: none;
+  }
 }
 /* The metre scale on the archaeologist's ground: a plate above the basemap plate, the mono face. */
 .maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale {
@@ -1579,12 +1694,56 @@
   stroke-width: 4px;
   stroke-linejoin: round;
 }
+/* The section is a slider along the line: pointing reads the ground, and the map follows. The
+   cursor is amber: it is the one thing on the stage that is active while the presenter points. */
+.profile-section__plot {
+  position: relative;
+  border-radius: 6px;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+.profile-section__plot:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 4px;
+}
+.profile-section__hit {
+  fill: transparent;
+}
+.profile-section__cursor-rule {
+  stroke: var(--amber);
+  stroke-width: 1.5;
+}
+.profile-section__cursor-dot {
+  fill: var(--amber);
+  stroke: var(--plate);
+  stroke-width: 2;
+}
+.profile-section__desc {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* The caption and the readout share one cell, so pointing never moves the column. */
 .profile-section__caption {
-  display: block;
+  display: grid;
   margin-top: 2px;
   font-size: 15px;
   line-height: 1.35;
   color: var(--label);
+}
+.profile-section__caption-text {
+  grid-area: 1 / 1;
+}
+.profile-section__caption-text--hidden {
+  visibility: hidden;
+}
+.profile-section__readout {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fog);
 }
 .profile-section__num {
   font-family: var(--font-mono);

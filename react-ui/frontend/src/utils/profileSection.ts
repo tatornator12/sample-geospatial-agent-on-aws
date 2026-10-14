@@ -178,6 +178,96 @@ export function sectionLayout(p: ProfileData, width: number, height: number): Se
   return { width, height, path, fill, baselineY, x0, x1, xFor, yFor, ticks, marks, exaggeration: Math.round(exaggeration) };
 }
 
+/**
+ * The cursor. The presenter runs a finger along the section (or along the line on the map) and
+ * both show the same spot: the section a rule and a dot at that distance, the map a dot at the
+ * same point on the transect. These helpers are the arithmetic both sides share.
+ */
+
+/** The ground's height above the baseline `atM` metres along the line, or null in a LiDAR gap. */
+export function heightAt(p: ProfileData, atM: number): number | null {
+  const s = p.samples;
+  if (s.length === 0 || !Number.isFinite(atM)) return null;
+  if (atM <= s[0][0]) return s[0][1];
+  if (atM >= s[s.length - 1][0]) return s[s.length - 1][1];
+  let lo = 0, hi = s.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (s[mid][0] <= atM) lo = mid;
+    else hi = mid;
+  }
+  const [d0, z0] = s[lo];
+  const [d1, z1] = s[hi];
+  if (z0 === null || z1 === null) return null;
+  const f = d1 > d0 ? (atM - d0) / (d1 - d0) : 0;
+  return z0 + (z1 - z0) * f;
+}
+
+/** The distance along the line a pixel column of the section stands for, clamped to the line. */
+export function distanceAtX(layout: Pick<SectionLayout, 'x0' | 'x1'>, lengthM: number, x: number): number {
+  const span = Math.max(1, layout.x1 - layout.x0);
+  return (Math.min(1, Math.max(0, (x - layout.x0) / span))) * Math.max(0, lengthM);
+}
+
+/** "at 312 m, +1.4 m": where the cursor is and how high the ground stands there. */
+export function cursorWords(atM: number, height: number | null): string {
+  const at = `at ${Math.round(atM)} m`;
+  if (height === null) return `${at}, no LiDAR return`;
+  const h = Math.round(height * 10) / 10;
+  const z = h > 0 ? `+${h.toFixed(1)} m` : h < 0 ? `−${Math.abs(h).toFixed(1)} m` : '0.0 m';
+  return `${at}, ${z}`;
+}
+
+type LngLat = [number, number];
+const M_PER_DEG = 111_320;
+
+/** A polyline in local metres (equirectangular about its first vertex): ample for a 2 km line. */
+function localMetres(coords: LngLat[]): Array<[number, number]> {
+  const k = Math.cos(((coords[0]?.[1] ?? 0) * Math.PI) / 180);
+  return coords.map(([lng, lat]) => [(lng - coords[0][0]) * M_PER_DEG * k, (lat - coords[0][1]) * M_PER_DEG]);
+}
+
+/** The point a share `f` of the way along a polyline, by ground length. */
+export function pointAlong(coords: LngLat[], f: number): LngLat | null {
+  if (coords.length < 2) return null;
+  const m = localMetres(coords);
+  const seg = m.slice(1).map((p, i) => Math.hypot(p[0] - m[i][0], p[1] - m[i][1]));
+  const total = seg.reduce((a, b) => a + b, 0);
+  if (total <= 0) return coords[0];
+  let want = Math.min(1, Math.max(0, f)) * total;
+  for (let i = 0; i < seg.length; i += 1) {
+    if (want <= seg[i] || i === seg.length - 1) {
+      const t = seg[i] > 0 ? Math.min(1, want / seg[i]) : 0;
+      const [a, b] = [coords[i], coords[i + 1]];
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    }
+    want -= seg[i];
+  }
+  return coords[coords.length - 1];
+}
+
+/** The share of the way along a polyline of the point on it nearest `p`, by ground length. */
+export function nearestAlong(coords: LngLat[], p: LngLat): number | null {
+  if (coords.length < 2) return null;
+  const m = localMetres([...coords, p]);
+  const q = m.pop()!;
+  let best = Infinity, bestAt = 0, run = 0;
+  for (let i = 0; i + 1 < m.length; i += 1) {
+    const [ax, ay] = m[i], [bx, by] = m[i + 1];
+    const vx = bx - ax, vy = by - ay;
+    const len2 = vx * vx + vy * vy;
+    const t = len2 > 0 ? Math.min(1, Math.max(0, ((q[0] - ax) * vx + (q[1] - ay) * vy) / len2)) : 0;
+    const d = Math.hypot(ax + vx * t - q[0], ay + vy * t - q[1]);
+    const len = Math.sqrt(len2);
+    if (d < best) {
+      best = d;
+      bestAt = run + t * len;
+    }
+    run += len;
+  }
+  return run > 0 ? bestAt / run : 0;
+}
+
 /** One sentence for the room and the screen reader: what the section shows. */
 export function sectionDescription(p: ProfileData, exaggeration: number): string {
   const marks = p.marks.map((m) => `${m.kind} ${m.offsetM >= 0 ? '+' : '−'}${Math.abs(m.offsetM).toFixed(1)} m at ${Math.round(m.atM)} m`).join(', ');

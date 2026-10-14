@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { Feature } from 'geojson';
-import { profileFromFeatures, profileSiteId, sectionDescription, sectionLayout } from './profileSection.ts';
+import {
+  cursorWords,
+  distanceAtX,
+  heightAt,
+  nearestAlong,
+  pointAlong,
+  profileFromFeatures,
+  profileSiteId,
+  sectionDescription,
+  sectionLayout,
+} from './profileSection.ts';
 
 // What measure_profile writes for the Great Circle (shortened): the line with its samples, the marks.
 const URL = 's3://b/session_data/abc/terrain/profile_newark-great-circle.geojson';
@@ -87,5 +97,62 @@ describe('sectionLayout', () => {
 
   it('describes itself in one sentence', () => {
     expect(sectionDescription(p, L.exaggeration)).toMatch(/^Cross-section along the transect, 430 m, heights about \d+ times exaggerated, 362 m bank to bank: bank \+1\.8 m at 34 m, ditch −2\.5 m at 47 m/);
+  });
+});
+
+describe('the section cursor arithmetic', () => {
+  const p = profileFromFeatures(FEATURES, URL)!;
+  const line = FEATURES[0].geometry as unknown as { coordinates: Array<[number, number]> };
+
+  it('reads the height between samples, and null in a LiDAR gap', () => {
+    const [d0, z0] = p.samples[3] as [number, number];
+    const [d1, z1] = p.samples[4] as [number, number];
+    expect(heightAt(p, d0)).toBeCloseTo(z0, 10);
+    expect(heightAt(p, (d0 + d1) / 2)).toBeCloseTo((z0 + z1) / 2, 10);
+    // 120 m is the gap: anything between 110 and 130 has no reading.
+    expect(heightAt(p, 115)).toBeNull();
+    expect(heightAt(p, 125)).toBeNull();
+    // Off the ends: the end readings.
+    expect(heightAt(p, -5)).toBe(p.samples[0][1]);
+    expect(heightAt(p, 9999)).toBe(p.samples[p.samples.length - 1][1]);
+  });
+
+  it('turns a pixel column into a distance along the line, clamped to it', () => {
+    const layout = { x0: 46, x1: 346 };
+    expect(distanceAtX(layout, 430, 46)).toBe(0);
+    expect(distanceAtX(layout, 430, 196)).toBeCloseTo(215, 10);
+    expect(distanceAtX(layout, 430, 346)).toBe(430);
+    expect(distanceAtX(layout, 430, 10)).toBe(0);
+    expect(distanceAtX(layout, 430, 900)).toBe(430);
+  });
+
+  it('says where the cursor is in the stage form', () => {
+    expect(cursorWords(212.4, 2.18)).toBe('at 212 m, +2.2 m');
+    expect(cursorWords(47, -2.54)).toBe('at 47 m, −2.5 m');
+    expect(cursorWords(0, 0.01)).toBe('at 0 m, 0.0 m');
+    expect(cursorWords(120, null)).toBe('at 120 m, no LiDAR return');
+  });
+
+  it('puts a distance on the map line and reads a map point back as a distance', () => {
+    const mid = pointAlong(line.coordinates, 0.5)!;
+    expect(mid[0]).toBeCloseTo(-82.4305, 6);
+    expect(mid[1]).toBeCloseTo(40.041, 6);
+    expect(pointAlong(line.coordinates, 0)).toEqual(line.coordinates[0]);
+    expect(pointAlong(line.coordinates, 1)![0]).toBeCloseTo(line.coordinates[1][0], 10);
+    // A point a little off the line, a quarter of the way along, reads as a quarter.
+    expect(nearestAlong(line.coordinates, [-82.43175, 40.0412])!).toBeCloseTo(0.25, 3);
+    // Beyond an end, the end.
+    expect(nearestAlong(line.coordinates, [-82.44, 40.041])!).toBe(0);
+    expect(pointAlong([[0, 0]], 0.5)).toBeNull();
+    expect(nearestAlong([[0, 0]], [0, 0])).toBeNull();
+  });
+
+  it('walks a bent line by ground length, not by vertex count', () => {
+    // An L: 100 m east, then 300 m north (at the equator, 1e-3 deg is about 111 m).
+    const bent: Array<[number, number]> = [[0, 0], [0.0009, 0], [0.0009, 0.0027]];
+    const quarter = pointAlong(bent, 0.25)!;
+    expect(quarter[0]).toBeCloseTo(0.0009, 6);
+    expect(quarter[1]).toBeCloseTo(0, 6);
+    expect(nearestAlong(bent, [0.0009, 0.00135])!).toBeCloseTo(0.625, 3);
   });
 });

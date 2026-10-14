@@ -3,11 +3,22 @@ import type { LayerMetadata } from './layerFormatting.ts';
 import { layerLegend, stackLegends } from './layerStack.ts';
 import {
   HILLSHADE,
+  LIGHT_ALTITUDE,
+  LIGHT_ALTITUDE_RANGE,
+  LIGHT_AZIMUTH,
+  LIGHT_HIGH,
+  LIGHT_SUNSET,
   LOCAL_RELIEF,
   LOCAL_RELIEF_FINE,
   SITE_FRAME,
   TRANSECT,
+  altitudeWords,
+  compassName,
+  dialAzimuth,
   inTerrainTree,
+  lightAltitude,
+  lightSweep,
+  stepLight,
   isTerrainLayer,
   marksBounds,
   signedMetres,
@@ -150,5 +161,51 @@ describe('siteWindow', () => {
     // Degrees of longitude at Newark: 3 km is about 0.0357; the window should be 0.4 of that.
     const [w, , e] = siteWindow([-82.447979, 40.027501, -82.412259, 40.054956]);
     expect(e - w).toBeCloseTo(0.4 * (-82.412259 - -82.447979), 10);
+  });
+});
+
+describe('the raking light', () => {
+  it('sinks the sun first, then takes it once round, back to the north-west', () => {
+    expect(lightAltitude(0)).toBe(LIGHT_HIGH);
+    expect(lightAltitude(LIGHT_SUNSET)).toBeCloseTo(LIGHT_ALTITUDE, 10);
+    expect(lightAltitude(1)).toBeCloseTo(LIGHT_ALTITUDE, 10);
+    // Lower all the way down, never below the raking angle.
+    const heights = [0, 0.05, 0.1, 0.15, 0.2, 0.25].map((t) => lightAltitude(t));
+    heights.slice(1).forEach((h, i) => expect(h).toBeLessThan(heights[i]));
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(LIGHT_ALTITUDE - 1e-9);
+    // The azimuth holds while the sun sinks, then turns once and lands where it started.
+    expect(lightSweep(0)).toBe(LIGHT_AZIMUTH);
+    expect(lightSweep(LIGHT_SUNSET)).toBe(LIGHT_AZIMUTH);
+    expect(lightSweep((1 + LIGHT_SUNSET) / 2)).toBeCloseTo((LIGHT_AZIMUTH + 180) % 360, 6);
+    expect(lightSweep(1)).toBeCloseTo(LIGHT_AZIMUTH, 6);
+    expect(lightSweep(2)).toBeCloseTo(LIGHT_AZIMUTH, 6);
+  });
+
+  it('names the sun\'s height in the room\'s words', () => {
+    expect(altitudeWords(8)).toMatch(/long shadows/);
+    expect(altitudeWords(LIGHT_ALTITUDE)).toMatch(/walls stand up/);
+    expect(altitudeWords(40)).toMatch(/shadows shorten/);
+    expect(altitudeWords(60)).toMatch(/flat/);
+  });
+
+  it('reads the dial as the room sees the map', () => {
+    // North-up map: up is north, right is east, down-left is south-west.
+    expect(dialAzimuth(0, -10, 0)).toBe(0);
+    expect(dialAzimuth(10, 0, 0)).toBe(90);
+    expect(dialAzimuth(-10, 10, 0)).toBe(225);
+    // The ground view turns the map 35°: straight up on screen is 35° on the map.
+    expect(dialAzimuth(0, -10, 35)).toBe(35);
+    expect(dialAzimuth(-10, -10, 35)).toBe(350);
+    expect(dialAzimuth(0, 0, 35)).toBe(35);
+    expect(compassName(dialAzimuth(-10, -10, 0))).toBe('north-west');
+  });
+
+  it('steps by keyboard: 5° on the arrows, 45° (or 15° of height) on the page keys', () => {
+    expect(stepLight(315, 'ArrowRight', 'azimuth')).toBe(320);
+    expect(stepLight(2, 'ArrowLeft', 'azimuth')).toBe(357);
+    expect(stepLight(315, 'PageUp', 'azimuth')).toBe(0);
+    expect(stepLight(25, 'PageDown', 'altitude')).toBe(LIGHT_ALTITUDE_RANGE[0] + 5);
+    expect(stepLight(LIGHT_ALTITUDE_RANGE[1], 'ArrowUp', 'altitude')).toBe(LIGHT_ALTITUDE_RANGE[1]);
+    expect(stepLight(25, 'Enter', 'azimuth')).toBeNull();
   });
 });

@@ -40,38 +40,129 @@ export const TRANSECT_MAX_ZOOM = 17;
 export const MARKS_MAX_ZOOM = 9;
 
 /**
+ * The record at rest: the eastern woodlands at dusk, not a globe in space. The camera stands low
+ * over the southern Appalachians looking west-north-west across the Mississippi into the sunset,
+ * the horizon in the frame with the last light on it; the continent's own relief is stood up and
+ * lit by the low western sun, so the ridges and the valleys every site on the record sits in read
+ * as landform. The satellite ground goes to a dark monochrome under it. (Looking west also keeps
+ * the edge of the Web Mercator world, 85° N, out of a 70° view; looking north it shows.)
+ */
+export const REST_PITCH = 70;
+export const REST_BEARING = 290;
+export const REST_EXAGGERATION = 6;
+/** The map allows the rest view's pitch (MapLibre's default ceiling is 60). */
+export const MAX_PITCH = 75;
+export const REST_SKY = {
+  'sky-color': '#0f141b',
+  'horizon-color': '#4d3427',
+  'fog-color': '#1a1714',
+  'sky-horizon-blend': 0.5,
+  'horizon-fog-blend': 0.6,
+  'fog-ground-blend': 0.3,
+  'atmosphere-blend': 0,
+} as const;
+/** No sky: what the other acts and the ground scene see. */
+export const NO_SKY = {
+  'sky-color': 'transparent',
+  'horizon-color': 'transparent',
+  'fog-color': 'transparent',
+  'fog-ground-blend': 1,
+  'atmosphere-blend': 0,
+} as const;
+/** The continental relief: a low sun from the west, a bone highlight, shadows to the dome. */
+export const REST_LIGHT = { azimuth: 260, altitude: 28 };
+export const REST_RELIEF_HIGHLIGHT = 'rgba(222, 204, 172, 0.5)';
+/** How far the satellite ground recedes at rest: darker and greyer than under a finding. */
+export const REST_BASEMAP = { brightness: 0.3, saturation: -1 };
+
+/**
  * The light. A hillshade's hint names the DEM it was lit from; the stage serves that DEM as
- * terrain-RGB through TiTiler and lights it itself with MapLibre's hillshade layer, so the sun is
- * a parameter. When the LiDAR lands the light goes once round the earthwork and settles where
- * the baked product was lit (north-west, 315°), so every bank throws its shadow from every side
- * before the room reads the ground; after that the presenter can move the sun. The baked
- * hillshade raster under it is served as a flat grey sheet (its own COG, rescaled to one value)
- * so the live light reads on paper, not on satellite imagery.
+ * terrain-RGB through TiTiler and lights it itself with MapLibre's hillshade layer (the GDAL
+ * "basic" model, which takes the sun's height as well as its direction), so the sun is a
+ * parameter. When the LiDAR lands the sun starts high, where the ground reads flat, sinks to a
+ * raking angle so the walls stand up, then goes once round the earthwork and settles where the
+ * baked product was lit (north-west, 315°); after that the presenter moves it from the light plate.
+ * The baked hillshade raster under it is served as a flat grey sheet (its own COG, rescaled to one
+ * value) so the live light reads on paper, not on satellite imagery.
  */
 export const LIGHT_AZIMUTH = 315;
-export const LIGHT_SWEEP_MS = 6000;
-export const LIGHT_EXAGGERATION = 0.75;
+/** The raking sun the sweep settles at, in degrees above the horizon. */
+export const LIGHT_ALTITUDE = 25;
+/** Where the sweep starts: a high sun, the flat ground pale and the walls faint. */
+export const LIGHT_HIGH = 50;
+/**
+ * The light plate's height control: 5° (long shadows) to 50° (a high sun). Higher than that the
+ * flat ground goes nearly white, which on a dark stage is a flash, not a lesson.
+ */
+export const LIGHT_ALTITUDE_RANGE: [number, number] = [5, 50];
+export const LIGHT_SWEEP_MS = 8000;
+/** The share of the sweep the sun spends sinking before it goes round. */
+export const LIGHT_SUNSET = 0.25;
+export const LIGHT_EXAGGERATION = 1;
 /** A grey sheet from the hillshade's own 1–255 values: a rescale so wide every pixel is mid-grey. */
 export const PAPER_RESCALE: [number, number] = [-100000, 100000];
 /** How long a terrain product takes to surface over the scene under it (the dissolve). */
 export const REVEAL_MS = 1800;
 
-/** The light's azimuth at `t` in [0, 1] of the sweep: one full turn from 315° back to 315°, eased. */
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+const easeInOut = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
+
+/**
+ * The light's azimuth at `t` in [0, 1] of the sweep: held while the sun sinks, then one full turn
+ * from 315° back to 315°, eased.
+ */
 export function lightSweep(t: number, from: number = LIGHT_AZIMUTH): number {
-  const x = Math.min(1, Math.max(0, t));
-  const eased = x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-  return (from + 360 * eased) % 360;
+  const x = clamp01((clamp01(t) - LIGHT_SUNSET) / (1 - LIGHT_SUNSET));
+  return (from + 360 * easeInOut(x)) % 360;
 }
 
-/** The light's strength at `t`: rises over the first fifth of the sweep so the relief fades in. */
-export function lightStrength(t: number, full: number = LIGHT_EXAGGERATION): number {
-  return full * Math.min(1, Math.max(0, t) / 0.2);
+/** The sun's height at `t`: from high to the raking angle over the first quarter, then held. */
+export function lightAltitude(t: number, high: number = LIGHT_HIGH, low: number = LIGHT_ALTITUDE): number {
+  const x = clamp01(clamp01(t) / LIGHT_SUNSET);
+  return high + (low - high) * easeOut(x);
 }
 
-/** "north-west" for 315: the compass point the light comes from, for the legend and the dial. */
+/** "north-west" for 315: the compass point the light comes from, for the legend and the plate. */
 export function compassName(azimuth: number): string {
   const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
   return names[Math.round((((azimuth % 360) + 360) % 360) / 45) % 8];
+}
+
+/** What the sun's height does to the ground, in the room's words. */
+export function altitudeWords(altitude: number): string {
+  if (altitude <= 15) return 'very low: long shadows';
+  if (altitude <= 30) return 'low: walls stand up';
+  if (altitude <= 40) return 'mid: shadows shorten';
+  return 'high: the ground reads flat';
+}
+
+/**
+ * The azimuth a point on the dial means. The dial is drawn as the room sees the map (rotated by
+ * the camera's bearing, so the sun on the dial sits where the light comes from on screen): a
+ * pointer `dx` px right and `dy` px down of the dial's centre is the light from that screen
+ * direction, turned back to map north.
+ */
+export function dialAzimuth(dx: number, dy: number, bearing: number): number {
+  if (dx === 0 && dy === 0) return ((bearing % 360) + 360) % 360;
+  const screen = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  return Math.round(((screen + bearing) % 360 + 360) % 360);
+}
+
+/** A keyboard step on the dial or the height: arrows by 5, Page keys by 45 (azimuth) or 15 (height). */
+export function stepLight(value: number, key: string, kind: 'azimuth' | 'altitude'): number | null {
+  const small = 5;
+  const big = kind === 'azimuth' ? 45 : 15;
+  const delta =
+    key === 'ArrowRight' || key === 'ArrowUp' ? small
+      : key === 'ArrowLeft' || key === 'ArrowDown' ? -small
+        : key === 'PageUp' ? big
+          : key === 'PageDown' ? -big
+            : null;
+  if (delta === null) return null;
+  if (kind === 'azimuth') return (((value + delta) % 360) + 360) % 360;
+  const [lo, hi] = LIGHT_ALTITUDE_RANGE;
+  return Math.min(hi, Math.max(lo, value + delta));
 }
 
 /** TiTiler's terrain-RGB tiles for a presigned DEM: the source MapLibre lights and could stand up. */
