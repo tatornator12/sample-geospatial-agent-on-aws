@@ -19,6 +19,7 @@ import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { currentBriefId } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
+import { twoColumnTables } from '../utils/tables.ts';
 import { stepColumnMaxHeight } from '../utils/stageLayout.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
@@ -485,7 +486,11 @@ export function ChatSidebar({
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
   // The answer on the stage: what the agent said after its last tool call (a replay's recorded
   // narrative, or a stopped or failed turn's one line, has no answer field and stands as is).
-  const answerText = !isStreaming && lastAssistant ? stagePunctuation((lastAssistant.answer ?? lastAssistant.content).trim()) : '';
+  // Two columns at most in the column (tables.ts): a third column the model wrote anyway folds
+  // into the second, so the room never reads a value with its documented figure cut off.
+  const answerText = !isStreaming && lastAssistant
+    ? twoColumnTables(stagePunctuation((lastAssistant.answer ?? lastAssistant.content).trim()))
+    : '';
   const answerFailed = /^Error:/.test(answerText);
 
   // Where the agent is: this turn's tools while working, the last turn's when finished.

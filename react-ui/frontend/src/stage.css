@@ -177,9 +177,11 @@
   font-size: 15px;
   line-height: 1.3;
 }
-.stage-answer__text th,
-.stage-answer__text td {
-  padding: 4px 8px 4px 0;
+/* Scoped under .stage-answer so these win over App.css's .markdown-content cells (12px sides),
+   which load after this file. */
+.stage-answer .stage-answer__text table th,
+.stage-answer .stage-answer__text table td {
+  padding: 6px 10px 6px 0;
   text-align: left;
   vertical-align: top;
   /* Wrap between words; a word never breaks, so a label column keeps its longest word's width. */
@@ -187,8 +189,8 @@
   border-bottom: 1px solid var(--hairline);
   font-variant-numeric: tabular-nums;
 }
-.stage-answer__text th:last-child,
-.stage-answer__text td:last-child {
+.stage-answer .stage-answer__text table th:last-child,
+.stage-answer .stage-answer__text table td:last-child {
   padding-right: 0;
 }
 .stage-answer__text th {
