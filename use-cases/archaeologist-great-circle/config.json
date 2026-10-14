@@ -1,0 +1,117 @@
+{
+  "name": "The Great Circle, measured",
+  "description": "The Great Circle Earthworks measured across on 1 m LiDAR: 362 m bank to bank, the bank and the interior ditch in metres, beside the record",
+  "location": "Newark, Ohio",
+  "user_question": "How big is the Great Circle, and how was it built?",
+  "agent": "archaeologist",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "ai_archaeologist_dev",
+  "tool_calls": [
+    {
+      "name": "find_known_site",
+      "params": {
+        "name": "Great Circle Earthworks"
+      },
+      "result": "Site found on the public record"
+    },
+    {
+      "name": "show_terrain",
+      "params": {
+        "site_id": "newark-great-circle",
+        "product": "lrm"
+      },
+      "result": "1 m LiDAR terrain from the cache"
+    },
+    {
+      "name": "measure_profile",
+      "params": {
+        "site_id": "newark-great-circle"
+      },
+      "result": "Transect measured on the 1 m DEM"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/archaeologist-great-circle/lrm_newark-great-circle.tif",
+        "title": "Great Circle Earthworks, local relief model",
+        "question": "What does the circular enclosure, its walls, interior ditch, and central mound look like?"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/archaeologist-great-circle/lrm_newark-great-circle.tif",
+        "title": "Great Circle Earthworks, local relief model",
+        "description": "USGS 3DEP 1 m bare-earth DEM, Ohio Statewide Phase 2 2020. Red = higher than surroundings (bank); blue = lower (ditch).",
+        "render": {
+          "kind": "raster",
+          "colormap": "rdbu_r",
+          "rescale": [
+            -1.0,
+            1.0
+          ],
+          "units": "m",
+          "group": "terrain",
+          "legend": "Local relief",
+          "bounds": [
+            -82.447979,
+            40.027501,
+            -82.412259,
+            40.054956
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/archaeologist-great-circle/profile_newark-great-circle.geojson",
+        "title": "Great Circle Earthworks, transect",
+        "description": "Verified east-west transect, 430 m total. Banks and ditches marked.",
+        "render": {
+          "kind": "vector",
+          "group": "terrain",
+          "label": "label"
+        }
+      },
+      "result": "Shown on the map"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "lrm_newark-great-circle.tif",
+        "title": "Great Circle Earthworks, local relief model",
+        "render": {
+          "kind": "raster",
+          "colormap": "rdbu_r",
+          "rescale": [
+            -1.0,
+            1.0
+          ],
+          "units": "m",
+          "group": "terrain",
+          "legend": "Local relief",
+          "bounds": [
+            -82.447979,
+            40.027501,
+            -82.412259,
+            40.054956
+          ]
+        }
+      },
+      {
+        "file": "profile_newark-great-circle.geojson",
+        "title": "Great Circle Earthworks, transect",
+        "render": {
+          "kind": "vector",
+          "group": "terrain",
+          "label": "label"
+        }
+      }
+    ]
+  }
+}

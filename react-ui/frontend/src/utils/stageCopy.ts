@@ -50,6 +50,16 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
     ],
     placeholder: 'Ask for a Methane Watch brief, or name a region and a year',
   },
+  // The AI Archaeologist's three beats (design.md, Act 4 run sheet); known sites only, so the
+  // placeholder asks for a name on the record, never for "any place".
+  archaeologist: {
+    prompts: [
+      { label: 'The Octagon, from space', prompt: 'Show me the Newark Octagon the way an archaeologist sees it' },
+      { label: 'Measure the Great Circle', prompt: 'How big is the Great Circle, and how was it built?' },
+      { label: 'Where else, like this', prompt: 'Where else did they build like this?' },
+    ],
+    placeholder: 'Name a known site, or ask how they built it',
+  },
 };
 
 export function stageCopyFor(agentId: string | undefined): AgentStageCopy {
@@ -91,6 +101,11 @@ const STEP_NAMES: Record<string, string> = {
   thermal_anomalies: 'Check for heat',
   nearby_infrastructure: 'Check what is mapped nearby',
   registry_lookup: 'Check the public registry',
+  // The AI Archaeologist's four tools.
+  find_known_site: 'Look up the public record',
+  show_terrain: 'Show the 1 m LiDAR',
+  measure_profile: 'Measure across the earthwork',
+  find_similar_sites: 'Find sites of the same form',
 };
 
 export function stepName(toolName: string): string {

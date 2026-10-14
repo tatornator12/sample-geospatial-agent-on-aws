@@ -3,6 +3,7 @@
  */
 
 import type { RenderHint } from './render.ts';
+import { isTerrainLayer } from './archaeoLayers.ts';
 
 export interface LayerMetadata {
   id: string;
@@ -248,6 +249,9 @@ export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 
  */
 export function layerRowLabel(layer: LayerMetadata): string {
   if (isMethaneLayer(layer)) return layer.name;
+  // The archaeologist's terrain keeps the tool's title ("Great Circle, LiDAR hillshade"); the
+  // scene cleaner would read "of" patterns into it.
+  if (isTerrainLayer(layer)) return layer.name;
   if (isSimilarityLayer(layer)) return formatSimilarityLabel(layer);
   if (layer.type === 'geometry') return layer.name;
   return formatLayerDisplayText(layer, 'tci');

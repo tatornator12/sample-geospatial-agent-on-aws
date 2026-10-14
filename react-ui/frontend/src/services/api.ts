@@ -258,6 +258,20 @@ export async function loadMethaneBaseline(): Promise<GeometryData | null> {
 }
 
 /**
+ * The AI Archaeologist's record: one point per site in its catalogue (all already on the public
+ * record), for the map the stage shows before the first prompt. Null when it is not published.
+ */
+export async function loadArchaeologyRecord(): Promise<GeometryData | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/archaeology/record`, { headers: getAuthHeaders() });
+    if (!response.ok) return null;
+    return (await response.json()) as GeometryData;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Ask the backend to boot the runtime for a session before the first prompt (fire and forget).
  * Returns true when the backend accepted the request; never throws.
  */

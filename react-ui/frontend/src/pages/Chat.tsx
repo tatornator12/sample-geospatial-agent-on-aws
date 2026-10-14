@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
-import { getApiUrl, loadMethaneBaseline, prewarmSession } from '../services/api';
+import { getApiUrl, loadArchaeologyRecord, loadMethaneBaseline, prewarmSession } from '../services/api';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { MapView } from '../components/MapView';
@@ -358,6 +358,25 @@ export function Chat() {
         locationName: 'EMIT Methane Watch: global repeat sites',
         sourceUrl: 's3://methane-baseline/watch_sites_v002.geojson',
         render: { kind: 'points', group: 'watch', property: 'repeat_dates', label: 'repeat_dates', units: 'dates' },
+      });
+    });
+    return () => { cancelled = true; };
+  }, [selectedAgentId, sessionId, scenarioId, mapReady]);
+
+  // The AI Archaeologist's resting state is the record: every site in its catalogue as a fog mark
+  // over the eastern United States, so the room sees "known sites" before a word is said. Every
+  // one is already on the public record; the agent can show nothing else. The first prompt dives
+  // to the ground; a replay case brings its own layers.
+  useEffect(() => {
+    if (selectedAgentId !== 'archaeologist' || scenarioId || !mapReady) return;
+    let cancelled = false;
+    void loadArchaeologyRecord().then((record) => {
+      if (cancelled || !record) return;
+      setCurrentGeometry((current) => current ?? {
+        ...record,
+        locationName: 'Sites on the public record',
+        sourceUrl: 's3://archaeology-record/sites_public.geojson',
+        render: { kind: 'points', group: 'terrain', label: 'name' },
       });
     });
     return () => { cancelled = true; };

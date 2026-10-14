@@ -77,6 +77,32 @@ const scenarios: Scenario[] = [
     status: 'available',
     agent: 'methane',
   },
+  {
+    id: 'archaeologist-newark',
+    name: 'Newark Earthworks',
+    description: 'The Octagon Earthworks from space, then under the grass: 1 m LiDAR shows the eight-sided enclosure and its circle beneath a former golf course. A site already on the World Heritage list.',
+    icon: '/newark_earthworks.png',
+    // From the public record (Ohio History Connection; UNESCO 2023).
+    metrics: [
+      { label: 'Octagon Encloses', value: '50 acres (documented)' },
+      { label: 'Designation', value: 'World Heritage, 2023' },
+    ],
+    status: 'available',
+    agent: 'archaeologist',
+  },
+  {
+    id: 'archaeologist-great-circle',
+    name: 'The Great Circle, measured',
+    description: 'The Great Circle Earthworks measured across on 1 m LiDAR: the bank and the interior ditch in metres, beside what the record says',
+    icon: '/great_circle.png',
+    // The recorded take (dev): 362 m measured bank to bank; the record says nearly 1,200 ft (about 366 m).
+    metrics: [
+      { label: 'Bank to Bank', value: '362 m (366 m documented)' },
+      { label: 'Bank and Ditch', value: '+2.6 m, −2.7 m' },
+    ],
+    status: 'available',
+    agent: 'archaeologist',
+  },
 ];
 
 export function UseCaseGallery() {

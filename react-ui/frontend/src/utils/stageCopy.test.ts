@@ -14,6 +14,14 @@ describe('stageCopyFor', () => {
     expect(copy.placeholder).toBe('Ask for a Methane Watch brief, or name a region and a year');
   });
 
+  it('gives the AI Archaeologist its three beats and a placeholder that asks for a known site (Week 5)', () => {
+    const copy = stageCopyFor('archaeologist');
+    expect(copy.prompts.map((p) => p.label)).toEqual(['The Octagon, from space', 'Measure the Great Circle', 'Where else, like this']);
+    expect(copy.prompts.every((p) => !p.fill)).toBe(true);
+    expect(copy.placeholder).toBe('Name a known site, or ask how they built it');
+    expect(copy.placeholder).not.toMatch(/any place/i);
+  });
+
   it('falls back to the Earth Analyst for dev, stable, unknown and absent ids', () => {
     const earth = stageCopyFor(undefined);
     expect(earth.prompts).toHaveLength(5);
@@ -36,6 +44,10 @@ describe('stepName', () => {
   it('names what the agent is doing, and falls back to the spaced tool name', () => {
     expect(stepName('create_bbox_from_coordinates')).toBe('Frame the ground');
     expect(stepName('triage_plumes')).toBe('Rank by methane');
+    expect(stepName('find_known_site')).toBe('Look up the public record');
+    expect(stepName('show_terrain')).toBe('Show the 1 m LiDAR');
+    expect(stepName('measure_profile')).toBe('Measure across the earthwork');
+    expect(stepName('find_similar_sites')).toBe('Find sites of the same form');
     expect(stepName('some_new_tool')).toBe('some new tool');
     expect(stepName('constructor')).toBe('constructor');
   });

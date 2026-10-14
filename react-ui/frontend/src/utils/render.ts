@@ -15,10 +15,11 @@
 export type RenderKind = 'raster' | 'vector' | 'points' | 'columns';
 export const RENDER_KINDS: readonly RenderKind[] = ['raster', 'vector', 'points', 'columns'];
 
-export const COLORMAPS = ['plasma', 'viridis', 'magma', 'ice', 'rdylgn', 'rdylgn_r', 'blues', 'spectral'] as const;
+// `gray` and `rdbu_r` are the AI Archaeologist's terrain products (a hillshade, a local relief model).
+export const COLORMAPS = ['plasma', 'viridis', 'magma', 'ice', 'rdylgn', 'rdylgn_r', 'blues', 'spectral', 'gray', 'rdbu_r'] as const;
 export type ColormapName = (typeof COLORMAPS)[number];
 
-export const RENDER_GROUPS = ['methane', 'watch', 'change', 'similar', 'imagery', 'index', 'boundary'] as const;
+export const RENDER_GROUPS = ['methane', 'watch', 'change', 'similar', 'imagery', 'index', 'boundary', 'terrain'] as const;
 export type RenderGroup = (typeof RENDER_GROUPS)[number];
 
 export interface RenderHint {
@@ -149,6 +150,10 @@ export const RAMP_ANCHORS: Partial<Record<ColormapName, string[]>> = {
   rdylgn_r: ['#006837', '#66bd63', '#ffffbf', '#f46d43', '#a50026'],
   blues: ['#f7fbff', '#c6dbef', '#6baed6', '#2171b5', '#08306b'],
   spectral: ['#9e0142', '#f46d43', '#ffffbf', '#66c2a5', '#5e4fa2'],
+  // The archaeologist's terrain, as TiTiler draws them (its colorMaps entries 0, 64, 128, 191, 255):
+  // a hillshade's greys, and ColorBrewer RdBu reversed for the local relief (ditch blue, bank red).
+  gray: ['#000000', '#404040', '#808080', '#bfbfbf', '#ffffff'],
+  rdbu_r: ['#053061', '#6bacd0', '#f7f6f6', '#e58368', '#67001f'],
 };
 
 /**

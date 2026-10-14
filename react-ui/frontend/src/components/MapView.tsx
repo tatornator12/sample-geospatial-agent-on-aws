@@ -6,7 +6,7 @@ import MapboxDraw from 'maplibre-gl-draw';
 import 'maplibre-gl-draw/dist/mapbox-gl-draw.css';
 import { getPresignedUrl } from '../services/api.ts';
 import type { GeometryData, RasterData } from '../types.ts';
-import { TITILER_URL, TITILER_API_KEY } from '../config.ts';
+import { TITILER_URL, TITILER_API_KEY, TERRAIN_TILES_URL } from '../config.ts';
 import {
   boundsWithin,
   findComparePair,
@@ -36,6 +36,21 @@ import {
   type StackLegend,
   type StackPlace,
 } from '../utils/layerStack.ts';
+import {
+  FRAME_MAX_ZOOM,
+  GROUND_BEARING,
+  GROUND_PITCH,
+  MARKS_MAX_ZOOM,
+  RELIEF_EXAGGERATION,
+  TRANSECT_MAX_ZOOM,
+  isTerrainLayer,
+  marksBounds,
+  signedMetres,
+  siteWindow,
+  terrainGeometryHint,
+  terrainRasterHint,
+  transectParts,
+} from '../utils/archaeoLayers.ts';
 import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
 import { Starfield } from './Starfield.tsx';
 import type { Tip } from '../utils/steps.ts';
@@ -64,6 +79,8 @@ const COLUMNS_PITCH = 55;
 const COARSE_RASTER_OPACITY = 0.75;
 
 const TIPS_SOURCE = 'watch-tips';
+// The archaeologist's ground: the terrain-RGB source the 1 m products are draped on.
+const GROUND_SOURCE = 'ground-dem';
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -188,6 +205,48 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       mapInstance.off('touchend', release);
     };
   }, [globeOn, working]);
+
+  // The archaeologist's ground: on when the first terrain product lands, off when the map is
+  // cleared. The map stands up its 3D terrain (a global terrain-RGB source, relief ×3, the
+  // hillshade or relief draped on it), the camera reads it from a low oblique angle looking
+  // north-east across the hillshade's light, and a metre scale sits above the basemap plate.
+  // The other acts never see any of this: the Earth Analyst is flat, the Methane Hunter orbits.
+  const [groundOn, setGroundOn] = useState(false);
+  const groundOnRef = useRef(false);
+  const scaleControl = useRef<maplibregl.ScaleControl | null>(null);
+  useEffect(() => {
+    groundOnRef.current = groundOn;
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const apply = () => {
+      if (groundOn) {
+        if (!mapInstance.getSource(GROUND_SOURCE)) {
+          mapInstance.addSource(GROUND_SOURCE, {
+            type: 'raster-dem',
+            tiles: [TERRAIN_TILES_URL],
+            encoding: 'terrarium',
+            tileSize: 256,
+            maxzoom: 15,
+            attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP)',
+          });
+        }
+        mapInstance.setTerrain({ source: GROUND_SOURCE, exaggeration: RELIEF_EXAGGERATION });
+        if (!scaleControl.current) {
+          scaleControl.current = new maplibregl.ScaleControl({ maxWidth: 160, unit: 'metric' });
+          mapInstance.addControl(scaleControl.current, 'bottom-right');
+        }
+      } else {
+        if (mapInstance.getTerrain()) mapInstance.setTerrain(null);
+        if (mapInstance.getSource(GROUND_SOURCE)) mapInstance.removeSource(GROUND_SOURCE);
+        if (scaleControl.current) {
+          mapInstance.removeControl(scaleControl.current);
+          scaleControl.current = null;
+        }
+      }
+    };
+    if (mapInstance.isStyleLoaded()) apply();
+    else mapInstance.once('styledata', apply);
+  }, [groundOn]);
 
   // The tips on the globe: one mark per scanned watch area at its hotspot (or its centre when the
   // scan found none), sized and coloured by the anomaly on the TROPOMI legend's own ramp (ice),
@@ -370,12 +429,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   // for a regional change scan: its grid of squares vanished into the satellite basemap at state
   // scale, so the ground dims while the scan is the finding. Runs after the basemap effect above,
   // so a basemap switch mid-act comes back dimmed too.
+  // And for the archaeologist's terrain: the hillshade is the lit specimen, the satellite ground
+  // around its 3 km frame recedes to monochrome.
   const methaneOnStage = useMemo(
     () => layerGroups.methane.some((l) => rasterVisibility[l.id] !== false)
       || layerGroups.changeDetection.some((l) => rasterVisibility[l.id] !== false)
       // The regional scan's grid (scan_hotspots_*.geojson, cells with a change_score).
-      || layerGroups.geometries.some((l) => /scan_hotspots|change_score/.test(l.url) && rasterVisibility[l.id] !== false),
-    [layerGroups.methane, layerGroups.changeDetection, layerGroups.geometries, rasterVisibility]
+      || layerGroups.geometries.some((l) => /scan_hotspots|change_score/.test(l.url) && rasterVisibility[l.id] !== false)
+      || allLayers.some((l) => l.type === 'raster' && isTerrainLayer(l) && rasterVisibility[l.id] !== false),
+    [layerGroups.methane, layerGroups.changeDetection, layerGroups.geometries, allLayers, rasterVisibility]
   );
   useEffect(() => {
     methaneOnStageRef.current = methaneOnStage;
@@ -429,6 +491,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     map.current.on('zoomend', () => {
       if (map.current) setZoom(map.current.getZoom());
     });
+    // The headless capture harness reads the camera through this in a dev build; never in production.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __stageCamera?: () => unknown }).__stageCamera = () => {
+        const m = map.current;
+        if (!m) return null;
+        const c = m.getCenter();
+        return { zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing(), lon: c.lng, lat: c.lat, terrain: !!m.getTerrain() };
+      };
+    }
 
     // Handle WebGL context loss - recreate map if context can't be restored
     const canvas = map.current.getCanvas();
@@ -557,6 +628,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         // columns, by the validated hint or by the tools' own file names.
         const methaneHint: RenderHint | null = methaneGeometryHint(geometry.render, geometry.sourceUrl);
         const isMethane = methaneHint !== null;
+        // The archaeologist's vectors: the transect across an earthwork, a site's frame, and the
+        // catalogue's marks at rest. Fog, never a data ramp: these are places on the record.
+        const terrainHint: RenderHint | null = isMethane ? null : terrainGeometryHint(geometry.render, geometry.sourceUrl);
+        const isTerrain = terrainHint !== null;
 
         try {
           currentMap.addSource(geometryId, {
@@ -577,7 +652,133 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             geometry.features.some((f: any) =>
               f?.properties && f.properties.__layer_type === 'protected_area');
 
-          if (methaneHint?.kind === 'points') {
+          if (terrainHint?.kind === 'points') {
+            // The record at rest: a fog dot per catalogue site, a ring on a World Heritage one, the
+            // name in mono beside it where it fits (the Hopewell cluster thins itself out). Gone
+            // once the camera dives to a site.
+            const heritage: maplibregl.FilterSpecification = ['==', ['get', 'world_heritage'], true];
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'circle',
+              source: geometryId,
+              maxzoom: MARKS_MAX_ZOOM,
+              paint: {
+                'circle-color': '#e9eef3',
+                'circle-opacity': 0.9,
+                'circle-radius': 4,
+                'circle-pitch-alignment': 'map',
+              },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'circle',
+              source: geometryId,
+              filter: heritage,
+              maxzoom: MARKS_MAX_ZOOM,
+              paint: {
+                'circle-opacity': 0,
+                'circle-radius': 9,
+                'circle-stroke-color': '#e9eef3',
+                'circle-stroke-width': 2,
+                'circle-stroke-opacity': 0.9,
+                'circle-pitch-alignment': 'map',
+              },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: `${geometryId}-labels`,
+              type: 'symbol',
+              source: geometryId,
+              maxzoom: MARKS_MAX_ZOOM,
+              layout: {
+                'symbol-sort-key': ['case', heritage, 0, 1],
+                'text-field': ['get', terrainHint.label ?? 'name'],
+                'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+                'text-size': 15,
+                'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
+                'text-radial-offset': 0.9,
+                'text-justify': 'auto',
+                'text-padding': 6,
+                'text-optional': true,
+                visibility: 'visible',
+              },
+              paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2 },
+            });
+          } else if (isTerrain && terrainHint.label) {
+            // The transect: a fog line across the earthwork, a mark where each bank and ditch was
+            // read, and the tool's own label beside it ("bank +1.8 m", "ditch −2.5 m") in mono.
+            const { marks } = transectParts(geometry.features as Parameters<typeof transectParts>[0]);
+            const isLine: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'LineString'];
+            const isBank: maplibregl.FilterSpecification = ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'bank']];
+            const isDitch: maplibregl.FilterSpecification = ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'ditch']];
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'line',
+              source: geometryId,
+              filter: isLine,
+              paint: { 'line-color': '#e9eef3', 'line-width': 2, 'line-opacity': 0.9 },
+              layout: { visibility: 'visible', 'line-cap': 'round' },
+            });
+            // A bank is a filled dot (the ground rises), a ditch a ring (the ground drops).
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'circle',
+              source: geometryId,
+              filter: isBank,
+              paint: { 'circle-color': '#e9eef3', 'circle-radius': 5, 'circle-opacity': 0.95, 'circle-pitch-alignment': 'map' },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: `${geometryId}-hairline`,
+              type: 'circle',
+              source: geometryId,
+              filter: isDitch,
+              paint: {
+                'circle-opacity': 0,
+                'circle-radius': 5,
+                'circle-stroke-color': '#e9eef3',
+                'circle-stroke-width': 2,
+                'circle-stroke-opacity': 0.95,
+                'circle-pitch-alignment': 'map',
+              },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: `${geometryId}-labels`,
+              type: 'symbol',
+              source: geometryId,
+              filter: ['==', ['geometry-type'], 'Point'],
+              layout: {
+                'text-field': ['get', terrainHint.label],
+                'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+                'text-size': 18,
+                'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+                'text-radial-offset': 0.8,
+                'text-justify': 'auto',
+                'text-padding': 4,
+                'text-allow-overlap': marks.length <= 6,
+                visibility: 'visible',
+              },
+              paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2.5 },
+            });
+          } else if (isTerrain) {
+            // A site's frame: a dashed fog hairline, nothing filled; the ground inside it is the finding.
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'fill',
+              source: geometryId,
+              paint: { 'fill-color': '#e9eef3', 'fill-opacity': 0 },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'line',
+              source: geometryId,
+              paint: { 'line-color': '#e9eef3', 'line-opacity': 0.5, 'line-width': 1.5, 'line-dasharray': [3, 2] },
+              layout: { visibility: 'visible' },
+            });
+          } else if (methaneHint?.kind === 'points') {
             // The watch baseline on the globe: every site a small fog dot, sites seen on five or
             // more dates ringed and labelled "×N", the watch areas as dashed hairlines. Counts and
             // shapes only: no names. Fog, not plasma: dates are a count, not a measurement.
@@ -1010,13 +1211,40 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           url: geometry.sourceUrl || JSON.stringify(geometry.features).substring(0, 200),
           type: 'geometry',
           bounds: boundsArray,
-          ...(methaneHint ? { render: methaneHint } : {}),
+          ...(methaneHint ? { render: methaneHint } : terrainHint ? { render: terrainHint } : {}),
         }]);
         // A new vector lands on top; the watch baseline (sites, rings, watch areas) lands under the
         // other vectors and over the imagery, so the columns and footprints read over it.
         placeInStack(fillLayerId, isMethane && methaneHint?.kind === 'points' ? 'aboveImagery' : 'top');
         
         console.log(`✅ Geometry added:`, name, `bounds:`, boundsArray);
+
+        if (isTerrain) {
+          // One record on the map at a time (a reset re-lands it); a second transect of the same
+          // site replaces the first.
+          allLayersRef.current
+            .filter((l) => l.type === 'geometry' && l.id !== fillLayerId && isTerrainLayer(l) &&
+              (terrainGeometryHint(l.render, l.url)?.kind ?? 'vector') === terrainHint.kind &&
+              (terrainHint.kind === 'points' || !!terrainGeometryHint(l.render, l.url)?.label === !!terrainHint.label))
+            .forEach((l) => removeLayer(l.id));
+          if (terrainHint.kind === 'points') {
+            // The record at rest: the whole catalogue in the frame, flat and north-up, clear of the plates.
+            const all = marksBounds(geometry.features as Parameters<typeof marksBounds>[0]) ?? boundsArray;
+            currentMap.fitBounds([[all[0], all[1]], [all[2], all[3]]], {
+              padding: STAGE_PADDING_NOW(), duration: 1800, maxZoom: 6, pitch: 0, bearing: 0,
+            });
+          } else if (terrainHint.label) {
+            // The transect: the camera comes down to the earthwork, on the ground's own tilt.
+            currentMap.fitBounds(bounds, {
+              padding: STAGE_PADDING_NOW(), duration: 1800, maxZoom: TRANSECT_MAX_ZOOM,
+              pitch: groundOnRef.current ? GROUND_PITCH : 0, bearing: groundOnRef.current ? GROUND_BEARING : 0,
+            });
+          } else if (!groundOnRef.current) {
+            // A site's frame before any terrain: frame it flat; the terrain that follows tilts the view.
+            currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: FRAME_MAX_ZOOM });
+          }
+          return;
+        }
 
         // The ranked footprints replace the detected ones (same plumes, now measured): one set of
         // outlines on the stage, never two stacked.
@@ -1077,7 +1305,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         } else {
           // Every act frames its finding clear of the plates (the step column, the caption band,
           // the layers plate), so what the camera lands on is what the room sees.
-          currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 15 });
+          currentMap.fitBounds(bounds, {
+            padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 15,
+            ...(groundOnRef.current ? { pitch: GROUND_PITCH, bearing: GROUND_BEARING } : {}),
+          });
           console.log(`🎯 fitBounds called`);
         }
       };
@@ -1157,7 +1388,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       {
         padding: STAGE_PADDING_NOW(),
         duration: 1500,
-        maxZoom: typeof cap === 'number' ? Math.max(1, cap - 0.5) : 15,
+        maxZoom: typeof cap === 'number' ? Math.max(1, cap - 0.5) : groundOnRef.current ? TRANSECT_MAX_ZOOM : 15,
+        // On the archaeologist's ground every flight keeps the low oblique view.
+        ...(groundOnRef.current ? { pitch: GROUND_PITCH, bearing: GROUND_BEARING } : {}),
       }
     );
     
@@ -1296,8 +1529,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     setLayerOrder([]);
     addedRasterUrls.current.clear(); // Clear the URL tracking ref
     plumeFramed.current = false;
-    // Back to the flat, upright map the other acts expect.
+    // Back to the flat, upright map the other acts expect: no globe, no ground.
     setGlobeOn(false);
+    groundOnRef.current = false;
+    setGroundOn(false);
     if (mapInstance.getPitch() !== 0 || mapInstance.getBearing() !== 0) mapInstance.easeTo({ pitch: 0, bearing: 0, duration: 600 });
 
     console.log(`🗑️ Cleared ${count} layers`);
@@ -1451,11 +1686,18 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // A methane plume raster: by its validated hint, or by the tool's own file name.
           const probe: LayerMetadata = { id: '', sourceId: '', name: raster.name, url: raster.url, type: 'raster', render: raster.render };
           const isMethaneRaster = isMethaneLayer(probe);
+          // The archaeologist's terrain (a hillshade, a local relief model), by hint or file name.
+          const terrainHint = isMethaneRaster ? null : terrainRasterHint(raster.render, raster.url);
+          const isTerrainRaster = terrainHint !== null;
           const hint: RenderHint | undefined =
-            methaneRasterHint(raster.render, raster.url) ?? raster.render ?? (isMethaneRaster ? METHANE_RASTER : undefined);
-          // The camera follows the methane act: the plume on arrival, then the ground scene after it.
+            methaneRasterHint(raster.render, raster.url) ?? terrainHint ?? raster.render ?? (isMethaneRaster ? METHANE_RASTER : undefined);
+          // The camera follows the methane act (the plume on arrival, then the ground scene after
+          // it) and the archaeologist's: the scene "from space" lands flat on the site, then every
+          // terrain product lands on the ground, tilted. The record on the stage marks that act.
+          const inArchaeoAct = isTerrainRaster || groundOnRef.current ||
+            allLayersRef.current.some(isTerrainLayer) || newLayerMetadata.some(isTerrainLayer);
           const followCamera =
-            isMethaneRaster ||
+            isMethaneRaster || inArchaeoAct ||
             allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l)) ||
             newLayerMetadata.some((l) => isMethaneLayer(l));
           const hintParams = tileParamsFor(hint);
@@ -1529,7 +1771,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // and other scenes join the bottom, just above the basemap, so an NDVI displayed after
           // its scene is never hidden under it. The layers plate lists the stack in the order the
           // map draws it, and the presenter can restack anything from there.
-          const isFinding = isMethaneRaster || indexLegendFor(raster.url) !== null
+          const isFinding = isMethaneRaster || isTerrainRaster || indexLegendFor(raster.url) !== null
             || hint?.group === 'index' || hint?.group === 'change';
 
           // A coarse raster (the hint caps its zoom: TROPOMI's ~4 km cells) is hidden above that
@@ -1566,20 +1808,33 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           addedRasterUrls.current.add(raster.url);
 
 
+          // The archaeologist's ground stands up under the first terrain product and stays until
+          // the map is cleared; a second site's products land on the same ground.
+          if (isTerrainRaster && !groundOnRef.current) {
+            groundOnRef.current = true;
+            setGroundOn(true);
+          }
+
           // The camera moves to the finding: the plume fills the frame; the ground scene after it
-          // tightens a little further. Only in the methane act; other acts keep today's framing.
+          // tightens a little further. In the methane act and the archaeologist's; other acts keep
+          // today's framing.
           if (followCamera && rasterBounds) {
             plumeFramed.current = true;
-            const [w, s, e, n] = rasterBounds;
+            // On the ground the camera lands on the site in the middle of its 3 km frame, not on the
+            // frame (a replay adds the scene after the hillshade, so this holds for any raster once
+            // the ground is up); the scene "from space" before any terrain still frames the whole clip.
+            const [w, s, e, n] = groundOnRef.current ? siteWindow(rasterBounds) : rasterBounds;
             // A coarse raster frames below its own cap so it is still on screen when the camera lands.
-            const cap = coarse ? Math.max(1, hint!.max_zoom! - 0.5) : isMethaneRaster ? 13 : 14;
-            // With the 3D columns on the stage the frame keeps their tilt; otherwise it is flat.
+            const cap = coarse ? Math.max(1, hint!.max_zoom! - 0.5) : inArchaeoAct ? FRAME_MAX_ZOOM : isMethaneRaster ? 13 : 14;
+            // With the 3D columns on the stage the frame keeps their tilt; on the archaeologist's
+            // ground it takes the low oblique view; otherwise it is flat.
             const columnsOnStage = allLayersRef.current.some((l) => methaneGeometryHint(l.render, l.url)?.kind === 'columns');
             mapInstance.fitBounds([[w, s], [e, n]], {
               padding: STAGE_PADDING_NOW(),
               duration: 1800,
               maxZoom: cap,
-              pitch: columnsOnStage ? COLUMNS_PITCH : 0,
+              pitch: groundOnRef.current ? GROUND_PITCH : columnsOnStage ? COLUMNS_PITCH : 0,
+              ...(groundOnRef.current ? { bearing: GROUND_BEARING } : {}),
             });
           }
 
@@ -1773,6 +2028,48 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         </div>
       );
     }
+    if (lg.kind === 'relief') {
+      // The archaeologist's local relief: the ground below its surroundings reads blue, above
+      // reads red; the ends in signed metres (±1 m for standing walls, ±0.3 m for ploughed ones).
+      const lo = signedMetres(lg.lo, lg.units);
+      const hi = signedMetres(lg.hi, lg.units);
+      return (
+        <div key={lg.key} className="map-legend map-legend--stacked">
+          <span className="map-legend__name">{lg.label}</span>
+          <div
+            className="map-legend__bar"
+            role="img"
+            aria-label={`Colour ramp: ${lg.label}, blue is ground lower than its surroundings down to ${lo}, red is higher up to ${hi}`}
+          >
+            <span className="map-legend__label">
+              lower <span className="map-legend__num">{lo}</span>
+            </span>
+            <span className="map-legend__ramp" style={{ background: rampGradient(lg.ramp) ?? undefined }} aria-hidden="true" />
+            <span className="map-legend__label">
+              <span className="map-legend__num">{hi}</span> higher
+            </span>
+          </div>
+        </div>
+      );
+    }
+    if (lg.kind === 'hillshade') {
+      return (
+        <div key={lg.key} className="map-legend map-legend--stacked">
+          <span className="map-legend__name">Hillshade</span>
+          <span className="map-legend__label">1 m LiDAR, lit from the north-west: banks cast shadows, ditches catch them</span>
+        </div>
+      );
+    }
+    if (lg.kind === 'record') {
+      return (
+        <div key={lg.key} className="map-legend map-legend--sites" role="img" aria-label="A dot is a site on the public record; a ring marks a World Heritage site">
+          <span className="map-legend__dot" aria-hidden="true" />
+          <span className="map-legend__label">on the public record</span>
+          <span className="map-legend__ring" aria-hidden="true" />
+          <span className="map-legend__label">World Heritage</span>
+        </div>
+      );
+    }
     return (
       <div key={lg.key} className="map-legend" role="img" aria-label="Colour ramp: lighter violet is less alike, deeper violet is more alike">
         <span className="map-legend__label">less alike</span>
@@ -1855,7 +2152,20 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
                 </div>
               )}
 
-              {legends.length > 0 && <div className="map-layers__legends">{legends.map(renderLegend)}</div>}
+              {(legends.length > 0 || groundOn) && (
+                <div className="map-layers__legends">
+                  {legends.map(renderLegend)}
+                  {groundOn && (
+                    // The archaeologist's ground is a stated viewing aid: the 3D relief is exaggerated,
+                    // the hillshade and relief draped on it are not.
+                    <div className="map-legend map-legend--ground">
+                      <span className="map-legend__label">
+                        ground relief <span className="map-legend__num">×{RELIEF_EXAGGERATION}</span>, read from the south-west
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {comparePair && (
                 <button type="button" className="stage-btn map-group__action" onClick={openCompare}>

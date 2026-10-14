@@ -167,12 +167,11 @@
   margin: 0 0 10px;
   padding-left: 20px;
 }
-/* A table in the answer (a ranking, a comparison): 15px, numbers in the mono face, scrolls sideways
-   inside the column rather than squeezing. */
+/* A table in the answer (a ranking, a comparison, measured beside documented): 15px, tabular
+   numbers, the whole table inside the column. Cells wrap; nothing scrolls sideways, because a
+   column the room cannot see is a column that is not there. */
 .stage-answer__text table {
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
+  width: 100%;
   border-collapse: collapse;
   margin: 0 0 10px;
   font-size: 15px;
@@ -182,9 +181,15 @@
 .stage-answer__text td {
   padding: 4px 8px 4px 0;
   text-align: left;
-  white-space: nowrap;
+  vertical-align: top;
+  /* Wrap between words; a word never breaks, so a label column keeps its longest word's width. */
+  overflow-wrap: break-word;
   border-bottom: 1px solid var(--hairline);
   font-variant-numeric: tabular-nums;
+}
+.stage-answer__text th:last-child,
+.stage-answer__text td:last-child {
+  padding-right: 0;
 }
 .stage-answer__text th {
   color: var(--label);
@@ -1305,6 +1310,37 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--fog);
+}
+/* A number inside a worded legend end (the archaeologist's "lower −1 m"): the same rule. */
+.map-legend__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fog);
+}
+/* The hillshade's key and the ground note wrap: they are sentences, not ramp ends. */
+.map-legend--stacked > .map-legend__label,
+.map-legend--ground .map-legend__label {
+  white-space: normal;
+  line-height: 1.35;
+}
+.map-legend--ground {
+  margin-top: 10px;
+}
+/* The metre scale on the archaeologist's ground: a plate above the basemap plate, the mono face. */
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale {
+  margin: 0 56px 72px 0;
+  padding: 4px 10px;
+  height: auto;
+  border: 1px solid var(--hairline-strong);
+  border-top: 1px solid var(--hairline-strong);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--plate) 88%, transparent);
+  color: var(--fog);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  box-shadow: 0 1px 2px rgba(3, 6, 10, 0.5);
 }
 
 /* Match popup rows: label left, number right in the mono face with tabular figures. */

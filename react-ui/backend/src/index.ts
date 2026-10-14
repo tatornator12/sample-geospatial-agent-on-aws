@@ -801,6 +801,27 @@ app.get('/api/methane/baseline', async (_req: Request, res: Response) => {
   }
 });
 
+// The AI Archaeologist's record: one point per catalogue site (name, culture, designation; every
+// one already on the public record), published beside its terrain cache by
+// scripts/publish_site_record.py. The stage puts it on the map the moment the act is chosen,
+// before any prompt. 404 until it is published.
+const SITE_RECORD_KEY = 'archaeology/cache/v1/sites_public.geojson';
+app.get('/api/archaeology/record', async (_req: Request, res: Response) => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  if (!bucket) return res.status(503).json({ error: 'S3 bucket not configured' });
+  try {
+    const collection = parseJson(await readS3Text(bucket, SITE_RECORD_KEY, 1_000_000)) as { type?: unknown; features?: unknown } | null;
+    if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) {
+      return res.status(404).json({ error: 'No site record published yet' });
+    }
+    res.set('Cache-Control', 'private, max-age=300');
+    return res.json(collection);
+  } catch (error) {
+    console.error('Site record read failed:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'Failed to read the site record' });
+  }
+});
+
 // The card for a draft: the live session's (sessionId), or a replay case's (caseId, never filed).
 app.get('/api/brief', async (req: Request, res: Response) => {
   const bucket = process.env.S3_BUCKET_NAME;

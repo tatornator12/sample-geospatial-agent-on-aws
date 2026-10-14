@@ -77,7 +77,8 @@
         "lat": 40.053658,
         "lon": -82.446061,
         "source": "https://whc.unesco.org/en/list/1689/maps/",
-        "verified": false
+        "verified": true,
+        "verification": "checked on the 1 m hillshade 2026-10-14: sits on the avenue between the circle (west) and the octagon (east), both inside the centre 1.2 km"
       },
       "frame_half_m": 1500,
       "transect": null,
@@ -115,7 +116,8 @@
         "lat": 39.403361,
         "lon": -84.09255,
         "source": "https://whc.unesco.org/en/list/1689/maps/",
-        "verified": false
+        "verified": true,
+        "verification": "checked on the 1 m hillshade 2026-10-14: mid-plateau; the walls follow the plateau edge around the ravines, within the 3 km frame"
       },
       "frame_half_m": 1500,
       "transect": null,
@@ -219,7 +221,8 @@
         "lat": 39.298561,
         "lon": -82.918489,
         "source": "https://whc.unesco.org/en/list/1689/maps/",
-        "verified": false
+        "verified": true,
+        "verification": "checked on the 1 m relief (±0.3 m) 2026-10-14: on the neck joining the circle (north-west) and the octagon (south-east); both read clearly in the centre 1.2 km"
       },
       "frame_half_m": 1500,
       "transect": null,
@@ -242,7 +245,8 @@
         "lat": 39.384792,
         "lon": -82.979156,
         "source": "https://whc.unesco.org/en/list/1689/maps/",
-        "verified": false
+        "verified": true,
+        "verification": "checked on the 1 m relief (±0.3 m) 2026-10-14: on the south wall of the circle; the square lies to the south-east, within the centre 1.2 km"
       },
       "frame_half_m": 1500,
       "transect": null,
@@ -279,7 +283,8 @@
         "lat": 39.237469,
         "lon": -83.219825,
         "source": "https://whc.unesco.org/en/list/1689/maps/",
-        "verified": false
+        "verified": true,
+        "verification": "checked on the 1 m relief (±0.3 m) 2026-10-14: 40 m south of the central Seip Mound, inside the great circle; the square and small circle read to the west and north"
       },
       "frame_half_m": 1500,
       "transect": null,
@@ -389,7 +394,8 @@
         "lat": 39.1131,
         "lon": -83.4063,
         "source": "https://en.wikipedia.org/wiki/Fort_Hill_State_Memorial",
-        "verified": false
+        "verified": true,
+        "verification": "checked on the 1 m hillshade 2026-10-14: on the hilltop plateau the wall encloses"
       },
       "frame_half_m": 1500,
       "transect": null,

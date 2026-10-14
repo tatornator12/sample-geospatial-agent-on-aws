@@ -10,6 +10,7 @@
  */
 import { isMethaneLayer, isSimilarityLayer, type LayerMetadata } from './layerFormatting.ts';
 import { indexLegendFor, type ColormapName } from './render.ts';
+import { isTerrainLayer, terrainLegend, terrainRasterHint } from './archaeoLayers.ts';
 
 /** Move one entry from `from` to `to` (both indexes in the same list); a copy, never in place. */
 export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
@@ -145,13 +146,26 @@ export type StackLegend =
   /** The watch baseline's dots and rings. */
   | { kind: 'sites'; key: 'sites' }
   /** The similarity map's violet ramp. */
-  | { kind: 'similar'; key: 'similar' };
+  | { kind: 'similar'; key: 'similar' }
+  /** The archaeologist's local relief: signed metres in the mono face, "lower" and "higher" in words. */
+  | { kind: 'relief'; key: string; label: string; ramp: ColormapName; lo: number; hi: number; units: string }
+  /** The archaeologist's hillshade: a key, not a ramp (grey is the ground lit from the north-west). */
+  | { kind: 'hillshade'; key: 'hillshade' }
+  /** The catalogue marks at rest: a dot per site on the public record, a ring on a World Heritage one. */
+  | { kind: 'record'; key: 'record' };
 
 const MEASURE_LABEL: Record<string, string> = { 'ppm·m': 'CH4 enhancement', ppb: 'CH4 anomaly' };
 
 /** The legend a layer reads by, or null (true colour, boundaries, drawn shapes). */
 export function layerLegend(layer: LayerMetadata): StackLegend | null {
   if (isSimilarityLayer(layer)) return { kind: 'similar', key: 'similar' };
+  if (isTerrainLayer(layer)) {
+    if (layer.type === 'geometry') return layer.render?.kind === 'points' ? { kind: 'record', key: 'record' } : null;
+    const legend = terrainLegend(terrainRasterHint(layer.render, layer.url));
+    if (!legend) return null;
+    if (legend.kind === 'hillshade') return { kind: 'hillshade', key: 'hillshade' };
+    return { kind: 'relief', key: `relief-${legend.hi}`, label: legend.label, ramp: 'rdbu_r', lo: legend.lo, hi: legend.hi, units: legend.units };
+  }
   if (isMethaneLayer(layer)) {
     const hint = layer.render;
     if (!hint) return null;
@@ -190,7 +204,7 @@ export function stackLegends(layersTopFirst: readonly LayerMetadata[], shown: (i
     seen.add(legend.key);
     out.push(legend);
   }
-  const isKey = (l: StackLegend) => (l.kind === 'sites' || l.kind === 'similar' ? 1 : 0);
+  const isKey = (l: StackLegend) => (l.kind === 'sites' || l.kind === 'similar' || l.kind === 'hillshade' || l.kind === 'record' ? 1 : 0);
   return out.sort((a, b) => isKey(a) - isKey(b));
 }
 
