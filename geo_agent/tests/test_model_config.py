@@ -18,7 +18,8 @@ def test_sonnet_4_6_keeps_the_low_temperature(monkeypatch):
 
 
 def test_models_that_deprecate_temperature_get_none(monkeypatch):
-    for model_id in ("us.anthropic.claude-sonnet-5", "us.anthropic.claude-opus-5", "us.anthropic.claude-fable-5-1"):
+    for model_id in ("us.anthropic.claude-sonnet-5", "us.anthropic.claude-sonnet-5-5", "us.anthropic.claude-opus-5",
+                     "us.anthropic.claude-opus-5-5", "us.anthropic.claude-haiku-5-5", "us.anthropic.claude-fable-5-1"):
         cfg = _reload_config(monkeypatch, model_id)
         assert cfg.model_kwargs() == {"model_id": model_id}, model_id
 

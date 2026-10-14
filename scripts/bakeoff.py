@@ -8,9 +8,12 @@ Prints pass rates, per-prompt seconds and the model's "what I see" sentences sid
 side, and writes the raw reports next to each other for the record.
 
 Usage:
-    python scripts/bakeoff.py [--models id1 id2 ...] [--only NAME] [--out DIR]
+    python scripts/bakeoff.py [--agent earth|methane|archaeologist] [--models id1 id2 ...]
+                              [--only NAME] [--out DIR]
 
-Dev only. The stable runtime is never touched by this script.
+Dev only. The stable runtime is never touched by this script. A model that rejects
+`temperature` (the Claude 5 generation, Fable) gets MODEL_TEMPERATURE=none on the runtime
+for its pass, so an image built before that family was known still runs it.
 """
 import argparse
 import json
@@ -27,10 +30,12 @@ from eval import resolve_agent_arn  # noqa: E402
 
 DEFAULT_MODELS = [
     "us.anthropic.claude-sonnet-4-6",
-    "us.anthropic.claude-sonnet-5",
-    "us.anthropic.claude-fable-5-1",
+    "us.anthropic.claude-sonnet-5-5",
+    "us.anthropic.claude-haiku-5-5",
 ]
 MODEL_ENV_KEYS = ("MODEL_ID", "BEDROCK_MODEL_ID")
+# Same families as geo_agent/config.py MODELS_WITHOUT_TEMPERATURE (probed on Bedrock 2026-10-14).
+NO_TEMPERATURE = ("claude-sonnet-5", "claude-opus-5", "claude-haiku-5", "claude-fable")
 
 
 def runtime_id(arn: str) -> str:
@@ -42,10 +47,13 @@ def get_runtime(control, rid: str) -> dict:
 
 
 def set_model(control, rid: str, current: dict, model_id: str) -> None:
-    """Env-only update: everything else copied from the current definition."""
+    """Env-only update: everything else copied from the current definition (including its own
+    MODEL_TEMPERATURE, which a no-temperature model overrides with "none" for its pass)."""
     env = dict(current["environmentVariables"])
     for key in MODEL_ENV_KEYS:
         env[key] = model_id
+    if any(m in model_id for m in NO_TEMPERATURE):
+        env["MODEL_TEMPERATURE"] = "none"
     control.update_agent_runtime(
         agentRuntimeId=rid,
         agentRuntimeArtifact={"containerConfiguration": {
@@ -65,9 +73,9 @@ def set_model(control, rid: str, current: dict, model_id: str) -> None:
     raise TimeoutError("runtime did not become READY within 5 minutes")
 
 
-def run_eval(model_id: str, only: str | None, out_dir: Path) -> dict:
-    report = out_dir / f"{model_id.replace('.', '_').replace(':', '_')}.json"
-    cmd = [sys.executable, str(REPO_ROOT / "scripts" / "eval.py"), "--target", "dev",
+def run_eval(model_id: str, only: str | None, out_dir: Path, agent: str) -> dict:
+    report = out_dir / f"{agent}__{model_id.replace('.', '_').replace(':', '_')}.json"
+    cmd = [sys.executable, str(REPO_ROOT / "scripts" / "eval.py"), "--target", "dev", "--agent", agent,
            "--json", str(report), "--label", model_id]
     if only:
         cmd += ["--only", only]
@@ -106,17 +114,19 @@ def print_comparison(reports: list[dict]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--agent", default="earth", choices=("earth", "methane", "archaeologist"),
+                        help="which agent's dev runtime and golden prompts (default: earth)")
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS)
     parser.add_argument("--only", help="run a single golden prompt by name")
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "docs" / "bakeoff")
     args = parser.parse_args()
 
-    arn = resolve_agent_arn("dev")
+    arn = resolve_agent_arn("dev", args.agent)
     rid = runtime_id(arn)
     control = boto3.client("bedrock-agentcore-control", region_name=arn.split(":")[3])
     current = get_runtime(control, rid)
     original_model = current["environmentVariables"].get("MODEL_ID")
-    print(f"dev runtime: {rid} (version {current['agentRuntimeVersion']}), current model {original_model}")
+    print(f"{args.agent} dev runtime: {rid} (version {current['agentRuntimeVersion']}), current model {original_model}")
     args.out.mkdir(parents=True, exist_ok=True)
 
     reports: list[dict] = []
@@ -124,7 +134,7 @@ def main() -> int:
         for model_id in args.models:
             print(f"\n--- switching dev to {model_id} ...", flush=True)
             set_model(control, rid, current, model_id)
-            reports.append(run_eval(model_id, args.only, args.out))
+            reports.append(run_eval(model_id, args.only, args.out, args.agent))
     finally:
         print(f"\n--- restoring dev to {original_model} ...", flush=True)
         set_model(control, rid, current, original_model)
@@ -133,7 +143,7 @@ def main() -> int:
 
     if reports:
         print_comparison(reports)
-        (args.out / "summary.json").write_text(json.dumps(reports, indent=1))
+        (args.out / f"summary-{args.agent}.json").write_text(json.dumps(reports, indent=1))
     return 0
 
 

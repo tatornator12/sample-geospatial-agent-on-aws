@@ -18,12 +18,13 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 # Bedrock Model Configuration
 MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-6")
-# MODEL_TEMPERATURE="none" (or empty) sends no temperature at all. Claude Sonnet 5, Opus 5 and
-# Fable reject the parameter ("`temperature` is deprecated for this model"); see
-# MODELS_WITHOUT_TEMPERATURE below, which omits it for those families automatically.
+# MODEL_TEMPERATURE="none" (or empty) sends no temperature at all. The Claude 5 generation
+# (Sonnet 5 and 5.5, Opus 5 and 5.5, Haiku 5.5) and Fable reject the parameter ("`temperature`
+# is deprecated for this model"; probed on Bedrock 2026-10-14); see MODELS_WITHOUT_TEMPERATURE
+# below, which omits it for those families automatically. Sonnet 4.6 and Haiku 4.5 still take it.
 _temperature_raw = os.getenv("MODEL_TEMPERATURE", "0.1").strip().lower()
 MODEL_TEMPERATURE = None if _temperature_raw in ("", "none") else float(_temperature_raw)
-MODELS_WITHOUT_TEMPERATURE = ("claude-sonnet-5", "claude-opus-5", "claude-fable")
+MODELS_WITHOUT_TEMPERATURE = ("claude-sonnet-5", "claude-opus-5", "claude-haiku-5", "claude-fable")
 
 
 def model_kwargs() -> dict:

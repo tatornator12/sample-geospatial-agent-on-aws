@@ -34,8 +34,18 @@ against the Sentinel-1 detections inside it; (2) "when can we look again": the n
 pass from ESA's published acquisition plan (availability to check in that spec's spike). No
 trained forecasting model and no accuracy claims.
 
-Backlog, strictly last (only if every act, the replay cases and rehearsal week are done):
-forecasting with weather data (the user, Oct 13). Not specced; nothing else waits on it.
+Backlog, in this order, after Dark Vessels and only if the replay cases and rehearsal week are
+done:
+1. **Archaeologist, bounded discovery** (the user, Oct 14). A mound detector on the 1 m local
+   relief model that runs only inside a known site's documented boundary and scores what it
+   finds against the record ("the LiDAR shows 23 mounds at Mound City; the record lists 23");
+   anything outside the recorded features is never drawn or counted aloud. Needs a boundary
+   source per site (the frames are plain 3 km squares; UNESCO component polygons or NPS unit
+   boundaries are the candidates) and a design decision added to the archaeologist spec. The
+   known-sites-only rule stands: no candidate outside a documented site is ever shown, and
+   general scanning of imagery for undiscovered sites is out (PRODUCT.md; looting, NHPA 304,
+   ARPA 9, tribal consultation).
+2. Forecasting with weather data (the user, Oct 13). Not specced; nothing else waits on it.
 
 Cut list if behind (in this order, never touching the foundation, eyes, similarity, replay
 cases or rehearsal week): live AIS (keep replay) → Archaeologist shrinks to a 90-second

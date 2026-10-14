@@ -126,3 +126,53 @@ a 23.7 s boot and the real prompt on that session reached its first tool call in
 the new image before anyone opens the stage) and a runtime that has sat idle for hours before
 the show. Runtimes also expose `lifecycleConfiguration.idleRuntimeSessionTimeout` (currently
 900 s); raising it for show day would keep warmed sessions alive across an act. Not changed yet.
+
+# Model bake-off 2 — 2026-10-14: Sonnet 5.5 and Haiku 5.5
+Bedrock in us-east-1 gained Claude Sonnet 5.5 (Sep 28) and Claude Haiku 5.5 (Oct 7); Fable 5
+and Opus 5.5 are also listed. Same method as September, now on all three dev runtimes at once
+(`scripts/bakeoff.py --agent earth|methane|archaeologist`), each agent's full golden set, one
+pass per model, Sonnet 4.6 restored at the end (dev versions earth 30, methane 41,
+archaeologist 11; stable untouched). Haiku 5.5 rejects `temperature` like the rest of the
+Claude 5 generation; `config.py` now omits it for `claude-haiku-5` too, and the bake-off sets
+`MODEL_TEMPERATURE=none` on the runtime for such a model so an older image still runs it.
+Fable 5 and 5.1 still fail in this account with the data-retention-mode error (unchanged).
+| | Sonnet 4.6 | Sonnet 5.5 | Haiku 5.5 |
+|---|---|---|---|
+| Earth Analyst (8) | **8/8**, 308 s | 7/8, 315 s | 8/8, 325 s |
+| Methane Hunter (12) | **12/12**, 388 s | 12/12, 413 s | 10/12, 364 s |
+| AI Archaeologist (7) | **7/7**, 127 s | 7/7, 146 s | 6/7, 122 s |
+| Final report, all 27 prompts | 67 s / 29.8k chars | **10 s / 27.4k chars** | 29 s / 25.5k chars |
+| Price per M tokens (in / out) | $3 / $15 | $2 / $10 | $0.10 / $0.50 (to 100k) |
+## Findings
+1. **Nobody is faster end to end.** Sonnet 5.5 is 2 to 15 % slower on the tool loop across all
+   three agents (315 vs 308, 413 vs 388, 146 vs 127 s); Haiku 5.5 is within noise of 4.6 (325,
+   364, 122 s). Each act is ten to thirty model round trips and the new models do not shorten
+   them. Sonnet 5.5 does write its closing answer far faster (10 s across the set against 67 s),
+   which the room would notice at the end of a turn, but the loop is where the minutes are.
+2. **The failures are prompt-following, and they are the kind a live stage cannot absorb.**
+   Sonnet 5.5 answered the drawn-polygon prompt with a clarifying question ("Please give the
+   two dates or years… If you don't pick one, I'll run option 1") and did no work; 4.6 and Haiku
+   ran NDVI. Haiku 5.5 called a forbidden tool in the Methane Hunter (`find_location_boundary`
+   on rank-watch-area), dropped the brief's required `Check:` line on watch-named-area, and
+   paraphrased the archaeologist's fixed refusal sentence (the content was right, the exact
+   sentence the test and the stage copy rely on was not).
+3. **Vision narration thins out.** All three models call `inspect_image` at the same points
+   and act correctly on what they see, but what they say while looking differs. Sonnet 4.6
+   narrates every look in a full sentence the step column shows the room ("the octagon's eight
+   straight walls and corner angles are sharply drawn… the Observatory Mound is visible as a
+   raised platform at the circle's gateway"). Sonnet 5.5 gives one terse line and skipped the
+   sentence on the Great Circle relief model; Haiku 5.5 often went straight from the look to the
+   next tool with no sentence at all (0 narrated inspections on three of the five key prompts).
+   On stage that sentence is the act.
+4. **Cost is not the constraint.** The whole demo is a few hundred turns; at 4.6's rates that is
+   tens of dollars. Haiku 5.5's price (a thirtieth of 4.6) would matter for a product, not for
+   Nov 9.
+## Decision
+Keep **Claude Sonnet 4.6** on all three runtimes through the Nov 3 freeze: it is the only model
+that passed every golden prompt on every agent, and it narrates what it sees. Sonnet 5.5 is the
+successor when there is time to re-tune the prompts (one line each for "never ask, run the
+default" and "say what you see before the next call" would likely recover both gaps) and the
+faster closing answer is worth having; that is post-demo work. Haiku 5.5 is not a candidate for
+the stage: two forbidden-behaviour misses in twelve methane prompts is a live-demo risk for no
+speed gain. Re-run `scripts/bakeoff.py --agent <each>` after any prompt change that alters
+round-trip count.
