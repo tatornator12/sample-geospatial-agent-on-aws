@@ -89,4 +89,5 @@ then are `DEPLOY_TARGET=dev`. The Act 3 decision is also due Oct 24 (ROADMAP row
 ## Gate log
 
 - Oct 14 (pre-gate, the stage done): pytest geo_agent 123, methane-hunter 147, ai-archaeologist 28; backend 52; vitest 167; `impeccable detect` 0; `npm run build` clean. Evals on dev: earth 8/8, methane 12/12, archaeologist 7/7 (v7; one warning, an em dash inside a Great Circle table cell, which the stage prints as a comma). Decision 4: option B (1.4). Act 4 timings and the teaser: not yet run
+- Oct 14 (after the wow pass, `822d360`): pytest geo_agent 123, methane-hunter 147, ai-archaeologist 31; backend 54; vitest 179; `impeccable detect` 0; `npm run build` clean. Eval archaeologist dev v13 7/7 (the same em dash warning in a Great Circle table cell). Live turns through the local UI: the Octagon lights its session DEM and settles at 315°; the Great Circle draws its section from the fresh measurement
 - (Oct 24: commands with counts, both Act 4 timings and the teaser)
