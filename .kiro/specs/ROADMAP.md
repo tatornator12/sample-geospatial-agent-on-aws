@@ -47,6 +47,14 @@ done:
    ARPA 9, tribal consultation).
 2. Forecasting with weather data (the user, Oct 13). Not specced; nothing else waits on it.
 
+After the demo (the user, Oct 14; never before Nov 9): **move the three agents to Claude Sonnet
+5.5.** The Oct 14 bake-off (`docs/bakeoff/README.md`) kept Sonnet 4.6 for the stage because 5.5
+asked a clarifying question on the drawn-polygon prompt and narrates its looks tersely; it was
+otherwise 7/8, 12/12, 7/7 and closes a turn six times faster. The move is a prompt retune (a
+"never ask, run the default" line and a "say what you see before the next call" line in the
+shared RESPONSE STYLE block), `MODEL_ID` on each `.env`, a full bake-off per agent, then the
+usual dev → stable promotion. Haiku 5.5 is not on the list.
+
 Cut list if behind (in this order, never touching the foundation, eyes, similarity, replay
 cases or rehearsal week): live AIS (keep replay) → Archaeologist shrinks to a 90-second
 teaser → Methane keeps only the replay case. (Ground Motion, first on the list, was dropped
