@@ -260,9 +260,22 @@ async def show_terrain(site_id: str, product: str = "hillshade") -> str:
         return json.dumps({"error": f"The {product} for {site['names'][0]} is missing from the terrain cache "
                                     "(scripts/build_site_catalogue.py)."})
     bounds = built["bounds"]
+    # The hillshade travels with the DEM it was lit from, so the stage can light the ground itself
+    # (the light sweeps round the earthwork when the LiDAR lands, and the presenter can move the sun).
+    # A server-side copy of the cached COG into the session; the stage reads it through TiTiler.
+    dem_url = None
+    if product == "hillshade":
+        dem_key = f"{session_prefix()}terrain/dem_{site_id}.tif"
+        try:
+            _s3().copy_object(Bucket=config.S3_BUCKET_NAME, Key=dem_key,
+                              CopySource={"Bucket": config.S3_BUCKET_NAME, "Key": f"{CACHE_PREFIX}/{site_id}_dem.tif"},
+                              ContentType="image/tiff", MetadataDirective="REPLACE")
+            dem_url = f"s3://{config.S3_BUCKET_NAME}/{dem_key}"
+        except Exception as e:  # the baked hillshade still shows; only the live light is lost
+            logger.warning("show_terrain DEM copy failed for %s: %s", site_id, type(e).__name__)
     if product == "hillshade":
         render = {"kind": "raster", "colormap": "gray", "rescale": [1, 255], "group": "terrain",
-                  "legend": "Hillshade", "bounds": bounds}
+                  "legend": "Hillshade", "bounds": bounds, **({"dem": dem_url} if dem_url else {})}
     else:
         render = {"kind": "raster", "colormap": "rdbu_r", "rescale": [-stretch, stretch], "units": "m",
                   "group": "terrain", "legend": "Local relief", "bounds": bounds}
@@ -346,6 +359,7 @@ async def measure_profile(site_id: str, transect: list = None) -> str:
                 dem[dem == ds.nodata] = ep.NODATA
             dist, z = ep.sample(dem, ds.window_transform(win), (xs[0], ys[0]), (xs[1], ys[1]))
             result = ep.analyse(dist, z)
+            profile = ep.thin(dist, z, result["baseline_m"])
             # Where each feature sits, back in degrees, for the map's labels.
             pts = []
             for f in result["features"]:
@@ -359,12 +373,17 @@ async def measure_profile(site_id: str, transect: list = None) -> str:
         logger.warning("measure_profile failed for %s: %s", site_id, type(e).__name__)
         return json.dumps({"error": f"The DEM for {site['names'][0]} could not be read ({type(e).__name__})."})
 
-    features = [{"type": "Feature", "properties": {"kind": "transect", "label": label},
+    # The line carries the section itself (distance along it, height above the baseline, every
+    # metre or so), so the stage can draw the cross-section the room reads the numbers on.
+    features = [{"type": "Feature",
+                 "properties": {"kind": "transect", "label": label, "length_m": result["length_m"],
+                                "baseline_m": result["baseline_m"], "max_relief_m": result["max_relief_m"],
+                                "outer_banks_span_m": result["outer_banks_span_m"], "profile": profile},
                  "geometry": {"type": "LineString", "coordinates": coords}}]
     for f, lon, lat in pts:
         sign = "+" if f["offset_m"] >= 0 else "−"
         features.append({"type": "Feature",
-                         "properties": {"kind": f["kind"], "offset_m": f["offset_m"],
+                         "properties": {"kind": f["kind"], "offset_m": f["offset_m"], "at_m": f["at_m"],
                                         "label": f"{f['kind']} {sign}{abs(f['offset_m']):.1f} m"},
                          "geometry": {"type": "Point", "coordinates": [round(lon, 6), round(lat, 6)]}})
     url = _put_json(f"{session_prefix()}terrain/profile_{site_id}.geojson",

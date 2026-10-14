@@ -145,23 +145,25 @@ def main() -> int:
     bucket = None
     for t in tools:
         params = tool_input(t)
-        url = params.get("s3_url")
-        m = url_re.match(url) if isinstance(url, str) else None
-        if not m:
-            continue
-        bucket = bucket or m.group(1)
-        key = m.group(2)
-        if key in local_for:
-            continue
-        name = case_name(key)
-        if not name or not fetch(m.group(1), key, name):
-            continue
-        local_for[key] = name
-        if t["name"] == "inspect_image":  # the rendering the chip shows (tools._inspection_key)
-            stem = key.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-            for ext in ("png", "jpg"):
-                if fetch(m.group(1), f"{session_prefix}inspections/{stem}.{ext}", f"inspections/{stem}.{ext}"):
-                    break
+        # The layer itself, and the DEM a hillshade's render hint carries (the stage lights it live).
+        render = params.get("render") if isinstance(params.get("render"), dict) else {}
+        for url in (params.get("s3_url"), render.get("dem")):
+            m = url_re.match(url) if isinstance(url, str) else None
+            if not m:
+                continue
+            bucket = bucket or m.group(1)
+            key = m.group(2)
+            if key in local_for:
+                continue
+            name = case_name(key)
+            if not name or not fetch(m.group(1), key, name):
+                continue
+            local_for[key] = name
+            if t["name"] == "inspect_image":  # the rendering the chip shows (tools._inspection_key)
+                stem = key.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                for ext in ("png", "jpg"):
+                    if fetch(m.group(1), f"{session_prefix}inspections/{stem}.{ext}", f"inspections/{stem}.{ext}"):
+                        break
     if not bucket:
         raise SystemExit("the run put nothing on the map; not a usable replay case")
 
@@ -180,6 +182,11 @@ def main() -> int:
                     params[k] = new
                 else:
                     params.pop(k)
+        if isinstance(params.get("render"), dict) and isinstance(params["render"].get("dem"), str):
+            new = rewrite(params["render"]["dem"])
+            params["render"] = {**params["render"], **({"dem": new} if new else {})}
+            if not new:
+                params["render"].pop("dem", None)
         tool_calls.append({"name": t["name"], "params": params, "result": RESULTS.get(t["name"], "Done")})
         if t["name"] == "display_visual" and "s3_url" in params:
             name = params["s3_url"].rsplit("/", 1)[-1]

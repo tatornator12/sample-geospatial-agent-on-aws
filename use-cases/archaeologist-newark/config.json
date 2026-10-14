@@ -27,7 +27,7 @@
       "params": {
         "s3_url": "s3://bucket/use-cases/archaeologist-newark/tci_clipped_newark_octagon_2026-10-05.tif",
         "title": "Newark Octagon, Sentinel-2 true colour",
-        "question": "What is visible on the ground? Can you see the earthwork walls, golf course fairways, or other features?"
+        "question": "What is visible from space? Can you see the earthwork walls, golf course fairways, or other features?"
       },
       "result": "Looked at the image"
     },
@@ -36,7 +36,7 @@
       "params": {
         "s3_url": "s3://bucket/use-cases/archaeologist-newark/tci_clipped_newark_octagon_2026-10-05.tif",
         "title": "Octagon Earthworks, Sentinel-2 true colour",
-        "description": "Sentinel-2, 2026-10-05. The site sits within a suburban grid; the former golf course fairways are still faintly visible across the open green area."
+        "description": "Sentinel-2, 2026-10-05. Former golf course fairways still visible as lighter grass strips. Suburban Newark, Ohio surrounds the site."
       },
       "result": "Shown on the map"
     },
@@ -51,9 +51,9 @@
     {
       "name": "inspect_image",
       "params": {
-        "question": "What earthwork shapes are visible? Can you see the octagon walls, the circle, and the connecting avenue?",
         "s3_url": "s3://bucket/use-cases/archaeologist-newark/hillshade_newark-octagon.tif",
-        "title": "Octagon Earthworks, LiDAR hillshade"
+        "title": "Octagon Earthworks, LiDAR hillshade",
+        "question": "What earthwork shapes are visible? Can you see the octagon walls, the circle, and the connecting avenue?"
       },
       "result": "Looked at the image"
     },
@@ -62,7 +62,7 @@
       "params": {
         "s3_url": "s3://bucket/use-cases/archaeologist-newark/hillshade_newark-octagon.tif",
         "title": "Octagon Earthworks, LiDAR hillshade",
-        "description": "USGS 3DEP 1 m bare-earth DEM, OH Statewide Phase 2 2020. The octagon (right), the circle (left of centre), and the connecting avenue are all clearly resolved. A second circle is visible at the bottom-right corner of the frame.",
+        "description": "USGS 3DEP 1 m bare-earth DEM, Ohio Statewide Phase 2 (2020, published 2023). The octagon walls, attached circle, Observatory Mound, and connecting avenue are all visible.",
         "render": {
           "kind": "raster",
           "colormap": "gray",
@@ -77,7 +77,8 @@
             40.039923,
             -82.428199,
             40.067382
-          ]
+          ],
+          "dem": "s3://bucket/use-cases/archaeologist-newark/dem_newark-octagon.tif"
         }
       },
       "result": "Shown on the map"
@@ -102,7 +103,8 @@
             40.039923,
             -82.428199,
             40.067382
-          ]
+          ],
+          "dem": "s3://bucket/use-cases/archaeologist-newark/dem_newark-octagon.tif"
         }
       },
       {

@@ -35,7 +35,7 @@
       "params": {
         "s3_url": "s3://bucket/use-cases/archaeologist-great-circle/lrm_newark-great-circle.tif",
         "title": "Great Circle Earthworks, local relief model",
-        "question": "What does the circular enclosure, its walls, interior ditch, and central mound look like?"
+        "question": "What earthwork shapes are visible? Are the banks and ditches clear?"
       },
       "result": "Looked at the image"
     },
@@ -44,7 +44,7 @@
       "params": {
         "s3_url": "s3://bucket/use-cases/archaeologist-great-circle/lrm_newark-great-circle.tif",
         "title": "Great Circle Earthworks, local relief model",
-        "description": "USGS 3DEP 1 m bare-earth DEM, Ohio Statewide Phase 2 2020. Red = higher than surroundings (bank); blue = lower (ditch).",
+        "description": "USGS 3DEP 1 m bare-earth LiDAR, Ohio Statewide Phase 2 2020. Red = higher than surroundings (bank); blue = lower (ditch).",
         "render": {
           "kind": "raster",
           "colormap": "rdbu_r",
@@ -70,7 +70,7 @@
       "params": {
         "s3_url": "s3://bucket/use-cases/archaeologist-great-circle/profile_newark-great-circle.geojson",
         "title": "Great Circle Earthworks, transect",
-        "description": "Verified east-west transect, 430 m total. Banks and ditches marked.",
+        "description": "Verified east-west transect, 430 m total. Outer bank to outer bank: 362 m measured, about 366 m documented.",
         "render": {
           "kind": "vector",
           "group": "terrain",

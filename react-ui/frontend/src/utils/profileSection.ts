@@ -1,0 +1,186 @@
+/**
+ * The cross-section: the measured ground along the archaeologist's transect, drawn in the step
+ * column as the measurement lands. `measure_profile` writes the line's samples into the transect
+ * GeoJSON (every metre or so, offsets from the baseline) and each bank and ditch as a point that
+ * knows where it sits along the line; this module turns that into an SVG the room can read, with
+ * the heights on a labelled axis (a 430 m line a few metres high needs vertical exaggeration,
+ * and the axis says so instead of a footnote).
+ */
+import type { Feature } from 'geojson';
+
+export interface ProfileMark {
+  kind: 'bank' | 'ditch';
+  atM: number;
+  offsetM: number;
+  label: string;
+}
+
+export interface ProfileData {
+  siteId: string;
+  label: string;
+  lengthM: number;
+  baselineM: number;
+  spanM: number | null;
+  maxReliefM: number | null;
+  /** [distance along the line in m, height above the baseline in m or null where the LiDAR has a gap]. */
+  samples: Array<[number, number | null]>;
+  marks: ProfileMark[];
+}
+
+const PROFILE_FILE = /profile_([a-z0-9][a-z0-9-]{1,63})\.geojson$/i;
+const MAX_SAMPLES = 1200;
+
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** The site id a transect file is named for, or null. */
+export function profileSiteId(sourceUrl: string | undefined): string | null {
+  const m = (sourceUrl || '').match(PROFILE_FILE);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/** A section from the transect GeoJSON the tool wrote, or null when the line carries no samples. */
+export function profileFromFeatures(features: Feature[], sourceUrl: string | undefined): ProfileData | null {
+  const siteId = profileSiteId(sourceUrl);
+  if (!siteId) return null;
+  const line = features.find((f) => f.geometry?.type === 'LineString' && f.properties?.kind === 'transect');
+  const p = (line?.properties ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(p.profile) || p.profile.length < 2) return null;
+  const samples: Array<[number, number | null]> = [];
+  for (const row of p.profile.slice(0, MAX_SAMPLES)) {
+    if (!Array.isArray(row) || row.length < 2) continue;
+    const d = num(row[0]);
+    if (d === null) continue;
+    samples.push([d, num(row[1])]);
+  }
+  if (samples.length < 2) return null;
+  const marks: ProfileMark[] = [];
+  for (const f of features) {
+    if (f.geometry?.type !== 'Point') continue;
+    const q = (f.properties ?? {}) as Record<string, unknown>;
+    const atM = num(q.at_m);
+    const offsetM = num(q.offset_m);
+    if ((q.kind !== 'bank' && q.kind !== 'ditch') || atM === null || offsetM === null) continue;
+    marks.push({ kind: q.kind, atM, offsetM, label: typeof q.label === 'string' ? q.label.slice(0, 24) : '' });
+  }
+  marks.sort((a, b) => a.atM - b.atM);
+  return {
+    siteId,
+    label: typeof p.label === 'string' ? p.label.slice(0, 80) : '',
+    lengthM: num(p.length_m) ?? samples[samples.length - 1][0],
+    baselineM: num(p.baseline_m) ?? 0,
+    spanM: num(p.outer_banks_span_m),
+    maxReliefM: num(p.max_relief_m),
+    samples,
+    marks,
+  };
+}
+
+export interface SectionLayout {
+  width: number;
+  height: number;
+  /** The ground, as SVG path data; a gap in the LiDAR breaks the line. */
+  path: string;
+  /** The same ground closed down to the baseline, for a faint wash under the line. */
+  fill: string;
+  baselineY: number;
+  /** The left edge of the plot (the axis labels sit to its left). */
+  x0: number;
+  x1: number;
+  xFor: (m: number) => number;
+  yFor: (m: number) => number;
+  /** Horizontal rules with their labels, three at most: "+2 m", "0", "−2 m". */
+  ticks: Array<{ y: number; label: string }>;
+  /**
+   * Every bank and ditch gets its mark; only the tallest bank and the deepest ditch get a label
+   * (the two figures the answer quotes), so the section reads from the back of the room.
+   */
+  marks: Array<ProfileMark & { x: number; y: number; labelled: boolean; labelY: number; anchor: 'start' | 'middle' | 'end' }>;
+  /** Vertical exaggeration of the drawing, for the description. */
+  exaggeration: number;
+}
+
+const fmt = (m: number) => (m > 0 ? `+${m} m` : m < 0 ? `−${Math.abs(m)} m` : '0');
+
+/**
+ * Pixel geometry for a section `width` × `height` px. The plot leaves a gutter on the left for the
+ * axis labels and room above and below for the mark labels; heights span the data, padded, and
+ * always include the baseline.
+ */
+export function sectionLayout(p: ProfileData, width: number, height: number): SectionLayout {
+  const gutter = 46;
+  // Room above for the bank's label and below for the ditch's (15 px mono, centred 14 px off the mark).
+  const padTop = 24, padBottom = 24;
+  const x0 = gutter, x1 = Math.max(gutter + 40, width - 8);
+  const heights = p.samples.map((s) => s[1]).filter((v): v is number => v !== null);
+  const lo = Math.min(0, ...heights, ...p.marks.map((m) => m.offsetM));
+  const hi = Math.max(0, ...heights, ...p.marks.map((m) => m.offsetM));
+  const span = Math.max(1, hi - lo);
+  const yTop = padTop, yBottom = height - padBottom;
+  const yFor = (m: number) => yBottom - ((m - lo) / span) * (yBottom - yTop);
+  const length = Math.max(1, p.lengthM);
+  const xFor = (m: number) => x0 + (Math.min(length, Math.max(0, m)) / length) * (x1 - x0);
+
+  let path = '';
+  let open = false;
+  for (const [d, z] of p.samples) {
+    if (z === null) {
+      open = false;
+      continue;
+    }
+    path += `${open ? 'L' : 'M'}${xFor(d).toFixed(1)} ${yFor(z).toFixed(1)}`;
+    open = true;
+  }
+  // The wash: the ground over the baseline, run by run, closed to the baseline.
+  const baselineY = yFor(0);
+  let fill = '';
+  let runStart: number | null = null;
+  let last: [number, number] | null = null;
+  const closeRun = () => {
+    if (runStart !== null && last) fill += `L${last[0].toFixed(1)} ${baselineY.toFixed(1)}L${runStart.toFixed(1)} ${baselineY.toFixed(1)}Z`;
+    runStart = null;
+    last = null;
+  };
+  for (const [d, z] of p.samples) {
+    if (z === null) {
+      closeRun();
+      continue;
+    }
+    const x = xFor(d), y = yFor(z);
+    if (runStart === null) {
+      runStart = x;
+      fill += `M${x.toFixed(1)} ${baselineY.toFixed(1)}L${x.toFixed(1)} ${y.toFixed(1)}`;
+    } else {
+      fill += `L${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    last = [x, y];
+  }
+  closeRun();
+
+  // Three rules at most, on whole metres (1, 2, 5 or 10 apart), always the baseline: a 128 px
+  // section with a rule a metre is a ladder, not an axis.
+  const step = [1, 2, 5, 10].find((s) => Math.floor(hi / s) - Math.ceil(lo / s) + 1 <= 3) ?? 20;
+  const ticks: Array<{ y: number; label: string }> = [];
+  for (let k = Math.ceil(lo / step); k <= Math.floor(hi / step); k += 1) ticks.push({ y: yFor(k * step), label: fmt(k * step) });
+  if (!ticks.some((t) => t.label === '0')) ticks.push({ y: baselineY, label: '0' });
+
+  // The two figures the answer quotes: the tallest bank (label above its dot) and the deepest
+  // ditch (label below its ring). Near an end of the line a label anchors to the end it is near.
+  const tallest = p.marks.reduce<ProfileMark | null>((a, m) => (m.kind === 'bank' && (!a || m.offsetM > a.offsetM) ? m : a), null);
+  const deepest = p.marks.reduce<ProfileMark | null>((a, m) => (m.kind === 'ditch' && (!a || m.offsetM < a.offsetM) ? m : a), null);
+  const labelHalf = 52;
+  const marks = p.marks.map((m) => {
+    const x = xFor(m.atM), y = yFor(m.offsetM);
+    const anchor: 'start' | 'middle' | 'end' = x - labelHalf < x0 ? 'start' : x + labelHalf > x1 ? 'end' : 'middle';
+    return { ...m, x, y, labelled: m === tallest || m === deepest, labelY: y + (m.kind === 'bank' ? -14 : 14), anchor };
+  });
+
+  const exaggeration = ((yBottom - yTop) / span) / ((x1 - x0) / length);
+  return { width, height, path, fill, baselineY, x0, x1, xFor, yFor, ticks, marks, exaggeration: Math.round(exaggeration) };
+}
+
+/** One sentence for the room and the screen reader: what the section shows. */
+export function sectionDescription(p: ProfileData, exaggeration: number): string {
+  const marks = p.marks.map((m) => `${m.kind} ${m.offsetM >= 0 ? '+' : '−'}${Math.abs(m.offsetM).toFixed(1)} m at ${Math.round(m.atM)} m`).join(', ');
+  const span = p.spanM !== null ? `, ${Math.round(p.spanM)} m bank to bank` : '';
+  return `Cross-section along the transect, ${Math.round(p.lengthM)} m, heights about ${exaggeration} times exaggerated${span}${marks ? `: ${marks}` : ''}.`;
+}

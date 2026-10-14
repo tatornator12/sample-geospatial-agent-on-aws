@@ -39,6 +39,45 @@ describe('scenarioLayers', () => {
     const many = Array.from({ length: 40 }, (_, i) => ({ file: `l${i}.tif` }));
     assert.equal(scenarioLayers({ assets: { layers: many } }, B, ID).length, 12);
   });
+
+  it('points a hillshade hint\'s DEM at the case prefix and drops anything that is not a dem file', () => {
+    const A = 'archaeologist-newark';
+    const hint = { kind: 'raster', colormap: 'gray', group: 'terrain' };
+    const layers = scenarioLayers({
+      assets: {
+        layers: [
+          { file: 'hillshade_a.tif', render: { ...hint, dem: `s3://bucket/use-cases/${A}/dem_newark-octagon.tif` } },
+          { file: 'hillshade_b.tif', render: { ...hint, dem: 'dem_x.tif' } },
+          { file: 'hillshade_c.tif', render: { ...hint, dem: 's3://other/use-cases/x/dem_x.tif' } },
+          { file: 'hillshade_d.tif', render: { ...hint, dem: `s3://bucket/use-cases/${A}/../dem_x.tif` } },
+          { file: 'hillshade_e.tif', render: { ...hint, dem: 'hillshade_x.tif' } },
+          { file: 'hillshade_f.tif', render: { ...hint, dem: 7 } },
+        ],
+      },
+    }, B, A);
+    assert.deepEqual(layers.map((l) => l.render?.dem), [
+      `s3://${B}/use-cases/${A}/dem_newark-octagon.tif`, `s3://${B}/use-cases/${A}/dem_x.tif`,
+      undefined, undefined, undefined, undefined,
+    ]);
+    assert.deepEqual(Object.keys(layers[2].render!), ['kind', 'colormap', 'group']);
+  });
+});
+
+describe('scenarioToolCalls', () => {
+  it('rewrites the DEM inside a display_visual render hint like the top-level URLs', () => {
+    const A = 'archaeologist-newark';
+    const calls = scenarioToolCalls({
+      tool_calls: [{
+        name: 'display_visual',
+        params: {
+          s3_url: `s3://bucket/use-cases/${A}/hillshade_x.tif`,
+          render: { kind: 'raster', dem: `s3://bucket/use-cases/${A}/dem_x.tif` },
+        },
+      }],
+    }, B, A) as Array<{ params: { s3_url: string; render: { dem?: string } } }>;
+    assert.equal(calls[0].params.s3_url, `s3://${B}/use-cases/${A}/hillshade_x.tif`);
+    assert.equal(calls[0].params.render.dem, `s3://${B}/use-cases/${A}/dem_x.tif`);
+  });
 });
 
 describe('scenarioToolCalls', () => {

@@ -69,7 +69,11 @@ def analyse(distance: np.ndarray, z: np.ndarray, step: float = 1.0) -> dict:
     for i in range(len(zs)):
         if not np.isfinite(zs[i]):
             continue
-        lo, hi = max(0, i - half), min(len(zs), i + half + 1)
+        # A crest or a ditch needs ground on both sides: within a window of either end of the line
+        # the ground may keep rising or falling past it, so an end sample is never a feature.
+        if i < half or i + half >= len(zs):
+            continue
+        lo, hi = i - half, i + half + 1
         seg = zs[lo:hi]
         if not np.isfinite(seg).all():
             continue
@@ -92,3 +96,19 @@ def analyse(distance: np.ndarray, z: np.ndarray, step: float = 1.0) -> dict:
     return {"baseline_m": round(baseline, 2), "length_m": round(float(distance[-1]), 1),
             "features": out, "outer_banks_span_m": span,
             "max_relief_m": round(float(np.nanmax(z) - np.nanmin(z)), 2)}
+
+
+MAX_PROFILE_POINTS = 600
+
+
+def thin(distance: np.ndarray, z: np.ndarray, baseline: float, max_points: int = MAX_PROFILE_POINTS) -> list:
+    """The section for the stage to draw: [[distance_m, offset_m], ...] relative to the baseline,
+    every sample up to `max_points`, then every n-th so a 3 km line stays a few kilobytes. A gap in
+    the LiDAR is a null, so the drawn line breaks where the ground was not measured."""
+    n = len(distance)
+    stride = max(1, -(-n // max_points))
+    idx = list(range(0, n, stride))
+    if idx[-1] != n - 1:
+        idx.append(n - 1)
+    return [[round(float(distance[i]), 1), round(float(z[i] - baseline), 2) if np.isfinite(z[i]) else None]
+            for i in idx]

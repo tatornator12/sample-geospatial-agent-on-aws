@@ -55,6 +55,22 @@ describe('parseRenderHint', () => {
   it('ignores fields it does not know', () => {
     expect(parseRenderHint({ kind: 'raster', colormap: 'viridis', onclick: 'x' })).toEqual({ kind: 'raster', colormap: 'viridis' });
   });
+
+  it("accepts the archaeologist's DEM only where the session or a replay case keeps it", () => {
+    const hs = { kind: 'raster', colormap: 'gray', rescale: [1, 255], group: 'terrain', legend: 'Hillshade' };
+    for (const dem of [
+      's3://geospatial-agent-on-aws-419324627248/session_data/abc-123/terrain/dem_newark-octagon.tif',
+      's3://my.bucket/use-cases/archaeologist-newark/dem_newark-octagon.tif',
+    ]) expect(parseRenderHint({ ...hs, dem })).toEqual({ ...hs, dem });
+    for (const dem of [
+      's3://b/session_data/abc/dem_x.tif',                 // not in the terrain folder
+      's3://b/session_data/abc/terrain/hillshade_x.tif',  // not a DEM
+      's3://b/archaeology/cache/v1/newark-octagon_dem.tif', // the cache itself is never presigned
+      's3://b/session_data/../terrain/dem_x.tif',
+      'https://example.com/dem_x.tif',
+      7,
+    ]) expect(parseRenderHint({ ...hs, dem })).toBeNull();
+  });
 });
 
 describe('tileParamsFor', () => {

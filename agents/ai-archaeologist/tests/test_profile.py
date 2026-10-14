@@ -26,6 +26,20 @@ def test_analyse_finds_both_banks_both_ditches_and_the_span():
     assert out["baseline_m"] == GROUND_M
 
 
+def test_the_ends_of_the_line_are_never_a_bank_or_a_ditch():
+    # Ground falling away at the east end (the Great Circle's line ends in a slope): the last
+    # sample is the lowest in its half-window, but there is no ground past it to call it a ditch.
+    d = np.arange(0, 431, 1.0)
+    r = np.abs(d - 215)
+    z = GROUND_M + BANK_H * np.exp(-((r - BANK_R) / 6) ** 2) - DITCH_D * np.exp(-((r - 168) / 5) ** 2)
+    z = z - np.clip(d - 410, 0, None) * 0.06
+    z[:6] += np.linspace(1.2, 0, 6)
+    out = ep.analyse(d, z)
+    assert [f["kind"] for f in out["features"]] == ["bank", "ditch", "ditch", "bank"]
+    half = ep.WINDOW_M
+    assert all(half <= f["at_m"] <= d[-1] - half for f in out["features"])
+
+
 def test_too_little_lidar_is_an_error():
     d = np.arange(0, 100, 1.0)
     z = np.full(100, np.nan)
@@ -67,6 +81,26 @@ def test_measure_profile_reproduces_the_synthetic_ring(tools, fake_s3, monkeypat
     feats = json.loads(fake_s3.objects[key])["features"]
     assert feats[0]["geometry"]["type"] == "LineString" and len(feats) == 5
     assert feats[1]["properties"]["label"].startswith("bank +2.")
+    # The line carries the section the stage draws: every metre of a 430 m line, offsets from the
+    # baseline, the banks at their height; each mark knows where it sits along the line.
+    line = feats[0]["properties"]
+    assert line["length_m"] == body["length_m"] and line["baseline_m"] == body["baseline_m"]
+    assert line["outer_banks_span_m"] == body["outer_banks_span_m"]
+    prof = line["profile"]
+    assert 400 <= len(prof) <= 431 and prof[0][0] == 0.0 and prof[-1][0] == body["length_m"]
+    assert max(p[1] for p in prof if p[1] is not None) > BANK_H - 0.2
+    assert all(abs(f["at_m"] - m["properties"]["at_m"]) < 1e-6 for f, m in zip(body["features"], feats[1:]))
+
+
+def test_thin_keeps_a_long_line_small_and_marks_gaps():
+    d = np.arange(0, 3001, 1.0)
+    z = np.full(3001, 250.0)
+    z[100:110] = np.nan
+    prof = ep.thin(d, z, 250.0)
+    assert len(prof) <= ep.MAX_PROFILE_POINTS + 1 and prof[0] == [0.0, 0.0] and prof[-1][0] == 3000.0
+    assert any(p[1] is None for p in prof)
+    short = ep.thin(np.arange(0, 51, 1.0), np.full(51, 1.5), 1.0)
+    assert len(short) == 51 and short[3] == [3.0, 0.5]
 
 
 def test_without_a_verified_transect_it_crosses_the_centre_east_west(tools, monkeypatch, tmp_path):

@@ -70,6 +70,14 @@ then are `DEPLOY_TARGET=dev`. The Act 3 decision is also due Oct 24 (ROADMAP row
     - Oct 14, both cases on the local stack: hosts were Esri (basemap), `s3.amazonaws.com` (terrain tiles), TiTiler and the demo bucket only; camera pitch 60, bearing 35, terrain on; the Octagon lands at zoom 14.7 on the earthworks, the Great Circle at 17 with the bank and ditch labels on the ring; both tables read in the column
   - _Requirements: 7.1, 7.2_
 
+- [x] 6.4 The wow pass (the user, Oct 14: rest view A and "lets do all")
+  - Rest relief: the record at rest sits on a `hillshade` of the global Terrain Tiles (lit 315°, soft highlight), basemap dimmed, gone when the ground comes up. Options B (survey drift) and C (open at a site) were set aside: B is the methane act's motion, C spoils the reveal
+  - Dissolve: terrain rasters fade in over 1.8 s (`REVEAL_MS`), skipped under reduced motion
+  - Raking light: `show_terrain(hillshade)` stages `terrain/dem_<site>.tif` and puts `render.dem` in the hint (`render.ts` accepts only session or case `dem_*.tif`); the stage tiles it through TiTiler `terrarium`, draws the baked hillshade as flat paper and lights the DEM live; one 6 s sweep that settles at 315°, a dial in the legend, the legend sentence follows the sun. The backend's `withCaseDem` rewrites a replay case's DEM to its own folder
+  - Cross-section: `measure_profile` carries `profile` (≤600 samples), `length_m`, `baseline_m`, `max_relief_m`, `outer_banks_span_m` and each mark's `at_m`; `ProfileSection` draws it under the measure step, labelling only the tallest bank and the deepest ditch. `analyse` no longer calls a line's end a feature (the first take marked "ditch −1.0 m" at 430 m where the ground just falls away); dev v13
+  - Headless (local stack, both cases): rest relief on and off with the ground; the light rises from 0 at about 4.3 s, goes 315° round to 315° in 6 s and holds; the dial to 135° re-lights and the legend reads "lit from the south-east"; section present with its sentence. The only 404s are TiTiler edge tiles that touch the frame by 1 to 3% (outside the COG's data; also true of the products before this pass)
+  - True 3D banks (the site DEM as the 3D ground): not built. One terrain source per map, and the 3 km DEM has no data past its frame, so the ground would fall off a cliff at the edge; it needs a spike (blend or clip) after the gate. ROADMAP backlog
+  - Both cases re-recorded and synced so they carry the DEM and the profile: `archaeologist-newark` from dev v12 (hillshade with `dem_newark-octagon.tif`), `archaeologist-great-circle` from v13 (six marks, 362 m, +2.6 m, −2.7 m; the gallery card's figures unchanged)
 ## Day 5: gate (Friday Oct 24, dev-only)
 
 - [ ] 7. Gate and rehearsal

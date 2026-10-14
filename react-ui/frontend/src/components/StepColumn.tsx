@@ -12,8 +12,10 @@ import { theme } from '../theme';
 import type { EvidenceItem } from '../utils/evidence.ts';
 import { EvidenceChip } from './EvidenceChip.tsx';
 import { PassFilmstrip } from './PassFilmstrip.tsx';
+import { ProfileSection } from './ProfileSection.tsx';
 import { TipBoard } from './TipBoard.tsx';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
+import type { ProfileData } from '../utils/profileSection.ts';
 import {
   PLAN_STAGES,
   chosenCue,
@@ -43,12 +45,29 @@ interface StepColumnProps {
   tips?: Tip[];
   /** The mission's end frame (a brief card follows): the plan and the self-check, steps on demand. */
   compact?: boolean;
+  /** The archaeologist's measured sections, by site id, drawn under the measure step that made them. */
+  profiles?: Record<string, ProfileData>;
 }
 
 const MAX_VISIBLE = 9;
 
+/**
+ * The sections a measure step produced: by the site id it was called with; when the call carries
+ * none the stage falls back to the one section there is, so a replay recorded before the id was
+ * stored still shows its drawing.
+ */
+function sectionsFor(group: StepGroup, profiles: Record<string, ProfileData>): ProfileData[] {
+  const ids = group.calls
+    .map((c) => (c.params as Record<string, unknown> | undefined)?.site_id)
+    .filter((id): id is string => typeof id === 'string');
+  const hits = ids.map((id) => profiles[id]).filter((p): p is ProfileData => !!p);
+  if (hits.length > 0) return [...new Map(hits.map((p) => [p.siteId, p])).values()];
+  const all = Object.values(profiles);
+  return ids.length === 0 && all.length === 1 ? all : [];
+}
+
 export function StepColumn({
-  steps, live, evidence = [], onOpenEvidence, methaneDir = null, tips = [], compact = false,
+  steps, live, evidence = [], onOpenEvidence, methaneDir = null, tips = [], compact = false, profiles = {},
 }: StepColumnProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -231,6 +250,12 @@ export function StepColumn({
               {onOpenEvidence && items.map((item) => (
                 <div key={item.toolId} style={{ gridColumn: '1 / -1' }}>
                   <EvidenceChip item={item} onOpen={onOpenEvidence} />
+                </div>
+              ))}
+              {/* The archaeologist's cross-section lands under the step that measured it. */}
+              {group.name === 'measure_profile' && sectionsFor(group, profiles).map((p) => (
+                <div key={p.siteId} style={{ gridColumn: '1 / -1' }}>
+                  <ProfileSection profile={p} />
                 </div>
               ))}
             </li>

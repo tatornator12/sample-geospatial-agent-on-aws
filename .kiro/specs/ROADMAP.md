@@ -46,6 +46,13 @@ done:
    general scanning of imagery for undiscovered sites is out (PRODUCT.md; looting, NHPA 304,
    ARPA 9, tribal consultation).
 2. Forecasting with weather data (the user, Oct 13). Not specced; nothing else waits on it.
+3. **Archaeologist, true 3D banks** (the user, Oct 14; spike first). Stand the 3D ground on the
+   site's own 1 m DEM instead of the global tiles, so the Great Circle's bank rises out of the
+   ground at its real height. Blocked on two things a spike must answer: MapLibre allows one
+   terrain source per map, and the 3 km site DEM has no data past its frame, so the ground drops
+   off a cliff at the edge. Candidates: a blended terrarium tile (site DEM inside, global tiles
+   outside) served from the bucket, or clipping the camera to the frame. The raking light,
+   dissolve and cross-section shipped Oct 14 without it.
 
 After the demo (the user, Oct 14; never before Nov 9): **move the three agents to Claude Sonnet
 5.5.** The Oct 14 bake-off (`docs/bakeoff/README.md`) kept Sonnet 4.6 for the stage because 5.5

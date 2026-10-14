@@ -413,6 +413,7 @@ export function Chat() {
           isLoadingScenario={isLoadingScenario}
           scenarioError={scenarioError}
           onSessionReset={handleSessionReset}
+          geometry={currentGeometry}
           onGeometryUpdate={setCurrentGeometry}
           onRastersUpdate={setCurrentRasters}
           drawnGeometryMessage={drawnGeometryMessage}

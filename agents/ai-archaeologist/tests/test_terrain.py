@@ -3,20 +3,30 @@ live, with the render hint the map and inspect_image agree on."""
 import asyncio
 import json
 
-from conftest import SESSION
+from conftest import BUCKET, SESSION
 
 
 def _run(coro):
     return asyncio.run(coro)
 
 
-def test_hillshade_is_copied_into_the_session_with_a_grey_hint(tools, fake_s3):
+def test_hillshade_is_copied_into_the_session_with_a_grey_hint_and_its_dem(tools, fake_s3):
     body = json.loads(_run(tools.show_terrain("newark-octagon", "hillshade")))
     key = f"session_data/{SESSION}/terrain/hillshade_newark-octagon.tif"
-    assert body["s3_url"].endswith(key) and fake_s3.copies == [(f"{tools.CACHE_PREFIX}/newark-octagon_hillshade.tif", key)]
+    dem_key = f"session_data/{SESSION}/terrain/dem_newark-octagon.tif"
+    assert body["s3_url"].endswith(key)
+    # The hillshade and the DEM it was lit from, both server-side copies; the DEM rides in the hint
+    # so the stage can light the ground itself.
+    assert fake_s3.copies == [(f"{tools.CACHE_PREFIX}/newark-octagon_hillshade.tif", key),
+                              (f"{tools.CACHE_PREFIX}/newark-octagon_dem.tif", dem_key)]
     assert body["render"] == {"kind": "raster", "colormap": "gray", "rescale": [1, 255], "group": "terrain",
-                              "legend": "Hillshade", "bounds": body["bounds"]}
+                              "legend": "Hillshade", "bounds": body["bounds"], "dem": f"s3://{BUCKET}/{dem_key}"}
     assert body["source"]["dataset"].startswith("USGS 3DEP 1 m")
+
+
+def test_relief_copies_no_dem(tools, fake_s3):
+    body = json.loads(_run(tools.show_terrain("newark-great-circle", "lrm")))
+    assert "dem" not in body["render"] and len(fake_s3.copies) == 1
 
 
 def test_relief_uses_the_sites_stretch(tools):

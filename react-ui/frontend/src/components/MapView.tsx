@@ -50,6 +50,16 @@ import {
   terrainGeometryHint,
   terrainRasterHint,
   transectParts,
+  LIGHT_AZIMUTH,
+  LIGHT_EXAGGERATION,
+  LIGHT_SWEEP_MS,
+  PAPER_RESCALE,
+  REVEAL_MS,
+  compassName,
+  demTilesUrl,
+  isHillshadeHint,
+  lightStrength,
+  lightSweep,
 } from '../utils/archaeoLayers.ts';
 import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
 import { Starfield } from './Starfield.tsx';
@@ -79,8 +89,13 @@ const COLUMNS_PITCH = 55;
 const COARSE_RASTER_OPACITY = 0.75;
 
 const TIPS_SOURCE = 'watch-tips';
-// The archaeologist's ground: the terrain-RGB source the 1 m products are draped on.
+// The archaeologist's ground: the terrain-RGB source the 1 m products are draped on, and the
+// relief the whole record is read on at rest (the same source, lit as a hillshade over the dimmed
+// basemap: the archaeologist's map is landform, not imagery).
 const GROUND_SOURCE = 'ground-dem';
+const RELIEF_LAYER = 'rest-relief';
+// A raster's companion (the live light over a hillshade) travels with it in the stack.
+const LIGHT_SUFFIX = '-light';
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -214,22 +229,39 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const [groundOn, setGroundOn] = useState(false);
   const groundOnRef = useRef(false);
   const scaleControl = useRef<maplibregl.ScaleControl | null>(null);
+  // The record at rest reads on relief: while the catalogue marks are on the stage and no terrain
+  // product has stood the ground up, the same terrain tiles are lit as a hillshade just above the
+  // dimmed basemap, so the Appalachians and the river valleys the mound builders chose read as
+  // landform. The first LiDAR product takes over (the 1 m hillshade is the relief then).
+  const reliefOn = useMemo(
+    () => !groundOn && allLayers.some((l) =>
+      l.type === 'geometry' && terrainGeometryHint(l.render, l.url)?.kind === 'points' && rasterVisibility[l.id] !== false),
+    [groundOn, allLayers, rasterVisibility],
+  );
+  const reliefOnRef = useRef(false);
+  const ensureGroundSource = (mapInstance: maplibregl.Map) => {
+    if (mapInstance.getSource(GROUND_SOURCE)) return;
+    mapInstance.addSource(GROUND_SOURCE, {
+      type: 'raster-dem',
+      tiles: [TERRAIN_TILES_URL],
+      encoding: 'terrarium',
+      tileSize: 256,
+      maxzoom: 15,
+      attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP)',
+    });
+  };
+  const dropGroundSource = (mapInstance: maplibregl.Map) => {
+    if (!groundOnRef.current && !reliefOnRef.current && mapInstance.getSource(GROUND_SOURCE)) {
+      mapInstance.removeSource(GROUND_SOURCE);
+    }
+  };
   useEffect(() => {
     groundOnRef.current = groundOn;
     const mapInstance = map.current;
     if (!mapInstance) return;
     const apply = () => {
       if (groundOn) {
-        if (!mapInstance.getSource(GROUND_SOURCE)) {
-          mapInstance.addSource(GROUND_SOURCE, {
-            type: 'raster-dem',
-            tiles: [TERRAIN_TILES_URL],
-            encoding: 'terrarium',
-            tileSize: 256,
-            maxzoom: 15,
-            attribution: 'Terrain: AWS Terrain Tiles (USGS 3DEP)',
-          });
-        }
+        ensureGroundSource(mapInstance);
         mapInstance.setTerrain({ source: GROUND_SOURCE, exaggeration: RELIEF_EXAGGERATION });
         if (!scaleControl.current) {
           scaleControl.current = new maplibregl.ScaleControl({ maxWidth: 160, unit: 'metric' });
@@ -237,7 +269,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         }
       } else {
         if (mapInstance.getTerrain()) mapInstance.setTerrain(null);
-        if (mapInstance.getSource(GROUND_SOURCE)) mapInstance.removeSource(GROUND_SOURCE);
+        dropGroundSource(mapInstance);
         if (scaleControl.current) {
           mapInstance.removeControl(scaleControl.current);
           scaleControl.current = null;
@@ -247,6 +279,84 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     if (mapInstance.isStyleLoaded()) apply();
     else mapInstance.once('styledata', apply);
   }, [groundOn]);
+  useEffect(() => {
+    reliefOnRef.current = reliefOn;
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    const apply = () => {
+      if (reliefOn) {
+        ensureGroundSource(mapInstance);
+        if (!mapInstance.getLayer(RELIEF_LAYER)) {
+          // Just above the basemap: the stack (marks, frames, products) draws over it.
+          const above = mapInstance.getLayersOrder().find((id) => !BASEMAP_IDS.includes(id));
+          mapInstance.addLayer({
+            id: RELIEF_LAYER,
+            type: 'hillshade',
+            source: GROUND_SOURCE,
+            paint: {
+              'hillshade-illumination-direction': LIGHT_AZIMUTH,
+              'hillshade-illumination-anchor': 'map',
+              'hillshade-exaggeration': 0.8,
+              'hillshade-shadow-color': '#05070a',
+              // A soft highlight: full white makes the continental shelf louder than the sites.
+              'hillshade-highlight-color': 'rgba(233, 238, 243, 0.55)',
+              'hillshade-accent-color': '#0f141b',
+            },
+          }, above);
+        }
+      } else {
+        if (mapInstance.getLayer(RELIEF_LAYER)) mapInstance.removeLayer(RELIEF_LAYER);
+        dropGroundSource(mapInstance);
+      }
+    };
+    if (mapInstance.isStyleLoaded()) apply();
+    else mapInstance.once('styledata', apply);
+  }, [reliefOn]);
+
+  // The light over a hillshade: the live layers (one per hillshade on the stage), the sun's
+  // azimuth the dial shows, and the sweep in flight when the LiDAR lands.
+  const lightLayers = useRef<Set<string>>(new Set());
+  const [lightCount, setLightCount] = useState(0);
+  const [lightAzimuth, setLightAzimuth] = useState(LIGHT_AZIMUTH);
+  const sweepFrame = useRef(0);
+  const setLight = (azimuth: number) => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    lightLayers.current.forEach((id) => {
+      if (mapInstance.getLayer(id)) {
+        mapInstance.setPaintProperty(id, 'hillshade-illumination-direction', azimuth);
+        mapInstance.setPaintProperty(id, 'hillshade-exaggeration', LIGHT_EXAGGERATION);
+      }
+    });
+  };
+  const stopSweep = () => {
+    if (sweepFrame.current) cancelAnimationFrame(sweepFrame.current);
+    sweepFrame.current = 0;
+  };
+  // One turn of the sun round the earthwork, then it settles where the baked hillshade was lit.
+  const sweepLight = (lightId: string) => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+    stopSweep();
+    const t0 = performance.now();
+    const step = (now: number) => {
+      if (!mapInstance.getLayer(lightId)) return;
+      const t = (now - t0) / LIGHT_SWEEP_MS;
+      mapInstance.setPaintProperty(lightId, 'hillshade-illumination-direction', lightSweep(t));
+      mapInstance.setPaintProperty(lightId, 'hillshade-exaggeration', lightStrength(t));
+      if (t < 1) {
+        sweepFrame.current = requestAnimationFrame(step);
+      } else {
+        sweepFrame.current = 0;
+        setLightAzimuth(LIGHT_AZIMUTH);
+        setLight(LIGHT_AZIMUTH);
+      }
+    };
+    sweepFrame.current = requestAnimationFrame(step);
+  };
+  const forgetLight = (lightId: string) => {
+    if (lightLayers.current.delete(lightId)) setLightCount(lightLayers.current.size);
+  };
 
   // The tips on the globe: one mark per scanned watch area at its hotspot (or its centre when the
   // scan found none), sized and coloured by the anomaly on the TROPOMI legend's own ramp (ice),
@@ -436,8 +546,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       || layerGroups.changeDetection.some((l) => rasterVisibility[l.id] !== false)
       // The regional scan's grid (scan_hotspots_*.geojson, cells with a change_score).
       || layerGroups.geometries.some((l) => /scan_hotspots|change_score/.test(l.url) && rasterVisibility[l.id] !== false)
-      || allLayers.some((l) => l.type === 'raster' && isTerrainLayer(l) && rasterVisibility[l.id] !== false),
-    [layerGroups.methane, layerGroups.changeDetection, layerGroups.geometries, allLayers, rasterVisibility]
+      || allLayers.some((l) => l.type === 'raster' && isTerrainLayer(l) && rasterVisibility[l.id] !== false)
+      // And the record at rest: the relief reads on a dark monochrome ground.
+      || reliefOn,
+    [layerGroups.methane, layerGroups.changeDetection, layerGroups.geometries, allLayers, rasterVisibility, reliefOn]
   );
   useEffect(() => {
     methaneOnStageRef.current = methaneOnStage;
@@ -497,7 +609,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         const m = map.current;
         if (!m) return null;
         const c = m.getCenter();
-        return { zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing(), lon: c.lng, lat: c.lat, terrain: !!m.getTerrain() };
+        const light = [...lightLayers.current].filter((id) => m.getLayer(id)).map((id) => ({
+          id,
+          azimuth: m.getPaintProperty(id, 'hillshade-illumination-direction'),
+          strength: m.getPaintProperty(id, 'hillshade-exaggeration'),
+        }));
+        return {
+          zoom: m.getZoom(), pitch: m.getPitch(), bearing: m.getBearing(), lon: c.lng, lat: c.lat,
+          terrain: !!m.getTerrain(), relief: !!m.getLayer(RELIEF_LAYER), light,
+        };
       };
     }
 
@@ -1401,6 +1521,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   // result the dashed query outline and the rank labels.
   const geometryCompanionIds = (fillLayerId: string) =>
     ['-outline', '-query', '-labels', '-hairline'].map(suffix => fillLayerId.replace('-fill', suffix));
+  // Every map layer that travels with a listed one: a geometry's fill companions, a raster's light.
+  const companionIds = (id: string) => (id.startsWith('cogLayer-') ? [`${id}${LIGHT_SUFFIX}`] : geometryCompanionIds(id));
 
   // Put the stack (top first) on the map: per listed layer, its map layers in their current order
   // (a geometry's fill, hairline, outline, labels travel together), bottom group first, each
@@ -1412,11 +1534,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     const style = mapInstance.getLayersOrder();
     const groups = order
       .map((id) => {
-        const members = new Set([id, ...geometryCompanionIds(id)]);
+        const members = new Set([id, ...companionIds(id)]);
         return style.filter((sid) => members.has(sid));
       })
       .filter((g) => g.length > 0);
-    const ceiling = stackCeiling(style, new Set(groups.flat()), BASEMAP_IDS);
+    // The rest relief is part of the floor, like the basemap: the stack draws over it.
+    const ceiling = stackCeiling(style, new Set(groups.flat()), [...BASEMAP_IDS, RELIEF_LAYER]);
     for (const [id, beforeId] of stackMoves(groups, ceiling)) {
       mapInstance.moveLayer(id, beforeId);
     }
@@ -1471,13 +1594,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         if (mapInstance.getSource(id)) mapInstance.removeSource(id);
       });
     } else {
-      // Raster layer
-      if (mapInstance.getLayer(layer.id)) {
-        mapInstance.removeLayer(layer.id);
-      }
-      if (mapInstance.getSource(layer.sourceId)) {
-        mapInstance.removeSource(layer.sourceId);
-      }
+      // Raster layer, and the live light over a hillshade with its DEM source.
+      [layer.id, `${layer.id}${LIGHT_SUFFIX}`].forEach((id) => {
+        if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
+      });
+      [layer.sourceId, `${layer.sourceId}-dem`].forEach((id) => {
+        if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+      });
+      forgetLight(`${layer.id}${LIGHT_SUFFIX}`);
       // Remove URL from tracking ref
       addedRasterUrls.current.delete(layer.url);
     }
@@ -1512,15 +1636,19 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           if (mapInstance.getSource(id)) mapInstance.removeSource(id);
         });
       } else {
-        // Raster layer
-        if (mapInstance.getLayer(layer.id)) {
-          mapInstance.removeLayer(layer.id);
-        }
-        if (mapInstance.getSource(layer.sourceId)) {
-          mapInstance.removeSource(layer.sourceId);
-        }
+        // Raster layer, and the live light over a hillshade with its DEM source.
+        [layer.id, `${layer.id}${LIGHT_SUFFIX}`].forEach((id) => {
+          if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
+        });
+        [layer.sourceId, `${layer.sourceId}-dem`].forEach((id) => {
+          if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+        });
       }
     });
+    stopSweep();
+    lightLayers.current.clear();
+    setLightCount(0);
+    setLightAzimuth(LIGHT_AZIMUTH);
 
     // Clear all layers (basemap is dynamic and not tracked here)
     setAllLayers([]);
@@ -1702,7 +1830,19 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             newLayerMetadata.some((l) => isMethaneLayer(l));
           const hintParams = tileParamsFor(hint);
 
-          if (hintParams) {
+          // A hillshade that names its DEM gets a live light: the DEM is served as terrain-RGB and
+          // lit by the map itself (the sweep when it lands, the dial after), and the baked hillshade
+          // under it becomes a flat grey sheet so the light reads on paper, not on imagery.
+          let demPresigned: string | null = null;
+          if (isTerrainRaster && isHillshadeHint(hint) && hint?.dem) {
+            demPresigned = await getPresignedUrl(hint.dem);
+            if (abortController.signal.aborted) break;
+          }
+          const liveLight = demPresigned !== null;
+
+          if (liveLight) {
+            tileUrl = `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&bidx=1&rescale=${PAPER_RESCALE[0]},${PAPER_RESCALE[1]}&colormap_name=gray`;
+          } else if (hintParams) {
             // The agent said how this layer looks (validated in utils/render.ts).
             tileUrl = `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&${hintParams}`;
           } else if (urlLower.includes('change_detection') || urlLower.includes('change-detection')) {
@@ -1777,18 +1917,69 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // A coarse raster (the hint caps its zoom: TROPOMI's ~4 km cells) is hidden above that
           // zoom and dimmed below it, so it tips the eye without walling off the finding.
           const coarse = typeof hint?.max_zoom === 'number';
+          // A terrain product surfaces through the scene under it rather than snapping on: the
+          // golf course dissolves and the earthwork is there. Not under reduced motion.
+          const reveal = isTerrainRaster && !prefersReducedMotion();
+          const targetOpacity = coarse ? COARSE_RASTER_OPACITY : 1.0;
           mapInstance.addLayer({
             id: layerId,
             type: 'raster',
             source: sourceId,
             ...(coarse ? { maxzoom: hint!.max_zoom } : {}),
             paint: {
-              'raster-opacity': coarse ? COARSE_RASTER_OPACITY : 1.0,
+              'raster-opacity': reveal ? 0 : targetOpacity,
+              ...(reveal ? { 'raster-opacity-transition': { duration: REVEAL_MS, delay: 0 } } : {}),
             },
             layout: {
               visibility: isVisible ? 'visible' : 'none',
             },
           });
+          if (reveal) requestAnimationFrame(() => {
+            if (mapInstance.getLayer(layerId)) mapInstance.setPaintProperty(layerId, 'raster-opacity', targetOpacity);
+          });
+          if (liveLight && demPresigned) {
+            const demSourceId = `${sourceId}-dem`;
+            const lightId = `${layerId}${LIGHT_SUFFIX}`;
+            mapInstance.addSource(demSourceId, {
+              type: 'raster-dem',
+              tiles: [demTilesUrl(TITILER_URL, demPresigned)],
+              encoding: 'terrarium',
+              tileSize: 256,
+              minzoom: Math.max(sourceMinZoom, 10),
+              maxzoom: 17,
+              ...(rasterBounds ? { bounds: rasterBounds } : {}),
+            });
+            const still = prefersReducedMotion();
+            mapInstance.addLayer({
+              id: lightId,
+              type: 'hillshade',
+              source: demSourceId,
+              paint: {
+                'hillshade-illumination-direction': LIGHT_AZIMUTH,
+                'hillshade-illumination-anchor': 'map',
+                'hillshade-exaggeration': still ? LIGHT_EXAGGERATION : 0,
+                'hillshade-shadow-color': '#0f141b',
+                'hillshade-highlight-color': '#ffffff',
+                'hillshade-accent-color': '#0f141b',
+              },
+              layout: { visibility: isVisible ? 'visible' : 'none' },
+            });
+            lightLayers.current.add(lightId);
+            setLightCount(lightLayers.current.size);
+            setLightAzimuth(LIGHT_AZIMUTH);
+            if (!still) {
+              // The sun goes round once the camera has landed and the ground has loaded (idle),
+              // or after four seconds regardless, so a slow tile never holds the act.
+              let started = false;
+              const start = () => {
+                if (started) return;
+                started = true;
+                sweepLight(lightId);
+              };
+              mapInstance.once('idle', start);
+              setTimeout(start, 4000);
+            }
+          }
           placeInStack(layerId, isFinding ? 'aboveImagery' : 'bottom');
 
           // Track this layer with metadata
@@ -1891,9 +2082,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         mapInstance.setLayoutProperty(layerId, 'visibility', visibility);
       }
       
-      // For geometry layers, also update the companion layers (outline, query, labels)
-      if (layerId.includes('geometry') && layerId.includes('-fill')) {
-        geometryCompanionIds(layerId).forEach(id => {
+      // The companions follow: a geometry's outline, query, labels; a hillshade's live light.
+      if ((layerId.includes('geometry') && layerId.includes('-fill')) || layerId.startsWith('cogLayer-')) {
+        companionIds(layerId).forEach(id => {
           if (mapInstance.getLayer(id)) {
             mapInstance.setLayoutProperty(id, 'visibility', visibility);
           }
@@ -2053,10 +2244,37 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       );
     }
     if (lg.kind === 'hillshade') {
+      // With a live light the sentence follows the sun, and the dial moves it: raking light is how
+      // LiDAR archaeology reads a wall, so the presenter can show it from any side on a question.
+      const live = lightCount > 0;
+      const from = live ? compassName(lightAzimuth) : 'north-west';
       return (
         <div key={lg.key} className="map-legend map-legend--stacked">
           <span className="map-legend__name">Hillshade</span>
-          <span className="map-legend__label">1 m LiDAR, lit from the north-west: banks cast shadows, ditches catch them</span>
+          <span className="map-legend__label">1 m LiDAR, lit from the {from}: banks cast shadows, ditches catch them</span>
+          {live && (
+            <label className="map-dial">
+              <span className="map-dial__label">
+                light from <span className="map-legend__num">{Math.round(lightAzimuth)}°</span>
+              </span>
+              <input
+                type="range"
+                className="map-dial__input"
+                min={0}
+                max={359}
+                step={1}
+                value={Math.round(lightAzimuth)}
+                onChange={(e) => {
+                  stopSweep();
+                  const az = Number(e.target.value);
+                  setLightAzimuth(az);
+                  setLight(az);
+                }}
+                aria-label="Direction the light comes from, in degrees from north"
+                aria-valuetext={`${Math.round(lightAzimuth)} degrees, from the ${from}`}
+              />
+            </label>
+          )}
         </div>
       );
     }

@@ -19,6 +19,7 @@ import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { currentBriefId } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
+import { profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
 import { twoColumnTables } from '../utils/tables.ts';
 import { stepColumnMaxHeight } from '../utils/stageLayout.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
@@ -77,6 +78,9 @@ interface ChatSidebarProps {
   onWorkingChange?: (working: boolean) => void;
   /** The TROPOMI tips as they load, for the globe. */
   onTipsUpdate?: (tips: Tip[]) => void;
+  /** The geometry on the map right now (the stage's state, whichever loader put it there), so
+   * the column can draw the archaeologist's section when its transect lands. */
+  geometry?: GeometryData | null;
 }
 
 export function ChatSidebar({
@@ -94,8 +98,17 @@ export function ChatSidebar({
   onDrawnGeometryMessageSent,
   onWorkingChange,
   onTipsUpdate,
+  geometry = null,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  // The archaeologist's measured sections this session, by site id: harvested from the transect
+  // GeoJSON when it lands on the map (live or replayed), kept when later geometry replaces it.
+  const [profiles, setProfiles] = useState<Record<string, ProfileData>>({});
+  useEffect(() => {
+    if (!geometry?.features) return;
+    const p = profileFromFeatures(geometry.features as Parameters<typeof profileFromFeatures>[0], geometry.sourceUrl);
+    if (p) setProfiles((prev) => (prev[p.siteId] === p ? prev : { ...prev, [p.siteId]: p }));
+  }, [geometry]);
   const [userInput, setUserInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [streamingTools, setStreamingTools] = useState<ToolCall[]>([]);
@@ -130,6 +143,7 @@ export function ChatSidebar({
     }
     liveSessionRef.current = sessionId;
     setOpenEvidence(null);
+    setProfiles({});
     setMessages([]);
     setUserInput('');
     setStreamingText('');
@@ -615,6 +629,7 @@ export function ChatSidebar({
                   methaneDir={methaneDir}
                   tips={tips}
                   compact={showBrief && draftedBrief}
+                  profiles={profiles}
                   key={`steps-${briefId ?? 'live'}`}
                 />
               )}

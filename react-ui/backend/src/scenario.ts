@@ -39,10 +39,27 @@ export function scenarioLayers(config: unknown, bucket: string, scenarioId: stri
       s3_url: `s3://${bucket}/use-cases/${scenarioId}/${file}`,
       title: typeof title === 'string' && title.trim() ? title.trim().slice(0, 120) : file,
     };
-    if (render && typeof render === 'object' && !Array.isArray(render)) layer.render = render as Record<string, unknown>;
+    if (render && typeof render === 'object' && !Array.isArray(render)) {
+      layer.render = withCaseDem(render as Record<string, unknown>, bucket, scenarioId);
+    }
     out.push(layer);
   }
   return out;
+}
+
+/**
+ * A hillshade's render hint names the DEM it was lit from. In a recorded case that is the
+ * placeholder `s3://bucket/use-cases/<id>/dem_<site>.tif` (or a bare file name); both become the
+ * real bucket's URL under this case's prefix. Anything else is dropped, never passed through.
+ */
+function withCaseDem(render: Record<string, unknown>, bucket: string, scenarioId: string): Record<string, unknown> {
+  if (render.dem === undefined) return render;
+  const { dem, ...rest } = render;
+  if (typeof dem !== 'string') return rest;
+  const placeholder = `s3://bucket/use-cases/${scenarioId}/`;
+  const file = dem.startsWith(placeholder) ? dem.slice(placeholder.length) : dem;
+  if (!LAYER_FILE.test(file) || !/^dem_/.test(file)) return rest;
+  return { ...rest, dem: `s3://${bucket}/use-cases/${scenarioId}/${file}` };
 }
 
 /**
@@ -61,6 +78,11 @@ export function scenarioToolCalls(config: unknown, bucket: string, scenarioId: s
     const rewritten: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(params as Record<string, unknown>)) {
       rewritten[k] = typeof v === 'string' && v.startsWith(placeholder) && !v.includes('..') ? real + v.slice(placeholder.length) : v;
+    }
+    // The one nested URL a recorded call carries: the DEM in a hillshade's render hint.
+    const render = rewritten.render;
+    if (render && typeof render === 'object' && !Array.isArray(render)) {
+      rewritten.render = withCaseDem(render as Record<string, unknown>, bucket, scenarioId);
     }
     return { ...(call as object), params: rewritten };
   });
