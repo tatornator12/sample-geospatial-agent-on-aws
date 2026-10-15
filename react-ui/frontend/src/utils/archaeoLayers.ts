@@ -8,7 +8,7 @@
  * a valid hint and is recognised by its file name instead. Everything the act puts on the map is
  * a site already on the public record (the agent's catalogue); nothing here can place a point.
  */
-import type { RenderHint } from './render.ts';
+import { isStageDemUrl, type RenderHint } from './render.ts';
 
 /** A hillshade: the ground lit from the north-west, greys 1–255 (0 is nodata). */
 export const HILLSHADE: RenderHint = { kind: 'raster', colormap: 'gray', rescale: [1, 255], group: 'terrain', legend: 'Hillshade' };
@@ -45,11 +45,22 @@ export const MARKS_MAX_ZOOM = 9;
  * the horizon in the frame with the last light on it; the continent's own relief is stood up and
  * lit by the low western sun, so the ridges and the valleys every site on the record sits in read
  * as landform. The satellite ground goes to a dark monochrome under it. (Looking west also keeps
- * the edge of the Web Mercator world, 85° N, out of a 70° view; looking north it shows.)
+ * the edge of the Web Mercator world, 85° N, out of a steep view; looking north it shows.) 65°, not
+ * the first take's 70°: the record spreads deeper down the window and the far names shrink less;
+ * at 1280x720 it names one more site (18 of 21 against 17).
  */
-export const REST_PITCH = 70;
+export const REST_PITCH = 65;
 export const REST_BEARING = 290;
 export const REST_EXAGGERATION = 6;
+/** The rest view's names, in px as drawn (the Back Row Rule): the far ones are sized up to it. */
+export const REST_LABEL_SIZE = 15;
+/**
+ * The rest view's left margin when the step column is down (it is, at rest): room for a name to
+ * the left of the westmost dot, so the record spreads across the whole stage, not the right 3/4.
+ */
+export const REST_EDGE = 120;
+/** The share of the window kept over the farthest site for the land running on to the horizon. */
+export const REST_TOP_SHARE = 0.22;
 /** The map allows the rest view's pitch (MapLibre's default ceiling is 60). */
 export const MAX_PITCH = 75;
 export const REST_SKY = {
@@ -170,6 +181,20 @@ export function demTilesUrl(titilerUrl: string, presignedDem: string): string {
   return `${titilerUrl}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(presignedDem)}&algorithm=terrarium`;
 }
 
+/**
+ * The DEM a hillshade was lit from, by the tool's own file names: `show_terrain` writes
+ * `terrain/hillshade_<site>.tif` and stages `terrain/dem_<site>.tif` beside it (a replay case keeps
+ * both flat in its folder). The stage uses this when the model passed the hillshade's render hint
+ * on without its `dem` (it copies the hint, and once in a while drops a key), and checks the file
+ * is there before it trades the baked hillshade for the live light.
+ */
+export function companionDem(hillshadeUrl: string | undefined): string | null {
+  const m = (hillshadeUrl || '').match(/^(s3:\/\/[^/]+\/(?:session_data\/[^/]+\/terrain|use-cases\/[^/]+))\/hillshade_([a-z0-9][a-z0-9-]{1,63})\.tif$/);
+  if (!m) return null;
+  const dem = `${m[1]}/dem_${m[2]}.tif`;
+  return isStageDemUrl(dem) ? dem : null;
+}
+
 /** The hillshade product, as against the local relief model: only the hillshade gets a live light. */
 export function isHillshadeHint(hint: RenderHint | null | undefined): boolean {
   return !!hint && hint.kind === 'raster' && hint.group === 'terrain' && hint.colormap === 'gray';
@@ -270,6 +295,81 @@ export function transectParts(features: Feature[]): { line: Feature | null; mark
     (f) => f?.geometry?.type === 'Point' && (f.properties?.kind === 'bank' || f.properties?.kind === 'ditch'),
   );
   return { line, marks };
+}
+
+/**
+ * A site's name as the rest view prints it: the place, not the park. "Cahokia Mounds State
+ * Historic Site" is "Cahokia Mounds", "Monumental Earthworks of Poverty Point" is "Poverty Point";
+ * a continent of 28 names fits twice as many labels at half the width.
+ */
+export function shortSiteName(name: string): string {
+  let s = (name || '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/^Monumental Earthworks of /, '').trim();
+  const tails = [
+    ' State Historic Site', ' National Historical Park', ' National Monument', ' Archeological State Park',
+    ' Archaeological State Park', ' State Archaeological Park', ' Archaeological Park', ' Archaeological Center',
+    ' State Park', ' & Nature Preserve',
+  ];
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const t of tails) {
+      if (s.endsWith(t) && s.length > t.length) {
+        s = s.slice(0, -t.length).trim();
+        changed = true;
+      }
+    }
+  }
+  return s || name;
+}
+
+type RecordFeature = { type?: string; properties?: Record<string, unknown> | null; geometry?: { type: string; coordinates: unknown } | null };
+
+/** The World Heritage property a component belongs to: "Hopewell Ceremonial Earthworks", or null. */
+export function heritageProperty(designation: unknown): string | null {
+  const m = typeof designation === 'string' ? designation.match(/UNESCO World Heritage \(([^,()]+?),\s*\d{4}\)/) : null;
+  return m ? m[1].trim() : null;
+}
+
+/**
+ * The rest view's name labels: one per site under its short name, except that the components of
+ * one World Heritage property on the record (the eight Hopewell Ceremonial Earthworks, within a
+ * day's drive of each other in Ohio) share one label at their middle, "Hopewell Ceremonial
+ * Earthworks, 8 sites", instead of eight names that collide into none. Every dot stays its own.
+ * A site's own label sits on its dot (`group` false), so the same points keep the other names off
+ * those dots; a shared label sits between its dots (`group` true) and keeps nothing out (keeping
+ * the names off all eight Hopewell dots too costs Fort Hill's and Miamisburg's names, measured).
+ * `size`, when set, is the text-size that lands the name at 15 px at the rest view's depth
+ * (restCamera.ts sizeAtLeast).
+ */
+export interface RecordLabel {
+  type: 'Feature';
+  properties: { label: string; heritage: boolean; group: boolean; size?: number };
+  geometry: { type: 'Point'; coordinates: [number, number] };
+}
+export function recordLabels(features: RecordFeature[]): { type: 'FeatureCollection'; features: RecordLabel[] } {
+  const points = features.flatMap((f) => {
+    const c = f?.geometry?.type === 'Point' ? (f.geometry.coordinates as number[]) : null;
+    return c && Number.isFinite(c[0]) && Number.isFinite(c[1]) ? [{ f, c: [c[0], c[1]] as [number, number] }] : [];
+  });
+  const groups = new Map<string, Array<[number, number]>>();
+  for (const { f, c } of points) {
+    const prop = heritageProperty(f.properties?.designation);
+    if (prop) groups.set(prop, [...(groups.get(prop) ?? []), c]);
+  }
+  const out: RecordLabel[] = [];
+  for (const [prop, cs] of groups) {
+    if (cs.length < 2) continue;
+    const lon = cs.reduce((a, c) => a + c[0], 0) / cs.length;
+    const lat = cs.reduce((a, c) => a + c[1], 0) / cs.length;
+    out.push({ type: 'Feature', properties: { label: `${prop}, ${cs.length} sites`, heritage: true, group: true }, geometry: { type: 'Point', coordinates: [lon, lat] } });
+  }
+  for (const { f, c } of points) {
+    const prop = heritageProperty(f.properties?.designation);
+    if (prop && (groups.get(prop)?.length ?? 0) >= 2) continue;
+    const name = typeof f.properties?.name === 'string' ? f.properties.name : '';
+    if (!name) continue;
+    out.push({ type: 'Feature', properties: { label: shortSiteName(name), heritage: f.properties?.world_heritage === true, group: false }, geometry: { type: 'Point', coordinates: c } });
+  }
+  return { type: 'FeatureCollection', features: out };
 }
 
 /** [west, south, east, north] of a point collection, or null when nothing is usable. */

@@ -48,6 +48,11 @@ export interface RenderHint {
 // the backend's presign allowlist agrees (s3Access.ts). Nothing else is ever fetched from a hint.
 const DEM_URL = /^s3:\/\/[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\/(session_data\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/terrain|use-cases\/[A-Za-z0-9][A-Za-z0-9._-]{0,127})\/dem_[a-z0-9][a-z0-9-]{1,63}\.tif$/;
 
+/** A DEM the stage may presign and light: the session's terrain folder or a replay case, `dem_<site>.tif`. */
+export function isStageDemUrl(url: unknown): url is string {
+  return typeof url === 'string' && DEM_URL.test(url);
+}
+
 const TEXT_MAX = 24;
 const SAFE_TEXT = /^[\w ·°%/.-]+$/u;
 const IDENTIFIER = /^[a-z_][a-z0-9_]{0,31}$/;

@@ -13,9 +13,13 @@ import {
   SITE_FRAME,
   TRANSECT,
   altitudeWords,
+  companionDem,
   compassName,
   dialAzimuth,
+  heritageProperty,
   inTerrainTree,
+  recordLabels,
+  shortSiteName,
   lightAltitude,
   lightSweep,
   stepLight,
@@ -207,5 +211,73 @@ describe('the raking light', () => {
     expect(stepLight(25, 'PageDown', 'altitude')).toBe(LIGHT_ALTITUDE_RANGE[0] + 5);
     expect(stepLight(LIGHT_ALTITUDE_RANGE[1], 'ArrowUp', 'altitude')).toBe(LIGHT_ALTITUDE_RANGE[1]);
     expect(stepLight(25, 'Enter', 'azimuth')).toBeNull();
+  });
+});
+
+describe('the record\'s names at rest', () => {
+  it('prints the place, not the park', () => {
+    expect(shortSiteName('Cahokia Mounds State Historic Site')).toBe('Cahokia Mounds');
+    expect(shortSiteName('Monumental Earthworks of Poverty Point')).toBe('Poverty Point');
+    expect(shortSiteName('Great Mound (Mounds State Park)')).toBe('Great Mound');
+    expect(shortSiteName('Etowah Indian Mounds State Historic Site')).toBe('Etowah Indian Mounds');
+    expect(shortSiteName('Plum Bayou Mounds Archeological State Park')).toBe('Plum Bayou Mounds');
+    expect(shortSiteName('Pinson Mounds State Archaeological Park')).toBe('Pinson Mounds');
+    expect(shortSiteName('Fort Hill Earthworks & Nature Preserve')).toBe('Fort Hill Earthworks');
+    expect(shortSiteName('Ocmulgee Mounds National Historical Park')).toBe('Ocmulgee Mounds');
+    expect(shortSiteName('Effigy Mounds National Monument')).toBe('Effigy Mounds');
+    expect(shortSiteName('Aztalan State Park')).toBe('Aztalan');
+    expect(shortSiteName('Serpent Mound')).toBe('Serpent Mound');
+    expect(shortSiteName('State Park')).toBe('State Park');
+  });
+
+  it('reads the World Heritage property a component belongs to', () => {
+    expect(heritageProperty('UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component)')).toBe('Hopewell Ceremonial Earthworks');
+    expect(heritageProperty('UNESCO World Heritage (1982); National Historic Landmark')).toBeNull();
+    expect(heritageProperty('National Historic Landmark')).toBeNull();
+    expect(heritageProperty(undefined)).toBeNull();
+  });
+
+  it('gives one label to a property\'s components and short names to the rest', () => {
+    const pt = (name: string, lon: number, lat: number, designation: string, wh = false) => ({
+      type: 'Feature', properties: { name, designation, world_heritage: wh }, geometry: { type: 'Point', coordinates: [lon, lat] },
+    });
+    const hopewell = 'UNESCO World Heritage (Hopewell Ceremonial Earthworks, 2023) (component)';
+    const labels = recordLabels([
+      pt('Octagon Earthworks', -82.45, 40.05, hopewell, true),
+      pt('Great Circle Earthworks', -82.43, 40.04, hopewell, true),
+      pt('Mound City Group', -83.0, 39.37, hopewell, true),
+      pt('Cahokia Mounds State Historic Site', -90.06, 38.66, 'UNESCO World Heritage (1982)', true),
+      pt('Serpent Mound', -83.43, 39.03, 'National Historic Landmark'),
+      { type: 'Feature', properties: { name: 'No point' }, geometry: null },
+    ]).features;
+    expect(labels.map((f) => f.properties.label)).toEqual([
+      'Hopewell Ceremonial Earthworks, 3 sites', 'Cahokia Mounds', 'Serpent Mound',
+    ]);
+    expect(labels[0].properties.heritage).toBe(true);
+    expect(labels[0].geometry.coordinates[0]).toBeCloseTo((-82.45 - 82.43 - 83.0) / 3, 10);
+    expect(labels[2].properties.heritage).toBe(false);
+    // The shared label sits between dots (it keeps nothing out); a site's own sits on its dot.
+    expect(labels.map((f) => f.properties.group)).toEqual([true, false, false]);
+    expect(labels[2].geometry.coordinates).toEqual([-83.43, 39.03]);
+    // A property with one component on the record keeps that component's own name.
+    const lone = recordLabels([pt('Seip Earthworks', -83.2, 39.24, hopewell, true)]).features;
+    expect(lone.map((f) => f.properties.label)).toEqual(['Seip Earthworks']);
+  });
+});
+
+describe('companionDem', () => {
+  it('finds the DEM show_terrain staged beside a hillshade, in a session or a replay case', () => {
+    expect(companionDem('s3://geospatial-agent-on-aws-419324627248/session_data/931575d0-a79e/terrain/hillshade_newark-octagon.tif'))
+      .toBe('s3://geospatial-agent-on-aws-419324627248/session_data/931575d0-a79e/terrain/dem_newark-octagon.tif');
+    expect(companionDem('s3://my.bucket/use-cases/archaeologist-newark/hillshade_newark-octagon.tif'))
+      .toBe('s3://my.bucket/use-cases/archaeologist-newark/dem_newark-octagon.tif');
+  });
+
+  it('is null for anything else', () => {
+    expect(companionDem('s3://b/session_data/abc/terrain/lrm_newark-great-circle.tif')).toBeNull();
+    expect(companionDem('s3://b/session_data/abc/rasters/hillshade_x.tif')).toBeNull();
+    expect(companionDem('s3://b/archaeology/cache/v1/hillshade_newark-octagon.tif')).toBeNull();
+    expect(companionDem('https://example.com/terrain/hillshade_x.tif')).toBeNull();
+    expect(companionDem(undefined)).toBeNull();
   });
 });

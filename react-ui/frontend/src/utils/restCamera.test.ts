@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitPitched, type Camera, type Lens } from './restCamera.ts';
+import { fitPitched, labelPerspective, sizeAtLeast, type Camera, type Lens } from './restCamera.ts';
 
 const SIZE = { width: 1920, height: 1024 };
 const PAD = { top: 300, bottom: 170, left: 480, right: 410 };
@@ -65,5 +65,36 @@ describe('fitPitched', () => {
   it('leaves the camera alone with nothing to fit or no room', () => {
     expect(fitPitched([], start, SIZE, PAD, flat)).toBe(start);
     expect(fitPitched(SITES, start, { width: 800, height: 400 }, PAD, flat)).toBe(start);
+  });
+});
+
+describe('the rest view names at depth', () => {
+  const H = 1024;
+
+  it('scales a name as MapLibre does: 1 at the centre, smaller towards the horizon, larger near', () => {
+    expect(labelPerspective(H / 2, H, 65)).toBeCloseTo(1, 10);
+    // f = (H/2)/tan(18.435°) = 1.5·H; 200 px above the centre at 65°: 0.5 + 0.5·(1 − tan65·200/1536).
+    expect(labelPerspective(H / 2 - 200, H, 65)).toBeCloseTo(0.5 + 0.5 * (1 - (Math.tan((65 * Math.PI) / 180) * 200) / 1536), 3);
+    expect(labelPerspective(H / 2 - 200, H, 65)).toBeLessThan(1);
+    expect(labelPerspective(H / 2 + 200, H, 65)).toBeGreaterThan(1);
+    // Flat on: no depth.
+    expect(labelPerspective(100, H, 0)).toBeCloseTo(1, 10);
+    // A padded map's centre is its own.
+    expect(labelPerspective(600, H, 65, 36.87, 600)).toBeCloseTo(1, 10);
+    // Clamped like the shader, past the horizon included.
+    expect(labelPerspective(-100000, H, 65)).toBe(0);
+    expect(labelPerspective(1e7, H, 65)).toBe(4);
+  });
+
+  it('sizes a far name up to the floor and leaves a near one alone', () => {
+    expect(sizeAtLeast(15, 0.85)).toBeCloseTo(17.7, 5);
+    // As drawn: at least the floor.
+    expect(sizeAtLeast(15, 0.85) * 0.85).toBeGreaterThanOrEqual(15);
+    expect(sizeAtLeast(15, 1)).toBe(15);
+    expect(sizeAtLeast(15, 1.3)).toBe(15);
+    // Never past twice the floor, and nothing odd from a degenerate scale.
+    expect(sizeAtLeast(15, 0.2)).toBe(30);
+    expect(sizeAtLeast(15, 0)).toBe(15);
+    expect(sizeAtLeast(15, Number.NaN)).toBe(15);
   });
 });

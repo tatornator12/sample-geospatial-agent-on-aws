@@ -63,3 +63,26 @@ export function fitPitched(
   }
   return camera;
 }
+
+/**
+ * How much MapLibre scales a viewport-aligned label drawn at container row `y` of a pitched view.
+ * The symbol shader multiplies text-size by clamp(0.5 + 0.5 · d_centre / d_anchor, 0, 4); on flat
+ * ground d_centre / d_anchor = 1 − tan(pitch) · (centreY − y) / f, with f = (H / 2) / tan(fov / 2)
+ * the camera's distance to the centre in px. In the rest view a name near the horizon draws at
+ * about 85% of its size and one in the foreground at about 120%.
+ */
+export function labelPerspective(y: number, height: number, pitchDeg: number, fovDeg = 36.87, centreY = height / 2): number {
+  const f = height / 2 / Math.tan((fovDeg * Math.PI) / 360);
+  const ratio = 1 - (Math.tan((pitchDeg * Math.PI) / 180) * (centreY - y)) / f;
+  return Math.min(4, Math.max(0, 0.5 + 0.5 * ratio));
+}
+
+/**
+ * The text-size that draws at no less than `floor` px at that perspective: a far name grows to land
+ * at the floor (the Back Row Rule's 15 px), never past twice it; a near one keeps `floor` and the
+ * depth it is drawn at.
+ */
+export function sizeAtLeast(floor: number, perspective: number): number {
+  if (!(perspective > 0) || perspective >= 1) return floor;
+  return Math.min(2 * floor, Math.ceil((floor / perspective) * 10) / 10);
+}

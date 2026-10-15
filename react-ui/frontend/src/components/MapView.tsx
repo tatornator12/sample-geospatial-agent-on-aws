@@ -46,6 +46,8 @@ import {
   TRANSECT_MAX_ZOOM,
   isTerrainLayer,
   marksBounds,
+  recordLabels,
+  companionDem,
   signedMetres,
   siteWindow,
   terrainGeometryHint,
@@ -60,7 +62,10 @@ import {
   PAPER_RESCALE,
   REST_BASEMAP,
   REST_BEARING,
+  REST_EDGE,
   REST_EXAGGERATION,
+  REST_LABEL_SIZE,
+  REST_TOP_SHARE,
   REST_LIGHT,
   REST_PITCH,
   REST_RELIEF_HIGHLIGHT,
@@ -73,7 +78,7 @@ import {
   lightSweep,
 } from '../utils/archaeoLayers.ts';
 import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
-import { fitPitched, type Camera } from '../utils/restCamera.ts';
+import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
 import { getSectionCursor, setSectionCursor, useSectionCursor } from '../utils/sectionCursor.ts';
 import { Starfield } from './Starfield.tsx';
@@ -759,7 +764,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       },
       center: [0, 20],
       zoom: 2,
-      // The archaeologist's rest view stands at 70°; every other camera names its own pitch.
+      // The archaeologist's rest view stands at 65°; every other camera names its own pitch.
       maxPitch: MAX_PITCH,
       // Compact attribution: a small info button in the corner instead of a white bar under the plates.
       attributionControl: { compact: true },
@@ -979,7 +984,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
                 'circle-color': '#e9eef3',
                 'circle-opacity': 0.9,
                 'circle-radius': 4,
-                // Upright to the room: at the rest view's 70° a ground-aligned dot is a dash.
+                // Upright to the room: at the rest view's 65° a ground-aligned dot is a dash.
                 'circle-pitch-alignment': 'viewport',
               },
               layout: { visibility: 'visible' },
@@ -1000,24 +1005,52 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               },
               layout: { visibility: 'visible' },
             });
+            // The names ride on their own points (utils/archaeoLayers.ts recordLabels): short names,
+            // and one label for the eight Hopewell components that would otherwise collide into none.
+            // Each carries the size that lands it at 15 px at the rest view's depth (sizeRestLabels).
+            currentMap.addSource(`${geometryId}-points`, {
+              type: 'geojson',
+              data: recordLabels(geometry.features as Parameters<typeof recordLabels>[0]),
+            });
             currentMap.addLayer({
               id: `${geometryId}-labels`,
               type: 'symbol',
-              source: geometryId,
+              source: `${geometryId}-points`,
               maxzoom: MARKS_MAX_ZOOM,
               layout: {
-                'symbol-sort-key': ['case', heritage, 0, 1],
-                'text-field': ['get', terrainHint.label ?? 'name'],
+                'symbol-sort-key': ['case', ['==', ['get', 'heritage'], true], 0, 1],
+                'text-field': ['get', 'label'],
                 'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
-                'text-size': 15,
-                'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
+                'text-size': ['coalesce', ['get', 'size'], REST_LABEL_SIZE],
+                'text-max-width': 9,
+                'text-variable-anchor': ['left', 'right', 'top', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
                 'text-radial-offset': 0.9,
                 'text-justify': 'auto',
-                'text-padding': 6,
+                'text-padding': 3,
                 'text-optional': true,
                 visibility: 'visible',
               },
               paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2 },
+            });
+            // The dots keep the names off them: an unseen glyph on each named site's dot (a ring's is
+            // larger), placed before the names (it is above them) and always, so a name never covers
+            // a neighbour's dot. The shared Hopewell label sits between its dots and keeps nothing out.
+            currentMap.addLayer({
+              id: `${geometryId}-keepout`,
+              type: 'symbol',
+              source: `${geometryId}-points`,
+              filter: ['!=', ['get', 'group'], true],
+              maxzoom: MARKS_MAX_ZOOM,
+              layout: {
+                // Any glyph the font surely has: only its box counts.
+                'text-field': 'O',
+                'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
+                'text-size': ['case', ['==', ['get', 'heritage'], true], 16, 12],
+                'text-allow-overlap': true,
+                'text-ignore-placement': false,
+                visibility: 'visible',
+              },
+              paint: { 'text-opacity': 0 },
             });
           } else if (isTerrain && terrainHint.label) {
             // The transect: a fog line across the earthwork, a mark where each bank and ditch was
@@ -1556,6 +1589,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               (l.type === 'geometry' && terrainGeometryHint(l.render, l.url)?.kind === 'points'));
             const cam = onlyRecord && !groundOnRef.current ? restCameraFor(currentMap, geometry.features) : null;
             if (cam) {
+              sizeRestLabels(currentMap, geometryId, geometry.features, cam);
               currentMap.flyTo({ ...cam, duration: 2400 });
             } else {
               const all = marksBounds(geometry.features as Parameters<typeof marksBounds>[0]) ?? boundsArray;
@@ -1703,9 +1737,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   };
 
   // Fly to a specific layer's bounds
-  // The rest view's camera for the record: pitched 70°, looking up the valleys, fitted by looking
-  // (fitBounds picks its zoom as if flat). The sites keep to the lower two-thirds of the window so
-  // the land runs on to a horizon above them; the jumps are undone before anything is drawn.
+  // The rest view's camera for the record: pitched 65°, looking up the valleys, fitted by looking
+  // (fitBounds picks its zoom as if flat). The sites keep below the top fifth of the window so the
+  // land runs on to a horizon above them; the jumps are undone before anything is drawn.
   const restCameraFor = (mapInstance: maplibregl.Map, features: GeometryData['features']): Camera | null => {
     const points = (features ?? [])
       .flatMap((f) => (f?.geometry?.type === 'Point' ? [f.geometry.coordinates as [number, number]] : []))
@@ -1715,8 +1749,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     const box = mapInstance.getContainer();
     const size = { width: box.clientWidth, height: box.clientHeight };
     const stage = STAGE_PADDING_NOW();
-    // Room for the names beside the dots, and the sky band over the farthest site.
-    const pad = { top: Math.max(stage.top, Math.round(size.height * 0.3)), bottom: stage.bottom, left: stage.left + 40, right: stage.right + 40 };
+    // Room for the names beside the dots, and the sky band over the farthest site. At rest the step
+    // column is down, so the record takes the stage's whole width; with steps up it keeps clear.
+    const columnUp = typeof document !== 'undefined' && !!document.querySelector('.stage-steps');
+    const pad = {
+      top: Math.max(stage.top, Math.round(size.height * REST_TOP_SHARE)),
+      bottom: stage.bottom,
+      left: columnUp ? stage.left + 40 : REST_EDGE,
+      right: stage.right + 40,
+    };
     const flat = mapInstance.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: stage, bearing: REST_BEARING });
     if (!flat?.center || typeof flat.zoom !== 'number') return null;
     const c = maplibregl.LngLat.convert(flat.center);
@@ -1748,6 +1789,31 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     return sane ? cam : { ...start, zoom: flat.zoom + 0.5 };
   };
 
+  // The record's names at the rest camera: MapLibre draws a name smaller the farther off it is, so
+  // each gets the size that lands it at no less than 15 px there (utils/restCamera.ts sizeAtLeast).
+  // The jump is undone before anything is drawn.
+  const sizeRestLabels = (mapInstance: maplibregl.Map, sourceId: string, features: GeometryData['features'], cam: Camera) => {
+    const src = mapInstance.getSource(`${sourceId}-points`) as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+    const labels = recordLabels(features as Parameters<typeof recordLabels>[0]);
+    const height = mapInstance.getContainer().clientHeight;
+    const p = mapInstance.getPadding();
+    const top = p.top ?? 0, bottom = p.bottom ?? 0;
+    const centreY = top + (height - top - bottom) / 2;
+    const fov = mapInstance.getVerticalFieldOfView();
+    const before = { center: mapInstance.getCenter(), zoom: mapInstance.getZoom(), pitch: mapInstance.getPitch(), bearing: mapInstance.getBearing() };
+    try {
+      mapInstance.jumpTo(cam);
+      for (const f of labels.features) {
+        const y = mapInstance.project(f.geometry.coordinates).y;
+        if (Number.isFinite(y)) f.properties.size = sizeAtLeast(REST_LABEL_SIZE, labelPerspective(y, height, cam.pitch, fov, centreY));
+      }
+    } finally {
+      mapInstance.jumpTo(before);
+    }
+    src.setData(labels);
+  };
+
   const flyToLayer = (layerId: string) => {
     if (!map.current) return;
     
@@ -1760,7 +1826,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       const src = mapInstance.getSource(layer.sourceId) as maplibregl.GeoJSONSource | undefined;
       const data = src?.serialize().data as GeometryData | undefined;
       const cam = data && typeof data === 'object' && Array.isArray(data.features) ? restCameraFor(mapInstance, data.features) : null;
-      if (cam) {
+      if (cam && data) {
+        sizeRestLabels(mapInstance, layer.sourceId, data.features, cam);
         mapInstance.flyTo({ ...cam, duration: 1500 });
         return;
       }
@@ -1786,7 +1853,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   // A geometry's fill layer travels with its companions: the outline, and for a similarity
   // result the dashed query outline and the rank labels.
   const geometryCompanionIds = (fillLayerId: string) =>
-    ['-outline', '-query', '-labels', '-hairline'].map(suffix => fillLayerId.replace('-fill', suffix));
+    ['-outline', '-query', '-labels', '-keepout', '-hairline'].map(suffix => fillLayerId.replace('-fill', suffix));
   // Every map layer that travels with a listed one: a geometry's fill companions, a raster's light.
   const companionIds = (id: string) => (id.startsWith('cogLayer-') ? [`${id}${LIGHT_SUFFIX}`] : geometryCompanionIds(id));
 
@@ -2109,10 +2176,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // A hillshade that names its DEM gets a live light: the DEM is served as terrain-RGB and
           // lit by the map itself (the sweep when it lands, the dial after), and the baked hillshade
           // under it becomes a flat grey sheet so the light reads on paper, not on imagery.
+          // The DEM comes from the hint, or (when the model passed the hint on without it) from the
+          // tool's own naming beside the hillshade, checked with TiTiler before the paper goes down:
+          // the light must not depend on the model copying one key.
           let demPresigned: string | null = null;
-          if (isTerrainRaster && isHillshadeHint(hint) && hint?.dem) {
-            demPresigned = await getPresignedUrl(hint.dem);
+          const demUrl = isTerrainRaster && isHillshadeHint(hint) ? (hint?.dem ?? companionDem(raster.url)) : null;
+          if (demUrl) {
+            demPresigned = await getPresignedUrl(demUrl);
+            if (demPresigned && !hint?.dem && !(await fetchCogBounds(demPresigned))) demPresigned = null;
             if (abortController.signal.aborted) break;
+            if (demPresigned && !hint?.dem) console.log(`💡 Live light from the companion DEM (the hint had none):`, demUrl);
           }
           const liveLight = demPresigned !== null;
 
