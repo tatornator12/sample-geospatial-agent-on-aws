@@ -82,7 +82,7 @@ Constraints that future work must respect:
 - Deploys name their target explicitly; the live runtime is never the place to try ideas.
 Terminology the product uses: AOI (area of interest), scene, index (NDVI/NDWI/NBR), change
 map, hotspot, embedding, replay case, act, agent, tool call, evidence chip, confidence.
-Undecided (record, do not invent): Act 3 choice (Oct 24); projector resolution; whether the
+Undecided (record, do not invent): projector resolution; whether the
 demo UI changes are pushed to the public aws-samples repository.
 
 ## Brand Commitments

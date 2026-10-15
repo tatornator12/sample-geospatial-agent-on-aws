@@ -24,7 +24,7 @@ not all up front, so requirements reflect what the data spikes actually showed.
 | 3 | `similarity-search` | Sep 29–Oct 3 | G2: Release 1 promoted to `demo-stable`; Act 1 rehearsed (7 min) | built Sep 24; **G2 promoted Sep 24** (`deployed-2026-09-24`, stable v70 + CloudFront; UI build fix `deployed-2026-09-24-1712`); Act 1 rehearsal pending |
 | 4 | `methane-hunter` | Oct 6–17 | G3: Release 2; two agents in switcher; Acts 1–2 rehearsed | **Release 2 promoted Oct 12** (`deployed-2026-10-12`: Earth stable v72, Methane stable v3, CloudFront UI); user signed in and sees both agents; Turkmenistan cleared for the stage (13.1, Oct 12); Acts 1–2 rehearsal pending |
 | 5 | `ai-archaeologist` | Oct 20–24 (started early) | closer works on a public site; **Act 3 decision written down** | spec **approved Oct 12** (all 8 decisions); Act 3 decided Oct 12: Dark Vessels |
-| 6 | `act3-dark-vessels` | Oct 27–31 (earlier if Act 4 lands early) | G4: Release 3; full 30-minute run-through | not started; spike `docs/spikes/dark-vessels.md` |
+| 6 | `act3-dark-vessels` | Oct 16–30 (started early; Act 4 landed early) | G4: Release 3; full 30-minute run-through | spec **drafted Oct 15, awaiting approval** (9 decisions; decision 9 moves G4 to Friday Oct 30, since Oct 31 is a Saturday in 2026); spike `docs/spikes/dark-vessels.md` |
 | 7 | `demo-readiness` | Nov 3–7 | freeze Nov 3; runbook, backup videos, prewarm, 2 timed rehearsals | not started |
 
 Act 3 carries a prediction component (the user, Oct 13), about one minute of its eight, written
