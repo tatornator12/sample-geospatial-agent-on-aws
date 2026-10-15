@@ -8,6 +8,7 @@ import {
   LIGHT_AZIMUTH,
   LIGHT_HIGH,
   LIGHT_SUNSET,
+  LIGHT_SWEEP_MS,
   LOCAL_RELIEF,
   LOCAL_RELIEF_FINE,
   SITE_FRAME,
@@ -183,6 +184,19 @@ describe('the raking light', () => {
     expect(lightSweep((1 + LIGHT_SUNSET) / 2)).toBeCloseTo((LIGHT_AZIMUTH + 180) % 360, 6);
     expect(lightSweep(1)).toBeCloseTo(LIGHT_AZIMUTH, 6);
     expect(lightSweep(2)).toBeCloseTo(LIGHT_AZIMUTH, 6);
+  });
+
+  it('turns slowly enough to follow: 12 s in all, never faster than about 63° a second', () => {
+    expect(LIGHT_SWEEP_MS).toBe(12000);
+    const dt = 1 / 1200; // 10 ms steps
+    let fastest = 0;
+    for (let t = 0; t < 1; t += dt) {
+      const a = lightSweep(t), b = lightSweep(t + dt);
+      const d = Math.abs(((b - a + 540) % 360) - 180); // the short way round
+      fastest = Math.max(fastest, d / (dt * LIGHT_SWEEP_MS / 1000));
+    }
+    expect(fastest).toBeLessThan(64);
+    expect(fastest).toBeGreaterThan(55);
   });
 
   it('names the sun\'s height in the room\'s words', () => {

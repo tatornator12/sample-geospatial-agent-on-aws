@@ -101,4 +101,5 @@ then are `DEPLOY_TARGET=dev`. The Act 3 decision is also due Oct 24 (ROADMAP row
 - Oct 14 (after the wow pass, `822d360`): pytest geo_agent 123, methane-hunter 147, ai-archaeologist 31; backend 54; vitest 179; `impeccable detect` 0; `npm run build` clean. Eval archaeologist dev v13 7/7 (the same em dash warning in a Great Circle table cell). Live turns through the local UI: the Octagon lights its session DEM and settles at 315°; the Great Circle draws its section from the fresh measurement
 - Oct 14 (the second take, 6.5; frontend only): vitest 192; backend 54; `impeccable detect` 0; `npm run build` clean; `tsc` clean; eslint on the touched files shows only the findings MapView already had. Agents and replay cases unchanged (dev v13, the same recordings)
 - Oct 15 (the loose ends, 6.6; frontend only): vitest 199; backend 54; `impeccable detect` 0; `npm run build` clean; `tsc` clean. Agents and replay cases unchanged (dev v13)
+- Oct 15 (the sweep slowed to 12 s on a sine ease, the user: "a little fast"): vitest 200; `impeccable detect` 0; `tsc` clean
 - (Oct 24: commands with counts, both Act 4 timings and the teaser)

@@ -106,7 +106,12 @@ export const LIGHT_HIGH = 50;
  * flat ground goes nearly white, which on a dark stage is a flash, not a lesson.
  */
 export const LIGHT_ALTITUDE_RANGE: [number, number] = [5, 50];
-export const LIGHT_SWEEP_MS = 8000;
+/**
+ * The arrival sweep: 12 s (was 8, "a little fast", the user, Oct 15). The sun sinks over the first
+ * 3 s, then turns once round in 9 s on a sine ease, at most about 63° a second mid-turn (the cubic
+ * ease over 6 s peaked at 180°, a whip the room could not follow).
+ */
+export const LIGHT_SWEEP_MS = 12000;
 /** The share of the sweep the sun spends sinking before it goes round. */
 export const LIGHT_SUNSET = 0.25;
 export const LIGHT_EXAGGERATION = 1;
@@ -116,7 +121,8 @@ export const PAPER_RESCALE: [number, number] = [-100000, 100000];
 export const REVEAL_MS = 1800;
 
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
-const easeInOut = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+// A sine ease: a gentle start and stop and a steady middle (its steepest is π/2, the cubic's 3).
+const easeInOutSine = (x: number) => (1 - Math.cos(Math.PI * x)) / 2;
 const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
 
 /**
@@ -125,7 +131,7 @@ const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
  */
 export function lightSweep(t: number, from: number = LIGHT_AZIMUTH): number {
   const x = clamp01((clamp01(t) - LIGHT_SUNSET) / (1 - LIGHT_SUNSET));
-  return (from + 360 * easeInOut(x)) % 360;
+  return (from + 360 * easeInOutSine(x)) % 360;
 }
 
 /** The sun's height at `t`: from high to the raking angle over the first quarter, then held. */
