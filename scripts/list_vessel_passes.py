@@ -41,7 +41,7 @@ AGENT = ROOT / "agents" / "dark-vessels"
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(AGENT))
 import vessels_gfw as gfw  # noqa: E402
-import coverage as cv  # noqa: E402
+import ais_coverage as cv  # noqa: E402
 from predict import Grid  # noqa: E402
 
 OUT = AGENT / "data" / "passes_v1.json"

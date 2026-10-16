@@ -80,6 +80,9 @@ INDEX_STYLES: tuple[tuple[tuple[str, ...], IndexStyle], ...] = (
     (("hillshade_",), IndexStyle("hillshade", 1.0, 255.0, tuple(_GREYS))),
     (("lrm03_",), IndexStyle("lrm03", -0.3, 0.3, tuple(_RDBU_R))),
     (("lrm_",), IndexStyle("lrm", -1.0, 1.0, tuple(_RDBU_R))),
+    # Dark Vessels evidence chips (uint8 1-255, already stretched on the chip's own sea, so 128 sits
+    # near the sea's median): the speckle goes dark and a vessel stays a bright point.
+    (("/vessels/chips/",), IndexStyle("radar_chip", 128.0, 255.0, tuple(_GREYS))),
 )
 
 

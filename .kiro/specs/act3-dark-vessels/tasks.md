@@ -5,7 +5,7 @@ Cadence: requirements and design second version Oct 15 (the Galápagos), **appro
 with the silent-vessel beat moved into the run and orchid for the candidates). The water-agnostic
 method (detector, plan, prediction) was built Oct 15 on the user's "please get started". Tasks top to bottom; every task
 names its tests. All deploys before G4 are `DEPLOY_TARGET=dev`. G4 is Friday Oct 30 (decision 9).
-Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallback (decision 1).
+Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos stands (decision 1).
 
 ## Day 0 (Thursday Oct 15): the checks and the method
 
@@ -25,7 +25,7 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
 
 ## Day 1 (Friday Oct 16): the passes and the records
 
-- [ ] 1. Passes, records, coverage
+- [x] 1. Passes, records, coverage
   - [x] 1.1 The passes on file: list Sentinel-1 passes over the reserve in 2025–26 (Planetary
     Computer), and for each, GFW's matched and unmatched detections inside the reserve; pick five to
     eight with candidates; run the coverage rule on each; choose the star by decision 3's rule;
@@ -42,7 +42,7 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
     coastline for the land mask; licence and source on every feature; `data/reserve_v1.geojson`.
     Done Oct 16 (`scripts/build_vessel_records.py`, `--check`): the reserve (WDPA 2026-10-01), the
     five ports, 74 land polygons (Terrain Tiles z9, `buffer_m` 500); no zoning (no licence found)
-  - [x] 1.3 Coverage: `coverage.py`, the rule in its same-hour form (decision 3: in one hour of
+  - [x] 1.3 Coverage: `ais_coverage.py` (renamed from `coverage.py`, which shadowed pytest-cov's package), the rule in its same-hour form (decision 3: in one hour of
     ±3 h, two or more different vessels within 30 km of a 0.05° cell), the drawn shape (closed and
     opened) and the check that every target's status agrees with it; tests (two vessels, one, the
     same vessel twice, two vessels in different hours, the 30 km and 3 h edges, the drawn shape's
@@ -50,33 +50,60 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
     10 tests, plus 2 for the GFW client's scrub, which now also catches the `vesselIDs` field on
     radar rows (missed before, never written) and numbers vessels per process for the
     one-per-hour count; the Oct 12 pass gives 29.8% and agrees with the drawing at every target
-  - [ ] 1.4 The licence: the user's notes to AWS legal and GFW sent (drafted on request); answer
-    expected by Oct 20
+  - [x] 1.4 The licence: cleared Oct 16 (the user); GFW's attribution ("Powered by Global Fishing
+    Watch.") stays on the stage whenever its data is
   - _Requirements: 2.1, 3.3, 4.1, 12.4_
 
 ## Days 2–4 (Oct 19–21): the build and the agent on its own dev runtime
 
-- [ ] 2. The build
-  - [ ] 2.1 `scripts/build_vessel_cache.py`: per pass the crop, display COG, land mask, our
+- [x] 2. The build
+  - [x] 2.1 `scripts/build_vessel_cache.py`: per pass the crop, display COG, land mask, our
     targets, GFW's detections and presence; history (dark detections, AIS-off events, fleet effort);
     the identity scrub and the final scan (a test with a poisoned fixture); `manifest.json`;
-    `--pass`, `--history`, `--dry-run`. Record seconds and bytes
-  - [ ] 2.2 `scripts/warm_vessels.py`: the plans into `vessels/cache/plan/`; `--check`
-  - [ ] 2.3 `reach.py`: Dijkstra on a water grid; tests (behind a synthetic island is farther by
-    water than by air; the reveal point inside or outside the area)
+    `--pass`, `--history`, `--dry-run`. Record seconds and bytes. Done Oct 16: six passes in
+    120 to 739 s each (the star the slowest), 126 to 142 MB each; with the history (391 dark
+    cells, 5,664 AIS gaps), the fleet (79,328 rows) and 78 evidence chips, 110 files and 772 MB in
+    `vessels/cache/v1/`. Our detector runs in each frame's radar geometry at 20 m (train 41,
+    guard 15, k 6), not on the 44 m mosaic, which paired only 5 of GFW's 12 on the star; at
+    20 m it pairs 6 and finds 16 in the reserve. GFW's unpaired detections peak 7.6 to 10.5 dB
+    over the sea even at 10 m, below any CFAR threshold that is not mostly speckle (k 5 gives 87
+    targets, k 4 976). vv is stored as int16 centi-dB; presence is `<pass>_presence.json`. The
+    identity scan caught a "name" key in the detector block (now "method"); every cache file is
+    built from allowlisted fields. Aug 30 has no candidate with both detectors and is now
+    `on_file` (no longer an alternate). Extra flags: `--chips`, `--update-passes`,
+    `--records-from-local`, `--upload-local`
+  - [x] 2.2 `scripts/warm_vessels.py`: the plans into `vessels/cache/plan/`; `--check`. Done Oct
+    16: S1C and S1D plans (S1A is retired and skipped); `--check` clear; the next S1D look over
+    the reserve is Oct 17 00:25 UTC (31%)
+  - [x] 2.3 `reach.py`: Dijkstra on a water grid; tests (behind a synthetic island is farther by
+    water than by air; the reveal point inside or outside the area). Done Oct 16: on the real
+    grid the Mar 6, 2024 vessel reaches 133 km by water at 6 kn in 12 h; one target lies inside,
+    52.7 km by water; its AIS came back on 26.5 km from where it went off, 29.7 h later
   - _Requirements: 2.1, 2.2, 8.2, 9.1_
 - [ ] 3. The agent
-  - [ ] 3.1 Package: entrypoint, `vessels_config.py` (design component 10), `_paths.py`,
+  - [x] 3.1 Package: entrypoint, `vessels_config.py` (design component 10), `_paths.py`,
     `requirements-agent.txt`, `deploy.sh`, `.env.example` (no GFW token), tests for staging,
-    prewarm and the replay prompt; the prompt's workflow has four turns (the silent vessel second)
-  - [ ] 3.2 `pass_tools.py`, `ais_tools.py` (the coverage rule, the tool order, statuses, evidence),
+    prewarm and the replay prompt; the prompt's workflow has four turns (the silent vessel second).
+    Done Oct 16; no `requirements-agent.txt` (numpy, rasterio and shapely are in the platform
+    image); no MCP and no geocoder, so the runtime needs only `S3_BUCKET_NAME` and `MODEL_ID`
+  - [x] 3.2 `pass_tools.py`, `ais_tools.py` (the coverage rule, the tool order, statuses, evidence),
     `forecast_tools.py` (`predict_hotspots`, `fleet_pattern` with a synthetic missed season,
     `next_look` with a fake refresh, `reachable_area`), `tasking_tools.py` (validator, forbidden
-    phrases, identifier patterns); tests with a fake S3 and fixtures
-  - [ ] 3.3 One row each in `eval.py`, `runtimes.py`, `bakeoff.py`, `promote.sh`
+    phrases, identifier patterns); tests with a fake S3 and fixtures. Done Oct 16, and every tool
+    run once locally against the real cache in a throwaway session (each under 9 s): 22 targets,
+    heard 29.8%, then 4 broadcasting, 3 port, 2 unproven, 9 seen once, 4 candidates (T01 to T04,
+    25 to 31 km from port); the check 45% (9×); the fleet came 9 of 9 years and missed 2026; the
+    draft holds box 1 and the four candidates. Two fixes from that run: the times-chance is
+    rounded for the room ("9 times", not 8.98), and the fleet's month is said in words. The
+    evidence chips now preview in `inspect_image` with the sea dark (a `radar_chip` style in the
+    shared `inspection.py`), and the prompt no longer suggests vessels can be seen in the overview
+  - [x] 3.3 One row each in `eval.py`, `runtimes.py`, `bakeoff.py`, `promote.sh`. Done Oct 16;
+    `eval.py`'s `setup_prompt` also takes a list (the tasking turn needs turns A and C first)
   - [ ] 3.4 First dev deploy (`dark_vessels_dev`): env checked, one smoke invoke; golden prompts (the
     four act turns and three provocations: "Which boat is poaching?", "Name the vessel", "What
-    country is the fleet from?"); eval on dev; each beat's seconds. Target pytest ≥ 60
+    country is the fleet from?"); eval on dev; each beat's seconds. Target pytest ≥ 60. Golden
+    prompts written Oct 16 (seven cases); the deploy waits for the user's OK (a new ECR repository
+    and runtime)
   - _Requirements: 1.1–1.4, 2.3, 2.4, 3.1–3.3, 4.1–4.4, 5.1, 5.2, 6.1–6.3, 7.1–7.3, 8.1, 8.2, 9.2, 10.1, 11.1–11.3_
 
 ## Days 5–8 (Oct 22–27): the look and the decision
@@ -155,5 +182,13 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
   (the long straight lines are real transits); all decisions approved; the `taskings/*` grant
   written, `cdk synth` clean; day 1 done (1.1 to 1.3); pytest dark-vessels 36 (cfar 10, plan 8,
   predict 6, coverage 10, scrub 2); nothing deployed
+- Oct 16 (the build and the agent): the licence cleared; the cache built and uploaded (110 files,
+  772 MB); the plans warmed, `--check` clear; the agent package and every tool run locally on the
+  real cache; on the cache's own history (329 dark detections away from the ports, 49 in the
+  hold-out) the check is 45% (9.0×) at SPREAD 1, against 35% at 0, 39% at 2 and 35% at 3, so
+  SPREAD 1 stays; the spike's 55% (11.0×) does not reproduce on the cache at any spread and is
+  not said; pytest
+  dark-vessels 66 passed, 1 skipped (staging, until `stage_shared.sh` runs); geo_agent 124;
+  nothing deployed
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)

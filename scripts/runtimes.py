@@ -29,6 +29,7 @@ REQUIRED_ENV = {
     "earth": ["S3_BUCKET_NAME", "MODEL_ID", "ARCGIS_MCP_URL", "ARCGIS_MCP_TOKEN"],
     "methane": ["S3_BUCKET_NAME", "MODEL_ID", "ARCGIS_MCP_URL", "ARCGIS_MCP_TOKEN", "EARTHDATA_TOKEN"],
     "archaeologist": ["S3_BUCKET_NAME", "MODEL_ID", "ARCGIS_MCP_URL", "ARCGIS_MCP_TOKEN"],
+    "vessels": ["S3_BUCKET_NAME", "MODEL_ID"],   # no MCP: every place is on file
 }
 ARN_RE = re.compile(r"^arn:aws:bedrock-agentcore:[a-z0-9-]+:\d{12}:runtime/[A-Za-z0-9_-]+$")
 ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")

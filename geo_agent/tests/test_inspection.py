@@ -103,6 +103,14 @@ def test_methane_watch_rasters_preview_like_the_map(inspection):
     assert tuple(inspection.build_ramp(anomaly.anchors)[-1]) == (0xfd, 0xe7, 0x25)
 
 
+def test_dark_vessels_chips_preview_with_the_sea_dark(inspection):
+    """Evidence chips (uint8, stretched on their own sea) show from the sea's median up; the radar
+    overview of the same pass keeps the plain percentile stretch."""
+    chip = inspection.index_style("s3://b/session_data/s/vessels/chips/s1d-20261012t0018_T01.tif")
+    assert chip.name == "radar_chip" and (chip.vmin, chip.vmax) == (128.0, 255.0)
+    assert inspection.index_style("s3://b/session_data/s/vessels/radar_s1d-20261012t0018.tif") is None
+
+
 def test_archaeologist_terrain_previews_like_the_map(inspection):
     """Hillshade in grey over 1-255; local relief on rdbu_r, +-1 m, or +-0.3 m for ploughed walls."""
     shade = inspection.index_style("s3://b/session_data/s/terrain/hillshade_newark-octagon.tif")

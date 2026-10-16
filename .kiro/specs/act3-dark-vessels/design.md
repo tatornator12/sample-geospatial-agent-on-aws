@@ -39,7 +39,9 @@ Verified premises (Oct 15, `docs/spikes/galapagos.md`):
 - ESA's plans (Oct 16): S1D has six IW takes over the reserve to Nov 5 (orbits 106, 128, 33, 55;
   24 to 54% of it each); S1C has none. Each patrol box gets a full look within ten days.
 - The squid fleet near the Galápagos (north of 8°S) every June to August 2017–2025; none in 2026
-  after May (it stayed off Peru, 34,000 to 43,000 fishing hours a month, and Chile).
+  after May (it stayed off Peru, 34,000 to 43,000 fishing hours a month, and Chile). The built
+  fleet file's rule (present in at least half of the years) expects June to September; the agent
+  says that.
 - AIS-off events near the reserve: 5,659 in 2023–26 (fishing 1,448), 2 starting inside it; five
   moments since 2023 where a pass saw a silent vessel's water with a dark target in reach.
 - GFW API: token works; Cloudflare needs a User-Agent; one report at a time, 366 days at most;
@@ -51,7 +53,10 @@ Verified premises (Oct 15, `docs/spikes/galapagos.md`):
 - The prediction on the newest data: fitted on 2023 to Jun 30, 2026 and checked on Jul 1 to
   Oct 12, 2026 (51 dark targets away from ports), the top 5% of the water held 55% (11.0×) and the
   top 10% held 76% (7.6×). Fitting on the last 12 months alone did worse (49% in the top 5%), so
-  the map uses all history; the forward map adds everything to Oct 12.
+  the map uses all history; the forward map adds everything to Oct 12. On the built cache's own
+  history (Oct 16: 329 dark detections away from the ports, 49 in the hold-out) the same check
+  gives 45% (9×) in the top 5% and 57% (5.7×) in the top 10%; that is the number the agent says.
+  SPREAD 1 is the best of 0 to 3 on it (35%, 45%, 39%, 35%), so it stays.
 - The seabed: the AWS Terrain Tiles carry bathymetry (zoom 7 over the islands: −3,851 to +2,115 m,
   92% of the tile under water), and MapLibre 6.11 draws it with a `color-relief` layer and a
   `hillshade`. Prototyped on the stage Oct 16 (below, component 11).
@@ -78,25 +83,28 @@ agents/dark-vessels/
   deploy.sh  golden_prompts.json  build_replay_case.py  tests/
 
 scripts/build_vessel_cache.py   (offline, builder-run; GFW token from agents/dark-vessels/.env)
-  passes_v1.json → Planetary Computer STAC + SAS → VV window over the reserve at 40 m
-    → <pass>_vv.tif (COG) + <pass>_display.tif (uint8 dB) → land mask → cfar → <pass>_targets.json
+  passes_v1.json → Planetary Computer STAC + SAS → each frame read in its own radar geometry at
+    20 m (the 2x overview) → land mask → cfar (train 41, guard 15, k 6) → <pass>_targets.json;
+    the frames mosaicked north-up → <pass>_vv.tif (COG, int16 centi-dB) + <pass>_display.tif (uint8)
   GFW per pass day: SAR detections matched / unmatched (0.01°), AIS presence ±3 h (one position per
-    vessel per hour, 0.01°, no key) → <pass>_gfw.json, <pass>_heard.json; the replay: the three days
-    to the pass as tracks under a random number per build (never derived from a vessel id), type and
-    size class only → <pass>_replay.json
+    vessel per hour, 0.01°, no key) → into <pass>_targets.json and <pass>_presence.json; the replay:
+    the three days to the pass as tracks under a random number per build (never derived from a
+    vessel id), type and size class only → <pass>_replay.json
+  --chips: a north-up 10 m chip (about 1.3 km) round each of our targets → <pass>_chip_<id>.tif
   GFW history: reserve dark detections daily 2023→, AIS-off events near the reserve 2023→,
     squid-jigger fishing effort monthly by 0.1° cell 2017→ → history_v1.json, fleet_v1.json
   → s3://<bucket>/vessels/cache/v1/… + manifest.json; a scan fails the build on any identity field
 scripts/warm_vessels.py   ESA plan KMLs → vessels/cache/plan/ (the day before and the morning of)
 
 model ── find_pass("latest")          → {pass_id, satellite, sensed, radar_s3_url, render}
-      ── display_visual → inspect_image                      "open water, a few bright points"
-      ── detect_vessels(pass_id)       → {ours 9, gfw 7, both 6, port 2, targets_s3_url}
-      ── check_ais_coverage(pass_id)   → {heard_share, heard_s3_url, unproven_s3_url}
-      ── match_ais(pass_id)            → {broadcasting 3, port 2, unproven 1, candidate 3}
+      ── inspect_image → display_visual             "open water, the islands blanked out"
+      ── detect_vessels(pass_id)       → {ours 16, gfw 12, both 6, port 3, targets 22}
+      ── check_ais_coverage(pass_id)   → {heard_share 0.298, heard_s3_url, unproven_s3_url}
+      ── match_ais(pass_id)            → {broadcasting 4, port 3, unproven 2, seen once 9, candidate 4}
       ── gather_evidence(pass_id)      → chips, nearest broadcast, zone, km to port and shore
-      ── predict_hotspots()            → {check: 53% in 5%, map_s3_url, boxes[3] + next looks}
-      ── fleet_pattern()               → {expected months, 2026 missed, where now, heat_s3_url}
+      ── reachable_area()              → {Mar 6 2024, fishing, 6 kn, 12 h, 133 km, 1 target inside}
+      ── predict_hotspots()            → {check: 45% in 5% (9×), heat_s3_url, boxes[3] + next looks}
+      ── fleet_pattern()               → {June to September, 2026 missed, off Peru, heat_s3_url}
       ── next_look(box)                → {S1D Oct 24 00:17 UTC …, footprint_s3_url}
       ── draft_tasking(...)            → draft; stop. "Decision: the officer's."
 UI    ── the officer picks a box and the candidates → Approve the tasking
@@ -124,9 +132,13 @@ pass is `s1a-20240306t0027`. The records (`scripts/build_vessel_records.py`) hol
 and 74 land polygons from the Terrain Tiles. That land covers 8,614 km², and 93% of it falls in
 the reserve's holes. The reserve's internal zoning is left out because no licence was found.
 
-The build reads each scene once (Planetary Computer, anonymous SAS, `/vsicurl/` windowed reads at
-40 m, the GCP affine as in the spike), writes the crop and a display copy, applies a land mask (the
-islands, buffered 500 m, from a public coastline chosen on day 1), runs `cfar.detect`, and asks GFW
+The build reads each scene once (Planetary Computer, anonymous SAS, `/vsicurl/` reads of each
+frame's 2x overview, 20 m, in its own radar geometry; the GCPs place each target), applies a land
+mask (the 74 Terrain Tiles polygons, buffered 500 m), runs `cfar.detect` there, writes the north-up
+crop (int16 centi-dB) and a display copy, and asks GFW. The 44 m mosaic was tried first and paired
+only 5 of GFW's 12 on the star; at 20 m it pairs 6. GFW's other detections peak only 7.6 to 10.5
+dB over the sea even at 10 m, so no CFAR that is not mostly speckle finds them (k 5 gives 87
+targets, k 4 976): the two detectors stay side by side, and a candidate needs both. The build asks GFW
 for that day's detections and the AIS presence around the pass. History for the predictions comes
 from GFW in yearly reports (the 366-day limit), one at a time. Every GFW response passes through the
 spike's scrub (names, MMSI, IMO, call signs, flags, vessel ids) before anything is written, and a
@@ -143,7 +155,8 @@ targets with `source` (ours, gfw, both) for the map.
 
 ### 3. `check_ais_coverage` and `match_ais`
 
-Heard water (decision 3, `coverage.py`): from the cached presence, a 0.05° cell is heard when, in
+Heard water (decision 3, `ais_coverage.py`, named so it never shadows the `coverage` package):
+from the cached presence, a 0.05° cell is heard when, in
 at least one hour of the three either side of the pass, two or more different broadcasting vessels
 were heard within 30 km of it (proof that the receivers, mostly satellites here, could hear that
 water then); otherwise unproven. Two vessels in the same hour is stricter than two across the
@@ -178,7 +191,7 @@ it was measured; the map's legend says "where dark targets were seen before".
 From the cached squid-jigger fishing effort (monthly, 0.1° cells, 2017→): hours by month and zone
 (near the Galápagos north of 8°S, off Peru 8 to 20°S, off Chile south of 20°S); the months the
 pattern expects the fleet near the Galápagos (present in at least half of the years); each season
-matched or missed; the latest month's heat as a COG. In 2026 the pattern expected June to August and
+matched or missed; the latest month's heat as a COG. In 2026 the pattern expected June to September and
 the fleet stayed off Peru; the agent says it in one sentence and shows where the fleet went.
 
 ### 7. `next_look`
@@ -198,7 +211,7 @@ the AIS came back on. In the run it plays on the best silent-vessel moment on fi
 2024-03-06: a fishing vessel's AIS off 12 h before the pass just west of the reserve; at 6 kn it
 could have reached 133 km by water, and the day's one dark target lies 51 km from where it went
 off; it came back on 30 h later, 26 km away). Day 1 reruns the moment search to Oct 12, 2026 and
-takes a newer moment if one holds. It is also the Santa Barbara fallback's main beat.
+takes a newer moment if one holds (it ran: none does, task 1.1).
 
 ### 9. The tasking and the officer's decision
 
@@ -328,8 +341,8 @@ AWS is ESA's plan, one host, bounded, cached.
 | 2:10 | Candidates | (same turn) | The grey rings in heard water turn orchid and take their labels: "candidates, not accusations" |
 | 2:30 | Evidence | (same turn) | Chips, both detectors, the nearest broadcast, the zone |
 | 3:20 | Gone silent | "Has a vessel gone silent near here?" | An earlier pass, dated plainly (Mar 6, 2024): the last broadcast, the area it could reach by water, the target inside it, then where the AIS came back on; "I cannot say which, if any, of these it is" |
-| 4:20 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on everything to June, its top 5% of the water held 55% of the dark targets seen since July"; three patrol boxes with their next passes |
-| 5:20 | The fleet | (same turn) | The camera pulls back to the fleet's lights off Peru; "it came every June to August since 2017; this year it did not" |
+| 4:20 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on everything before July 2026, the top 5% of the water held 45% of the 49 dark targets seen since, 9 times what that much water holds by chance"; three patrol boxes with their next passes |
+| 5:20 | The fleet | (same turn) | The camera pulls back to the fleet's lights off Peru; "it came in 9 of 9 years since 2017, and in 2026 it did not: in October 2026 it was off Peru" |
 | 6:00 | Act | "Draft the patrol tasking" | The boxes on the map; the presenter picks one, drops a candidate, approves; "Filed by the officer. The agent did not file it." |
 | 7:10 | Close | | "{n} candidates, not accusations; the radar looks again {next look}. The decision was the officer's." |
 
@@ -339,10 +352,8 @@ turn, then the tasking live.
 
 ## Decisions to approve
 
-1. **Water: the Galápagos Marine Reserve** (agreed Oct 15), with a yes on GFW's licence by Tuesday
-   Oct 20 (AWS legal and a note to GFW). If not, the Santa Barbara Channel and its sanctuary on
-   NOAA's AIS (the first draft's design; the detector, plan, prediction and reach modules are the
-   same).
+1. **Water: the Galápagos Marine Reserve** (agreed Oct 15). GFW's licence was cleared on Oct 16, so
+   the Santa Barbara fallback (the first draft's design on NOAA's AIS) is retired.
 2. **Passes on file only** (agreed Oct 15): the build caches everything; the runtime never calls GFW,
    Planetary Computer or NOAA; the one live read is ESA's plan.
 3. **The coverage rule and the star pass** (approved Oct 16 as recommended): a 0.05° cell is heard
@@ -385,5 +396,5 @@ turn, then the tasking live.
    archaeologist's dev gate is Friday Oct 23; freeze Nov 3 unchanged.
 10. **The silent-vessel beat is in the run** (the user, Oct 16: "add silent-vessel beat"): its own
     short turn after the evidence ("Has a vessel gone silent near here?"), on the best moment on file
-    (today the Mar 6, 2024 case, dated plainly as an earlier pass), about a minute; it is also the
-    fallback water's main beat. The run sheet above has it at 3:20.
+    (today the Mar 6, 2024 case, dated plainly as an earlier pass), about a minute. The run sheet
+    above has it at 3:20.

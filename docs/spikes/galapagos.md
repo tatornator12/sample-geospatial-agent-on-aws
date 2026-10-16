@@ -95,8 +95,8 @@ while the radar is looking.
 - Unmatched is not dark by intent: GFW's matching has its own limits, and the reserve's own boats
   (tourism, artisanal fishing) may not broadcast.
 - Licence: GFW's terms are non-commercial (CC BY-NC 4.0) and need attribution ("Powered by Global
-  Fishing Watch."); whether a vendor demo counts as commercial advantage is pending AWS legal and a
-  note to GFW (the user, Oct 15). The Galápagos act goes ahead only with a yes by Oct 20.
+  Fishing Watch."); whether a vendor demo counts as commercial advantage was put to AWS legal and
+  GFW (the user, Oct 15). Cleared Oct 16 (the user): the Galápagos act goes ahead.
 
 ## Artifacts
 

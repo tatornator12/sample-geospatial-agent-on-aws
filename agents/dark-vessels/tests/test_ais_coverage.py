@@ -8,7 +8,7 @@ import numpy as np
 from shapely.geometry import Point, box
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import coverage as cv  # noqa: E402
+import ais_coverage as cv  # noqa: E402
 from predict import Grid  # noqa: E402
 
 PASS = datetime(2026, 10, 12, 0, 17, tzinfo=timezone.utc)

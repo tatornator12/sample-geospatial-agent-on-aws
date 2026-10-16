@@ -11,6 +11,7 @@ report at a time per user; at most 366 days per report; `group-by` is required f
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -45,6 +46,19 @@ def scrub(o):
     if isinstance(o, list):
         return [scrub(v) for v in o]
     return o
+
+
+_KEY_RE = re.compile(r'"([A-Za-z_][A-Za-z0-9_]*)"\s*:')
+_MMSI_LIKE = re.compile(r"(?<![\d.])\d{9}(?![\d.])")      # nine digits on their own (not inside a decimal)
+
+
+def scan_identity(text: str) -> list[str]:
+    """What in a file's text could identify a vessel: a JSON key from IDENTITY (any case) or a
+    nine-digit number standing alone (MMSI-like). Empty when clean. The build runs this on every
+    file before anything is uploaded, and fails on any finding."""
+    found = sorted({f"key {k}" for k in _KEY_RE.findall(text) if k.lower() in _IDENTITY})
+    found += [f"nine-digit number {m}" for m in sorted(set(_MMSI_LIKE.findall(text)))[:5]]
+    return found
 
 
 def pseudonymise(o):

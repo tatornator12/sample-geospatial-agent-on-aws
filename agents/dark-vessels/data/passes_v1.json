@@ -50,8 +50,23 @@
     "candidates": 7,
     "unproven": 0
    },
-   "provisional": true,
-   "note": "the most recent pass with at least two candidates inside the reserve (decision 3)"
+   "provisional": false,
+   "note": "the most recent pass with at least two candidates inside the reserve (decision 3)",
+   "build": {
+    "counts": {
+     "ours": 17,
+     "ours_in_reserve": 16,
+     "gfw": 12,
+     "both": 6,
+     "gfw_unmatched_away": 7,
+     "heard_share": 0.298,
+     "candidates_gfw_only": 7,
+     "candidates_both": 4,
+     "seen_once": 3
+    },
+    "pair_km_median": 0.47,
+    "built": "2026-10-16"
+   }
   },
   {
    "pass_id": "s1d-20260930t0018",
@@ -76,8 +91,23 @@
     "candidates": 6,
     "unproven": 1
    },
-   "provisional": true,
-   "note": "a recent pass with at least two candidates"
+   "provisional": false,
+   "note": "a recent pass with at least two candidates",
+   "build": {
+    "counts": {
+     "ours": 11,
+     "ours_in_reserve": 11,
+     "gfw": 11,
+     "both": 5,
+     "gfw_unmatched_away": 7,
+     "heard_share": 0.322,
+     "candidates_gfw_only": 6,
+     "candidates_both": 3,
+     "seen_once": 3
+    },
+    "pair_km_median": 0.6,
+    "built": "2026-10-16"
+   }
   },
   {
    "pass_id": "s1d-20260918t0018",
@@ -102,8 +132,23 @@
     "candidates": 5,
     "unproven": 0
    },
-   "provisional": true,
-   "note": "a recent pass with at least two candidates"
+   "provisional": false,
+   "note": "a recent pass with at least two candidates",
+   "build": {
+    "counts": {
+     "ours": 13,
+     "ours_in_reserve": 12,
+     "gfw": 7,
+     "both": 5,
+     "gfw_unmatched_away": 5,
+     "heard_share": 0.308,
+     "candidates_gfw_only": 5,
+     "candidates_both": 4,
+     "seen_once": 1
+    },
+    "pair_km_median": 0.5,
+    "built": "2026-10-16"
+   }
   },
   {
    "pass_id": "s1d-20260907t1141",
@@ -128,12 +173,27 @@
     "candidates": 2,
     "unproven": 0
    },
-   "provisional": true,
-   "note": "a recent pass with at least two candidates"
+   "provisional": false,
+   "note": "a recent pass with at least two candidates",
+   "build": {
+    "counts": {
+     "ours": 22,
+     "ours_in_reserve": 21,
+     "gfw": 9,
+     "both": 8,
+     "gfw_unmatched_away": 2,
+     "heard_share": 0.264,
+     "candidates_gfw_only": 2,
+     "candidates_both": 2,
+     "seen_once": 0
+    },
+    "pair_km_median": 0.29,
+    "built": "2026-10-16"
+   }
   },
   {
    "pass_id": "s1d-20260830t0026",
-   "role": "alternate",
+   "role": "on_file",
    "satellite": "Sentinel-1D",
    "sensed": "2026-08-30T00:26:09Z",
    "orbit_state": "ascending",
@@ -154,8 +214,23 @@
     "candidates": 2,
     "unproven": 1
    },
-   "provisional": true,
-   "note": "a recent pass with at least two candidates"
+   "provisional": false,
+   "note": "on file, not an alternate: with both detectors it has no candidate (GFW alone had two)",
+   "build": {
+    "counts": {
+     "ours": 9,
+     "ours_in_reserve": 7,
+     "gfw": 7,
+     "both": 4,
+     "gfw_unmatched_away": 3,
+     "heard_share": 0.366,
+     "candidates_gfw_only": 2,
+     "candidates_both": 0,
+     "seen_once": 2
+    },
+    "pair_km_median": 0.49,
+    "built": "2026-10-16"
+   }
   }
  ],
  "silent_vessel": {
@@ -190,6 +265,22 @@
   "dark_out_of_reach_km": [
    256.4
   ],
-  "why": "the tightest moment that holds at 6 kn: its reach excludes the day's other dark target, and the AIS came back on 26 km from where it went off. 2024-05-05 also holds (81 km, a target at 70 km) but came back 100 km away; the two 2026-03-08 moments hold only because 32 to 35 h of silence give a 359 to 393 km reach, most of the radar box, so the area says nothing; 2024-07-04 does not hold (56 km, the target at 75 km)"
+  "why": "the tightest moment that holds at 6 kn: its reach excludes the day's other dark target, and the AIS came back on 26 km from where it went off. 2024-05-05 also holds (81 km, a target at 70 km) but came back 100 km away; the two 2026-03-08 moments hold only because 32 to 35 h of silence give a 359 to 393 km reach, most of the radar box, so the area says nothing; 2024-07-04 does not hold (56 km, the target at 75 km)",
+  "build": {
+   "counts": {
+    "ours": 130,
+    "ours_in_reserve": 12,
+    "gfw": 11,
+    "both": 9,
+    "gfw_unmatched_away": 0,
+    "heard_share": 0.284,
+    "candidates_gfw_only": 0,
+    "candidates_both": 0,
+    "seen_once": 0
+   },
+   "pair_km_median": 0.46,
+   "built": "2026-10-16"
+  },
+  "provisional": false
  }
 }

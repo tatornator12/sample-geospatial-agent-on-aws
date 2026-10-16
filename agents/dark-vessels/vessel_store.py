@@ -1,0 +1,203 @@
+"""Dark Vessels: what every tool shares. The passes on file, the records (the reserve, its ports, the
+land), the cache in the project bucket (vessels/cache/v1/, built by scripts/build_vessel_cache.py),
+the session's folder (session_data/<sid>/vessels/), and the fixed sentences.
+
+The runtime reads only the bucket and the session (and, in next_look, ESA's plan). It never calls
+Global Fishing Watch, Planetary Computer or NOAA, and nothing it reads carries a vessel's identity:
+the build stripped and scanned every file.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import math
+import os
+import re
+import time
+from functools import lru_cache
+from pathlib import Path
+
+import boto3
+import numpy as np
+from shapely.geometry import Point, shape
+from shapely.ops import unary_union
+from shapely.prepared import prep
+
+import _paths  # noqa: F401  (shared platform code on sys.path before `import config`)
+import config
+from predict import Grid
+
+logger = logging.getLogger(__name__)
+
+HERE = Path(__file__).resolve().parent
+PASSES_PATH = HERE / "data" / "passes_v1.json"
+RECORDS_PATH = HERE / "data" / "reserve_v1.geojson"
+CACHE_PREFIX = "vessels/cache/v1"
+PLAN_PREFIX = "vessels/cache/plan"
+MANIFEST_KEY = f"{CACHE_PREFIX}/manifest.json"
+CACHE_TTL_S = 300
+PORT_KM = 10.0
+PASS_ID_RE = re.compile(r"^s1[a-d]-\d{8}t\d{4}$")
+CANDIDATE_ID_RE = re.compile(r"^T\d{2}$")
+ATTRIBUTION = "Powered by Global Fishing Watch."
+
+# Fixed sentences (the eval checks them word for word).
+ON_FILE_ONLY = "I only investigate passes on file."
+CANDIDATE_SENTENCE = "A candidate is a radar target with no broadcast nearby; it is not an accusation."
+CANNOT_SAY = "I cannot say which, if any, of these it is."
+NOT_EVIDENCE = "not evidence"
+OFFICERS_DECISION = "The decision is the officer's; I only draft."
+
+
+# --- S3 and the session ------------------------------------------------------------------------
+
+def _s3():
+    return boto3.client("s3")
+
+
+def session_id() -> str:
+    return os.environ.get("AGENT_SESSION_ID", config.DEFAULT_SESSION_ID)
+
+
+def session_prefix() -> str:
+    return f"session_data/{session_id()}/"
+
+
+def vessels_prefix() -> str:
+    return f"{session_prefix()}vessels/"
+
+
+def s3_url(key: str) -> str:
+    return f"s3://{config.S3_BUCKET_NAME}/{key}"
+
+
+def put_json(key: str, body) -> str:
+    _s3().put_object(Bucket=config.S3_BUCKET_NAME, Key=key, Body=json.dumps(body, separators=(",", ":")).encode(),
+                     ContentType="application/geo+json" if key.endswith(".geojson") else "application/json")
+    return s3_url(key)
+
+
+def get_json(key: str):
+    return json.loads(_s3().get_object(Bucket=config.S3_BUCKET_NAME, Key=key)["Body"].read())
+
+
+def copy_into_session(src_key: str, dst_key: str, content_type: str = "image/tiff") -> str:
+    """A server-side copy of a cached file into the session (the stage reads only session copies)."""
+    _s3().copy_object(Bucket=config.S3_BUCKET_NAME, Key=dst_key,
+                      CopySource={"Bucket": config.S3_BUCKET_NAME, "Key": src_key},
+                      ContentType=content_type, MetadataDirective="REPLACE")
+    return s3_url(dst_key)
+
+
+_cache: dict = {}
+
+
+def cached(key: str):
+    """A cache file, kept in the process for a few minutes (the same pass is read by every tool)."""
+    now = time.time()
+    hit = _cache.get(key)
+    if hit and hit[0] + CACHE_TTL_S > now:
+        return hit[1]
+    body = get_json(key)
+    _cache[key] = (now, body)
+    return body
+
+
+def manifest() -> dict:
+    return cached(MANIFEST_KEY)
+
+
+def clear_cache() -> None:
+    _cache.clear()
+
+
+# --- the passes on file and the records ---------------------------------------------------------
+
+@lru_cache(maxsize=1)
+def on_file() -> dict:
+    return json.loads(PASSES_PATH.read_text())
+
+
+def passes() -> list[dict]:
+    """Every pass on file: the star, the alternates, the silent vessel's earlier pass."""
+    f = on_file()
+    return f["passes"] + [f["silent_vessel"]]
+
+
+def pass_entry(pass_id: str) -> dict | None:
+    if not isinstance(pass_id, str) or not PASS_ID_RE.fullmatch(pass_id):
+        return None
+    return next((p for p in passes() if p["pass_id"] == pass_id), None)
+
+
+def on_file_list() -> list[str]:
+    """The passes on file as the agent names them ("Sentinel-1D, Oct 12, 2026")."""
+    out = []
+    for p in passes():
+        d = p["sensed"][:10]
+        out.append(f"{p['pass_id']} ({p.get('satellite', 'Sentinel-1')}, {d})")
+    return out
+
+
+def refusal(extra: str = "") -> str:
+    return json.dumps({"error": ON_FILE_ONLY + (f" {extra}" if extra else ""), "passes_on_file": on_file_list()})
+
+
+@lru_cache(maxsize=1)
+def records() -> dict:
+    rec = json.loads(RECORDS_PATH.read_text())
+    reserve = shape(next(f["geometry"] for f in rec["features"] if f["properties"]["kind"] == "reserve"))
+    ports = [(f["properties"]["name"], tuple(f["geometry"]["coordinates"])) for f in rec["features"]
+             if f["properties"]["kind"] == "port"]
+    land = unary_union([shape(f["geometry"]) for f in rec["features"] if f["properties"]["kind"] == "land"])
+    return {"reserve": reserve, "reserve_prep": prep(reserve), "ports": ports, "land": land}
+
+
+def km(a, b) -> float:
+    p = math.pi / 180
+    h = math.sin((b[1] - a[1]) * p / 2) ** 2 + math.cos(a[1] * p) * math.cos(b[1] * p) * math.sin((b[0] - a[0]) * p / 2) ** 2
+    return 12742.0176 * math.asin(math.sqrt(min(1.0, h)))
+
+
+def nearest_port(lon: float, lat: float) -> tuple[str, float]:
+    name, xy = min(records()["ports"], key=lambda p: km((lon, lat), p[1]))
+    return name, round(km((lon, lat), xy), 1)
+
+
+def km_to_shore(lon: float, lat: float) -> float:
+    """Distance to the nearest land polygon, in km (equirectangular at this latitude; fine at 0°)."""
+    d = Point(lon, lat).distance(records()["land"])
+    return round(d * 111.2, 1)
+
+
+def in_reserve(lon: float, lat: float) -> bool:
+    return records()["reserve_prep"].contains(Point(lon, lat))
+
+
+@lru_cache(maxsize=1)
+def reserve_grid() -> tuple[Grid, np.ndarray]:
+    """The 0.05° grid over the reserve (decision 3) and its water cells (cell centre in the reserve)."""
+    step = 0.05
+    w, s, e, n = records()["reserve"].bounds
+    grid = Grid(round(math.floor(w / step) * step, 2), round(math.floor(s / step) * step, 2),
+                round(math.ceil(e / step) * step, 2), round(math.ceil(n / step) * step, 2), step)
+    rp = records()["reserve_prep"]
+    h, wd = grid.shape
+    water = np.array([[rp.contains(Point(grid.west + (c + .5) * step, grid.south + (r + .5) * step)) for c in range(wd)]
+                      for r in range(h)])
+    return grid, water
+
+
+def fc(features: list[dict]) -> dict:
+    return {"type": "FeatureCollection", "features": features}
+
+
+def point(lon: float, lat: float, **props) -> dict:
+    return {"type": "Feature", "properties": props, "geometry": {"type": "Point", "coordinates": [round(lon, 5), round(lat, 5)]}}
+
+
+def nice_time(iso: str) -> str:
+    """'2026-10-12T00:18:02Z' -> 'Oct 12, 2026 00:18 UTC'."""
+    from datetime import datetime
+    t = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return f"{t:%b} {t.day}, {t:%Y %H:%M} UTC"

@@ -26,7 +26,8 @@ cd "$REPO_ROOT"
 PYTHON="${PYTHON:-$REPO_ROOT/.venv/bin/python}"
 TAG="deployed-$(date +%F)"
 DRY="${DRY_RUN:-0}"
-# The archaeologist joins the default with Release 3 at G4 (Oct 31; ai-archaeologist decision 7).
+# The archaeologist joins the default with Release 3 at G4 (Oct 31; ai-archaeologist decision 7),
+# and Dark Vessels with it (act3-dark-vessels task 7).
 PROMOTE_AGENTS="${PROMOTE_AGENTS:-earth methane}"
 
 # One row per agent (a new agent is a new row; bash 3.2 has no associative arrays):
@@ -37,6 +38,7 @@ AGENT_TABLE='
 earth|geo_agent|similar-central-park|S3_BUCKET_NAME AGENTCORE_ARN ARCGIS_MCP_TOKEN|||
 methane|agents/methane-hunter|strongest-plume|S3_BUCKET_NAME AGENTCORE_ARN ARCGIS_MCP_TOKEN EARTHDATA_TOKEN|methane|Methane Hunter|EMIT methane plumes, deployed from demo-stable
 archaeologist|agents/ai-archaeologist|great-circle-measure|S3_BUCKET_NAME AGENTCORE_ARN ARCGIS_MCP_TOKEN|archaeologist|AI Archaeologist|Known earthworks in 1 m LiDAR, deployed from demo-stable
+vessels|agents/dark-vessels|unseen-in-the-reserve|S3_BUCKET_NAME AGENTCORE_ARN|vessels|Dark Vessels|Radar targets with no AIS in the Galapagos Marine Reserve, deployed from demo-stable
 '
 agent_field() { awk -F'|' -v id="$1" -v col="$2" '$1 == id { print $col; exit }' <<<"$AGENT_TABLE"; }
 agent_dir() { local d; d="$(agent_field "$1" 2)"; [ -n "$d" ] && echo "$d"; }

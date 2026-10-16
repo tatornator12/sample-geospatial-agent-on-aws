@@ -8,7 +8,7 @@ Prints pass rates, per-prompt seconds and the model's "what I see" sentences sid
 side, and writes the raw reports next to each other for the record.
 
 Usage:
-    python scripts/bakeoff.py [--agent earth|methane|archaeologist] [--models id1 id2 ...]
+    python scripts/bakeoff.py [--agent earth|methane|archaeologist|vessels] [--models id1 id2 ...]
                               [--only NAME] [--out DIR]
 
 Dev only. The stable runtime is never touched by this script. A model that rejects
@@ -114,7 +114,7 @@ def print_comparison(reports: list[dict]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--agent", default="earth", choices=("earth", "methane", "archaeologist"),
+    parser.add_argument("--agent", default="earth", choices=("earth", "methane", "archaeologist", "vessels"),
                         help="which agent's dev runtime and golden prompts (default: earth)")
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS)
     parser.add_argument("--only", help="run a single golden prompt by name")

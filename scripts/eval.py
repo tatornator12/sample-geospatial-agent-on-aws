@@ -50,6 +50,11 @@ AGENTS = {
         "targets": {"dev": "ai_archaeologist_dev", "stable": "ai_archaeologist"},
         "prompts": REPO_ROOT / "agents" / "ai-archaeologist" / "golden_prompts.json",
     },
+    "vessels": {
+        "yaml": REPO_ROOT / "agents" / "dark-vessels" / ".bedrock_agentcore.yaml",
+        "targets": {"dev": "dark_vessels_dev", "stable": "dark_vessels"},
+        "prompts": REPO_ROOT / "agents" / "dark-vessels" / "golden_prompts.json",
+    },
 }
 
 # Backwards-compatible names for the Earth Analyst (scripts/prewarm.py and older callers).
@@ -292,11 +297,13 @@ def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str 
     text is checked with the session's registry sentences removed (see registry_lines)."""
     started = time.monotonic()
     try:
-        # setup_prompt: a first turn in the same session (not checked), so a follow-up is tested as
-        # the presenter types it. Timing and checks cover the second turn only.
+        # setup_prompt: earlier turns in the same session (not checked), so a follow-up is tested as
+        # the presenter types it; a string or a list of strings. Timing and checks cover the last turn only.
         session_id = new_session_id()
-        if case.get("setup_prompt"):
-            stream_invoke(client, arn, case["setup_prompt"], timeout, session_id)
+        setups = case.get("setup_prompt") or []
+        for setup in [setups] if isinstance(setups, str) else setups:
+            stream_invoke(client, arn, setup, timeout, session_id)
+        if setups:
             started = time.monotonic()
         text, marks = stream_invoke(client, arn, case["prompt"], timeout, session_id)
     except Exception as e:  # RuntimeClientError, timeout, throttling ...

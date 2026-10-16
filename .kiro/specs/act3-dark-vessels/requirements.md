@@ -6,7 +6,8 @@ rule against trained forecasting and accuracy claims, tabled EventBridge, and ag
 only; vessel type and size only, no flags. On Oct 16 the user approved the rest: the coverage rule
 (in its same-hour form, design decision 3), the tasking's `PutObject` grant, the names, the
 schedule, and the silent-vessel beat in the run rather than as a spare; the candidates' colour is
-orchid. The first draft (Santa Barbara Channel) is the fallback.
+orchid. The GFW licence was cleared on Oct 16 (the user: "GFW license is good"), so the
+Galápagos act goes ahead and the Santa Barbara fallback is retired.
 
 ## Introduction
 
@@ -26,7 +27,8 @@ year; GFW's radar detections with no AIS inside the reserve were 41 (2024), 109 
 (2026 to Oct 12), one to three a pass; our CA-CFAR (`cfar.py`) found GFW's dark target within
 0.58 km on a raw pass (a 90 km window read in 2.1 s); fitted on 2023–25 and leaving out the ports,
 the top 5% of the reserve's water held 53% of 2026's dark targets (10.6× chance), and refitted on
-the newest data (to June, checked on July 1 to Oct 12) it held 55% (11.0×); ESA's plan to
+the newest data (to June, checked on July 1 to Oct 12) it held 55% (11.0×) in the spike and 45%
+(9×) on the built cache, the number the agent says; ESA's plan to
 Nov 5 gives the reserve six planned Sentinel-1D passes; the squid fleet skipped the Galápagos in
 2026 and stayed off Peru and Chile.
 
@@ -42,8 +44,7 @@ heat map of the south-east Pacific; no read of GFW, Planetary Computer or NOAA a
 build caches them; the one live read is ESA's plan, bounded, with a cached fallback); no trained
 black-box model (counts, grids and backtests only); no automatic action and no EventBridge; no
 change to the other three agents' behaviour; no model change (Sonnet 4.6 through the Nov 3
-freeze). The Galápagos act goes ahead only with a yes on the GFW licence by Tuesday Oct 20;
-otherwise the same code runs on the Santa Barbara Channel with NOAA's AIS (design decision 1).
+freeze). The GFW licence is cleared (Oct 16), so the act runs in the Galápagos (design decision 1).
 
 ## Requirements
 
@@ -58,7 +59,8 @@ break Acts 1, 2 and 4, and agent number four is a table row, not a copy.
 1. WHEN `agents/dark-vessels/` is built THEN it SHALL contain its own entrypoint (`dark_vessels.py`,
    the shared runtime contract: prewarm, S3 session manager, sliding window, the tool-call streaming
    format, the replay-case prompt), `vessels_config.py`, its tool modules, `_paths.py`,
-   `requirements-agent.txt`, `deploy.sh`, `.env.example`, `golden_prompts.json`,
+   `requirements-agent.txt` (only if it needs more than the platform image; it does not),
+   `deploy.sh`, `.env.example`, `golden_prompts.json`,
    `build_replay_case.py` and `tests/`.
 2. WHEN the agent imports shared code THEN it SHALL come from the staged `_geo_agent/` copy through
    `geo_agent/stage_shared.sh`, with the staging allowlist test.
@@ -153,7 +155,7 @@ radar can see there, so that a patrol goes where the pattern points, not where a
 2. WHEN patrol boxes are returned THEN each SHALL carry its next planned Sentinel-1 passes from
    `next_look` (those covering at least 90% of the box).
 3. WHEN the agent speaks of the prediction THEN it SHALL state it as the check measured it ("fitted
-   on everything to June, this map's top 5% of the water held 55% of the dark targets seen since
+   on everything to June, this map's top 5% of the water held 45% of the dark targets seen since
    July") and SHALL make
    no claim beyond it.
 

@@ -31,3 +31,13 @@ def test_pseudonymise_numbers_vessels_then_the_scrub_drops_the_ids():
     assert [r["k"] for r in out] == [1, 2, 1]                   # the same vessel, the same number
     assert all("vesselId" not in r for r in out) and "id-a" not in repr(out) and "id-b" not in repr(out)
     assert g.pseudonymise({"lat": 0}) == {"lat": 0}            # rows without an id get no number
+
+
+def test_the_final_scan_fails_a_poisoned_cache_file_and_passes_a_clean_one():
+    clean = ('{"pass_id": "s1d-20261012t0018", "scenes": ["S1D_IW_GRDH_1SDV_20261012T001733_20261012T001803_004974_0096A1"],'
+             ' "targets": [{"lon": -90.12345, "lat": -0.123456789, "px": 12}], "type": "fishing", "k": 3}')
+    assert g.scan_identity(clean) == []                         # a 9-digit decimal part is not an MMSI
+    poisoned = clean[:-1] + ', "ShipName": "X", "note": "heard as 123456789 at 00:17"}'
+    found = g.scan_identity(poisoned)
+    assert "key ShipName" in found and "nine-digit number 123456789" in found
+    assert g.scan_identity('{"vesselIDs": []}') == ["key vesselIDs"]
