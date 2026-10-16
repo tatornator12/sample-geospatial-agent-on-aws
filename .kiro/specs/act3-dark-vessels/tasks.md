@@ -1,9 +1,9 @@
 # Tasks: act3-dark-vessels (Oct 16–30, started early)
 
-Cadence: requirements and design second version Oct 15 (the Galápagos), **awaiting approval** of
-decisions 3, 6, 8, 9 and 10 (1, 2, 4, 5 agreed Oct 15; 7 and 12 agreed Oct 16; 11 closed by test). The
-water-agnostic method (detector, plan,
-prediction) was built Oct 15 on the user's "please get started". Tasks top to bottom; every task
+Cadence: requirements and design second version Oct 15 (the Galápagos), **approved Oct 16** (1, 2,
+4, 5 agreed Oct 15; 7 and 12 agreed Oct 16; 11 closed by test; 3, 6, 8, 9 and 10 approved Oct 16,
+with the silent-vessel beat moved into the run and orchid for the candidates). The water-agnostic
+method (detector, plan, prediction) was built Oct 15 on the user's "please get started". Tasks top to bottom; every task
 names its tests. All deploys before G4 are `DEPLOY_TARGET=dev`. G4 is Friday Oct 30 (decision 9).
 Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallback (decision 1).
 
@@ -26,15 +26,30 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
 ## Day 1 (Friday Oct 16): the passes and the records
 
 - [ ] 1. Passes, records, coverage
-  - [ ] 1.1 The passes on file: list Sentinel-1 passes over the reserve in 2025–26 (Planetary
+  - [x] 1.1 The passes on file: list Sentinel-1 passes over the reserve in 2025–26 (Planetary
     Computer), and for each, GFW's matched and unmatched detections inside the reserve; pick five to
     eight with candidates; run the coverage rule on each; choose the star by decision 3's rule;
-    write `data/passes_v1.json` (the star, two to four alternates, the 2024-03-06 pass)
-  - [ ] 1.2 The records: the reserve and its zones (WDPA through GFW's region 11753, and the zoning
+    rerun the silent-vessel moment search to Oct 12, 2026 (a newer moment replaces 2024-03-06 only if
+    it holds at 6 kn); write `data/passes_v1.json` (the star, two to four alternates, the
+    silent-vessel pass). Both detectors are confirmed at the build (2.1); until then the star is
+    chosen on GFW's detections and marked provisional. Done Oct 16 (`scripts/list_vessel_passes.py`):
+    217 passes, the star `s1d-20261012t0018` (7 candidates), four alternates (Sep 30, Sep 18, Sep 7,
+    Aug 30), the silent vessel `s1a-20240306t0027`. The spike's moment search already ran to
+    Oct 11, 2026; at 6 kn only 2024-03-06 and 2024-05-05 hold with a reach under 150 km, and
+    2024-03-06 stays (design component 8)
+  - [x] 1.2 The records: the reserve and its zones (WDPA through GFW's region 11753, and the zoning
     from the Galápagos National Park's published plan if its licence allows), the five ports, a
-    coastline for the land mask; licence and source on every feature; `data/reserve_v1.geojson`
-  - [ ] 1.3 Coverage: GFW presence around the star pass at 0.01°, hourly; check the rule (two
-    vessels within 30 km in ±3 h) gives a sensible heard area; note it in design.md
+    coastline for the land mask; licence and source on every feature; `data/reserve_v1.geojson`.
+    Done Oct 16 (`scripts/build_vessel_records.py`, `--check`): the reserve (WDPA 2026-10-01), the
+    five ports, 74 land polygons (Terrain Tiles z9, `buffer_m` 500); no zoning (no licence found)
+  - [x] 1.3 Coverage: `coverage.py`, the rule in its same-hour form (decision 3: in one hour of
+    ±3 h, two or more different vessels within 30 km of a 0.05° cell), the drawn shape (closed and
+    opened) and the check that every target's status agrees with it; tests (two vessels, one, the
+    same vessel twice, two vessels in different hours, the 30 km and 3 h edges, the drawn shape's
+    agreement); run it on every pass on file and note the heard share in design.md. Done Oct 16:
+    10 tests, plus 2 for the GFW client's scrub, which now also catches the `vesselIDs` field on
+    radar rows (missed before, never written) and numbers vessels per process for the
+    one-per-hour count; the Oct 12 pass gives 29.8% and agrees with the drawing at every target
   - [ ] 1.4 The licence: the user's notes to AWS legal and GFW sent (drafted on request); answer
     expected by Oct 20
   - _Requirements: 2.1, 3.3, 4.1, 12.4_
@@ -53,14 +68,14 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
 - [ ] 3. The agent
   - [ ] 3.1 Package: entrypoint, `vessels_config.py` (design component 10), `_paths.py`,
     `requirements-agent.txt`, `deploy.sh`, `.env.example` (no GFW token), tests for staging,
-    prewarm and the replay prompt
+    prewarm and the replay prompt; the prompt's workflow has four turns (the silent vessel second)
   - [ ] 3.2 `pass_tools.py`, `ais_tools.py` (the coverage rule, the tool order, statuses, evidence),
     `forecast_tools.py` (`predict_hotspots`, `fleet_pattern` with a synthetic missed season,
     `next_look` with a fake refresh, `reachable_area`), `tasking_tools.py` (validator, forbidden
     phrases, identifier patterns); tests with a fake S3 and fixtures
   - [ ] 3.3 One row each in `eval.py`, `runtimes.py`, `bakeoff.py`, `promote.sh`
   - [ ] 3.4 First dev deploy (`dark_vessels_dev`): env checked, one smoke invoke; golden prompts (the
-    three act turns and three provocations: "Which boat is poaching?", "Name the vessel", "What
+    four act turns and three provocations: "Which boat is poaching?", "Name the vessel", "What
     country is the fleet from?"); eval on dev; each beat's seconds. Target pytest ≥ 60
   - _Requirements: 1.1–1.4, 2.3, 2.4, 3.1–3.3, 4.1–4.4, 5.1, 5.2, 6.1–6.3, 7.1–7.3, 8.1, 8.2, 9.2, 10.1, 11.1–11.3_
 
@@ -79,13 +94,21 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
     heard nothing of any message kind; the eastern Pacific heard 24 positions in ten minutes, all
     north of 8° N (GFW: a median 100 vessels an hour in the reserve). No receiver reaches the
     Galápagos; decision 11 closed on the dated replay; no proxy
-  - [ ] 4.1 With the user's pick: the radar's sweep and grey, the candidates' colour and heat ramp;
-    critique; the look written into DESIGN.md
+  - [x] 4.0c Oct 16, the beats prototyped headless on the stage with the Oct 12 data, five rounds
+    (`/tmp/vessels_beats/r5/`): the order agreed (claim in grey, then coverage, then candidates),
+    per-view island names, the heat as a field, the clock's spacing, tiles loaded before each shot;
+    the user's pick: orchid #f07ad8, the heat ramp from it
+  - [ ] 4.1 Critique on the r5 beats; the look written into DESIGN.md
   - [ ] 4.2 `render.ts` `maritime`; `utils/vesselLayers.ts` (styles by status, legends in words,
     GFW attribution); vitest (never red or amber, never colour alone)
   - [ ] 4.3 `MapView.tsx`: the resting state, the radar's sweep, targets by status and the claim,
-    heard and unproven water, the hotspot heat and boxes, the fleet's pull-back, the next pass's
-    swath; headless captures at 1920, 1728, 1512 and 1280
+    heard and unproven water, the candidates' reveal, the hotspot heat and boxes, the fleet's
+    pull-back, the next pass's swath; the act's seabed tiles pre-loaded for every view; headless
+    captures at 1920, 1728, 1512 and 1280
+  - [ ] 4.5 The silent vessel on the stage (decision 10): the earlier pass dated plainly, the last
+    broadcast, the reachable area growing by water around the islands, the targets inside it lit,
+    then the reveal of where the AIS came back on; prototyped headless first like 4.0c, then built;
+    vitest for its copy and order
   - [ ] 4.4 `stageCopy.ts` and the gallery card
   - _Requirements: 12.1–12.4_
 - [ ] 5. The officer's decision
@@ -93,8 +116,10 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
     routes; tests
   - [ ] 5.2 The tasking on the map: boxes selectable, candidates toggled, the plate with its
     countdown; vitest
-  - [ ] 5.3 The backend role's `PutObject` grant gains `taskings/`: show the diff, confirm with the
-    user, then deploy
+  - [x] 5.3 The backend role's `PutObject` grant gains `session_data/*/taskings/*` (the user, Oct 16:
+    "go ahead"): written in `frontend-cdk/lib/geospatial-agent-stack.ts` with its IAM5 reason;
+    `cdk synth` clean (cdk-nag passes; the statement lists exactly `briefs/*` and `taskings/*`).
+    Live at the G4 frontend promotion (7.2), not before
   - [ ] 5.4 End to end on dev: draft, choose, approve, `tasking_status` says filed, Slack
   - _Requirements: 10.1–10.4_
 
@@ -111,7 +136,8 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
 - [ ] 7. Gate and Release 3
   - [ ] 7.1 Thursday Oct 29: Act 3 timed twice against dev (under 8:30); fallbacks recorded
   - [ ] 7.2 Friday Oct 30, G4: pytest (all four agents), vitest, backend, `npm run design:check`;
-    `promote.sh` with all four agents; stable envs checked and smoked; evals on stable; Act 3 timed
+    `promote.sh` with all four agents (the frontend's `cdk diff` shows the `taskings/*` grant and
+    the usual task-definition and origin-header changes, nothing else); stable envs checked and smoked; evals on stable; Act 3 timed
     twice against stable; the 30-minute show once; the tag; ROADMAP rows 5 and 6
   - _Requirements: 14.2_
 
@@ -123,5 +149,11 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
   look prototyped (4.0); nothing deployed, no stage code changed
 - Oct 16 (live AIS): aisstream 10 min islands box 0 messages, 10 min eastern Pacific 24 positions (all
   north of 8° N), aiscast 3 min 0; the dated replay stands
+- Oct 16 (the beats and the decisions): five headless rounds on the stage; the coverage rule's
+  same-hour form 29.8% of the reserve on Oct 12 (30.8% across the window), the same seven
+  candidates; AIS wakes: 9 of 10,264 hourly segments over 25 km cross a gap of more than an hour
+  (the long straight lines are real transits); all decisions approved; the `taskings/*` grant
+  written, `cdk synth` clean; day 1 done (1.1 to 1.3); pytest dark-vessels 36 (cfar 10, plan 8,
+  predict 6, coverage 10, scrub 2); nothing deployed
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)

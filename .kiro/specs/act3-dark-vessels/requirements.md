@@ -1,9 +1,12 @@
 # Requirements: act3-dark-vessels (Oct 16–30, started early)
 
-Status: **DRAFT Oct 15, second version, awaiting approval.** The user chose the Galápagos (Oct 15:
+Status: **Approved Oct 16.** The user chose the Galápagos (Oct 15:
 "as long as we can possibly detect and predict with the area we have chosen"), set aside the Oct 13
 rule against trained forecasting and accuracy claims, tabled EventBridge, and agreed: passes on file
-only; vessel type and size only, no flags. The first draft (Santa Barbara Channel) is the fallback.
+only; vessel type and size only, no flags. On Oct 16 the user approved the rest: the coverage rule
+(in its same-hour form, design decision 3), the tasking's `PutObject` grant, the names, the
+schedule, and the silent-vessel beat in the run rather than as a spare; the candidates' colour is
+orchid. The first draft (Santa Barbara Channel) is the fallback.
 
 ## Introduction
 
@@ -107,9 +110,11 @@ target was seen, so that poor reception is never mistaken for a vessel hiding.
 
 #### Acceptance Criteria
 
-1. WHEN `check_ais_coverage` runs for a pass THEN, for every target, it SHALL count the distinct
-   broadcasting vessels heard within 30 km in the three hours either side of the pass, and call the
-   water `heard` (at least two) or `unproven`; it SHALL return the heard and unproven areas for the map.
+1. WHEN `check_ais_coverage` runs for a pass THEN it SHALL call each 0.05° cell of the reserve
+   `heard` when, in at least one hour of the three either side of the pass, two or more different
+   broadcasting vessels were heard within 30 km of it, and `unproven` otherwise; it SHALL return the
+   heard and unproven areas for the map, drawn so that every target's status agrees with the cell
+   it lies in.
 2. WHEN `match_ais` runs before `check_ais_coverage` for that pass in the session THEN it SHALL
    refuse and name the coverage check.
 3. WHEN `match_ais` runs THEN each target SHALL get one status: `broadcasting` (GFW matched it to
@@ -181,7 +186,7 @@ that a tasking asks for a look that will happen.
    the cache, saying its date; past the plan's end it SHALL say the pass is not planned yet and
    SHALL never extrapolate an orbit.
 
-### Requirement 9: A vessel that went silent (optional beat)
+### Requirement 9: A vessel that went silent (a beat in the run)
 
 **User Story:** As the audience, I want to see where a vessel that switched off its AIS could have
 been when the radar passed, and then where it came back on.
@@ -193,6 +198,10 @@ been when the radar passed, and then where it came back on.
    list the pass's targets inside it, and return where its AIS came back on, for the reveal.
 2. WHEN the agent describes it THEN it SHALL state the speed and the hours and say "I cannot say
    which, if any, of these it is."
+3. WHEN the beat plays (its own short turn, after the evidence) THEN the stage SHALL name the case's
+   date plainly as an earlier pass (it is not the star pass), show the last broadcast position, grow
+   the reachable area by water, light the targets inside it, and only then show where the AIS came
+   back on; the vessel SHALL be named by type and size only.
 
 ### Requirement 10: Acts with approval
 
@@ -232,8 +241,8 @@ what the evidence shows.
 
 #### Acceptance Criteria
 
-1. WHEN `AGENT_RUNTIMES` lists `vessels` THEN the switcher SHALL show "Dark Vessels" with three
-   prepared prompts, a placeholder and plain step names.
+1. WHEN `AGENT_RUNTIMES` lists `vessels` THEN the switcher SHALL show "Dark Vessels" with four
+   prepared prompts (the run's four turns), a placeholder and plain step names.
 2. WHEN a tool passes a render hint THEN the allowlist SHALL accept a `maritime` group (radar,
    targets by status, heard and unproven water, the hotspot map, patrol boxes, the fleet's heat,
    the next pass's footprint, the reserve and its zones), each with a legend in words.
@@ -243,11 +252,14 @@ what the evidence shows.
    labelled as a replay and never as live; the radar SHALL arrive in a way that shows the pass and
    the AIS SHALL stop at the pass's minute; critiqued before and polished after with Impeccable,
    detector 0.
+4. WHEN a target's status is drawn THEN it SHALL read without colour alone, never in red, never in
+   amber; GFW's attribution SHALL be on the map whenever its data is.
 5. WHEN the predictions run THEN they SHALL use the newest data on file: the check holds out the
    most recent months (today Jul 1 to Oct 12, 2026), the forward map uses everything to the newest
    day, and the build SHALL be rerun on Nov 5 to add the newest pass and AIS.
-4. WHEN a target's status is drawn THEN it SHALL read without colour alone, never in red, never in
-   amber; GFW's attribution SHALL be on the map whenever its data is.
+6. WHEN the targets appear THEN, until the coverage check is on the map, a target with no match
+   SHALL be a plain grey ring with no label; the candidates' colour (orchid) and their labels SHALL
+   appear only after it.
 
 ### Requirement 13: An offline replay case
 

@@ -1,0 +1,195 @@
+{
+ "version": "v1",
+ "built": "2026-10-16",
+ "until": "2026-10-13",
+ "rule": {
+  "heard": "a 0.05 deg cell is heard when, in at least one hour of the three either side of the pass, two or more different broadcasting vessels were heard within 30 km of it",
+  "candidate": "no AIS match, at least 10 km from a port, in heard water, seen by both detectors",
+  "star": "the most recent pass with at least two candidates inside the reserve"
+ },
+ "provisional": "every count is GFW's detector alone; ours runs at the build (task 2.1) and a candidate needs both",
+ "sources": [
+  "Microsoft Planetary Computer, sentinel-1-grd (Copernicus Sentinel data)",
+  "Global Fishing Watch API v3: public-global-sar-presence, public-global-presence (Powered by Global Fishing Watch.)"
+ ],
+ "summary": {
+  "passes": 217,
+  "with_two_unmatched_away": 51,
+  "shortlist": [
+   "s1d-20261012t0018",
+   "s1d-20260930t0018",
+   "s1d-20260923t0026",
+   "s1d-20260918t0018",
+   "s1d-20260907t1141",
+   "s1d-20260830t0026",
+   "s1d-20260813t0018",
+   "s1d-20260806t0026"
+  ]
+ },
+ "passes": [
+  {
+   "pass_id": "s1d-20261012t0018",
+   "role": "star",
+   "satellite": "Sentinel-1D",
+   "sensed": "2026-10-12T00:18:02Z",
+   "orbit_state": "ascending",
+   "relative_orbit": 33,
+   "scenes": [
+    "S1D_IW_GRDH_1SDV_20261012T001733_20261012T001803_004974_00963A",
+    "S1D_IW_GRDH_1SDV_20261012T001803_20261012T001831_004974_00963A"
+   ],
+   "reserve_share": 0.548,
+   "gfw": {
+    "matched": 4,
+    "unmatched": 8,
+    "unmatched_away_from_ports": 7
+   },
+   "coverage": {
+    "heard_share": 0.298,
+    "fixes": 850,
+    "candidates": 7,
+    "unproven": 0
+   },
+   "provisional": true,
+   "note": "the most recent pass with at least two candidates inside the reserve (decision 3)"
+  },
+  {
+   "pass_id": "s1d-20260930t0018",
+   "role": "alternate",
+   "satellite": "Sentinel-1D",
+   "sensed": "2026-09-30T00:18:02Z",
+   "orbit_state": "ascending",
+   "relative_orbit": 33,
+   "scenes": [
+    "S1D_IW_GRDH_1SDV_20260930T001733_20260930T001803_004799_009018",
+    "S1D_IW_GRDH_1SDV_20260930T001803_20260930T001831_004799_009018"
+   ],
+   "reserve_share": 0.548,
+   "gfw": {
+    "matched": 4,
+    "unmatched": 7,
+    "unmatched_away_from_ports": 7
+   },
+   "coverage": {
+    "heard_share": 0.322,
+    "fixes": 835,
+    "candidates": 6,
+    "unproven": 1
+   },
+   "provisional": true,
+   "note": "a recent pass with at least two candidates"
+  },
+  {
+   "pass_id": "s1d-20260918t0018",
+   "role": "alternate",
+   "satellite": "Sentinel-1D",
+   "sensed": "2026-09-18T00:18:02Z",
+   "orbit_state": "ascending",
+   "relative_orbit": 33,
+   "scenes": [
+    "S1D_IW_GRDH_1SDV_20260918T001733_20260918T001803_004624_0089FE",
+    "S1D_IW_GRDH_1SDV_20260918T001803_20260918T001831_004624_0089FE"
+   ],
+   "reserve_share": 0.548,
+   "gfw": {
+    "matched": 2,
+    "unmatched": 5,
+    "unmatched_away_from_ports": 5
+   },
+   "coverage": {
+    "heard_share": 0.308,
+    "fixes": 822,
+    "candidates": 5,
+    "unproven": 0
+   },
+   "provisional": true,
+   "note": "a recent pass with at least two candidates"
+  },
+  {
+   "pass_id": "s1d-20260907t1141",
+   "role": "alternate",
+   "satellite": "Sentinel-1D",
+   "sensed": "2026-09-07T11:41:47Z",
+   "orbit_state": "descending",
+   "relative_orbit": 55,
+   "scenes": [
+    "S1D_IW_GRDH_1SDV_20260907T114120_20260907T114149_004471_0084BA",
+    "S1D_IW_GRDH_1SDV_20260907T114149_20260907T114211_004471_0084BA"
+   ],
+   "reserve_share": 0.497,
+   "gfw": {
+    "matched": 7,
+    "unmatched": 2,
+    "unmatched_away_from_ports": 2
+   },
+   "coverage": {
+    "heard_share": 0.264,
+    "fixes": 858,
+    "candidates": 2,
+    "unproven": 0
+   },
+   "provisional": true,
+   "note": "a recent pass with at least two candidates"
+  },
+  {
+   "pass_id": "s1d-20260830t0026",
+   "role": "alternate",
+   "satellite": "Sentinel-1D",
+   "sensed": "2026-08-30T00:26:09Z",
+   "orbit_state": "ascending",
+   "relative_orbit": 106,
+   "scenes": [
+    "S1D_IW_GRDH_1SDV_20260830T002542_20260830T002611_004347_008066",
+    "S1D_IW_GRDH_1SDV_20260830T002611_20260830T002634_004347_008066"
+   ],
+   "reserve_share": 0.316,
+   "gfw": {
+    "matched": 3,
+    "unmatched": 3,
+    "unmatched_away_from_ports": 3
+   },
+   "coverage": {
+    "heard_share": 0.366,
+    "fixes": 908,
+    "candidates": 2,
+    "unproven": 1
+   },
+   "provisional": true,
+   "note": "a recent pass with at least two candidates"
+  }
+ ],
+ "silent_vessel": {
+  "pass_id": "s1a-20240306t0027",
+  "role": "silent_vessel",
+  "sensed": "2024-03-06T00:27:07Z",
+  "orbit_state": "ascending",
+  "relative_orbit": 106,
+  "scenes": [
+   "S1A_IW_GRDH_1SDV_20240306T002639_20240306T002708_052853_066596",
+   "S1A_IW_GRDH_1SDV_20240306T002708_20240306T002731_052853_066596"
+  ],
+  "reserve_share": 0.316,
+  "sensed_day": "2024-03-06",
+  "satellite": "Sentinel-1A",
+  "pass_time": "2024-03-06T00:26Z",
+  "gap": {
+   "type": "fishing",
+   "off_h_before_pass": 12.0,
+   "silent_h": 30.0,
+   "back_on_km": 26.1,
+   "off": [
+    -92.76,
+    -1.11
+   ]
+  },
+  "speed_kn": 6,
+  "reach_km": 133,
+  "dark_in_reach_km": [
+   50.7
+  ],
+  "dark_out_of_reach_km": [
+   256.4
+  ],
+  "why": "the tightest moment that holds at 6 kn: its reach excludes the day's other dark target, and the AIS came back on 26 km from where it went off. 2024-05-05 also holds (81 km, a target at 70 km) but came back 100 km away; the two 2026-03-08 moments hold only because 32 to 35 h of silence give a 359 to 393 km reach, most of the radar box, so the area says nothing; 2024-07-04 does not hold (56 km, the target at 75 km)"
+ }
+}

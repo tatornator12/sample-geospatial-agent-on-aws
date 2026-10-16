@@ -288,12 +288,17 @@ export class GeospatialAgentStack extends cdk.Stack {
         `arn:aws:s3:::${config.s3BucketName}/*`,
       ],
     }));
-    // The backend writes exactly one thing: a brief the analyst filed (POST /api/brief/approve
-    // writes <id>.md, <id>.png and <id>.filed.json beside the agent's draft). Nothing else.
+    // The backend writes exactly two things, each a human's decision filed beside the agent's draft:
+    // a brief the analyst filed (POST /api/brief/approve) and a patrol tasking the officer approved
+    // (POST /api/tasking/approve; Act 3, approved by the user Oct 16). Each writes <id>.md, <id>.png
+    // and <id>.filed.json. Nothing else.
     taskRole.addToPolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ['s3:PutObject'],
-      resources: [`arn:aws:s3:::${config.s3BucketName}/session_data/*/briefs/*`],
+      resources: [
+        `arn:aws:s3:::${config.s3BucketName}/session_data/*/briefs/*`,
+        `arn:aws:s3:::${config.s3BucketName}/session_data/*/taskings/*`,
+      ],
     }));
 
     // Grant access to invoke Bedrock AgentCore Runtime
@@ -781,8 +786,11 @@ export class GeospatialAgentStack extends cdk.Stack {
         },
         {
           id: 'AwsSolutions-IAM5',
-          reason: 'The only write the backend makes: the brief the analyst filed (<id>.md, <id>.png, <id>.filed.json) beside the agent\'s draft, under any session\'s briefs/ prefix. Session ids are per conversation, so the prefix cannot be enumerated at synth time.',
-          appliesTo: [`Resource::arn:aws:s3:::${config.s3BucketName}/session_data/*/briefs/*`],
+          reason: 'The only writes the backend makes: the brief the analyst filed and the patrol tasking the officer approved (<id>.md, <id>.png, <id>.filed.json) beside the agent\'s draft, under any session\'s briefs/ or taskings/ prefix. Session ids are per conversation, so the prefix cannot be enumerated at synth time.',
+          appliesTo: [
+            `Resource::arn:aws:s3:::${config.s3BucketName}/session_data/*/briefs/*`,
+            `Resource::arn:aws:s3:::${config.s3BucketName}/session_data/*/taskings/*`,
+          ],
         },
       ],
       true, // Apply to children

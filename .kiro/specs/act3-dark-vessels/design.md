@@ -1,7 +1,9 @@
 # Design: act3-dark-vessels
 
-Status: **DRAFT Oct 15, second version, awaiting approval** (ten decisions at the end; 1, 2, 4, 5
-and the EventBridge part of 6 already agreed by the user on Oct 15).
+Status: **Approved Oct 16.** Decisions 1, 2, 4, 5 and the EventBridge part of 6 were agreed on
+Oct 15; 7 and 12 on Oct 16; 11 was closed by test; 3, 6, 8, 9 and 10 were approved on Oct 16 (the
+user: "Orchid", "whatever your recommendation is", "go ahead", "your recommendations and add
+silent-vessel beat").
 
 ## Overview
 
@@ -78,8 +80,10 @@ agents/dark-vessels/
 scripts/build_vessel_cache.py   (offline, builder-run; GFW token from agents/dark-vessels/.env)
   passes_v1.json → Planetary Computer STAC + SAS → VV window over the reserve at 40 m
     → <pass>_vv.tif (COG) + <pass>_display.tif (uint8 dB) → land mask → cfar → <pass>_targets.json
-  GFW per pass day: SAR detections matched / unmatched (0.01°), AIS presence ±3 h (hourly, 0.01°,
-    distinct-vessel counts per cell, ids dropped) → <pass>_gfw.json, <pass>_heard.json
+  GFW per pass day: SAR detections matched / unmatched (0.01°), AIS presence ±3 h (one position per
+    vessel per hour, 0.01°, no key) → <pass>_gfw.json, <pass>_heard.json; the replay: the three days
+    to the pass as tracks under a random number per build (never derived from a vessel id), type and
+    size class only → <pass>_replay.json
   GFW history: reserve dark detections daily 2023→, AIS-off events near the reserve 2023→,
     squid-jigger fishing effort monthly by 0.1° cell 2017→ → history_v1.json, fleet_v1.json
   → s3://<bucket>/vessels/cache/v1/… + manifest.json; a scan fails the build on any identity field
@@ -109,6 +113,17 @@ is chosen on day 1 by a rule set now (decision 3): at least two candidates insid
 heard water, seen by both detectors, the most recent pass that has them. The spike's 2024-03-06
 pass stays on file for the silent-vessel beat.
 
+Day 1 (Oct 16, `scripts/list_vessel_passes.py`, GFW's detector alone until the build adds ours):
+217 Sentinel-1 passes over the reserve from Jan 1, 2025 to Oct 12, 2026, 51 of them with at least
+two unmatched detections 10 km or more from a port. On the eight newest of those, the coverage
+rule hears 23 to 37% of the reserve. The star is `s1d-20261012t0018` (Sentinel-1D, ascending,
+orbit 33, 55% of the reserve): 7 candidates, heard 29.8%, none unproven. The alternates are Sep 30
+(6 candidates), Sep 18 (5), Sep 7 (2, the descending orbit 55) and Aug 30 (2). The silent vessel's
+pass is `s1a-20240306t0027`. The records (`scripts/build_vessel_records.py`) hold the reserve
+(WDPA version 2026-10-01 through GFW, 0.0005° simplified, the islands as holes), the five ports
+and 74 land polygons from the Terrain Tiles. That land covers 8,614 km², and 93% of it falls in
+the reserve's holes. The reserve's internal zoning is left out because no licence was found.
+
 The build reads each scene once (Planetary Computer, anonymous SAS, `/vsicurl/` windowed reads at
 40 m, the GCP affine as in the spike), writes the crop and a display copy, applies a land mask (the
 islands, buffered 500 m, from a public coastline chosen on day 1), runs `cfar.detect`, and asks GFW
@@ -128,10 +143,15 @@ targets with `source` (ours, gfw, both) for the map.
 
 ### 3. `check_ais_coverage` and `match_ais`
 
-Heard water: from the cached presence, a 0.05° cell is heard when at least two distinct
-broadcasting vessels were heard within 30 km in the three hours either side of the pass (proof
-that the receivers, mostly satellites here, could hear that water then); otherwise unproven. The
-tool writes the heard and unproven areas and a coverage record `match_ais` requires. `match_ais`
+Heard water (decision 3, `coverage.py`): from the cached presence, a 0.05° cell is heard when, in
+at least one hour of the three either side of the pass, two or more different broadcasting vessels
+were heard within 30 km of it (proof that the receivers, mostly satellites here, could hear that
+water then); otherwise unproven. Two vessels in the same hour is stricter than two across the
+window, needs no link between one hour's positions and the next, and on the Oct 12 pass gives
+29.8% of the reserve against 30.8% and the same seven candidates. The map draws the cells as one
+rounded shape (closed and opened by about 3 km so no cell seams show), and the tool checks that
+every target's status agrees with the drawn shape before it returns. The tool writes the heard and
+unproven areas and a coverage record `match_ais` requires. `match_ais`
 gives each target one status: `broadcasting` (GFW matched it), `port`, `unproven`, `candidate` (no
 match, heard water, both detectors), `seen_once` (one detector only; never a candidate). It
 rewrites the targets GeoJSON so the map's marks change in place.
@@ -168,13 +188,17 @@ than 24 h triggers one refresh (8 s timeout: the listing page, then the newest K
 on failure, the cached plan with its date. Returns the next IW passes covering the asked share, and
 the first one's footprint for the map.
 
-### 8. `reachable_area` (the silent vessel, optional)
+### 8. `reachable_area` (the silent vessel, decision 10)
 
 `reach.py`: a 0.01° grid over the radar box (about 600 × 500 cells), the islands as obstacles from
 the land mask, 8-connected, Dijkstra from the vessel's last position (pure python `heapq`, about a
 second). The area is every cell within speed × hours; speed is stated (the gap's implied speed
 rounded up, at least 6 kn, or the presenter's). Returns the area, the targets inside it, and where
-the AIS came back on. Kept for the 2024-03-06 case and the Santa Barbara fallback.
+the AIS came back on. In the run it plays on the best silent-vessel moment on file (today
+2024-03-06: a fishing vessel's AIS off 12 h before the pass just west of the reserve; at 6 kn it
+could have reached 133 km by water, and the day's one dark target lies 51 km from where it went
+off; it came back on 30 h later, 26 km away). Day 1 reruns the moment search to Oct 12, 2026 and
+takes a newer moment if one holds. It is also the Santa Barbara fallback's main beat.
 
 ### 9. The tasking and the officer's decision
 
@@ -207,7 +231,9 @@ Fishing Watch" once when its data first appears).
   name so the stage wins over a drifting hint. Statuses read by shape and label as well as hue:
   `broadcasting` a fog dot tied by a hairline to its AIS position; `port` a small fog square;
   `unproven` a label-grey hollow ring with "not evidence"; `candidate` a ring in the act's one data
-  colour with a mono label (`T07  no AIS`); `seen_once` a faint dot. Never red, never amber.
+  colour, orchid #f07ad8 (chosen Oct 16 over lime and lilac: it holds against the cyan AIS and the
+  radar and stays apart from the amber UI accent), with a mono label (`T07  no AIS`); `seen_once` a
+  faint dot. Never red, never amber.
 - **The way of seeing: the sea from below, at night** (prototyped Oct 16, `/tmp/vessels_look/`).
   The other acts look at land (a flat satellite map, a globe from space, the ground at dusk); this
   one looks at the water. The satellite basemap goes; the ground is the seabed from the Terrain
@@ -230,8 +256,21 @@ Fishing Watch" once when its data first appears).
 - The radar arrives as a sweep along the satellite's ground track (a dome mask drawn back over about
   2.5 s; a dissolve under reduced motion); each target lights as the sweep passes it.
 - The claim: each broadcasting vessel's track draws a hairline to its target; the targets left alone
-  are the dark ones, found by elimination in front of the room.
+  stay plain grey rings with no label, because nothing is called dark before the coverage check.
 - Heard water is lit softly; unproven water is hatched with its label.
+- Only then the candidates: the left-alone rings in heard water turn orchid, grow, and take their
+  labels; the clock says "{n} candidates   radar targets with no AIS, in heard water".
+- The beats as prototyped (Oct 16, five headless rounds on the stage with the Oct 12 data,
+  `/tmp/vessels_beats/r5/`): rest, the radar grey and tinted (one shared dB stretch, never pure
+  white, ten strips a scene for the sweep), the claim, coverage, candidates, the hotspot, the fleet.
+  A ring is something the radar saw, a dot something AIS heard. The heat ramp is the candidates' hue
+  (clear to orchid to a pale orchid-fog), its radius about 2.2 cells at every zoom so the surface
+  reads as a field; patrol boxes say "k  NN%" at 18 px; the fleet's heat is in the AIS hue. Island
+  names are placed per view, each hugging its own coast and scored against traffic, targets, other
+  islands and the safe frame (hidden rather than clipped); coverage and next-look labels search a
+  grid inside their region. The clock plate keeps its spaces (`white-space: pre`). The stage
+  pre-loads the act's seabed tiles for every view before the beat (round 4's rest still was taken
+  with its edge tiles missing).
 - The prediction: the hotspot heat settles over the reserve, the three boxes outline, each with its
   share and the next pass's time; the next pass's swath crosses the frame at its planned angle.
 - The fleet: the camera rises and pulls back two thousand kilometres to the fleet's lights off Peru
@@ -242,8 +281,9 @@ Fishing Watch" once when its data first appears).
 - Step names: "Find the radar pass", "Find targets on the water", "Check where AIS could be heard",
   "Match targets to broadcasts", "Gather the evidence", "Predict where to look", "Read the fleet's
   pattern", "When the radar looks again", "Where it could have gone", "Draft the tasking", "Check
-  the tasking". Prompts: "Who is in the reserve unseen?", "Where should we look next?", "Draft the
-  patrol tasking". Placeholder: "Ask about a radar pass over the reserve".
+  the tasking". Prompts: "Who is in the reserve unseen?", "Has a vessel gone silent near here?",
+  "Where should we look next?", "Draft the patrol tasking". Placeholder: "Ask about a radar pass
+  over the reserve".
 
 ## Security and the language rules
 
@@ -281,20 +321,21 @@ AWS is ESA's plan, one host, bounded, cached.
 
 | t | Beat | Prompt / action | What the room sees |
 |---|---|---|---|
-| 0:00 | Switch | Dark Vessels (pre-warmed) | The islands at night, the reserve and its zones |
-| 0:20 | The pass | "Who is in the reserve unseen?" | The radar sweeps in along its track; chip; one sentence |
-| 1:10 | Targets | (same turn) | Targets light up; the port boats set aside |
-| 1:40 | Coverage | (same turn) | Heard water lit, unproven water hatched |
-| 2:10 | The claim | (same turn) | Broadcasting vessels claim their targets; three left alone: "candidates, not accusations" |
-| 2:50 | Evidence | (same turn) | Three chips, both detectors, the nearest broadcast, the zone |
-| 3:40 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on everything to June, its top 5% of the water held 55% of the dark targets seen since July"; three patrol boxes with their next passes |
-| 4:50 | The fleet | (same turn) | The camera pulls back to the fleet's lights off Peru; "it came every June to August since 2017; this year it did not" |
-| 5:40 | Act | "Draft the patrol tasking" | The boxes on the map; the presenter picks one, drops a candidate, approves; "Filed by the officer. The agent did not file it." |
-| 7:00 | Close | | "Three candidates, not accusations; the radar looks again Oct 24 at 00:17 UTC. The decision was the officer's." |
+| 0:00 | Switch | Dark Vessels (pre-warmed) | The sea from below at night, the AIS replay in motion, the reserve and its ports |
+| 0:20 | The pass | "Who is in the reserve unseen?" | The AIS stops at the pass's minute; the radar sweeps in along its track; chip; one sentence |
+| 1:00 | The claim | (same turn) | Targets light up; broadcasting vessels claim theirs; the port boats set aside; the rest stay grey |
+| 1:40 | Coverage | (same turn) | Heard water lit, unproven water hatched; "AIS was heard over 30% of the reserve" |
+| 2:10 | Candidates | (same turn) | The grey rings in heard water turn orchid and take their labels: "candidates, not accusations" |
+| 2:30 | Evidence | (same turn) | Chips, both detectors, the nearest broadcast, the zone |
+| 3:20 | Gone silent | "Has a vessel gone silent near here?" | An earlier pass, dated plainly (Mar 6, 2024): the last broadcast, the area it could reach by water, the target inside it, then where the AIS came back on; "I cannot say which, if any, of these it is" |
+| 4:20 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on everything to June, its top 5% of the water held 55% of the dark targets seen since July"; three patrol boxes with their next passes |
+| 5:20 | The fleet | (same turn) | The camera pulls back to the fleet's lights off Peru; "it came every June to August since 2017; this year it did not" |
+| 6:00 | Act | "Draft the patrol tasking" | The boxes on the map; the presenter picks one, drops a candidate, approves; "Filed by the officer. The agent did not file it." |
+| 7:10 | Close | | "{n} candidates, not accusations; the radar looks again {next look}. The decision was the officer's." |
 
-Fallback if over 8:30: fold the evidence into the first answer's chips. Spare beat if under 7:00:
-the silent vessel (Mar 6, 2024). Cut-list fallback: the replay of the first turn, then the tasking
-live.
+About 7:30 with 30 s in hand. Fallback if over 8:30: fold the evidence into the first answer's
+chips, then shorten the silent vessel to its reveal. Cut-list fallback: the replay of the first
+turn, then the tasking live.
 
 ## Decisions to approve
 
@@ -304,9 +345,13 @@ live.
    same).
 2. **Passes on file only** (agreed Oct 15): the build caches everything; the runtime never calls GFW,
    Planetary Computer or NOAA; the one live read is ESA's plan.
-3. **The coverage rule and the star pass:** heard water is at least two broadcasting vessels within
-   30 km in the three hours either side of the pass; a candidate needs heard water and both
-   detectors; the star is the most recent pass with at least two candidates inside the reserve.
+3. **The coverage rule and the star pass** (approved Oct 16 as recommended): a 0.05° cell is heard
+   when, in at least one hour of the three either side of the pass, two or more different
+   broadcasting vessels were heard within 30 km of it (the same-hour form: stricter than two across
+   the window, no link between hours needed; Oct 12: 29.8% against 30.8%, the same seven
+   candidates); the drawn shape must agree with every target's status; a candidate needs heard
+   water and both detectors; the star is the most recent pass with at least two candidates inside
+   the reserve.
 4. **The language** (agreed Oct 15): candidates with fixed sentences; type and size only; no names,
    identifiers or flags anywhere; forbidden phrases checked in tools.
 5. **Predictions** (agreed Oct 15, the Oct 13 rule set aside): two, both transparent statistics with
@@ -314,12 +359,13 @@ live.
    fleet's season (expected months, matched and missed seasons, where it is now).
 6. **The action:** a patrol tasking chosen and approved on the map (a box, the candidates, the
    planned look), filed by the backend with a snapshot and Slack; EventBridge tabled (Oct 15). The
-   backend role's `PutObject` grant gains `taskings/` (confirmed before deploy).
+   backend role's `PutObject` grant gains `session_data/*/taskings/*` (approved Oct 16: "go ahead";
+   written into `frontend-cdk` the same day, live at the G4 promotion's frontend deploy).
 7. **The look: the sea from below, at night** (agreed Oct 16, look D): the seabed's bathymetry instead
    of a satellite basemap, the islands as silhouettes, the latest AIS replayed in motion (long
    exposure, comet tails, moving heads, a dated clock), frozen at the pass for the claim; then the
    radar's sweep, heard and unproven water, the hotspot heat and boxes, the pull-back to the fleet.
-   The candidates' colour and the heat ramp are chosen at critique.
+   The candidates' colour is orchid #f07ad8 and the heat ramp follows it (the user's pick, Oct 16).
 11. **Live AIS: the dated replay** (tested Oct 16, closed): the stage shows the latest AIS on file in
     motion, labelled with its date (GFW, about four days behind; refreshed by the build). aisstream.io
     was tested on the user's key: ten minutes over the islands and the Gulf of Guayaquil heard
@@ -332,9 +378,12 @@ live.
 12. **Freshness** (agreed Oct 16): the passes on file include the newest GFW-matched pass (Oct 12
     today); the build is rerun on Thursday Nov 5 (data only, after the code freeze) to add the newest
     pass and AIS and refit the prediction, and the act is rehearsed on that data Nov 6.
-8. **Names:** agent id `vessels`, label "Dark Vessels", directory `agents/dark-vessels/`, runtimes
-   `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`, replay case `vessels-<pass>`.
-9. **Schedule:** dev only until G4 on **Friday Oct 30** (Oct 31 is a Saturday); the archaeologist's
-   dev gate is Friday Oct 23; freeze Nov 3 unchanged.
-10. **The silent-vessel beat is optional:** built (it is the fallback water's main beat too), used in
-    the Galápagos only as the spare beat on the Mar 6, 2024 case.
+8. **Names** (approved Oct 16): agent id `vessels`, label "Dark Vessels", directory
+   `agents/dark-vessels/`, runtimes `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`,
+   replay case `vessels-<pass>`.
+9. **Schedule** (approved Oct 16): dev only until G4 on **Friday Oct 30** (Oct 31 is a Saturday); the
+   archaeologist's dev gate is Friday Oct 23; freeze Nov 3 unchanged.
+10. **The silent-vessel beat is in the run** (the user, Oct 16: "add silent-vessel beat"): its own
+    short turn after the evidence ("Has a vessel gone silent near here?"), on the best moment on file
+    (today the Mar 6, 2024 case, dated plainly as an earlier pass), about a minute; it is also the
+    fallback water's main beat. The run sheet above has it at 3:20.
