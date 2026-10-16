@@ -1,347 +1,295 @@
 # Design: act3-dark-vessels
 
-Status: **DRAFT Oct 15, awaiting approval** (nine decisions at the end).
+Status: **DRAFT Oct 15, second version, awaiting approval** (ten decisions at the end; 1, 2, 4, 5
+and the EventBridge part of 6 already agreed by the user on Oct 15).
 
 ## Overview
 
 Two weeks, five pieces:
 
-1. `agents/dark-vessels/`: a fourth AgentCore runtime with ten tools of its own (`find_pass`,
-   `detect_vessels`, `check_ais_coverage`, `match_ais`, `gather_evidence`, `ais_gaps`,
-   `reachable_area`, `next_look`, `draft_referral`, `referral_status`) and the platform's shared
-   `display_visual` and `inspect_image` (ArcGIS `reverse_geocode` when reachable).
-2. A curated catalogue of passes on file and an offline build that caches, per pass, the radar
-   crop, its display rendering and its AIS (names and identifiers dropped) into
-   `vessels/cache/v1/`. Nothing slow is read live; detection runs once per pass and is cached.
-3. Three public records shipped with the agent: the oil platforms, the sanctuary and its marine
-   reserves, and the land mask and shipping lanes the evidence is measured against.
-4. The referral: a draft the tools validate, a card the officer approves on stage, a backend that
-   files it. Built on the Methane Hunter's brief pattern, as its own record.
-5. The stage: a `maritime` render group, the targets by status, the coverage gap, the reachable
-   area, the next pass, a resting state and the radar's arrival, prepared prompts, a gallery card
-   and a replay case.
+1. `agents/dark-vessels/`: a fourth AgentCore runtime with its own tools (`find_pass`,
+   `detect_vessels`, `check_ais_coverage`, `match_ais`, `gather_evidence`, `predict_hotspots`,
+   `fleet_pattern`, `next_look`, `reachable_area`, `draft_tasking`, `tasking_status`) and the
+   platform's `display_visual` and `inspect_image`.
+2. An offline build that caches the passes on file and everything the predictions need, from
+   Planetary Computer (Sentinel-1 GRD) and the Global Fishing Watch API, identity stripped, into
+   `vessels/cache/v1/`. The runtime never calls GFW and never holds its token.
+3. The method, already built and tested: `cfar.py` (our detector), `plan.py` (ESA's acquisition
+   plan), `predict.py` (the hotspot map, its held-out check and the patrol boxes).
+4. The officer's decision: a patrol tasking chosen and approved on the map, filed by the backend.
+5. The stage: a `maritime` render group, the targets by status, heard and unproven water, the
+   hotspot map and patrol boxes, the fleet's heat, the next pass, a resting state, the radar's
+   arrival, prepared prompts, a gallery card, a replay case and GFW's attribution.
 
-Verified premises (Oct 15, read-only public queries from the builder's laptop):
+Verified premises (Oct 15, `docs/spikes/galapagos.md`):
 
-- Planetary Computer STAC (`sentinel-1-grd`) answers in 0.5 s and still returns the spike's two
-  frames for 2024-01-20 over the channel. May–June 2026: 67 passes over the channel box (S1A 26,
-  S1D 23, S1C 18); Sep 1 to Oct 14, 2026: 20 (S1C and S1D only; S1A's last plan ends Jun 30). The
-  anonymous SAS endpoint answers 200 in 0.35 s.
-- `sentinel-1-rtc` also has items over the channel coast (EPSG:32611, `vv` and `vh` COGs, June
-  2026). Whether it keeps open-water pixels is a day-1 check; if it does, it removes the GCP warp.
-- NOAA AIS (`noaaocm.blob.core.windows.net/ais/csv2/csv{Y}/ais-{date}.csv.zst`): present for
-  2024-01-20 (203 MB), 2025-01-20, 2025-09-30, 2026-01-20 and every month-end to 2026-06-30
-  (196–272 MB a day); 2026-07-31 onward 404. AIS lags three to four months: every pass on file is
-  historical, and a "live AIS" path cannot exist for the show's own week anyway.
-- ESA's acquisition plan page lists KMLs per satellite (newest: S1C to Nov 6, S1D to Nov 4,
-  2026; 3.2 and 2.6 MB). Parsing both for IW footprints over the channel took 0.1 s. Relative
-  orbits 137 and 144 cover the whole channel (S1D Oct 19 01:57 and 13:56 UTC, S1C Oct 25 01:57 and
-  13:58, S1D Oct 31 01:57 and 13:56); orbits 35, 42, 64 and 71 graze it (0–18%). Two whole-channel
-  looks a week, and the plan is published about three weeks ahead.
-- Public sources exist for the records: the sanctuary boundary (NOAA ONMS, InPort 41999), the
-  Pacific OCS platforms (BOEM), state-water platforms (CDFW OSPR ds357). Fetched and checked on
-  day 1.
-- Runtimes are `network_mode: PUBLIC`, arm64, us-east-1. Nothing in the repo shows a runtime
-  reaching Azure; the design does not need it to (the build runs on the laptop).
+- Sentinel-1 frames cover about −94° to −88°, −2.5° to +2.5°: the reserve and the water around it,
+  not the EEZ edge. Reserve box: 242 frames on 117 days in the last year.
+- GFW radar detections inside the reserve (region `public-mpa-all` 11753), no AIS: 41 (2024), 109
+  (2025), 183 (2026 to Oct 12); matched: 346 to 803 a year. 148 of 2026's 183 lie 10 km or more from
+  the five ports.
+- Our CA-CFAR on the raw 2024-03-06 pass (VV at 40 m, a 90 km window in 2.1 s, detection 0.5 s)
+  matched GFW's one dark target that day within 0.58 km.
+- `predict.py` on the reserve, ports left out, fitted on 2023–25, checked on 2026 (147 dark
+  targets): top 1% of the water held 26% (25.9×), top 5% 53% (10.6×), top 10% 66% (6.6×).
+  Patrol boxes: north of Santa Cruz (8% of past dark targets), west of Isabela (6%), south-east of
+  Santa Cruz (4%).
+- ESA's plans (Oct 16): S1D has six IW takes over the reserve to Nov 5 (orbits 106, 128, 33, 55;
+  24 to 54% of it each); S1C has none. Each patrol box gets a full look within ten days.
+- The squid fleet near the Galápagos (north of 8°S) every June to August 2017–2025; none in 2026
+  after May (it stayed off Peru, 34,000 to 43,000 fishing hours a month, and Chile).
+- AIS-off events near the reserve: 5,659 in 2023–26 (fishing 1,448), 2 starting inside it; five
+  moments since 2023 where a pass saw a silent vessel's water with a dark target in reach.
+- GFW API: token works; Cloudflare needs a User-Agent; one report at a time, 366 days at most;
+  responses carry identity unless stripped; the reserve and EEZ exist as region layers.
 
 ## Architecture
 
 ```
 agents/dark-vessels/
   dark_vessels.py        entrypoint (the shared contract; tool list swapped)
-  vessels_config.py      prompt + model kwargs (not config.py)
-  pass_tools.py          find_pass, detect_vessels (CFAR in tiles, cached per pass)
-  ais_tools.py           check_ais_coverage, match_ais, gather_evidence, ais_gaps (DuckDB over parquet)
-  reach_tools.py         reachable_area (water grid, scipy Dijkstra), next_look (plan KML)
-  referral_tools.py      draft_referral, referral_status
-  cfar.py                two-parameter CA-CFAR on integral images (pure numpy; shared by the build)
-  data/passes_v1.json    the passes on file (curated, versioned)
-  data/platforms_v1.json the platforms, each with its public source
-  data/cinms_v1.geojson  the sanctuary, its marine reserves, the shipping lanes, with sources
-  requirements-agent.txt duckdb==1.5.3        Dockerfile.extra  httpfs pre-installed
+  vessels_config.py      prompt + model kwargs
+  cfar.py                our detector (built: 10 tests)
+  plan.py                ESA's acquisition plan (built: 8 tests)
+  predict.py             hotspot map, held-out check, patrol boxes (built: 6 tests)
+  reach.py               water-only reachable area (Dijkstra on a grid; pure python heapq)
+  pass_tools.py          find_pass, detect_vessels
+  ais_tools.py           check_ais_coverage, match_ais, gather_evidence
+  forecast_tools.py      predict_hotspots, fleet_pattern, next_look, reachable_area
+  tasking_tools.py       draft_tasking, tasking_status
+  data/passes_v1.json    the passes on file (curated)
+  data/reserve_v1.geojson  the reserve, its zones, its ports (sources on every feature)
   deploy.sh  golden_prompts.json  build_replay_case.py  tests/
 
-scripts/build_vessel_cache.py   (offline, builder-run)
-  passes_v1.json → Planetary Computer STAC + SAS → VV window over the channel → warp (GCPs) to
-    EPSG:32611 at 10 m → <pass>_vv.tif (uint16, deflate, overviews) + <pass>_display.tif
-    (uint8 dB at 20 m) → water mask (land + 500 m) → CFAR → <pass>_targets.json
-  NOAA AIS day before / of / after → DuckDB: channel box, drop vessel_name, imo, call_sign;
-    mmsi → a per-build pseudonymous key → ais/date=YYYY-MM-DD/part.parquet
-  → s3://<bucket>/vessels/cache/v1/… + manifest.json
-scripts/publish_vessel_record.py   the resting state: sanctuary, reserves, platforms, the star day's
-  AIS trails (simplified) → vessels/cache/v1/rest_v1.geojson (served by /api/vessels/rest)
-scripts/warm_vessels.py   the plan KMLs → vessels/cache/plan/ (day before and morning of the show)
+scripts/build_vessel_cache.py   (offline, builder-run; GFW token from agents/dark-vessels/.env)
+  passes_v1.json → Planetary Computer STAC + SAS → VV window over the reserve at 40 m
+    → <pass>_vv.tif (COG) + <pass>_display.tif (uint8 dB) → land mask → cfar → <pass>_targets.json
+  GFW per pass day: SAR detections matched / unmatched (0.01°), AIS presence ±3 h (hourly, 0.01°,
+    distinct-vessel counts per cell, ids dropped) → <pass>_gfw.json, <pass>_heard.json
+  GFW history: reserve dark detections daily 2023→, AIS-off events near the reserve 2023→,
+    squid-jigger fishing effort monthly by 0.1° cell 2017→ → history_v1.json, fleet_v1.json
+  → s3://<bucket>/vessels/cache/v1/… + manifest.json; a scan fails the build on any identity field
+scripts/warm_vessels.py   ESA plan KMLs → vessels/cache/plan/ (the day before and the morning of)
 
-model ── find_pass("2026-06-21")      → {pass_id, satellite, sensed, direction, orbit, coverage,
-                                          radar_s3_url, render}  (or "I only investigate passes on file.")
-      ── display_visual(radar) → inspect_image            "open water, bright points along the lanes"
-      ── detect_vessels(pass_id)       → {targets 19, platforms 5, targets_s3_url, render(points)}
-      ── check_ais_coverage(pass_id)   → {covered_share, gaps[{hours, km²}], gap_s3_url, tracks_s3_url}
-      ── match_ais(pass_id)            → {broadcasting 7, coverage_gap 3, no_ais 4, targets_s3_url}
-      ── gather_evidence(pass_id)      → per candidate: chip, nearest broadcast, reserve, shore, lane
-      ── ais_gaps(pass_id)             → [{gap_id, type, length class, last seen, top speed}]
-      ── reachable_area(pass_id, gap)  → {area_s3_url, kn, minutes, km, targets inside}
-      ── next_look()                   → {passes[{satellite, start, orbit, share}], footprint_s3_url}
-      ── draft_referral(...)           → draft card; stop. "Decision: the officer's."
-UI    ── Approve and send → POST /api/referral/approve → referrals/<id>.md + snapshot + Slack
-      ── "The officer approved and sent referral <id>" → referral_status(id) → "filed"
+model ── find_pass("latest")          → {pass_id, satellite, sensed, radar_s3_url, render}
+      ── display_visual → inspect_image                      "open water, a few bright points"
+      ── detect_vessels(pass_id)       → {ours 9, gfw 7, both 6, port 2, targets_s3_url}
+      ── check_ais_coverage(pass_id)   → {heard_share, heard_s3_url, unproven_s3_url}
+      ── match_ais(pass_id)            → {broadcasting 3, port 2, unproven 1, candidate 3}
+      ── gather_evidence(pass_id)      → chips, nearest broadcast, zone, km to port and shore
+      ── predict_hotspots()            → {check: 53% in 5%, map_s3_url, boxes[3] + next looks}
+      ── fleet_pattern()               → {expected months, 2026 missed, where now, heat_s3_url}
+      ── next_look(box)                → {S1D Oct 24 00:17 UTC …, footprint_s3_url}
+      ── draft_tasking(...)            → draft; stop. "Decision: the officer's."
+UI    ── the officer picks a box and the candidates → Approve the tasking
+         → POST /api/tasking/approve → taskings/<id>.md + snapshot (+ Slack) → tasking_status
 ```
 
 ## Components
 
-### 1. The passes on file (`data/passes_v1.json`) and the build
+### 1. The passes on file and the build
 
-Five to eight passes, each a whole-channel IW frame with AIS for the day before, of and after:
-the spike's pass (2024-01-20 14:01 UTC, the known-good fallback) and the best of a day-1 search
-over January–June 2026 (S1A, S1C, S1D; morning and evening passes). Per entry: `pass_id` (our
-short id, `s1c-20260621-1358`), `scene_id`, `satellite`, `sensed`, `direction`,
-`relative_orbit`, `channel_share`, `ais_days`, `note` (one line on what the pass shows, for the
-builder). The star pass is chosen on day 1 by a rule written down before the search (decision 1).
+`data/passes_v1.json`: five to eight Sentinel-1 passes over the reserve, 2025–26, each with its
+scene id, satellite, sensing time, orbit and share of the reserve, and a builder's note. The star
+is chosen on day 1 by a rule set now (decision 3): at least two candidates inside the reserve in
+heard water, seen by both detectors, the most recent pass that has them. The spike's 2024-03-06
+pass stays on file for the silent-vessel beat.
 
-The build reads each scene once from the laptop (the spike's path: STAC, SAS signing, `/vsicurl/`
-windowed reads of the tiled COG). The crop box is the channel and the sanctuary
-(−120.65, 33.35, −118.85, 34.48; about 165 × 125 km). GRD frames are GCP-georeferenced: the build
-warps with GDAL's GCP transformer to EPSG:32611 at 10 m and writes a COG; the display copy is
-dB-scaled to uint8 at 20 m so TiTiler serves it in one request per tile. If `sentinel-1-rtc` keeps
-water (day-1 check), the build reads the RTC COG instead and skips the warp. The cache path
-carries its version; the manifest records per pass the bytes, seconds, bounds and the CFAR
-parameters it was detected with.
+The build reads each scene once (Planetary Computer, anonymous SAS, `/vsicurl/` windowed reads at
+40 m, the GCP affine as in the spike), writes the crop and a display copy, applies a land mask (the
+islands, buffered 500 m, from a public coastline chosen on day 1), runs `cfar.detect`, and asks GFW
+for that day's detections and the AIS presence around the pass. History for the predictions comes
+from GFW in yearly reports (the 366-day limit), one at a time. Every GFW response passes through the
+spike's scrub (names, MMSI, IMO, call signs, flags, vessel ids) before anything is written, and a
+final scan of every cached file fails the build if any identity field or a 9-digit MMSI-like number
+appears.
 
-AIS: the build downloads each day's national file (about 200 MB), filters it with DuckDB to the
-crop box and keeps `base_date_time, latitude, longitude, sog, cog, heading, vessel_type, length,
-transceiver`, plus a vessel key that replaces the MMSI (a per-build random salt, hashed, never
-stored). `vessel_name`, `imo` and `call_sign` never reach the bucket. About 0.5 MB of parquet a day.
+### 2. `find_pass` and `detect_vessels`
 
-### 2. The records the agent measures against
+`find_pass` resolves "latest" or a date to a pass on file, copies its display COG into
+`session_data/<sid>/vessels/`, and returns `render {raster, gray, group maritime, legend "Radar
+backscatter", bounds}`. `detect_vessels` reads the cached targets (ours) and GFW's detections,
+pairs them within 1 km, marks anything within 10 km of a port `port`, and writes one GeoJSON of
+targets with `source` (ours, gfw, both) for the map.
 
-- `data/platforms_v1.json`: every standing platform in the channel and sanctuary (BOEM Pacific OCS
-  and the state's), name, position, operator status, source URL, retrieved date. The spike's four
-  (Gail, Grace, Gilda, Gina) are a subset; the 800 m radius stays.
-- `data/cinms_v1.geojson`: the sanctuary boundary (NOAA ONMS), its marine reserves and marine
-  conservation area (federal and state, named as the record names them), the Santa Barbara Channel
-  traffic separation scheme lanes, each feature with `source_url`. Licences checked on day 1.
-- The land mask: a coastline good to tens of metres around the islands (OSM land polygons or NOAA
-  shoreline; day 1 picks and notes the licence), buffered 500 m, rasterised per pass grid at build
-  time and cached beside the crop.
+### 3. `check_ais_coverage` and `match_ais`
 
-### 3. `find_pass(date, when)` and `detect_vessels(pass_id)`
+Heard water: from the cached presence, a 0.05° cell is heard when at least two distinct
+broadcasting vessels were heard within 30 km in the three hours either side of the pass (proof
+that the receivers, mostly satellites here, could hear that water then); otherwise unproven. The
+tool writes the heard and unproven areas and a coverage record `match_ais` requires. `match_ais`
+gives each target one status: `broadcasting` (GFW matched it), `port`, `unproven`, `candidate` (no
+match, heard water, both detectors), `seen_once` (one detector only; never a candidate). It
+rewrites the targets GeoJSON so the map's marks change in place.
 
-`find_pass` resolves a date (or "the latest on file") to one pass in the catalogue, copies its
-display COG into `session_data/<sid>/vessels/`, and returns it with
-`render {kind raster, colormap gray, rescale [1, 255], group maritime, legend "Radar backscatter",
-bounds}`. A date not on file returns the fixed sentence and the list of passes.
+### 4. `gather_evidence`
 
-`detect_vessels` reads `vessels/cache/v1/<pass>_targets.json` when present (the build and the warm
-script fill it). On a miss it runs `cfar.py` over the cached crop in 2,048-pixel tiles with a
-92-pixel overlap (guard 31 + train 61), so memory stays under 300 MB: dB domain, threshold
-`μ_ring + max(5σ_ring, 6 dB)`, single pixels need +8 dB, clusters of 1–200 pixels, the water mask
-applied first, and a sidelobe rule (a target within 300 m of a target 10 dB brighter is merged into
-it; the spike's Platform Gail ghost). Each target: `id` (T01…), lon, lat, `peak_db`, `extent_m`,
-`status` (`platform` within 800 m of the table, else `target`). The tool writes the targets as
-GeoJSON and returns `render {kind points, group maritime, property status, label id}`.
+Per candidate (at most six): a 1.2 km chip from the 40 m crop (a COG in the session, so
+`inspect_image` and the evidence gallery read it), both detectors' readings, the nearest
+broadcasting vessel from the presence cache (km, minutes, type and size class only), the reserve
+zone it lies in, km to the nearest port and shore, the fixed confidence sentence, and the innocent
+explanations from a fixed list (`small_boat_no_ais`, `reception_or_equipment`, `transponder_off`,
+`not_a_vessel`), each with what would confirm or rule it out.
 
-### 4. `check_ais_coverage(pass_id)` and `match_ais(pass_id)`
+### 5. `predict_hotspots` (prediction one)
 
-DuckDB over the pass's cached parquet (httpfs, the Methane Hunter's `overture.py` pattern).
+`predict.py` on the cached reserve history, port water left out, cells of 0.05° spread over their
+neighbours. Returns the held-out check (fit before Jan 1 of the latest year, test on that year),
+the map (a COG of the score for the stage), and three patrol boxes of 0.2°, each with its share of
+past dark targets and its next full looks from `plan.py`. The agent reads the check aloud the way
+it was measured; the map's legend says "where dark targets were seen before".
 
-Coverage: 2 km cells over the crop's water. A cell is `covered` if any position was received in it
-within ±60 min of the pass; `gap` if none was, but the same cell had traffic in at least three
-other hours of the three days on file; `quiet` otherwise (no traffic expected, so silence there
-proves nothing either way). Gap cells are unioned into polygons, each with the hours AIS was silent
-there (the spike's: west of −119.9°, 10:00–21:00 UTC). The tool writes the gap polygons and the AIS
-tracks within ±30 min of the pass (lines, `vessel_type` and a length class only) for the map, and a
-coverage record under the session that `match_ais` requires.
+### 6. `fleet_pattern` (prediction two)
 
-Matching: positions interpolated along each vessel's track to the sensing time (when a track has
-pings either side within 10 minutes), else the nearest ping within ±10 min; a target is
-`broadcasting` when one lies within 500 m. An unmatched target in a `gap` or `quiet` cell is
-`coverage_gap` (said aloud as "not evidence"); in a `covered` cell it is `no_ais`. Every target
-carries the nearest broadcast's distance and minutes. The tool rewrites the targets GeoJSON with
-the final status, so the map's marks change in place.
+From the cached squid-jigger fishing effort (monthly, 0.1° cells, 2017→): hours by month and zone
+(near the Galápagos north of 8°S, off Peru 8 to 20°S, off Chile south of 20°S); the months the
+pattern expects the fleet near the Galápagos (present in at least half of the years); each season
+matched or missed; the latest month's heat as a COG. In 2026 the pattern expected June to August and
+the fleet stayed off Peru; the agent says it in one sentence and shows where the fleet went.
 
-### 5. `gather_evidence(pass_id, target_ids)` and `ais_gaps(pass_id)`
+### 7. `next_look`
 
-Evidence, per `no_ais` target (all by default, at most six): a 1.2 km radar chip from the 10 m crop
-(a COG under the session, so `inspect_image` and the evidence gallery read it), the nearest
-broadcast (km, minutes, type, length class), inside the sanctuary or a named reserve (point in
-polygon), km to the nearest shore and to the nearest lane, and the fixed confidence sentence. The
-tool also returns `explanations` from a fixed list (`small_vessel_exempt`, `transponder_off`,
-`equipment_or_reception`, `not_a_vessel`), each with what would confirm or rule it out.
+`plan.py` over the cached plans (`vessels/cache/plan/`, the newest per satellite); a plan older
+than 24 h triggers one refresh (8 s timeout: the listing page, then the newest KML per satellite);
+on failure, the cached plan with its date. Returns the next IW passes covering the asked share, and
+the first one's footprint for the map.
 
-Gaps: tracks with no position for at least 30 minutes spanning the sensing time, whose last
-position was in a `covered` cell (silence where AIS could hear). Each gap: `gap_id` (G1…), type,
-length class, last position and time, the first position after (if any), and the vessel's own top
-speed over the six hours before (the 95th percentile of `sog`, rounded up to a knot, floor 6 kn).
+### 8. `reachable_area` (the silent vessel, optional)
 
-### 6. `reachable_area(pass_id, gap_id, top_speed_kn)` and `next_look()`
+`reach.py`: a 0.01° grid over the radar box (about 600 × 500 cells), the islands as obstacles from
+the land mask, 8-connected, Dijkstra from the vessel's last position (pure python `heapq`, about a
+second). The area is every cell within speed × hours; speed is stated (the gap's implied speed
+rounded up, at least 6 kn, or the presenter's). Returns the area, the targets inside it, and where
+the AIS came back on. Kept for the 2024-03-06 case and the Santa Barbara fallback.
 
-Reachable: a 250 m grid over the crop (about 660 × 500 cells), land and islands as obstacles from
-the same mask, 8-connected; `scipy.sparse.csgraph.dijkstra` from the last position gives water
-distance to every cell (about 0.3 s). The area is every cell within `speed × minutes` (minutes from
-the last ping to the sensing time), polygonised and simplified. Returned: the area, the speed and
-where it came from ("its own top speed in the six hours before"), the minutes, the farthest km, and
-the `no_ais` and `coverage_gap` targets inside, by id. Rendered as `kind vector, group maritime`.
+### 9. The tasking and the officer's decision
 
-Next look: `vessels/cache/plan/` holds the newest plan KML per satellite and its parsed IW
-footprints; `next_look` returns the next passes after now covering at least 50% of the channel
-(satellite, start UTC, relative orbit, share, plan file and period) and writes the first one's
-footprint for the map. A cache older than 24 h triggers one refresh (8 s timeout; the plan page
-lists the files, the newest per satellite is fetched); on failure it says the cached plan's date.
-Never an orbit extrapolation.
+`draft_tasking(box, candidate_ids, look, notes)`: the box one of `predict_hotspots`' three, the look
+one of `next_look`'s passes, notes at most three sentences of 220 characters, checked for the
+forbidden phrases and identifier patterns. The counts, coverage, candidates and check come from the
+session's own records. Written to `session_data/<sid>/taskings/<id>.draft.json`.
 
-### 7. The referral (`draft_referral`, `referral_status`) and its approval
+The decision happens on the map, not in a card: the three boxes are drawn with their share and next
+pass; selecting one lifts it; candidate marks can be toggled in or out; a tasking plate (bottom
+right, the light plate's slot) shows the choice, a countdown to the look, and "Approve the tasking"
+(primary) and "Not now" (quiet). Backend: `GET /api/tasking`, `POST /api/tasking/approve` on a
+filing core lifted out of the brief route (draft from S3, never the browser; markdown, snapshot,
+then `<id>.filed.json` last; idempotent; Slack fire-and-forget); the brief's tests stay green. Infra:
+the backend role's `s3:PutObject` grant gains `session_data/*/taskings/*` (shown and confirmed
+before deploy).
 
-The brief's pattern, its own record. `draft_referral(action, target_ids, gap_id, look, notes)`:
-`action` from `patrol_look`, `second_radar_look`, `no_action`; `look` must be one of `next_look`'s
-passes (by start time); `notes` at most three sentences of 220 characters. The tool reads the
-counts, the coverage, the candidates and the reachable area from the session's own records,
-checks every free-text field against the forbidden phrases (Requirement 9.1) and the identifier
-patterns (MMSI-like 9-digit numbers, IMO numbers, call signs), writes
-`session_data/<sid>/referrals/<id>.draft.json` and returns its markdown. `next_steps`: paste it,
-then "Decision: the officer's.", then the closer; call no other tool.
+### 10. Prompt
 
-Backend: `GET /api/referral` and `POST /api/referral/approve` beside the brief's routes, sharing a
-small filing core lifted out of the brief route (read the draft from S3, never from the browser;
-refuse a stale or malformed draft; write `<id>.md`, the PNG snapshot, then `<id>.filed.json` last;
-idempotent; Slack fire-and-forget). The brief's own tests stay green through the lift. Frontend:
-`ReferralCard` from the BriefCard's parts (state head "Draft referral" / "Sent referral", a title
-written by the tool, the counts sentence, the verdict lines, the candidates, the next look, the
-decision "Approve and send" / "Request another look"). Infra: the backend role's `s3:PutObject`
-grant gains `session_data/*/referrals/*` beside `…/briefs/*` (confirmed with the user before it is
-deployed).
+The Methane Hunter's sections for the sea: HARD RULES (passes on file; the order pass, look,
+detect, coverage, match, then words; candidates never accusations; type and size only, no flags;
+predictions only as measured; never file anything), RESPONSE STYLE (no em dashes), FINAL REPORT,
+CONFIDENCE, DISPLAY RIDES ALONG, LOOK BEFORE YOU ANALYSE, WORKFLOW (three turns), THE OFFICER'S
+DECISION, UNITS (km and nautical miles at sea, knots, UTC, dB), ATTRIBUTION (say "data from Global
+Fishing Watch" once when its data first appears).
 
-### 8. Prompt
+### 11. The stage and the look (decision 7)
 
-The Methane Hunter's sections, rewritten for the sea: HARD RULES (passes on file only; the order:
-pass, look, detect, coverage, match, then words; candidates never accusations; no names or
-identifiers; you never file or send a referral), RESPONSE STYLE (no em dashes; one sentence before
-each call), FINAL REPORT (the counts sentence first, a record of at most 120 words, a spoken
-closer of at most 240 characters), CONFIDENCE (the fixed sentences), DISPLAY RIDES ALONG,
-LOOK BEFORE YOU ANALYSE, WORKFLOW (the three turns), THE OFFICER'S DECISION, UNITS (km and nautical
-miles both for distance at sea, kn, UTC times, dB).
-
-### 9. The stage
-
-- `render.ts`: group `maritime`; no new kind (radar is `raster`, targets `points`, the rest
-  `vector`). `utils/vesselLayers.ts` resolves hints by group or by file name (`/vessels/`,
-  `/use-cases/vessels-`) and owns the styles, so the stage wins over a drifting hint.
-- Targets by status (never colour alone, never red, never amber): `broadcasting` a fog dot with a
-  hairline to its AIS position; `platform` a fog square outline; `coverage_gap` a label-grey hollow
-  ring and "not evidence" at 15 px; `no_ais` a ring in the act's one data colour with a mono label
-  (`T07  no AIS`). The act's data colour is chosen at critique (decision 7).
-- AIS tracks: fog hairlines at 40%, the ±30 min heads at 80%. Coverage gap: a dashed fog outline
-  with a diagonal hatch and its label ("AIS silent here 10:00–21:00 UTC: not evidence"). Reachable
-  area: the data colour at 12% with a dashed outline, the last position as a ring ("last AIS
-  13:12 UTC"), the label "11 kn × 47 min: up to 16 km over water". Next pass: a dashed fog hairline
-  footprint and "Next look: Sentinel-1D, Nov 12, 01:57 UTC" (orbit 137's 12-day repeat after
-  Oct 31; the label prints whatever the plan says, never this). The sanctuary and reserves: fog
-  hairlines with names at 15 px. Every one has its legend row in words in the layers plate.
-- Step names: "Find the radar pass", "Find targets on the water", "Check where AIS could hear",
-  "Match targets to broadcasts", "Gather the evidence", "Find vessels that went silent", "Where it
-  could have gone", "When the radar looks again", "Draft the referral", "Check the referral".
-- Prepared prompts: "Who went unseen?" (fills "Who was in the sanctuary on June 21 without
-  broadcasting AIS?", the date set by decision 1), "Where could it have gone?", "Draft the
-  referral". Placeholder: "Ask about a radar pass on file".
-- Resting state and the way of seeing (decision 7): `/api/vessels/rest` and a `Chat.tsx` effect
-  like the archaeologist's.
+- `render.ts` gains the `maritime` group; `utils/vesselLayers.ts` owns the styles by group or file
+  name so the stage wins over a drifting hint. Statuses read by shape and label as well as hue:
+  `broadcasting` a fog dot tied by a hairline to its AIS position; `port` a small fog square;
+  `unproven` a label-grey hollow ring with "not evidence"; `candidate` a ring in the act's one data
+  colour with a mono label (`T07  no AIS`); `seen_once` a faint dot. Never red, never amber.
+- Rest: the islands at night, flat and north-up, the reserve boundary and its zones as hairlines,
+  the ports as small marks, nothing moving; "Powered by Global Fishing Watch." in the attribution.
+- The radar arrives as a sweep along the satellite's ground track (a dome mask drawn back over about
+  2.5 s; a dissolve under reduced motion); each target lights as the sweep passes it.
+- The claim: each broadcasting vessel's track draws a hairline to its target; the targets left alone
+  are the dark ones, found by elimination in front of the room.
+- Heard water is lit softly; unproven water is hatched with its label.
+- The prediction: the hotspot heat settles over the reserve, the three boxes outline, each with its
+  share and the next pass's time; the next pass's swath crosses the frame at its planned angle.
+- The fleet: the camera rises and pulls back two thousand kilometres to the fleet's lights off Peru
+  (its fishing hours as heat), then comes back to the reserve.
+- Three directions are prototyped headless before building (the islands' scale and the basemap, the
+  radar's sweep and grey, the candidates' colour and the heat ramp), scored by Impeccable critique,
+  then polished; detector 0.
+- Step names: "Find the radar pass", "Find targets on the water", "Check where AIS could be heard",
+  "Match targets to broadcasts", "Gather the evidence", "Predict where to look", "Read the fleet's
+  pattern", "When the radar looks again", "Where it could have gone", "Draft the tasking", "Check
+  the tasking". Prompts: "Who is in the reserve unseen?", "Where should we look next?", "Draft the
+  patrol tasking". Placeholder: "Ask about a radar pass over the reserve".
 
 ## Security and the language rules
 
-Names and identifiers never reach the bucket (the build drops them and keys vessels
-pseudonymously), so neither the model nor the stage can show one. The forbidden phrases are
-checked in `draft_referral` and in the replay builder, not only the prompt; the prompt names them
-too. The referral is filed only by the authenticated backend route; no agent tool writes outside
-`session_data/<sid>/`. The backend's S3 allowlist is unchanged (every layer is a session copy;
-the resting state has its own route). The only external read at run time is the plan refresh, to
-one host, bounded, with the cache as fallback.
+Identity never reaches the bucket (stripped at the build, scanned before upload), so neither the
+model nor the stage can show one. The GFW token stays on the builder's laptop in a gitignored file
+and is never passed to a runtime, the frontend or a log. Forbidden phrases are checked in
+`draft_tasking` and the replay builder, not only in the prompt. No agent tool writes outside
+`session_data/<sid>/`; only the authenticated backend route files a tasking. The S3 allowlist is
+unchanged (session copies only; the resting state has its own route). The one runtime read outside
+AWS is ESA's plan, one host, bounded, cached.
 
 ## Error handling
 
-- A pass missing from the cache: "the radar for that pass is not built
-  (scripts/build_vessel_cache.py)", never a live read.
-- A CFAR cache miss on stage is slow, not fatal (tiles, bounded memory); the warm script makes it a
-  hit, and `warm_vessels.py --check` fails loudly the morning of the show if any is missing.
-- No AIS for a pass day: `check_ais_coverage` says so and `match_ais` refuses (no coverage, no
-  candidates).
-- `reachable_area` for a gap with no last position in covered water, or minutes ≤ 0: an error that
-  names the reason.
-- The plan refresh fails: the cached plan with its date; no plan at all: "the acquisition plan is
-  not cached" and no pass is invented.
-- ArcGIS MCP down: places come from the records' own names (reserves, islands, lanes); the
-  geocoder is never required.
+- A pass not built: "the radar for that pass is not built (scripts/build_vessel_cache.py)".
+- GFW data missing for a pass: `detect_vessels` returns ours only and says so; `match_ais` refuses
+  (no matching, no candidates).
+- The plan refresh fails: the cached plan with its date; no plan: no look is invented.
+- `warm_vessels.py --check` fails loudly the morning of the show if a pass, the history or the plan
+  is missing.
 
 ## Testing strategy
 
-- pytest (no network): CFAR on synthetic gamma speckle with planted point and 3 × 2 targets
-  (recall and no false alarms over a flat sea at the thresholds), the tile seams (a target on a
-  seam found once), the sidelobe merge; the platform radius; the coverage grid on a synthetic AIS
-  table with a planted gap; the tool order (`match_ais` before coverage refuses); interpolation and
-  the 500 m / 10 min match; the gap finder; the reachable area around a synthetic island (a point
-  behind the island is farther by water than by air); the plan parser on a trimmed fixture KML;
-  the referral validator, forbidden phrases and identifier patterns; the build's column drop (no
-  `vessel_name`, `imo`, `call_sign`, `mmsi` in the parquet); staging; prewarm and the replay
-  prompt. Target ≥ 40.
-- vitest: `maritime` hints accepted and rejected; `vesselLayers` styles by status (and never red
-  or amber); legends in words; stage copy; the referral card's states.
-- Backend: `/api/referral` read, approve, idempotence, a refused draft, the brief's tests
-  unchanged after the lift.
-- Live (recorded in tasks.md): the build's seconds and bytes per pass; detect warm and cold on the
-  dev runtime; each beat's time on dev; the eval; the replay's network log.
+- pytest (no network): `cfar.py` 10, `plan.py` 8, `predict.py` 6 (done); the coverage rule and the
+  tool order; matching and statuses; the fleet pattern on a synthetic series with one missed
+  season; the reachable area around a synthetic island; the tasking validator, forbidden phrases
+  and identifier patterns; the identity scan on a poisoned fixture; staging; prewarm and the replay
+  prompt. Target ≥ 60.
+- vitest: the `maritime` hints; the styles by status (never red or amber, never colour alone); the
+  legends; stage copy; the tasking plate's states.
+- Backend: the tasking routes (read, approve, idempotence, refusal); the brief's tests unchanged.
+- Live (recorded in tasks.md): the build's seconds and bytes per pass; each beat's time on dev; the
+  eval; the replay's network log.
 
 ## Act 3 run sheet (8 min)
 
 | t | Beat | Prompt / action | What the room sees |
 |---|---|---|---|
-| 0:00 | Switch | Agent switcher → Dark Vessels (pre-warmed) | The resting state: the sanctuary and its reserves at night, the platforms, the day's AIS traffic as fog trails (every vessel that broadcast) |
-| 0:20 | The pass | "Who was in the sanctuary on June 21 without broadcasting AIS?" | The radar pass arrives over the water (decision 7); chip; one sentence on what it shows |
-| 1:20 | Targets | (same turn) | Every vessel-sized target marked; the platforms set aside by name |
-| 1:50 | Coverage | (same turn) | Where AIS could hear at that hour; the gap drawn; its targets "not evidence" |
-| 2:30 | The answer | (same turn) | The targets turn to broadcasting or no AIS; "19 targets: 5 platforms, 7 broadcasting, 3 in a coverage gap, 4 with no AIS in covered water: candidates, not accusations" (numbers from the star pass) |
-| 3:20 | Evidence | (same turn, or "Show me the evidence") | Four radar chips; the nearest broadcast; one inside a marine reserve; the innocent explanations |
-| 4:30 | Where could it have gone | "A fishing vessel stopped broadcasting before the pass. Where could it have gone?" | The vessel's last position, its reachable water at its own top speed, the targets inside it |
-| 5:30 | When can we look again | (same turn) | The next planned pass's footprint over the whole channel, with its date and time |
-| 6:10 | Act | "Draft the referral" | The referral card; the presenter clicks "Approve and send"; "Sent by the officer. The agent did not send it." (Slack, if configured) |
-| 7:30 | Close | | "Four candidates, not accusations; the radar looks again on Nov 12. The decision was the officer's." Hand-off to Act 4 |
+| 0:00 | Switch | Dark Vessels (pre-warmed) | The islands at night, the reserve and its zones |
+| 0:20 | The pass | "Who is in the reserve unseen?" | The radar sweeps in along its track; chip; one sentence |
+| 1:10 | Targets | (same turn) | Targets light up; the port boats set aside |
+| 1:40 | Coverage | (same turn) | Heard water lit, unproven water hatched |
+| 2:10 | The claim | (same turn) | Broadcasting vessels claim their targets; three left alone: "candidates, not accusations" |
+| 2:50 | Evidence | (same turn) | Three chips, both detectors, the nearest broadcast, the zone |
+| 3:40 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on 2023 to 2025, its top 5% of the water held 53% of 2026's dark targets"; three patrol boxes with their next passes |
+| 4:50 | The fleet | (same turn) | The camera pulls back to the fleet's lights off Peru; "it came every June to August since 2017; this year it did not" |
+| 5:40 | Act | "Draft the patrol tasking" | The boxes on the map; the presenter picks one, drops a candidate, approves; "Filed by the officer. The agent did not file it." |
+| 7:00 | Close | | "Three candidates, not accusations; the radar looks again Oct 24 at 00:17 UTC. The decision was the officer's." |
 
-Fallback if over 8:30 on rehearsal two: fold the evidence into the first answer's chips and drop
-its beat. Cut-list fallback: the replay of the first turn, then the referral beat live.
+Fallback if over 8:30: fold the evidence into the first answer's chips. Spare beat if under 7:00:
+the silent vessel (Mar 6, 2024). Cut-list fallback: the replay of the first turn, then the tasking
+live.
 
 ## Decisions to approve
 
-1. Water, persona and the star pass: the Santa Barbara Channel and the Channel Islands National
-   Marine Sanctuary (the spike's water), the depicted sanctuary enforcement officer. The star pass
-   is chosen on day 1 from five to eight whole-channel passes by a rule set now: at least two
-   `no_ais` targets in covered water inside the sanctuary, at least one AIS gap spanning the pass
-   with a target inside its reachable area, and a coverage gap on screen if any pass has one (the
-   lesson is stronger shown than told). Fallback: the spike's 2024-01-20 pass.
-2. Passes on file only. An offline build caches each pass and its AIS into `vessels/cache/v1/`;
-   tools read only the bucket. No Planetary Computer or NOAA read at run time (AIS lags three to
-   four months, so a live path could never show the show's own week); "live AIS" on the cut list is
-   simply not built. Recommended: yes.
-3. The coverage rule is enforced in tools: `match_ais` refuses before `check_ais_coverage`, and a
-   silent target in a gap or quiet cell is `coverage_gap`, never a candidate.
-4. The language rules: candidates with fixed confidence sentences; no vessel names, MMSI, IMO
-   numbers or call signs anywhere (dropped at the build, so they cannot leak); vessels described by
-   type and length class; the forbidden phrases checked in `draft_referral` and the replay builder.
-5. The prediction is geometry, not a forecast: reachable water at a stated speed (the vessel's own
-   six-hour top speed by default) on a water-only grid, tested against the targets inside it; the
-   next look from ESA's live plan, forward from today (cached, refreshed daily), never an orbit
-   extrapolation. No accuracy claims.
-6. The action: a referral that asks for a patrol look or a second radar look at a named planned
-   pass, drafted by the agent, approved and sent by the officer on stage, filed by the backend
-   (markdown, map snapshot, Slack when configured). Its own record and card on the brief's filing
-   core; the Methane Hunter's brief is not changed beyond the lift. The backend role's `PutObject`
-   grant gains `referrals/` (an infra change, confirmed before deploy).
-7. The way of seeing: the sea at night, flat and north-up (radar is a map, not a landscape): the
-   basemap dark, the day's AIS traffic as fog trails (the lit world), the sanctuary and reserves as
-   hairlines, nothing moving at rest. The radar pass arrives as a sweep along the satellite's
-   ground track (a dome mask drawn back over about 2.5 s; a dissolve under reduced motion), and the
-   act's one data colour for the candidates and the reachable area is chosen at Impeccable critique
-   (never red, never amber).
-8. Names: agent id `vessels`, label "Dark Vessels", directory `agents/dark-vessels/`, runtimes
-   `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`, replay case
-   `vessels-<pass_id>`.
-9. Schedule: start Oct 16 (Act 4 landed early); dev only until G4. G4 is **Friday Oct 30**: the
-   ROADMAP and the archaeologist spec say Oct 31, which is a Saturday in 2026 (and the
-   archaeologist's "Friday Oct 24" gate is Friday Oct 23). Release 3 promotes all four agents
-   together; freeze Nov 3 unchanged.
+1. **Water: the Galápagos Marine Reserve** (agreed Oct 15), with a yes on GFW's licence by Tuesday
+   Oct 20 (AWS legal and a note to GFW). If not, the Santa Barbara Channel and its sanctuary on
+   NOAA's AIS (the first draft's design; the detector, plan, prediction and reach modules are the
+   same).
+2. **Passes on file only** (agreed Oct 15): the build caches everything; the runtime never calls GFW,
+   Planetary Computer or NOAA; the one live read is ESA's plan.
+3. **The coverage rule and the star pass:** heard water is at least two broadcasting vessels within
+   30 km in the three hours either side of the pass; a candidate needs heard water and both
+   detectors; the star is the most recent pass with at least two candidates inside the reserve.
+4. **The language** (agreed Oct 15): candidates with fixed sentences; type and size only; no names,
+   identifiers or flags anywhere; forbidden phrases checked in tools.
+5. **Predictions** (agreed Oct 15, the Oct 13 rule set aside): two, both transparent statistics with
+   a measured held-out check: where dark targets will be (the hotspot map and patrol boxes) and the
+   fleet's season (expected months, matched and missed seasons, where it is now).
+6. **The action:** a patrol tasking chosen and approved on the map (a box, the candidates, the
+   planned look), filed by the backend with a snapshot and Slack; EventBridge tabled (Oct 15). The
+   backend role's `PutObject` grant gains `taskings/` (confirmed before deploy).
+7. **The look:** the islands at night; the radar's sweep; the claim by elimination; heard and
+   unproven water; the hotspot heat and boxes; the camera's pull-back to the fleet. Three prototypes
+   and a critique decide the colours and scale before building.
+8. **Names:** agent id `vessels`, label "Dark Vessels", directory `agents/dark-vessels/`, runtimes
+   `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`, replay case `vessels-<pass>`.
+9. **Schedule:** dev only until G4 on **Friday Oct 30** (Oct 31 is a Saturday); the archaeologist's
+   dev gate is Friday Oct 23; freeze Nov 3 unchanged.
+10. **The silent-vessel beat is optional:** built (it is the fallback water's main beat too), used in
+    the Galápagos only as the spare beat on the Mar 6, 2024 case.

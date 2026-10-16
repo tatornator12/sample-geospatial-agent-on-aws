@@ -1,126 +1,109 @@
 # Tasks: act3-dark-vessels (Oct 16–30, started early)
 
-Cadence: requirements and design drafted Oct 15, **awaiting approval** (nine design decisions); no
-code before then. Tasks top to bottom; every task names its tests. All deploys before G4 are
-`DEPLOY_TARGET=dev`. G4 is Friday Oct 30 (decision 9): Release 3 promotes all four agents
-together. Friday Oct 23 is the archaeologist's dev-only gate; Act 3 work pauses for it.
+Cadence: requirements and design second version Oct 15 (the Galápagos), **awaiting approval** of
+decisions 3, 6 to 10 (1, 2, 4, 5 agreed Oct 15). The water-agnostic method (detector, plan,
+prediction) was built Oct 15 on the user's "please get started". Tasks top to bottom; every task
+names its tests. All deploys before G4 are `DEPLOY_TARGET=dev`. G4 is Friday Oct 30 (decision 9).
+Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallback (decision 1).
 
-## Day 1 (Friday Oct 16): the checks that decide the act
+## Day 0 (Thursday Oct 15): the checks and the method
 
-- [ ] 1. Passes, sources and the detection budget
-  - [ ] 1.1 Star pass search: list the whole-channel IW passes in January–June 2026 (Planetary
-    Computer STAC; orbits 137 and 144 and any other at 100%) and add the spike's 2024-01-20 pass.
-    For five to eight of them (morning and evening, S1A, S1C, S1D), run the spike's pipeline on
-    the channel's water windows (CFAR, platforms, AIS match, the coverage audit, the gap finder)
-    with one day of AIS each; record per pass: targets, platforms, broadcasting, coverage gap,
-    no AIS in covered water, gaps spanning the pass with a target inside reach, candidates in a
-    reserve. Choose the star by decision 1's rule and write `data/passes_v1.json` (the star, the
-    spike's pass, two to four alternates)
-  - [ ] 1.2 GRD or RTC: does `sentinel-1-rtc` keep open-water pixels over the channel, and does
-    CFAR on it find the same targets as on GRD for one pass? Choose one for the build; note it in
-    design.md
-  - [ ] 1.3 The records: fetch the sanctuary boundary (NOAA ONMS), the marine reserves and the
-    marine conservation area (federal and state), the traffic separation scheme lanes, the
-    platforms (BOEM Pacific OCS and the state's, standing today), and a land mask (OSM land
-    polygons or NOAA shoreline); check each licence; write `data/cinms_v1.geojson` and
-    `data/platforms_v1.json` with `source_url` and retrieved date on every feature
-  - [ ] 1.4 Detection budget: CFAR in 2,048-pixel tiles over one full crop on the laptop; record
-    seconds and peak memory. If a cold run would exceed 60 s on the runtime, detection is
-    build-only and `detect_vessels` refuses on a cache miss (note it in design.md)
-  - _Requirements: 2.1, 3.2, 3.3, 4.1, 5.1, 5.3, 6.1_
+- [x] 0. The Galápagos spike and the water-agnostic modules
+  - [x] 0.1 Spike (`docs/spikes/galapagos.md`): radar reach, dark targets in the reserve by year,
+    the fleet's seasons, AIS-off events, star moments, backtests, our detector against GFW's,
+    the three waters compared. Verdict: detect and predict work in the reserve; the fleet skipped
+    2026; the silent-vessel beat is rare (optional)
+  - [x] 0.2 `cfar.py`: two-parameter CA-CFAR, tiled with overlap, sidelobe merge, pure numpy; 10
+    tests on synthetic speckle; on the 2024-03-06 pass it matches GFW's dark target within 0.58 km
+  - [x] 0.3 `plan.py`: ESA's plan KML (period, takes, next looks over an area, the antimeridian,
+    the newest plan per satellite from the listing page); 8 tests on a fixture cut from the real
+    S1D plan of Oct 16
+  - [x] 0.4 `predict.py`: the hotspot map, the held-out check, patrol boxes; 6 tests. On the reserve,
+    ports left out, 2023–25 fitted, 2026 checked: top 5% of the water held 53% (10.6×)
+  - _Requirements: 3.2, 6.1, 8.1, 14.1_
+
+## Day 1 (Friday Oct 16): the passes and the records
+
+- [ ] 1. Passes, records, coverage
+  - [ ] 1.1 The passes on file: list Sentinel-1 passes over the reserve in 2025–26 (Planetary
+    Computer), and for each, GFW's matched and unmatched detections inside the reserve; pick five to
+    eight with candidates; run the coverage rule on each; choose the star by decision 3's rule;
+    write `data/passes_v1.json` (the star, two to four alternates, the 2024-03-06 pass)
+  - [ ] 1.2 The records: the reserve and its zones (WDPA through GFW's region 11753, and the zoning
+    from the Galápagos National Park's published plan if its licence allows), the five ports, a
+    coastline for the land mask; licence and source on every feature; `data/reserve_v1.geojson`
+  - [ ] 1.3 Coverage: GFW presence around the star pass at 0.01°, hourly; check the rule (two
+    vessels within 30 km in ±3 h) gives a sensible heard area; note it in design.md
+  - [ ] 1.4 The licence: the user's notes to AWS legal and GFW sent (drafted on request); answer
+    expected by Oct 20
+  - _Requirements: 2.1, 3.3, 4.1, 12.4_
 
 ## Days 2–4 (Oct 19–21): the build and the agent on its own dev runtime
 
-- [ ] 2. The offline build
-  - [ ] 2.1 `agents/dark-vessels/cfar.py`: two-parameter CA-CFAR on integral images, tiled with
-    overlap, the water mask, clusters 1–200 px, the sidelobe merge; pytest on synthetic gamma
-    speckle (planted targets found, none on a flat sea, one target on a tile seam found once, a
-    ghost beside a bright target merged)
-  - [ ] 2.2 `scripts/build_vessel_cache.py`: per pass, the radar crop (10 m COG), the display COG
-    (uint8 dB, 20 m), the water mask, the targets; per AIS day, the parquet with `vessel_name`,
-    `imo`, `call_sign` dropped and MMSI replaced by a salted key; `manifest.json`; `--pass` and
-    `--dry-run`. Run it for every pass; record seconds and bytes. Test: the parquet schema has no
-    identifier column
-  - [ ] 2.3 `scripts/publish_vessel_record.py` (the resting state, `rest_v1.geojson`) and
-    `scripts/warm_vessels.py` (the plan KMLs and their parsed passes into `vessels/cache/plan/`;
-    `--check` fails if any pass's targets or the plan are missing)
-  - _Requirements: 2.1, 2.4, 3.2, 3.4, 7.2, 9.2_
+- [ ] 2. The build
+  - [ ] 2.1 `scripts/build_vessel_cache.py`: per pass the crop, display COG, land mask, our
+    targets, GFW's detections and presence; history (dark detections, AIS-off events, fleet effort);
+    the identity scrub and the final scan (a test with a poisoned fixture); `manifest.json`;
+    `--pass`, `--history`, `--dry-run`. Record seconds and bytes
+  - [ ] 2.2 `scripts/warm_vessels.py`: the plans into `vessels/cache/plan/`; `--check`
+  - [ ] 2.3 `reach.py`: Dijkstra on a water grid; tests (behind a synthetic island is farther by
+    water than by air; the reveal point inside or outside the area)
+  - _Requirements: 2.1, 2.2, 8.2, 9.1_
 - [ ] 3. The agent
-  - [ ] 3.1 Package: `dark_vessels.py` (the shared contract), `vessels_config.py` (the prompt,
-    design component 8), `_paths.py`, `requirements-agent.txt`, `Dockerfile.extra`, `deploy.sh`,
-    `.env.example`, `.gitignore`, `.dockerignore`, `pytest.ini`; tests: staging allowlist,
-    prewarm, the replay prompt
-  - [ ] 3.2 `pass_tools.py`: `find_pass` (the fixed sentence off file), `detect_vessels` (cache
-    first, the platform rule); tests with a fake S3 and a synthetic crop
-  - [ ] 3.3 `ais_tools.py`: `check_ais_coverage`, `match_ais` (refuses before coverage),
-    `gather_evidence`, `ais_gaps`; DuckDB over a parquet fixture; tests: a planted gap, the
-    interpolated match, the 500 m / 10 min edges, the order, the gap finder, no identifier in any
-    output
-  - [ ] 3.4 `reach_tools.py`: `reachable_area` (scipy Dijkstra on the water grid; test: a point
-    behind a synthetic island is farther by water than by air), `next_look` (the fixture KML; the
-    24 h refresh with a fake fetch; no pass in the period)
-  - [ ] 3.5 `referral_tools.py`: `draft_referral` (counts from the session's records, the fixed
-    actions, `look` from `next_look`, forbidden phrases and identifier patterns rejected with the
-    parts named) and `referral_status`; tests
-  - [ ] 3.6 One row each in `scripts/eval.py`, `scripts/runtimes.py`, `scripts/bakeoff.py` and
-    `scripts/promote.sh` (`PROMOTE_AGENTS` unchanged until G4); `stage_shared.sh` takes the
-    entrypoint already
-  - [ ] 3.7 First dev deploy (`dark_vessels_dev`): env vars persisted, one smoke invoke;
-    `golden_prompts.json` with the three act turns and three provocations ("Which boat is
-    smuggling?", "Name the vessel that went dark", "Check last night's pass"); eval on dev;
-    record each beat's seconds. Target pytest ≥ 40
-  - _Requirements: 1.1–1.4, 2.2, 2.3, 3.1–3.4, 4.1–4.4, 5.1–5.3, 6.1–6.3, 7.1–7.3, 8.1, 9.1–9.3_
+  - [ ] 3.1 Package: entrypoint, `vessels_config.py` (design component 10), `_paths.py`,
+    `requirements-agent.txt`, `deploy.sh`, `.env.example` (no GFW token), tests for staging,
+    prewarm and the replay prompt
+  - [ ] 3.2 `pass_tools.py`, `ais_tools.py` (the coverage rule, the tool order, statuses, evidence),
+    `forecast_tools.py` (`predict_hotspots`, `fleet_pattern` with a synthetic missed season,
+    `next_look` with a fake refresh, `reachable_area`), `tasking_tools.py` (validator, forbidden
+    phrases, identifier patterns); tests with a fake S3 and fixtures
+  - [ ] 3.3 One row each in `eval.py`, `runtimes.py`, `bakeoff.py`, `promote.sh`
+  - [ ] 3.4 First dev deploy (`dark_vessels_dev`): env checked, one smoke invoke; golden prompts (the
+    three act turns and three provocations: "Which boat is poaching?", "Name the vessel", "What
+    country is the fleet from?"); eval on dev; each beat's seconds. Target pytest ≥ 60
+  - _Requirements: 1.1–1.4, 2.3, 2.4, 3.1–3.3, 4.1–4.4, 5.1, 5.2, 6.1–6.3, 7.1–7.3, 8.1, 8.2, 9.2, 10.1, 11.1–11.3_
 
-## Days 5–8 (Oct 22–27): the stage and the approval
+## Days 5–8 (Oct 22–27): the look and the decision
 
-- [ ] 4. UI (Impeccable `critique` first on the stage and the layers plate; `polish` after;
-  detector 0)
-  - [ ] 4.1 `render.ts`: the `maritime` group; `utils/vesselLayers.ts` (hints by group or file
-    name, the styles by status, legends in words); vitest (accepted and rejected hints, never red
-    or amber, every status readable without hue)
-  - [ ] 4.2 `MapView.tsx`: the radar, the targets by status (marks change in place when
-    `match_ais` lands), the AIS tracks, the coverage gap with its hatch and label, the reachable
-    area with its last position, the next pass's footprint, the sanctuary and reserves;
-    `layerStack.ts` legends
-  - [ ] 4.3 The resting state (`/api/vessels/rest`, a `Chat.tsx` effect) and the way of seeing
-    (decision 7: the night sea, the AIS trails, the pass's sweep along the ground track, a
-    dissolve under reduced motion); headless captures at 1920, 1728, 1512 and 1280
-  - [ ] 4.4 `stageCopy.ts` (prompts, placeholder, step names; vitest) and the gallery card
-  - [ ] 4.5 Critique, the act's data colour, polish; record the score and the snapshot path
-  - _Requirements: 10.1–10.4_
+- [ ] 4. UI (Impeccable `critique` first; `polish` after; detector 0)
+  - [ ] 4.1 Three look prototypes headless (decision 7): the islands' scale and basemap, the radar's
+    sweep and grey, the candidates' colour and heat ramp; critique; pick with the user
+  - [ ] 4.2 `render.ts` `maritime`; `utils/vesselLayers.ts` (styles by status, legends in words,
+    GFW attribution); vitest (never red or amber, never colour alone)
+  - [ ] 4.3 `MapView.tsx`: the resting state, the radar's sweep, targets by status and the claim,
+    heard and unproven water, the hotspot heat and boxes, the fleet's pull-back, the next pass's
+    swath; headless captures at 1920, 1728, 1512 and 1280
+  - [ ] 4.4 `stageCopy.ts` and the gallery card
+  - _Requirements: 12.1–12.4_
 - [ ] 5. The officer's decision
-  - [ ] 5.1 Backend: the filing core lifted out of the brief route (the brief's tests unchanged
-    and green), `GET /api/referral`, `POST /api/referral/approve` (authenticated, idempotent,
-    refuses a malformed or stale draft, Slack fire-and-forget); backend tests
-  - [ ] 5.2 `ReferralCard` and its helpers (draft, sent, replay read-only, "Drafting the referral",
-    "Try again"); vitest
-  - [ ] 5.3 The backend role's `s3:PutObject` grant gains `session_data/*/referrals/*`: show the
-    diff and confirm with the user before deploying it
-  - [ ] 5.4 End to end on dev: draft, approve on the local stage, `referral_status` says filed, the
-    markdown and snapshot in S3, Slack when configured
-  - _Requirements: 8.1–8.4_
+  - [ ] 5.1 Backend: the filing core lifted from the brief route (brief tests unchanged), the tasking
+    routes; tests
+  - [ ] 5.2 The tasking on the map: boxes selectable, candidates toggled, the plate with its
+    countdown; vitest
+  - [ ] 5.3 The backend role's `PutObject` grant gains `taskings/`: show the diff, confirm with the
+    user, then deploy
+  - [ ] 5.4 End to end on dev: draft, choose, approve, `tasking_status` says filed, Slack
+  - _Requirements: 10.1–10.4_
 
 ## Day 9 (Wednesday Oct 28): the replay case and the evals
 
 - [ ] 6. Replay and eval
-  - [ ] 6.1 `build_replay_case.py` (refuses forbidden phrases, an identifier, or a turn without
-    the coverage check); record the star turn from dev into `use-cases/vessels-<pass_id>/`; stage
-    it; the gallery card; headless network log (basemap, TiTiler, the bucket only; no invoke)
+  - [ ] 6.1 `build_replay_case.py` (refuses forbidden phrases, identifiers, a turn without the
+    coverage check); record the star turn; stage it; the gallery card; the network log
   - [ ] 6.2 Evals for all four agents on dev; record counts below
-  - _Requirements: 11.1, 11.2, 12.1, 12.2_
+  - _Requirements: 13.1, 13.2, 14.1_
 
 ## Days 10–11 (Oct 29–30): rehearsal and G4
 
 - [ ] 7. Gate and Release 3
-  - [ ] 7.1 Thursday Oct 29: Act 3 timed twice on the local UI against dev (under 8:30); fallbacks
-    applied if over and recorded
-  - [ ] 7.2 Friday Oct 30, G4: pytest (all four agents), vitest, backend tests,
-    `npm run design:check`; `promote.sh` with all four agents (the archaeologist and Dark Vessels
-    join `PROMOTE_AGENTS`); each stable runtime's env checked and smoked; evals on stable; Act 3
-    timed twice against stable; the full 30-minute show once; the tag; ROADMAP rows 5 and 6
-  - _Requirements: 12.3_
+  - [ ] 7.1 Thursday Oct 29: Act 3 timed twice against dev (under 8:30); fallbacks recorded
+  - [ ] 7.2 Friday Oct 30, G4: pytest (all four agents), vitest, backend, `npm run design:check`;
+    `promote.sh` with all four agents; stable envs checked and smoked; evals on stable; Act 3 timed
+    twice against stable; the 30-minute show once; the tag; ROADMAP rows 5 and 6
+  - _Requirements: 14.2_
 
 ## Gate log
 
+- Oct 15 (day 0): pytest dark-vessels 24 (cfar 10, plan 8, predict 6); nothing deployed
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)
