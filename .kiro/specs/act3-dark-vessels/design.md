@@ -42,6 +42,20 @@ Verified premises (Oct 15, `docs/spikes/galapagos.md`):
   moments since 2023 where a pass saw a silent vessel's water with a dark target in reach.
 - GFW API: token works; Cloudflare needs a User-Agent; one report at a time, 366 days at most;
   responses carry identity unless stripped; the reserve and EEZ exist as region layers.
+- How recent (Oct 16): GFW's radar detections reach Oct 12 (passes with dark targets in the radar
+  box on Sep 30, Oct 5 and Oct 12) and its AIS presence reaches Oct 12 (hourly, about 3,500 vessel
+  hours a day in the box). AIS for Oct 10 to 12 over the reserve: 279 vessels (passenger 134, other
+  100, cargo 16, fishing 15), 218 of them moving more than 5 km; one hourly report took 2 s.
+- The prediction on the newest data: fitted on 2023 to Jun 30, 2026 and checked on Jul 1 to
+  Oct 12, 2026 (51 dark targets away from ports), the top 5% of the water held 55% (11.0×) and the
+  top 10% held 76% (7.6×). Fitting on the last 12 months alone did worse (49% in the top 5%), so
+  the map uses all history; the forward map adds everything to Oct 12.
+- The seabed: the AWS Terrain Tiles carry bathymetry (zoom 7 over the islands: −3,851 to +2,115 m,
+  92% of the tile under water), and MapLibre 6.11 draws it with a `color-relief` layer and a
+  `hillshade`. Prototyped on the stage Oct 16 (below, component 11).
+- Truly live AIS: not available from GFW (96 hours behind) or NOAA (months). aisstream.io offers a
+  free live WebSocket that must be proxied through our server, with coverage from volunteer
+  receivers that is unverified around the Galápagos; a coverage check needs a key (decision 11).
 
 ## Architecture
 
@@ -194,8 +208,25 @@ Fishing Watch" once when its data first appears).
   `broadcasting` a fog dot tied by a hairline to its AIS position; `port` a small fog square;
   `unproven` a label-grey hollow ring with "not evidence"; `candidate` a ring in the act's one data
   colour with a mono label (`T07  no AIS`); `seen_once` a faint dot. Never red, never amber.
-- Rest: the islands at night, flat and north-up, the reserve boundary and its zones as hairlines,
-  the ports as small marks, nothing moving; "Powered by Global Fishing Watch." in the attribution.
+- **The way of seeing: the sea from below, at night** (prototyped Oct 16, `/tmp/vessels_look/`).
+  The other acts look at land (a flat satellite map, a globe from space, the ground at dusk); this
+  one looks at the water. The satellite basemap goes; the ground is the seabed from the Terrain
+  Tiles' bathymetry, a `color-relief` from near-black abyss (#03070d at −4,200 m) through deep blue
+  to the platform's lighter blue (#244c62 just under the surface), shaded at a low exaggeration; the
+  islands are dark silhouettes (#0b0e12 to #161b22) with their names in label grey; the reserve is a
+  dashed fog hairline. Flat and north-up: a chart, not a landscape.
+- **The traffic in motion.** The latest three days of AIS on file play back on the seabed: every
+  track's whole wake as a faint long exposure (13% opacity, the routes between the islands appear
+  as a network), the last four hours as a comet tail (a `line-gradient` from clear to pale cyan
+  #9fd3e6), and each vessel's head as a fog dot moving between its hourly positions (interpolated
+  only across gaps of three hours or less; a longer gap breaks the wake). A clock plate at the top
+  centre says what the room is watching in mono: "AIS 2026-10-12 12:00 UTC 193 vessels
+  broadcasting". At rest it runs at about one hour every four seconds and loops; when the radar
+  pass lands it stops at the pass's minute, so the claim beat happens on a frozen sea. Under reduced
+  motion it shows the long exposure and the heads at the pass time, still. It is labelled as a
+  replay with its date, never as live.
+- Rest also shows the reserve, the ports as small marks, and "Powered by Global Fishing Watch." in
+  the attribution.
 - The radar arrives as a sweep along the satellite's ground track (a dome mask drawn back over about
   2.5 s; a dissolve under reduced motion); each target lights as the sweep passes it.
 - The claim: each broadcasting vessel's track draws a hairline to its target; the targets left alone
@@ -256,7 +287,7 @@ AWS is ESA's plan, one host, bounded, cached.
 | 1:40 | Coverage | (same turn) | Heard water lit, unproven water hatched |
 | 2:10 | The claim | (same turn) | Broadcasting vessels claim their targets; three left alone: "candidates, not accusations" |
 | 2:50 | Evidence | (same turn) | Three chips, both detectors, the nearest broadcast, the zone |
-| 3:40 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on 2023 to 2025, its top 5% of the water held 53% of 2026's dark targets"; three patrol boxes with their next passes |
+| 3:40 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on everything to June, its top 5% of the water held 55% of the dark targets seen since July"; three patrol boxes with their next passes |
 | 4:50 | The fleet | (same turn) | The camera pulls back to the fleet's lights off Peru; "it came every June to August since 2017; this year it did not" |
 | 5:40 | Act | "Draft the patrol tasking" | The boxes on the map; the presenter picks one, drops a candidate, approves; "Filed by the officer. The agent did not file it." |
 | 7:00 | Close | | "Three candidates, not accusations; the radar looks again Oct 24 at 00:17 UTC. The decision was the officer's." |
@@ -284,9 +315,19 @@ live.
 6. **The action:** a patrol tasking chosen and approved on the map (a box, the candidates, the
    planned look), filed by the backend with a snapshot and Slack; EventBridge tabled (Oct 15). The
    backend role's `PutObject` grant gains `taskings/` (confirmed before deploy).
-7. **The look:** the islands at night; the radar's sweep; the claim by elimination; heard and
-   unproven water; the hotspot heat and boxes; the camera's pull-back to the fleet. Three prototypes
-   and a critique decide the colours and scale before building.
+7. **The look: the sea from below, at night** (prototyped Oct 16): the seabed's bathymetry instead
+   of a satellite basemap, the islands as silhouettes, the latest AIS replayed in motion (long
+   exposure, comet tails, moving heads, a dated clock), frozen at the pass for the claim; then the
+   radar's sweep, heard and unproven water, the hotspot heat and boxes, the pull-back to the fleet.
+   The candidates' colour and the heat ramp are chosen at critique.
+11. **Live AIS:** the stage shows the latest AIS on file in motion, labelled with its date (GFW, about
+    four days behind; refreshed by the build). A truly live layer would need aisstream.io (a free
+    key from the user, a backend WebSocket proxy behind the stage's sign-in, its own terms, and a
+    coverage check around the islands first). Recommended: the dated replay for the show; test
+    aisstream's coverage only if the user wants live.
+12. **Freshness:** the passes on file include the newest GFW-matched pass (Oct 12 today); the build
+    is rerun on Thursday Nov 5 (data only, after the code freeze) to add the newest pass and AIS and
+    refit the prediction, and the act is rehearsed on that data Nov 6.
 8. **Names:** agent id `vessels`, label "Dark Vessels", directory `agents/dark-vessels/`, runtimes
    `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`, replay case `vessels-<pass>`.
 9. **Schedule:** dev only until G4 on **Friday Oct 30** (Oct 31 is a Saturday); the archaeologist's

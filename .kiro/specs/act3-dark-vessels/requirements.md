@@ -22,7 +22,8 @@ The data is proven (`docs/spikes/galapagos.md`, Oct 15): Sentinel-1 sees the res
 year; GFW's radar detections with no AIS inside the reserve were 41 (2024), 109 (2025) and 183
 (2026 to Oct 12), one to three a pass; our CA-CFAR (`cfar.py`) found GFW's dark target within
 0.58 km on a raw pass (a 90 km window read in 2.1 s); fitted on 2023–25 and leaving out the ports,
-the top 5% of the reserve's water held 53% of 2026's dark targets (10.6× chance); ESA's plan to
+the top 5% of the reserve's water held 53% of 2026's dark targets (10.6× chance), and refitted on
+the newest data (to June, checked on July 1 to Oct 12) it held 55% (11.0×); ESA's plan to
 Nov 5 gives the reserve six planned Sentinel-1D passes; the squid fleet skipped the Galápagos in
 2026 and stayed off Peru and Chile.
 
@@ -147,7 +148,8 @@ radar can see there, so that a patrol goes where the pattern points, not where a
 2. WHEN patrol boxes are returned THEN each SHALL carry its next planned Sentinel-1 passes from
    `next_look` (those covering at least 90% of the box).
 3. WHEN the agent speaks of the prediction THEN it SHALL state it as the check measured it ("fitted
-   on 2023 to 2025, this map's top 5% of the water held 53% of 2026's dark targets") and SHALL make
+   on everything to June, this map's top 5% of the water held 55% of the dark targets seen since
+   July") and SHALL make
    no claim beyond it.
 
 ### Requirement 7: Where the fleet is, and when it comes back (prediction)
@@ -235,9 +237,15 @@ what the evidence shows.
 2. WHEN a tool passes a render hint THEN the allowlist SHALL accept a `maritime` group (radar,
    targets by status, heard and unproven water, the hotspot map, patrol boxes, the fleet's heat,
    the next pass's footprint, the reserve and its zones), each with a legend in words.
-3. WHEN the agent is chosen THEN the stage SHALL show its resting state (the reserve, the islands,
-   its ports) and the radar SHALL arrive in a way that shows the pass, critiqued before and polished
-   after with Impeccable, detector 0.
+3. WHEN the agent is chosen THEN the stage SHALL show its own way of seeing (the seabed's
+   bathymetry, not a satellite basemap; the islands as silhouettes; the reserve and its ports) with
+   the latest AIS on file in motion (wakes, moving heads and a clock that names the date and hour),
+   labelled as a replay and never as live; the radar SHALL arrive in a way that shows the pass and
+   the AIS SHALL stop at the pass's minute; critiqued before and polished after with Impeccable,
+   detector 0.
+5. WHEN the predictions run THEN they SHALL use the newest data on file: the check holds out the
+   most recent months (today Jul 1 to Oct 12, 2026), the forward map uses everything to the newest
+   day, and the build SHALL be rerun on Nov 5 to add the newest pass and AIS.
 4. WHEN a target's status is drawn THEN it SHALL read without colour alone, never in red, never in
    amber; GFW's attribution SHALL be on the map whenever its data is.
 

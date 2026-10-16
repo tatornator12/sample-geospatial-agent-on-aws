@@ -66,8 +66,14 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
 ## Days 5–8 (Oct 22–27): the look and the decision
 
 - [ ] 4. UI (Impeccable `critique` first; `polish` after; detector 0)
-  - [ ] 4.1 Three look prototypes headless (decision 7): the islands' scale and basemap, the radar's
-    sweep and grey, the candidates' colour and heat ramp; critique; pick with the user
+  - [x] 4.0 Oct 16, the way of seeing (the user: "look different than the others" and "live ais
+    tracks in motion"): three looks prototyped on the stage with real data (`/tmp/vessels_look/`):
+    A the seabed alone, B a dark basemap with the AIS long exposure, C the seabed with the long
+    exposure; then D, the seabed with the long exposure, comet tails and moving heads over twelve
+    hours of the Oct 12 AIS (a GIF). Recommended: D. Truly live AIS is not in our data (GFW is about
+    four days behind); the stage plays the latest AIS back with its date (decision 11)
+  - [ ] 4.1 With the user's pick: the radar's sweep and grey, the candidates' colour and heat ramp;
+    critique; the look written into DESIGN.md
   - [ ] 4.2 `render.ts` `maritime`; `utils/vesselLayers.ts` (styles by status, legends in words,
     GFW attribution); vitest (never red or amber, never colour alone)
   - [ ] 4.3 `MapView.tsx`: the resting state, the radar's sweep, targets by status and the claim,
@@ -105,5 +111,8 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
 ## Gate log
 
 - Oct 15 (day 0): pytest dark-vessels 24 (cfar 10, plan 8, predict 6); nothing deployed
+- Oct 16 (the newest data and the look): GFW radar and AIS reach Oct 12; the prediction refitted to
+  June and checked on Jul 1 to Oct 12: top 5% of the water 55% (11.0×), top 10% 76% (7.6×); the
+  look prototyped (4.0); nothing deployed, no stage code changed
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)
