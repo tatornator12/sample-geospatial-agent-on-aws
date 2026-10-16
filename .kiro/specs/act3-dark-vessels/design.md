@@ -320,13 +320,15 @@ live.
    exposure, comet tails, moving heads, a dated clock), frozen at the pass for the claim; then the
    radar's sweep, heard and unproven water, the hotspot heat and boxes, the pull-back to the fleet.
    The candidates' colour and the heat ramp are chosen at critique.
-11. **Live AIS** (testing, the user's "let's test it" Oct 16): the stage shows the latest AIS on file
-    in motion, labelled with its date (GFW, about four days behind; refreshed by the build). A truly
-    live layer would need aisstream.io (a free key from the user, a backend WebSocket proxy behind
-    the stage's sign-in, its own terms, and a coverage check around the islands first). The test:
-    ten minutes of aisstream over the islands against GFW's hourly count for the same box; live is
-    built only if it hears a useful share of the reserve's traffic and its terms allow the show.
-    Otherwise the dated replay stands.
+11. **Live AIS: the dated replay** (tested Oct 16, closed): the stage shows the latest AIS on file in
+    motion, labelled with its date (GFW, about four days behind; refreshed by the build). aisstream.io
+    was tested on the user's key: ten minutes over the islands and the Gulf of Guayaquil heard
+    nothing (no positions, static data, base stations, aids to navigation, safety or rescue
+    messages), and ten minutes over the whole eastern Pacific from Peru to Panama heard 24
+    positions, all north of 8° N; GFW hears a median 100 vessels an hour inside the reserve. Its
+    receivers are on land and none reach Ecuador, Peru or the islands. The aiscast open feed heard
+    nothing south of 12° N in three minutes. Live here would need paid satellite AIS (a contract and
+    its own terms), not worth it before the freeze; no proxy is built.
 12. **Freshness** (agreed Oct 16): the passes on file include the newest GFW-matched pass (Oct 12
     today); the build is rerun on Thursday Nov 5 (data only, after the code freeze) to add the newest
     pass and AIS and refit the prediction, and the act is rehearsed on that data Nov 6.

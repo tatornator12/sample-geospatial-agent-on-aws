@@ -1,7 +1,7 @@
 # Tasks: act3-dark-vessels (Oct 16–30, started early)
 
 Cadence: requirements and design second version Oct 15 (the Galápagos), **awaiting approval** of
-decisions 3, 6, 8, 9 and 10 (1, 2, 4, 5 agreed Oct 15; 7 and 12 agreed Oct 16; 11 under test). The
+decisions 3, 6, 8, 9 and 10 (1, 2, 4, 5 agreed Oct 15; 7 and 12 agreed Oct 16; 11 closed by test). The
 water-agnostic method (detector, plan,
 prediction) was built Oct 15 on the user's "please get started". Tasks top to bottom; every task
 names its tests. All deploys before G4 are `DEPLOY_TARGET=dev`. G4 is Friday Oct 30 (decision 9).
@@ -75,8 +75,10 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
     four days behind); the stage plays the latest AIS back with its date (decision 11)
   - [x] 4.0a Oct 16, the user's pick: D (decision 7); live AIS to be tested on aisstream.io
     (decision 11); the Nov 5 data rerun and Nov 6 rehearsal agreed (decision 12)
-  - [ ] 4.0b The aisstream test: ten minutes over the islands (messages, vessels, positions inside
-    the reserve, no identity printed) against GFW's hourly count; its terms read for the show
+  - [x] 4.0b Oct 16, the aisstream test: ten minutes over the islands and a mainland check box
+    heard nothing of any message kind; the eastern Pacific heard 24 positions in ten minutes, all
+    north of 8° N (GFW: a median 100 vessels an hour in the reserve). No receiver reaches the
+    Galápagos; decision 11 closed on the dated replay; no proxy
   - [ ] 4.1 With the user's pick: the radar's sweep and grey, the candidates' colour and heat ramp;
     critique; the look written into DESIGN.md
   - [ ] 4.2 `render.ts` `maritime`; `utils/vesselLayers.ts` (styles by status, legends in words,
@@ -119,5 +121,7 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
 - Oct 16 (the newest data and the look): GFW radar and AIS reach Oct 12; the prediction refitted to
   June and checked on Jul 1 to Oct 12: top 5% of the water 55% (11.0×), top 10% 76% (7.6×); the
   look prototyped (4.0); nothing deployed, no stage code changed
+- Oct 16 (live AIS): aisstream 10 min islands box 0 messages, 10 min eastern Pacific 24 positions (all
+  north of 8° N), aiscast 3 min 0; the dated replay stands
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)
