@@ -42,6 +42,15 @@ while the radar is looking.
      5% held 37% (7.4×).
    - Dark targets, Santa Barbara Channel: top 1% 20% (20.5×), top 5% 47% (9.5×), top 10% 58%.
    - Where vessels go silent (0.25° cells): top 10% held 15% (1.5×). Weak.
+   - Rerun with `predict.py` on the reserve's own polygon, leaving out water within 10 km of the
+     five ports (the reserve's own boats), each cell spread over its neighbours: 147 dark targets
+     in 2026; the top 1% of the water held 26% (25.9×), the top 5% held 53% (10.6×), the top 10%
+     held 66% (6.6×). The three patrol boxes it proposes (0.2° squares, about 22 km): north of
+     Santa Cruz (−0.45, −90.50; 8% of past dark targets), west of Isabela (−0.20, −91.45; 6%),
+     south-east of Santa Cruz (−0.65, −90.10; 4%). The current plans give each a full Sentinel-1D
+     look within ten days (Oct 17 00:25 or Oct 24 00:17 UTC).
+   - What the radar will cover: the S1C plan to Nov 7 has no IW take over the reserve; the S1D
+     plan to Nov 5 has six (orbits 106, 128, 33, 55; 24 to 54% of the reserve each).
 7. **Our own detector agrees with GFW's.** CA-CFAR on the raw 2024-03-06 pass (VV, read at 40 m, a
    90 × 90 km window in 2.1 s, GCP affine): 8 targets; GFW's one dark target that day matched one of
    ours within 0.58 km.
