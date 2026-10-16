@@ -1,7 +1,8 @@
 # Tasks: act3-dark-vessels (Oct 16–30, started early)
 
 Cadence: requirements and design second version Oct 15 (the Galápagos), **awaiting approval** of
-decisions 3, 6 to 10 (1, 2, 4, 5 agreed Oct 15). The water-agnostic method (detector, plan,
+decisions 3, 6, 8, 9 and 10 (1, 2, 4, 5 agreed Oct 15; 7 and 12 agreed Oct 16; 11 under test). The
+water-agnostic method (detector, plan,
 prediction) was built Oct 15 on the user's "please get started". Tasks top to bottom; every task
 names its tests. All deploys before G4 are `DEPLOY_TARGET=dev`. G4 is Friday Oct 30 (decision 9).
 Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallback (decision 1).
@@ -72,6 +73,10 @@ Licence gate: a yes on GFW's terms by Tuesday Oct 20, or the Santa Barbara fallb
     exposure; then D, the seabed with the long exposure, comet tails and moving heads over twelve
     hours of the Oct 12 AIS (a GIF). Recommended: D. Truly live AIS is not in our data (GFW is about
     four days behind); the stage plays the latest AIS back with its date (decision 11)
+  - [x] 4.0a Oct 16, the user's pick: D (decision 7); live AIS to be tested on aisstream.io
+    (decision 11); the Nov 5 data rerun and Nov 6 rehearsal agreed (decision 12)
+  - [ ] 4.0b The aisstream test: ten minutes over the islands (messages, vessels, positions inside
+    the reserve, no identity printed) against GFW's hourly count; its terms read for the show
   - [ ] 4.1 With the user's pick: the radar's sweep and grey, the candidates' colour and heat ramp;
     critique; the look written into DESIGN.md
   - [ ] 4.2 `render.ts` `maritime`; `utils/vesselLayers.ts` (styles by status, legends in words,

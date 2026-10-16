@@ -315,19 +315,21 @@ live.
 6. **The action:** a patrol tasking chosen and approved on the map (a box, the candidates, the
    planned look), filed by the backend with a snapshot and Slack; EventBridge tabled (Oct 15). The
    backend role's `PutObject` grant gains `taskings/` (confirmed before deploy).
-7. **The look: the sea from below, at night** (prototyped Oct 16): the seabed's bathymetry instead
+7. **The look: the sea from below, at night** (agreed Oct 16, look D): the seabed's bathymetry instead
    of a satellite basemap, the islands as silhouettes, the latest AIS replayed in motion (long
    exposure, comet tails, moving heads, a dated clock), frozen at the pass for the claim; then the
    radar's sweep, heard and unproven water, the hotspot heat and boxes, the pull-back to the fleet.
    The candidates' colour and the heat ramp are chosen at critique.
-11. **Live AIS:** the stage shows the latest AIS on file in motion, labelled with its date (GFW, about
-    four days behind; refreshed by the build). A truly live layer would need aisstream.io (a free
-    key from the user, a backend WebSocket proxy behind the stage's sign-in, its own terms, and a
-    coverage check around the islands first). Recommended: the dated replay for the show; test
-    aisstream's coverage only if the user wants live.
-12. **Freshness:** the passes on file include the newest GFW-matched pass (Oct 12 today); the build
-    is rerun on Thursday Nov 5 (data only, after the code freeze) to add the newest pass and AIS and
-    refit the prediction, and the act is rehearsed on that data Nov 6.
+11. **Live AIS** (testing, the user's "let's test it" Oct 16): the stage shows the latest AIS on file
+    in motion, labelled with its date (GFW, about four days behind; refreshed by the build). A truly
+    live layer would need aisstream.io (a free key from the user, a backend WebSocket proxy behind
+    the stage's sign-in, its own terms, and a coverage check around the islands first). The test:
+    ten minutes of aisstream over the islands against GFW's hourly count for the same box; live is
+    built only if it hears a useful share of the reserve's traffic and its terms allow the show.
+    Otherwise the dated replay stands.
+12. **Freshness** (agreed Oct 16): the passes on file include the newest GFW-matched pass (Oct 12
+    today); the build is rerun on Thursday Nov 5 (data only, after the code freeze) to add the newest
+    pass and AIS and refit the prediction, and the act is rehearsed on that data Nov 6.
 8. **Names:** agent id `vessels`, label "Dark Vessels", directory `agents/dark-vessels/`, runtimes
    `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`, replay case `vessels-<pass>`.
 9. **Schedule:** dev only until G4 on **Friday Oct 30** (Oct 31 is a Saturday); the archaeologist's
