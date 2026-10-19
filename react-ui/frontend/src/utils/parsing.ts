@@ -1,5 +1,6 @@
 import type { ToolCall } from '../types.ts';
 import { parseRenderHint, type RenderHint } from './render.ts';
+import { vesselKind } from './vesselLayers.ts';
 
 /**
  * Clean streaming text from formatting artifacts
@@ -389,11 +390,14 @@ function isDisplayVisualComplete(tool: ToolCall): boolean {
  */
 export function extractAllVisualizationData(tools: ToolCall[]): {
   rasters: Array<{ url: string; title: string; date?: string; cloudCoverage?: string; render?: RenderHint }>;
-  geometries: Array<{ url: string; title: string; render?: RenderHint }>;
+  geometries: Array<{ url: string; title: string; render?: RenderHint; revision?: number }>;
 } {
   const rasters: Array<{ url: string; title: string; date?: string; cloudCoverage?: string; render?: RenderHint }> = [];
-  const geometries: Array<{ url: string; title: string; render?: RenderHint }> = [];
+  const geometries: Array<{ url: string; title: string; render?: RenderHint; revision?: number }> = [];
   const seenUrls = new Set<string>();
+  // Dark Vessels' targets file is rewritten in place (match_ais changes detect_vessels' statuses), so
+  // each showing of it after the first is a new revision for the map, not a duplicate.
+  const shown = new Map<string, number>();
 
   for (const tool of tools) {
     // Only process display_visual tools
@@ -410,12 +414,14 @@ export function extractAllVisualizationData(tools: ToolCall[]): {
     const title = tool.params.title;
     const description = tool.params.description || '';
 
-    // Skip if we've already seen this S3 URL
-    if (seenUrls.has(s3Url)) {
+    // Skip if we've already seen this S3 URL (unless it is a file the agent rewrites in place)
+    if (seenUrls.has(s3Url) && vesselKind(s3Url) !== 'targets') {
       continue;
     }
-    
+
     seenUrls.add(s3Url);
+    const revision = shown.get(s3Url) ?? 0;
+    shown.set(s3Url, revision + 1);
     // The agent's styling hint, validated; only present when it passes (see utils/render.ts).
     const render = parseRenderHint(tool.params.render) ?? undefined;
     
@@ -426,6 +432,7 @@ export function extractAllVisualizationData(tools: ToolCall[]): {
         url: s3Url,
         title: title,
         ...(render && render.kind !== 'raster' ? { render } : {}),
+        ...(revision > 0 ? { revision } : {}),
       });
       continue;
     }

@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand, StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import { checkS3Access } from './s3Access';
 import { isScenarioId, scenarioAgent, scenarioLayers, scenarioToolCalls } from './scenario';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
@@ -25,9 +25,30 @@ import {
   isSessionId,
   sessionBriefKeys,
 } from './brief';
-import { notifyFiled, slackWebhookUrl, webhookKind } from './slack';
+import { notifyFiled, notifyTaskingFiled, slackWebhookUrl, taskingWebhookUrl, webhookKind } from './slack';
+import { fileDecision, type FilingPlan, type FilingStore } from './filing';
+import {
+  HOTSPOTS_MAX_BYTES,
+  TASKING_DRAFT_MAX_BYTES,
+  caseTaskingDraftKey,
+  filedChoice,
+  isTaskingId,
+  newestTaskingId,
+  sessionBoxes,
+  sessionHotspotsKey,
+  sessionTaskingKeys,
+  taskingCard,
+  taskingChoice,
+  taskingFiledRecord,
+  taskingMarkdown,
+  taskingRefusal,
+  type TaskingChoice,
+} from './tasking';
 
 const BRIEF_APPROVE_PATH = '/api/brief/approve';
+const TASKING_APPROVE_PATH = '/api/tasking/approve';
+// The two routes that may carry a map snapshot parse their own (larger) body, after authentication.
+const LARGE_BODY_PATHS = new Set([BRIEF_APPROVE_PATH, TASKING_APPROVE_PATH]);
 
 dotenv.config();
 
@@ -166,10 +187,10 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
-// JSON bodies stay at the 100 kB default everywhere except the brief approval, which may carry a
-// map snapshot; that route parses its own (larger) body AFTER authentication.
+// JSON bodies stay at the 100 kB default everywhere except the brief and tasking approvals, which
+// may carry a map snapshot; those routes parse their own (larger) body AFTER authentication.
 const defaultJson = express.json();
-app.use((req, res, next) => (req.path === BRIEF_APPROVE_PATH ? next() : defaultJson(req, res, next)));
+app.use((req, res, next) => (LARGE_BODY_PATHS.has(req.path) ? next() : defaultJson(req, res, next)));
 
 // Health check (public, no auth required)
 app.get('/health', (req: Request, res: Response) => {
@@ -781,6 +802,43 @@ function parseJson(text: string | null): unknown {
   }
 }
 
+/** The filing core's store (filing.ts) on the data bucket. */
+function s3Store(bucket: string): FilingStore {
+  return {
+    get: (key, maxBytes) => readS3Text(bucket, key, maxBytes),
+    put: async (key, body, contentType) => {
+      await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }));
+    },
+  };
+}
+
+/** The keys under a prefix (at most 200): the newest tasking draft is found by its name. */
+async function listKeys(bucket: string, prefix: string): Promise<string[]> {
+  const out = await s3Client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 200 }));
+  return (out.Contents ?? []).map((o) => o.Key ?? '').filter(Boolean);
+}
+
+// Dark Vessels' resting state (Act 3): the star pass's AIS replay, the reserve, its ports and the
+// island names, published beside the vessel cache by scripts/publish_vessel_rest.py. The stage plays
+// the replay the moment the act is chosen, before any prompt. A fixed key: the browser never names one.
+const VESSEL_REST_KEY = 'vessels/cache/v1/rest_v1.json';
+app.get('/api/vessels/rest', async (_req: Request, res: Response) => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  if (!bucket) return res.status(503).json({ error: 'S3 bucket not configured' });
+  try {
+    const rest = parseJson(await readS3Text(bucket, VESSEL_REST_KEY, 3_000_000)) as
+      { version?: unknown; replay?: { tracks?: unknown }; reserve?: { type?: unknown } } | null;
+    if (!rest || rest.version !== 1 || !Array.isArray(rest.replay?.tracks) || typeof rest.reserve?.type !== 'string') {
+      return res.status(404).json({ error: 'No resting state published yet' });
+    }
+    res.set('Cache-Control', 'private, max-age=300');
+    return res.json(rest);
+  } catch (error) {
+    console.error('Vessel rest read failed:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'Failed to read the resting state' });
+  }
+});
+
 // The Methane Watch baseline (every EMIT repeat site plus the watch-area outlines), as the agent's
 // watch_baseline tool last cached it. The stage puts it on the globe the moment the Methane Hunter
 // is chosen, before any prompt. 404 until the first warm run has written it.
@@ -859,32 +917,108 @@ app.post(BRIEF_APPROVE_PATH, express.json({ limit: Math.ceil(SNAPSHOT_MAX_BYTES 
   if (!shot.ok) return res.status(400).json({ error: shot.reason });
   const keys = sessionBriefKeys(sessionId, briefId);
   try {
-    const existing = parseJson(await readS3Text(bucket, keys.filed, 10_000)) as { filed_at?: unknown; filed_by?: unknown } | null;
-    if (existing) return res.json({ status: 'filed', filedAt: existing.filed_at, filedBy: existing.filed_by, already: true });
-    const record = parseJson(await readS3Text(bucket, keys.draft, DRAFT_MAX_BYTES));
-    if (record === null) return res.status(404).json({ error: 'Brief not found' });
-    const refusal = fileRefusal(record, briefId, sessionId);
-    if (refusal) return res.status(409).json({ error: refusal });
-    const by = filedBy((req as any).user);
-    const at = new Date().toISOString();
-    const markdown = filedMarkdown((record as { markdown: string }).markdown, by, at);
-    await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: keys.markdown, Body: markdown, ContentType: 'text/markdown; charset=utf-8' }));
-    if (shot.png) {
-      await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: keys.snapshot, Body: shot.png, ContentType: 'image/png' }));
-    }
-    // The filed record last: brief_status reads it, so it exists only once everything else is written.
-    const filed = { brief_id: briefId, session_id: sessionId, status: 'filed', filed_at: at, filed_by: by,
-                    markdown_key: keys.markdown, snapshot_key: shot.png ? keys.snapshot : null };
-    await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: keys.filed, Body: JSON.stringify(filed), ContentType: 'application/json' }));
-    console.log(`📝 Brief ${briefId} filed by ${by}`);
-    // Slack hears about the analyst's decision (only when a webhook is configured); the analyst
-    // never waits for it, and a Slack failure never unfiles anything.
-    const card = briefCard(record, briefId, sessionId);
-    if (card) notifyFiled({ card, sessionId, filedBy: by, filedAt: at, markdownKey: keys.markdown, bucket });
-    return res.json({ status: 'filed', filedAt: at, filedBy: by });
+    // The filing core (filing.ts): the markdown and the snapshot first, the filed record last
+    // (brief_status reads it); Slack hears about the analyst's decision after, fire and forget.
+    const plan: FilingPlan = {
+      keys,
+      draftMaxBytes: DRAFT_MAX_BYTES,
+      notFound: 'Brief not found',
+      refusal: (record) => fileRefusal(record, briefId, sessionId),
+      markdown: (record, by, at) => filedMarkdown((record as { markdown: string }).markdown, by, at),
+      filedRecord: (_record, by, at, snapshotKey) => ({
+        brief_id: briefId, session_id: sessionId, status: 'filed', filed_at: at, filed_by: by,
+        markdown_key: keys.markdown, snapshot_key: snapshotKey,
+      }),
+      notify: (record, by, at) => {
+        const card = briefCard(record, briefId, sessionId);
+        if (card) notifyFiled({ card, sessionId, filedBy: by, filedAt: at, markdownKey: keys.markdown, bucket });
+      },
+    };
+    const result = await fileDecision(s3Store(bucket), plan, shot.png, filedBy((req as any).user), new Date().toISOString());
+    if (result.status === 200 && !result.body.already) console.log(`📝 Brief ${briefId} filed by ${result.body.filedBy}`);
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('Brief filing failed:', error instanceof Error ? error.message : error);
     return res.status(500).json({ error: 'Failed to file the brief' });
+  }
+});
+
+// ========================================
+// The officer's decision on a Dark Vessels patrol tasking (see tasking.ts)
+// ========================================
+
+// The tasking on the stage: the session's newest draft (or the one named), its card, the session's
+// patrol boxes to choose from, and whether it is filed; a replay case's draft is never filed.
+app.get('/api/tasking', async (req: Request, res: Response) => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  const { sessionId, caseId, taskingId } = req.query;
+  if (!bucket) return res.status(503).json({ error: 'S3 bucket not configured' });
+  if (taskingId !== undefined && !isTaskingId(taskingId)) return res.status(400).json({ error: 'Invalid taskingId' });
+  const live = isSessionId(sessionId);
+  if (!live && !isCaseId(caseId)) return res.status(400).json({ error: 'sessionId or caseId is required' });
+  try {
+    const prefix = live ? `session_data/${sessionId}/taskings/` : `use-cases/${caseId}/`;
+    const id = (taskingId as string | undefined) ?? newestTaskingId(await listKeys(bucket, prefix));
+    if (!id) return res.status(404).json({ error: 'No tasking drafted yet' });
+    if (!live) {
+      const card = taskingCard(parseJson(await readS3Text(bucket, caseTaskingDraftKey(caseId as string, id), TASKING_DRAFT_MAX_BYTES)), id);
+      const boxes = sessionBoxes(parseJson(await readS3Text(bucket, `use-cases/${caseId}/hotspots.json`, HOTSPOTS_MAX_BYTES)));
+      return card ? res.json({ status: 'replay', card, boxes }) : res.status(404).json({ error: 'Tasking not found' });
+    }
+    const keys = sessionTaskingKeys(sessionId as string, id);
+    const card = taskingCard(parseJson(await readS3Text(bucket, keys.draft, TASKING_DRAFT_MAX_BYTES)), id);
+    if (!card) return res.status(404).json({ error: 'Tasking not found' });
+    const boxes = sessionBoxes(parseJson(await readS3Text(bucket, sessionHotspotsKey(sessionId as string), HOTSPOTS_MAX_BYTES)));
+    const filed = parseJson(await readS3Text(bucket, keys.filed, 10_000)) as { filed_at?: unknown; filed_by?: unknown } | null;
+    return res.json(filed
+      ? { status: 'filed', filedAt: filed.filed_at, filedBy: filed.filed_by, choice: filedChoice(filed), card, boxes }
+      : { status: 'draft', card, boxes });
+  } catch (error) {
+    console.error('Tasking read failed:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'Failed to read the tasking' });
+  }
+});
+
+// Approve and file: only the officer's click does this, with the box and the candidates the officer
+// chose on the map. Idempotent: a filed tasking stays filed (and keeps its first choice).
+app.post(TASKING_APPROVE_PATH, express.json({ limit: Math.ceil(SNAPSHOT_MAX_BYTES * 1.4) + 4096 }), async (req: Request, res: Response) => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  const { sessionId, taskingId, box, candidateIds, snapshot } = req.body ?? {};
+  if (!bucket) return res.status(503).json({ error: 'S3 bucket not configured' });
+  if (!isSessionId(sessionId) || !isTaskingId(taskingId)) return res.status(400).json({ error: 'Invalid sessionId or taskingId' });
+  const shot = decodeSnapshot(snapshot);
+  if (!shot.ok) return res.status(400).json({ error: shot.reason });
+  const keys = sessionTaskingKeys(sessionId, taskingId);
+  try {
+    // The choice is checked against the draft and the session's own boxes before anything is written.
+    const card = taskingCard(parseJson(await readS3Text(bucket, keys.draft, TASKING_DRAFT_MAX_BYTES)), taskingId);
+    let choice: TaskingChoice | null = null;
+    if (card) {
+      const boxes = sessionBoxes(parseJson(await readS3Text(bucket, sessionHotspotsKey(sessionId), HOTSPOTS_MAX_BYTES)));
+      const checked = taskingChoice(card, boxes, box, candidateIds);
+      if (!checked.ok) return res.status(400).json({ error: checked.reason });
+      choice = checked.choice;
+    }
+    const cardOf = (record: unknown) => taskingCard(record, taskingId);
+    const plan: FilingPlan = {
+      keys,
+      draftMaxBytes: TASKING_DRAFT_MAX_BYTES,
+      notFound: 'Tasking not found',
+      refusal: (record) => taskingRefusal(record, taskingId) ?? (choice ? null : 'This draft is not a well-formed tasking of this session.'),
+      markdown: (record, by, at) => taskingMarkdown(cardOf(record)!, choice!, by, at),
+      filedRecord: (record, by, at, snapshotKey) => taskingFiledRecord(cardOf(record)!, choice!, sessionId, by, at, keys, snapshotKey),
+      notify: (record, by, at) => notifyTaskingFiled({
+        card: cardOf(record)!, choice: choice!, filedBy: by, filedAt: at, markdownKey: keys.markdown, bucket,
+      }),
+    };
+    const result = await fileDecision(s3Store(bucket), plan, shot.png, filedBy((req as any).user, 'officer'), new Date().toISOString());
+    if (result.status === 200 && !result.body.already) {
+      console.log(`📝 Tasking ${taskingId} filed by ${result.body.filedBy}: box ${choice?.box.box}, ${choice?.candidateIds.length} candidates`);
+    }
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('Tasking filing failed:', error instanceof Error ? error.message : error);
+    return res.status(500).json({ error: 'Failed to file the tasking' });
   }
 });
 
@@ -912,6 +1046,8 @@ app.listen(PORT, () => {
   // On or off only; the webhook URL itself is never printed.
   const slackUrl = slackWebhookUrl();
   console.log(`Slack on filed briefs: ${slackUrl ? `on (${webhookKind(slackUrl)} webhook)` : (process.env.SLACK_WEBHOOK_URL ? 'off (SLACK_WEBHOOK_URL is not a Slack webhook URL)' : 'off')}`);
+  const taskingUrl = taskingWebhookUrl();
+  console.log(`Slack on filed taskings: ${taskingUrl ? `on (${webhookKind(taskingUrl)} webhook)` : 'off (set SLACK_TASKING_WEBHOOK_URL; the brief\'s workflow says "brief")'}`);
   if (process.env.NODE_ENV === 'production') {
     console.log(`Frontend static files enabled`);
   }

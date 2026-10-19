@@ -132,29 +132,56 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
     (`/tmp/vessels_beats/r5/`): the order agreed (claim in grey, then coverage, then candidates),
     per-view island names, the heat as a field, the clock's spacing, tiles loaded before each shot;
     the user's pick: orchid #f07ad8, the heat ramp from it
-  - [ ] 4.1 Critique on the r5 beats; the look written into DESIGN.md
-  - [ ] 4.2 `render.ts` `maritime`; `utils/vesselLayers.ts` (styles by status, legends in words,
-    GFW attribution); vitest (never red or amber, never colour alone)
-  - [ ] 4.3 `MapView.tsx`: the resting state, the radar's sweep, targets by status and the claim,
-    heard and unproven water, the candidates' reveal, the hotspot heat and boxes, the fleet's
-    pull-back, the next pass's swath; the act's seabed tiles pre-loaded for every view; headless
-    captures at 1920, 1728, 1512 and 1280
-  - [ ] 4.5 The silent vessel on the stage (decision 10): the earlier pass dated plainly, the last
-    broadcast, the reachable area growing by water around the islands, the targets inside it lit,
-    then the reveal of where the AIS came back on; prototyped headless first like 4.0c, then built;
-    vitest for its copy and order
-  - [ ] 4.4 `stageCopy.ts` and the gallery card
+  - [x] 4.1 Critique on the r5 beats; the look written into DESIGN.md. Done Oct 19: 20/36, two P0s
+    (the claim beat showed no claim; the heat in the candidates' colour), three P1s (luminance,
+    the Back Row Rule, the two unprototyped beats); stored in `.impeccable/critique/` with what the
+    build did about each. The heat stays orchid (the user's pick), softened: 0.75, a dome halo
+    under the rings, "the heat is history, not today's candidates" on the clock. The review's amber
+    selection was not taken: the selection is fog, amber is the Approve button's alone
+  - [x] 4.2 `render.ts` `maritime`; `utils/vesselLayers.ts` (styles by status, legends in words,
+    GFW attribution); vitest (never red or amber, never colour alone). Done Oct 19
+  - [x] 4.3 `MapView.tsx` with `components/seaStage.ts` and `SeaClock.tsx`: the resting state, the
+    radar's sweep (the TiTiler preview drawn along the orbit's direction over 3.8 s), targets by
+    status and the claim (marked at `detect_vessels`), heard and unproven water, the candidates'
+    reveal (1.4 s after that pass's coverage is on the map), the hotspot heat and boxes, the
+    fleet's pull-back (back after 7 s), the next pass's swath; the seabed tiles pre-loaded for the
+    reserve and the fleet's view. Done Oct 19; five live headless runs against dev at 1920 with the
+    filed views at 1728, 1512 and 1280 (`/tmp/vessels_stage/`). Fixes from the runs: radar tiles
+    landing after the pass's targets no longer reverts the beat or the camera; a mistyped session
+    URL from the model (`fleet_2026_10` for `fleet_2026-10`) is refused by the agent's own
+    `display_visual` with `did_you_mean` (the frontend also stops after two failed loads); box
+    labels short (the look time alone) and slid off island names; reserve-scale labels hidden
+    below zoom 6; coverage quiet under the forecast and the fleet; the tasking framed once per
+    draft clear of both plates (on a 1280 screen the chosen box and the candidates, following the
+    officer's box), and the choice painted the moment it is clicked (it waited for the map to go
+    idle). The tasking turns were also run at 1280 from the start
+  - [x] 4.5 The silent vessel on the stage (decision 10): the earlier pass dated plainly, the last
+    broadcast, the reachable area, the targets inside it lit, then the reveal of where the AIS came
+    back on (4.2 s later); vitest for its copy and order. Done Oct 19, with one deviation: the
+    reach fades in, it does not grow by water around the islands (open with the user)
+  - [x] 4.4 `stageCopy.ts` (the act's prompts and step names) and the gallery card. Done Oct 19:
+    the card is "coming soon" until the replay case is recorded (6.1); its picture is the
+    candidates beat from the live run
   - _Requirements: 12.1–12.4_
 - [ ] 5. The officer's decision
-  - [ ] 5.1 Backend: the filing core lifted from the brief route (brief tests unchanged), the tasking
-    routes; tests
-  - [ ] 5.2 The tasking on the map: boxes selectable, candidates toggled, the plate with its
-    countdown; vitest
+  - [x] 5.1 Backend: the filing core lifted from the brief route (brief tests unchanged), the tasking
+    routes; tests. Done Oct 19: `filing.ts`, `tasking.ts`, `GET /api/vessels/rest`,
+    `GET /api/tasking`, `POST /api/tasking/approve` (idempotent: a second approval files nothing);
+    68 backend tests. Slack for taskings posts only to `SLACK_TASKING_WEBHOOK_URL` (or the brief's
+    webhook when it is an incoming webhook); the brief's workflow trigger says "brief", so tasking
+    Slack is off until that variable is set
+  - [x] 5.2 The tasking on the map: boxes selectable, candidates toggled, the plate with its
+    countdown; vitest. Done Oct 19 (`TaskingPlate.tsx`): click a box or a ring on the map or use
+    the plate; the boxes not chosen step back; a candidate left out turns grey with "left out";
+    after filing the stage asks the agent "Is it filed?" and `tasking_status` answers
   - [x] 5.3 The backend role's `PutObject` grant gains `session_data/*/taskings/*` (the user, Oct 16:
     "go ahead"): written in `frontend-cdk/lib/geospatial-agent-stack.ts` with its IAM5 reason;
     `cdk synth` clean (cdk-nag passes; the statement lists exactly `briefs/*` and `taskings/*`).
     Live at the G4 frontend promotion (7.2), not before
-  - [ ] 5.4 End to end on dev: draft, choose, approve, `tasking_status` says filed, Slack
+  - [ ] 5.4 End to end on dev: draft, choose, approve, `tasking_status` says filed, Slack. All but
+    Slack done Oct 19, five times from the local stage against `dark_vessels_dev` (box 2, three of
+    four candidates; `session_data/<sid>/taskings/` holds the filed record). Slack waits on
+    `SLACK_TASKING_WEBHOOK_URL`
   - _Requirements: 10.1–10.4_
 
 ## Day 9 (Wednesday Oct 28): the replay case and the evals
@@ -181,6 +208,11 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
 - Oct 16 (the newest data and the look): GFW radar and AIS reach Oct 12; the prediction refitted to
   June and checked on Jul 1 to Oct 12: top 5% of the water 55% (11.0×), top 10% 76% (7.6×); the
   look prototyped (4.0); nothing deployed, no stage code changed
+- Oct 19 (the stage and the decision, dev only): `dark_vessels_dev` v4 (claim at detect, the heard
+  share) 7/7; v5 (the `display_visual` URL check) 5/7, two closers over 240 characters; v6 (the
+  closer one sentence plus the fixed one) 7/7, one warning: a `---` rule on turn A, which the stage
+  now drops (`stagePunctuation`). pytest dark-vessels 74; vitest 237; backend 68; tsc and
+  `npm run build` clean; detector 0; eslint adds nothing over HEAD. Stable untouched
 - Oct 16 (live AIS): aisstream 10 min islands box 0 messages, 10 min eastern Pacific 24 positions (all
   north of 8° N), aiscast 3 min 0; the dated replay stands
 - Oct 16 (the beats and the decisions): five headless rounds on the stage; the coverage rule's

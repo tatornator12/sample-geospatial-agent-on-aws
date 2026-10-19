@@ -11,38 +11,30 @@
  * rules are tested without S3; index.ts wires them to the routes.
  */
 
+import { sessionFilingKeys, type FilingKeys } from './filing';
+
+// The session id, the snapshot and who filed it are the filing core's (filing.ts), shared with the
+// Dark Vessels tasking; re-exported so this module's callers and tests keep their names.
+export { SESSION_ID, SNAPSHOT_MAX_BYTES, decodeSnapshot, filedBy, isSessionId, type Snapshot } from './filing';
+
 export const BRIEF_ID = /^brief-\d{8}T\d{6}-[0-9a-f]{6}$/;
-/** AgentCore session ids: UUIDs or longer (33+ characters), plain characters only. */
-export const SESSION_ID = /^[A-Za-z0-9-]{33,128}$/;
 const CASE_ID = /^[a-z0-9-]{1,64}$/;
 
-export const SNAPSHOT_MAX_BYTES = 2 * 1024 * 1024;
 export const DRAFT_MAX_BYTES = 200_000;
-const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 export function isBriefId(value: unknown): value is string {
   return typeof value === 'string' && BRIEF_ID.test(value);
-}
-
-export function isSessionId(value: unknown): value is string {
-  return typeof value === 'string' && SESSION_ID.test(value);
 }
 
 export function isCaseId(value: unknown): value is string {
   return typeof value === 'string' && CASE_ID.test(value);
 }
 
-export interface BriefKeys {
-  draft: string;
-  filed: string;
-  markdown: string;
-  snapshot: string;
-}
+export type BriefKeys = FilingKeys;
 
 /** The S3 keys of one brief in a live session. Callers validate the ids first. */
 export function sessionBriefKeys(sessionId: string, briefId: string): BriefKeys {
-  const base = `session_data/${sessionId}/briefs/${briefId}`;
-  return { draft: `${base}.draft.json`, filed: `${base}.filed.json`, markdown: `${base}.md`, snapshot: `${base}.png` };
+  return sessionFilingKeys(sessionId, 'briefs', briefId);
 }
 
 /** A replay case keeps its brief's draft flat in the case folder; it is never filed. */
@@ -177,12 +169,6 @@ export function fileRefusal(record: unknown, briefId: string, sessionId: string)
   return null;
 }
 
-/** Who filed it, for the record: the signed-in email, or "analyst" (local development). */
-export function filedBy(user: unknown): string {
-  const email = (user as { email?: unknown } | undefined)?.email;
-  return typeof email === 'string' && /^[^\s@<>]{1,64}@[^\s@<>]{1,190}$/.test(email) ? email : 'analyst';
-}
-
 /** The filed brief's markdown: the draft's text with its status line replaced. */
 export function filedMarkdown(draftMarkdown: string, by: string, at: string): string {
   const status = `Status: FILED by ${by} at ${at}. Filed by the analyst, not by the agent.`;
@@ -191,23 +177,4 @@ export function filedMarkdown(draftMarkdown: string, by: string, at: string): st
   if (i >= 0) lines[i] = status;
   else lines.push('', status);
   return lines.join('\n').replace(/\(draft `(brief-[^`]+)`, not filed\)/, '(`$1`, filed)');
-}
-
-export type Snapshot = { ok: true; png: Buffer | null } | { ok: false; reason: string };
-
-/** The optional map snapshot: absent, or a base64 PNG data URL of at most 2 MB. */
-export function decodeSnapshot(value: unknown): Snapshot {
-  if (value === undefined || value === null || value === '') return { ok: true, png: null };
-  if (typeof value !== 'string') return { ok: false, reason: 'snapshot must be a PNG data URL' };
-  const prefix = 'data:image/png;base64,';
-  if (!value.startsWith(prefix)) return { ok: false, reason: 'snapshot must be a PNG data URL' };
-  const body = value.slice(prefix.length);
-  if (body.length > Math.ceil((SNAPSHOT_MAX_BYTES * 4) / 3) + 4) return { ok: false, reason: 'snapshot is larger than 2 MB' };
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(body)) return { ok: false, reason: 'snapshot is not base64' };
-  const png = Buffer.from(body, 'base64');
-  if (png.length > SNAPSHOT_MAX_BYTES) return { ok: false, reason: 'snapshot is larger than 2 MB' };
-  if (png.length < PNG_MAGIC.length || !png.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC)) {
-    return { ok: false, reason: 'snapshot is not a PNG' };
-  }
-  return { ok: true, png };
 }

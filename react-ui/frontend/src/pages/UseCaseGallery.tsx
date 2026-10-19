@@ -103,6 +103,20 @@ const scenarios: Scenario[] = [
     status: 'available',
     agent: 'archaeologist',
   },
+  {
+    id: 'vessels-s1d-20261012t0018',
+    name: 'Dark Vessels, Galápagos',
+    description: 'One Sentinel-1 pass over the Galápagos Marine Reserve: every radar target, the ones AIS accounts for set aside, coverage checked, and the rest shown as candidates for a patrol look, never accusations',
+    icon: '/dark_vessels.png',
+    // The dev take (Oct 19, v5): 22 targets on the Oct 12 2026 pass, 4 candidates. Coming soon until
+    // the replay case is recorded (tasks.md 6.1).
+    metrics: [
+      { label: 'Radar Targets', value: '22 on the Oct 12 pass' },
+      { label: 'Candidates', value: '4, in heard water' },
+    ],
+    status: 'coming-soon',
+    agent: 'vessels',
+  },
 ];
 
 export function UseCaseGallery() {

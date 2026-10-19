@@ -22,6 +22,16 @@ describe('stageCopyFor', () => {
     expect(copy.placeholder).not.toMatch(/any place/i);
   });
 
+  it('gives Dark Vessels its four turns (the golden prompts) and a placeholder about passes on file', () => {
+    const copy = stageCopyFor('vessels');
+    expect(copy.prompts.map((p) => p.prompt)).toEqual([
+      'Who is in the reserve unseen?', 'Has a vessel gone silent near here?', 'Where should we look next?', 'Draft the patrol tasking',
+    ]);
+    expect(copy.prompts.every((p) => !p.fill)).toBe(true);
+    expect(copy.placeholder).toBe('Ask about a radar pass over the reserve');
+    expect(copy.placeholder).not.toMatch(/live/i);
+  });
+
   it('falls back to the Earth Analyst for dev, stable, unknown and absent ids', () => {
     const earth = stageCopyFor(undefined);
     expect(earth.prompts).toHaveLength(5);
@@ -48,6 +58,10 @@ describe('stepName', () => {
     expect(stepName('show_terrain')).toBe('Show the 1 m LiDAR');
     expect(stepName('measure_profile')).toBe('Measure across the earthwork');
     expect(stepName('find_similar_sites')).toBe('Find sites of the same form');
+    expect(stepName('check_ais_coverage')).toBe('Check where AIS could be heard');
+    expect(stepName('match_ais')).toBe('Match targets to broadcasts');
+    expect(stepName('draft_tasking')).toBe('Draft the tasking');
+    expect(stepName('tasking_status')).toBe('Check the tasking');
     expect(stepName('some_new_tool')).toBe('some new tool');
     expect(stepName('constructor')).toBe('constructor');
   });

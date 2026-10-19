@@ -8,4 +8,12 @@ describe('stagePunctuation', () => {
     expect(stagePunctuation('2024–2025')).toBe('2024 to 2025');
     expect(stagePunctuation('no dashes here')).toBe('no dashes here');
   });
+
+  it('drops a horizontal rule on its own line, never a table row or a dash in prose', () => {
+    expect(stagePunctuation('T04 is a streak.\n\n---\n\n**Four candidates**')).toBe('T04 is a streak.\n\n\n\n**Four candidates**');
+    expect(stagePunctuation('a\n  * * *\nb\n___')).toBe('a\n\nb\n');
+    expect(stagePunctuation('| Box | Share |\n|---|---|\n| 1 | 9% |')).toBe('| Box | Share |\n|---|---|\n| 1 | 9% |');
+    expect(stagePunctuation('- T01: 31 km\n- T02: 31 km')).toBe('- T01: 31 km\n- T02: 31 km');
+    expect(stagePunctuation('a -- b')).toBe('a -- b');
+  });
 });

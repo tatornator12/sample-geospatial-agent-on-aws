@@ -78,6 +78,11 @@ interface ChatSidebarProps {
   onWorkingChange?: (working: boolean) => void;
   /** The TROPOMI tips as they load, for the globe. */
   onTipsUpdate?: (tips: Tip[]) => void;
+  /** Dark Vessels: told how many taskings the finished turns drafted (the map's tasking plate loads the newest). */
+  onTaskingDrafted?: (count: number) => void;
+  /** A prompt the stage sends on the presenter's behalf (the officer filed the tasking), once. */
+  autoPrompt?: string | null;
+  onAutoPromptSent?: () => void;
   /** The geometry on the map right now (the stage's state, whichever loader put it there), so
    * the column can draw the archaeologist's section when its transect lands. */
   geometry?: GeometryData | null;
@@ -98,6 +103,9 @@ export function ChatSidebar({
   onDrawnGeometryMessageSent,
   onWorkingChange,
   onTipsUpdate,
+  onTaskingDrafted,
+  autoPrompt,
+  onAutoPromptSent,
   geometry = null,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -281,10 +289,14 @@ export function ChatSidebar({
     // just the first — while de-duping across streaming updates. Each loaded
     // geometry is pushed separately and stacks as its own layer on the map.
     const loadedGeometryUrls = new Set<string>();
-    const loadNewGeometries = async (list: Array<{ url: string; title: string; render?: RenderHint }>) => {
+    // A URL that fails twice (a file the model mistyped) is not asked for again on every chunk.
+    const geometryFailures = new Map<string, number>();
+    const loadNewGeometries = async (list: Array<{ url: string; title: string; render?: RenderHint; revision?: number }>) => {
       for (const g of list) {
-        if (loadedGeometryUrls.has(g.url)) continue;
-        loadedGeometryUrls.add(g.url); // mark first so rapid stream updates don't double-load
+        // A file the agent rewrote in place (Dark Vessels' targets) is loaded again per showing.
+        const key = `${g.url}#${g.revision ?? 0}`;
+        if (loadedGeometryUrls.has(key) || (geometryFailures.get(key) ?? 0) >= 2) continue;
+        loadedGeometryUrls.add(key); // mark first so rapid stream updates don't double-load
         try {
           const geometry = await Promise.race([
             loadGeometry(g.url),
@@ -298,11 +310,13 @@ export function ChatSidebar({
             if (g.render) geometry.render = g.render;
             onGeometryUpdate(geometry);
           } else {
-            loadedGeometryUrls.delete(g.url);
+            loadedGeometryUrls.delete(key);
+            geometryFailures.set(key, (geometryFailures.get(key) ?? 0) + 1);
             console.error('Failed to load geometry (null) for:', g.url);
           }
         } catch (error) {
-          loadedGeometryUrls.delete(g.url);
+          loadedGeometryUrls.delete(key);
+          geometryFailures.set(key, (geometryFailures.get(key) ?? 0) + 1);
           console.error(`Exception loading geometry from ${g.url}:`, error);
         }
       }
@@ -532,6 +546,19 @@ export function ChatSidebar({
   useEffect(() => {
     onTipsUpdate?.(tips);
   }, [tips, onTipsUpdate]);
+  // Dark Vessels: every finished draft_tasking puts the newest draft on the map's tasking plate.
+  const taskingDrafts = messages.reduce((n, m) => n + (m.tools ?? []).filter((t) => t.name === 'draft_tasking').length, 0);
+  useEffect(() => {
+    if (!isStreaming) onTaskingDrafted?.(taskingDrafts);
+  }, [taskingDrafts, isStreaming, onTaskingDrafted]);
+  // The stage's own prompt (the officer filed on the map): sent once, when the agent is free.
+  useEffect(() => {
+    if (!autoPrompt || isProcessing) return;
+    onAutoPromptSent?.();
+    void sendMessage(autoPrompt);
+    // sendMessage is recreated every render; the prompt is what triggers this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPrompt, isProcessing]);
   // This act's prompts, placeholder and idle line; the room hears the act's name, not "(dev)".
   const copy = stageCopyFor(agentId);
   const speaker = stageAgentLabel(agentLabel) ?? 'Agent';

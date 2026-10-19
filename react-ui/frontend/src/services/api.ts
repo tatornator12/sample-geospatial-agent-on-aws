@@ -1,4 +1,5 @@
 import type { GeometryData, StreamEvent } from '../types.ts';
+import type { VesselRest } from '../utils/vesselLayers.ts';
 import { getIdToken } from '../utils/auth';
 
 // API URL: In production (when served from same origin), use current origin
@@ -268,6 +269,99 @@ export async function loadArchaeologyRecord(): Promise<GeometryData | null> {
     return (await response.json()) as GeometryData;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Dark Vessels' resting state: the star pass's AIS replay, the reserve, its ports and the island
+ * names (all already scrubbed of identity at the build). Null when it is not published.
+ */
+export async function loadVesselRest(): Promise<VesselRest | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/vessels/rest`, { headers: getAuthHeaders() });
+    if (!response.ok) return null;
+    const body = (await response.json()) as VesselRest;
+    return body && body.version === 1 && Array.isArray(body.replay?.tracks) ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The tasking card (validated server-side from the draft in S3; see backend/src/tasking.ts). */
+export interface TaskingLook {
+  satellite: string;
+  start: string;
+  share: number;
+  text: string;
+}
+export interface TaskingBox {
+  box: number;
+  bounds: [number, number, number, number];
+  share: number;
+  look: TaskingLook | null;
+}
+export interface TaskingCandidate {
+  id: string;
+  lon: number;
+  lat: number;
+  port: string;
+  portKm: number;
+  nearestBroadcastKm: number | null;
+}
+export interface TaskingCardData {
+  taskingId: string;
+  draftedAt: string;
+  passId: string;
+  passSensed: string;
+  counts: { broadcasting: number; port: number; unproven: number; seen_once: number; candidate: number };
+  heardShare: number;
+  box: TaskingBox;
+  candidates: TaskingCandidate[];
+  check: { hit: number; total: number; lift: number } | null;
+  notes: string[];
+  sentence: string;
+  attribution: string;
+}
+export interface TaskingState {
+  status: 'draft' | 'filed' | 'replay';
+  filedAt?: string;
+  filedBy?: string;
+  choice?: { box: number; candidateIds: string[] } | null;
+  card: TaskingCardData;
+  boxes: TaskingBox[];
+}
+
+/** The session's newest tasking draft (or a replay case's), or null when there is none (yet). */
+export async function getTasking(where: { sessionId: string } | { caseId: string }): Promise<TaskingState | null> {
+  try {
+    const params = new URLSearchParams(where);
+    const response = await fetch(`${API_URL}/api/tasking?${params.toString()}`, { headers: getAuthHeaders() });
+    if (!response.ok) return null;
+    return (await response.json()) as TaskingState;
+  } catch {
+    return null;
+  }
+}
+
+/** The officer files the tasking with the box and the candidates chosen on the map. */
+export async function approveTasking(
+  sessionId: string,
+  taskingId: string,
+  box: number,
+  candidateIds: string[],
+  snapshot?: string | null,
+): Promise<{ ok: true; filedAt?: string; filedBy?: string } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`${API_URL}/api/tasking/approve`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ sessionId, taskingId, box, candidateIds, ...(snapshot ? { snapshot } : {}) }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) return { ok: false, error: typeof body?.error === 'string' ? body.error : `HTTP ${response.status}` };
+    return { ok: true, filedAt: body.filedAt, filedBy: body.filedBy };
+  } catch {
+    return { ok: false, error: 'The backend could not be reached.' };
   }
 }
 

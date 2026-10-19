@@ -60,6 +60,17 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
     ],
     placeholder: 'Name a known site, or ask how they built it',
   },
+  // Dark Vessels' four turns (design.md, Act 3 run sheet); the prompts are the golden ones. Passes on
+  // file only, so the placeholder asks about a radar pass, never about live traffic.
+  vessels: {
+    prompts: [
+      { label: 'Who is in the reserve unseen?', prompt: 'Who is in the reserve unseen?' },
+      { label: 'Has a vessel gone silent?', prompt: 'Has a vessel gone silent near here?' },
+      { label: 'Where should we look next?', prompt: 'Where should we look next?' },
+      { label: 'Draft the patrol tasking', prompt: 'Draft the patrol tasking' },
+    ],
+    placeholder: 'Ask about a radar pass over the reserve',
+  },
 };
 
 export function stageCopyFor(agentId: string | undefined): AgentStageCopy {
@@ -106,6 +117,18 @@ const STEP_NAMES: Record<string, string> = {
   show_terrain: 'Show the 1 m LiDAR',
   measure_profile: 'Measure across the earthwork',
   find_similar_sites: 'Find sites of the same form',
+  // Dark Vessels' tools.
+  find_pass: 'Find the radar pass',
+  detect_vessels: 'Find targets on the water',
+  check_ais_coverage: 'Check where AIS could be heard',
+  match_ais: 'Match targets to broadcasts',
+  gather_evidence: 'Gather the evidence',
+  predict_hotspots: 'Predict where to look',
+  fleet_pattern: "Read the fleet's pattern",
+  next_look: 'When the radar looks again',
+  reachable_area: 'Where it could have gone',
+  draft_tasking: 'Draft the tasking',
+  tasking_status: 'Check the tasking',
 };
 
 export function stepName(toolName: string): string {

@@ -19,7 +19,9 @@ export const RENDER_KINDS: readonly RenderKind[] = ['raster', 'vector', 'points'
 export const COLORMAPS = ['plasma', 'viridis', 'magma', 'ice', 'rdylgn', 'rdylgn_r', 'blues', 'spectral', 'gray', 'rdbu_r'] as const;
 export type ColormapName = (typeof COLORMAPS)[number];
 
-export const RENDER_GROUPS = ['methane', 'watch', 'change', 'similar', 'imagery', 'index', 'boundary', 'terrain'] as const;
+// `maritime` is Dark Vessels' (Act 3): the radar, its targets, the coverage, the forecast. The stage
+// styles those by the tools' file names (utils/vesselLayers.ts); the group only says whose they are.
+export const RENDER_GROUPS = ['methane', 'watch', 'change', 'similar', 'imagery', 'index', 'boundary', 'terrain', 'maritime'] as const;
 export type RenderGroup = (typeof RENDER_GROUPS)[number];
 
 export interface RenderHint {

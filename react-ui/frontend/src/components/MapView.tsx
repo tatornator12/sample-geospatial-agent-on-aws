@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import '../utils/maplibreWorker.ts';
 import MapboxDraw from 'maplibre-gl-draw';
 import 'maplibre-gl-draw/dist/mapbox-gl-draw.css';
-import { getPresignedUrl } from '../services/api.ts';
+import { getPresignedUrl, type TaskingState } from '../services/api.ts';
 import type { FeatureCollection } from 'geojson';
 import type { GeometryData, RasterData } from '../types.ts';
 import { TITILER_URL, TITILER_API_KEY, TERRAIN_TILES_URL } from '../config.ts';
@@ -77,6 +77,34 @@ import {
   lightAltitude,
   lightSweep,
 } from '../utils/archaeoLayers.ts';
+import {
+  ATTRIBUTION as SEA_ATTRIBUTION,
+  FLEET_VIEW,
+  aisLook,
+  beatFor,
+  featureBounds,
+  growBounds,
+  heavyBounds,
+  isVesselLayer,
+  lookStartFrom,
+  passOf,
+  prepareReplay,
+  radarTileParams,
+  replayWindow,
+  seaPadding,
+  targetCounts,
+  toggled,
+  vesselGeometryHint,
+  vesselKind,
+  vesselRasterHint,
+  type SeaBeat,
+  type SeaFacts,
+  type VesselKind,
+  type VesselRest,
+} from '../utils/vesselLayers.ts';
+import * as sea from './seaStage.ts';
+import { SeaClock } from './SeaClock.tsx';
+import { TaskingPlate } from './TaskingPlate.tsx';
 import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
 import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
@@ -151,9 +179,41 @@ interface MapViewProps {
   working?: boolean;
   /** The TROPOMI tips by watch area, drawn on the globe as they load. */
   tips?: Tip[];
+  /** Dark Vessels' resting state (the AIS replay, the reserve, its ports): the act's sea comes with it. */
+  vesselRest?: VesselRest | null;
+  /** Dark Vessels' tasking: how many drafts this session (0 is none yet), for the session or the case. */
+  tasking?: { sessionId: string; caseId?: string; key: number };
+  /** The officer filed the tasking on the map: the agent is told next. */
+  onTaskingFiled?: (taskingId: string) => void;
 }
 
-export function MapView({ geometry, rasters, onDrawnGeometry, working = false, tips = [] }: MapViewProps) {
+/** A sea file on the stage: its kind and pass (by its name), its data and its map ids. */
+interface SeaFile {
+  kind: VesselKind;
+  pass: string | null;
+  url: string;
+  data: SeaFC | null;
+  ids: sea.SeaIds;
+}
+type SeaFC = { type: 'FeatureCollection'; features: Array<{ type: 'Feature'; properties: Record<string, unknown>; geometry: { type: string; coordinates: unknown } | null }> };
+
+/** Run once the style can take layers (isStyleLoaded is false while tiles stream; idle is the backstop). */
+function onStyle(m: maplibregl.Map, fn: () => void) {
+  if (m.isStyleLoaded()) {
+    fn();
+    return;
+  }
+  let done = false;
+  const run = () => {
+    if (done) return;
+    done = true;
+    fn();
+  };
+  m.once('styledata', run);
+  m.once('idle', run);
+}
+
+export function MapView({ geometry, rasters, onDrawnGeometry, working = false, tips = [], vesselRest = null, tasking, onTaskingFiled }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
@@ -370,6 +430,545 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     if (mapInstance.isStyleLoaded()) apply();
     else mapInstance.once('styledata', apply);
   }, [restOn]);
+
+  // Dark Vessels' sea at night (design component 11): on with the act's resting state or any of its
+  // files, off when the map is cleared of both. The satellite basemap goes; the ground is the seabed;
+  // three days of AIS play back over it and stop at the radar pass's minute when the pass lands. Every
+  // file the agent shows is styled by its own name (utils/vesselLayers.ts) and lands as one beat of
+  // the argument, in the order the tools run: the radar, the claim, the coverage, only then the
+  // candidates; then the forecast, the fleet, the next look, the tasking.
+  const vesselOnStage = useMemo(() => allLayers.some(isVesselLayer), [allLayers]);
+  const seaOn = !!vesselRest || vesselOnStage;
+  const seaOnRef = useRef(false);
+  const [seaBeat, setSeaBeatState] = useState<SeaBeat>('rest');
+  const seaBeatRef = useRef<SeaBeat>('rest');
+  const setSeaBeat = (beat: SeaBeat) => {
+    seaBeatRef.current = beat;
+    setSeaBeatState(beat);
+  };
+  const [seaFacts, setSeaFacts] = useState<SeaFacts>({});
+  // The pass the stage is showing (a radar, its targets, its coverage, an earlier pass's reach).
+  const [stagePass, setStagePass] = useState<string | null>(null);
+  const stagePassRef = useRef<string | null>(null);
+  // The first pass the session's targets came from: the forecast's beats return to it.
+  const firstPass = useRef<string | null>(null);
+  const seaFiles = useRef(new Map<string, SeaFile>());
+  const revealed = useRef(new Set<string>());
+  const [candidatesShown, setCandidatesShown] = useState(false);
+  const seaTimers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const sweeps = useRef(new Map<string, () => void>());
+  const player = useRef<sea.ReplayPlayer | null>(null);
+  const preparedReplay = useMemo(() => (vesselRest ? prepareReplay(vesselRest.replay.tracks) : []), [vesselRest]);
+  // Layers the date reset hid (another pass's), so the reset can bring back exactly those.
+  const dateHidden = useRef(new Set<string>());
+  // The tasking on the map: the draft (from the backend), the officer's box and the candidates left out.
+  const [taskingState, setTaskingState] = useState<TaskingState | null>(null);
+  const [taskBox, setTaskBox] = useState<number | null>(null);
+  const [taskExcluded, setTaskExcluded] = useState<string[]>([]);
+  const [taskingDismissed, setTaskingDismissed] = useState(0);
+  const taskingOn = seaOn && !!tasking && tasking.key > 0 && taskingDismissed !== tasking.key;
+
+  const seaLater = (fn: () => void, ms: number) => {
+    seaTimers.current.push(setTimeout(fn, ms));
+  };
+  const seaFileOf = (kind: VesselKind, pass?: string | null) =>
+    [...seaFiles.current.entries()].find(([, f]) => f.kind === kind && (pass === undefined || f.pass === pass)) ?? null;
+  // The view the room sees, inside the plates (labels land there).
+  const seaView = (m: maplibregl.Map): [number, number, number, number] => {
+    const p = seaPadding(STAGE_PADDING_NOW());
+    const box = m.getContainer();
+    const sw = m.unproject([p.left, box.clientHeight - p.bottom]);
+    const ne = m.unproject([box.clientWidth - p.right, p.top]);
+    if (!(sw.lng < ne.lng && sw.lat < ne.lat)) {
+      const b = m.getBounds();
+      return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    }
+    return [sw.lng, sw.lat, ne.lng, ne.lat];
+  };
+  const seaFit = (
+    m: maplibregl.Map,
+    b: [number, number, number, number],
+    opts: { maxZoom?: number; duration?: number; extra?: { left?: number; right?: number } } = {},
+  ) => {
+    const pad = seaPadding(STAGE_PADDING_NOW());
+    m.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
+      padding: { ...pad, left: pad.left + (opts.extra?.left ?? 0), right: pad.right + (opts.extra?.right ?? 0) },
+      duration: prefersReducedMotion() ? 0 : opts.duration ?? 1800,
+      maxZoom: opts.maxZoom ?? 10,
+      pitch: 0,
+      bearing: 0,
+    });
+  };
+  // The rest view: the whole reserve, clear of the clock plate (and of the step column when it is up).
+  const fitSeaRest = (m: maplibregl.Map, duration = 1600) => {
+    if (!vesselRest) return;
+    const b = featureBounds([{ type: 'Feature', properties: {}, geometry: vesselRest.reserve as never }]);
+    if (!b) return;
+    const stage = STAGE_PADDING_NOW();
+    const columnUp = typeof document !== 'undefined' && !!document.querySelector('.stage-steps');
+    m.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
+      padding: { top: 140, bottom: stage.bottom, left: columnUp ? stage.left : 90, right: allLayersRef.current.length ? stage.right : 90 },
+      duration: prefersReducedMotion() ? 0 : duration,
+      pitch: 0,
+      bearing: 0,
+    });
+  };
+
+  // The date reset: one pass on the stage at a time. A pass's layers landing hide another pass's; the
+  // forecast's (no pass) bring back the session's first pass. The AIS replay is the latest pass's, so
+  // over another pass it steps aside (the paint effect below).
+  const showPass = (pass: string | null) => {
+    if (!pass) return;
+    stagePassRef.current = pass;
+    setStagePass(pass);
+    const changes: Record<string, boolean> = {};
+    seaFiles.current.forEach((f, id) => {
+      if (!f.pass) return;
+      if (f.pass !== pass) {
+        changes[id] = false;
+        dateHidden.current.add(id);
+      } else if (dateHidden.current.has(id)) {
+        changes[id] = true;
+        dateHidden.current.delete(id);
+      }
+    });
+    if (Object.keys(changes).length) setRasterVisibility((prev) => ({ ...prev, ...changes }));
+  };
+  const backToFirstPass = () => {
+    const pass = firstPass.current ?? vesselRest?.pass.pass_id ?? null;
+    if (pass && stagePassRef.current !== pass) showPass(pass);
+  };
+
+  // The candidates' reveal waits for the coverage of the same pass to be on the map, then a breath.
+  const maybeReveal = () => {
+    const m = map.current;
+    if (!m) return;
+    seaFiles.current.forEach((f, id) => {
+      if (f.kind !== 'targets' || revealed.current.has(id) || !f.data) return;
+      if (!targetCounts(f.data.features).matched) return;
+      const coverage = [...seaFiles.current.values()].some((x) => (x.kind === 'heard' || x.kind === 'unproven') && x.pass === f.pass);
+      if (!coverage) {
+        console.warn('🛟 Candidates held: the coverage check is not on the map yet for', f.pass);
+        return;
+      }
+      revealed.current.add(id);
+      seaLater(() => {
+        if (!m.getLayer(id)) return;
+        sea.revealCandidates(m, id, [], prefersReducedMotion());
+        seaFiles.current.forEach((x, xid) => {
+          if ((x.kind === 'heard' || x.kind === 'unproven') && x.pass === f.pass) sea.quietCoverageLabels(m, xid);
+        });
+        setCandidatesShown(true);
+        setSeaBeat('candidates');
+      }, prefersReducedMotion() ? 0 : 1400);
+    });
+  };
+
+  // Debounced: the heat and the boxes land together; the camera frames both once.
+  const forecastFit = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fitForecast = () => {
+    if (forecastFit.current) clearTimeout(forecastFit.current);
+    forecastFit.current = setTimeout(() => {
+      const m = map.current;
+      if (!m) return;
+      const heat = seaFileOf('heat')?.[1].data;
+      const boxes = seaFileOf('boxes')?.[1].data;
+      const parts = [heat ? heavyBounds(heat.features, 0.15) : null, boxes ? featureBounds(boxes.features) : null]
+        .filter((b): b is [number, number, number, number] => !!b);
+      if (!parts.length) return;
+      const b: [number, number, number, number] = [
+        Math.min(...parts.map((p) => p[0])), Math.min(...parts.map((p) => p[1])),
+        Math.max(...parts.map((p) => p[2])), Math.max(...parts.map((p) => p[3])),
+      ];
+      seaFit(m, growBounds(b, 0.12));
+    }, 450);
+  };
+
+  // The fleet's pull-back: up and out to the fleet's lights off Peru, then back to the reserve.
+  const fleetBack = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pullBackToFleet = (m: maplibregl.Map) => {
+    const before = { center: m.getCenter(), zoom: m.getZoom() };
+    const beatBefore = seaBeatRef.current === 'fleet' ? 'boxes' : seaBeatRef.current;
+    seaFit(m, FLEET_VIEW, { duration: 2600, maxZoom: 6 });
+    if (fleetBack.current) clearTimeout(fleetBack.current);
+    fleetBack.current = setTimeout(() => {
+      if (!map.current || seaBeatRef.current !== 'fleet') return;
+      map.current.flyTo({ center: before.center, zoom: before.zoom, duration: prefersReducedMotion() ? 0 : 2600 });
+      setSeaBeat(beatBefore);
+    }, (prefersReducedMotion() ? 0 : 2600) + 7000);
+  };
+
+  // A targets file landed (first time, or statuses changed in place): counts, the beat, the reveal.
+  const landTargets = (m: maplibregl.Map, id: string, f: SeaFile, first: boolean) => {
+    if (!f.data) return;
+    const counts = targetCounts(f.data.features);
+    setSeaFacts((x) => ({ ...x, counts, passId: f.pass ?? x.passId }));
+    if (first) {
+      showPass(f.pass);
+      if (!firstPass.current) firstPass.current = f.pass;
+      const b = featureBounds(f.data.features);
+      if (b) seaFit(m, growBounds(b, 0.18));
+    }
+    if (counts.matched) {
+      if (!revealed.current.has(id)) setSeaBeat('coverage');
+      maybeReveal();
+    } else {
+      setSeaBeat('targets');
+    }
+  };
+
+  // Every other sea file: its beat, its facts, the camera's rule, the date reset.
+  const landSeaFile = (m: maplibregl.Map, id: string, f: SeaFile) => {
+    const feats = f.data?.features ?? [];
+    switch (f.kind) {
+      case 'targets':
+        landTargets(m, id, f, true);
+        return;
+      case 'heard': {
+        const share = Number(feats[0]?.properties?.share);
+        if (Number.isFinite(share)) setSeaFacts((x) => ({ ...x, heardShare: share }));
+        showPass(f.pass);
+        setSeaBeat('coverage');
+        maybeReveal();
+        return;
+      }
+      case 'unproven':
+        showPass(f.pass);
+        if (!revealed.current.size) setSeaBeat('coverage');
+        maybeReveal();
+        return;
+      case 'heat':
+      case 'boxes':
+        backToFirstPass();
+        setSeaBeat(f.kind === 'heat' && !seaFileOf('boxes') ? 'heat' : 'boxes');
+        fitForecast();
+        return;
+      case 'fleet': {
+        backToFirstPass();
+        const month = f.url.match(/fleet_(\d{4})-(\d{2})\.geojson/i);
+        const words = month ? new Date(Date.UTC(Number(month[1]), Number(month[2]) - 1, 1)).toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }) : undefined;
+        setSeaFacts((x) => ({ ...x, fleetMonth: words }));
+        pullBackToFleet(m);
+        setSeaBeat('fleet');
+        return;
+      }
+      case 'look': {
+        backToFirstPass();
+        const label = String(feats.find((x) => typeof x.properties?.label === 'string')?.properties.label ?? '');
+        setSeaFacts((x) => ({ ...x, look: label || undefined, lookStart: lookStartFrom(label, Date.now()) ?? undefined, now: Date.now() }));
+        setSeaBeat('look');
+        return;
+      }
+      case 'reach': {
+        showPass(f.pass);
+        const area = feats.find((x) => x.properties?.kind === 'reach');
+        setSeaFacts((x) => ({ ...x, passId: f.pass ?? x.passId, reach: area ? String(area.properties.label ?? '') : undefined }));
+        setSeaBeat('reach');
+        const b = featureBounds(feats);
+        if (b) seaFit(m, growBounds(b, 0.08), { maxZoom: 9 });
+        seaLater(() => sea.revealBackOn(m, id), prefersReducedMotion() ? 0 : 4200);
+        return;
+      }
+      default:
+        setSeaBeat(beatFor(f.kind));
+    }
+  };
+
+  // A sea file from display_visual: its layers by its kind, in the stack, and its beat.
+  const addSeaGeometry = (m: maplibregl.Map, data: GeometryData, geometryId: string, fillId: string) => {
+    const url = data.sourceUrl ?? '';
+    const kind = vesselKind(url);
+    const hint = vesselGeometryHint(data.render, url);
+    if (!kind || kind === 'radar' || !hint) return;
+    const fc = data as unknown as SeaFC;
+    // The same file again: match_ais rewrites the targets in place (statuses only), so the layer
+    // stays and its data changes; any other file shown twice replaces its first showing.
+    const same = [...seaFiles.current.entries()].find(([, f]) => f.url === url);
+    if (same && kind === 'targets') {
+      const [id, f] = same;
+      sea.updateTargets(m, f.ids, fc);
+      f.data = fc;
+      landTargets(m, id, f, false);
+      return;
+    }
+    if (same) removeLayer(same[0]);
+    // One next look on the stage at a time.
+    if (kind === 'look') [...seaFiles.current.entries()].filter(([, f]) => f.kind === 'look').forEach(([id]) => removeLayer(id));
+    const ids: sea.SeaIds = { source: geometryId, points: `${geometryId}-points`, fill: fillId };
+    const pass = passOf(url);
+    const avoid: Array<[number, number]> = [];
+    seaFiles.current.forEach((f) => {
+      if (f.kind === 'targets' && (!pass || f.pass === pass)) {
+        f.data?.features.forEach((x) => x.geometry?.type === 'Point' && avoid.push(x.geometry.coordinates as [number, number]));
+      }
+    });
+    try {
+      sea.addSeaLayers(m, kind, ids, fc, { view: seaView(m), avoid, reduced: prefersReducedMotion(), url });
+    } catch (err) {
+      console.error('❌ Error adding a sea layer:', err);
+      return;
+    }
+    const file: SeaFile = { kind, pass, url, data: fc, ids };
+    seaFiles.current.set(fillId, file);
+    const b = featureBounds(fc.features);
+    setAllLayers((prev) => [...prev, {
+      id: fillId,
+      sourceId: geometryId,
+      name: data.locationName || hint.legend || 'Sea layer',
+      url,
+      type: 'geometry',
+      ...(b ? { bounds: b } : {}),
+      render: hint,
+    }]);
+    placeInStack(fillId, 'top');
+    requestAnimationFrame(() => sea.arrive(m, kind, fillId));
+    landSeaFile(m, fillId, file);
+  };
+
+  // Something of this pass beyond its radar (its targets, coverage or reach) is already on the stage.
+  const seaPassMovedOn = (pass: string | null) =>
+    !!pass && [...seaFiles.current.values()].some((f) => f.kind !== 'radar' && f.pass === pass);
+
+  // A radar pass from display_visual (the raster effect adds the tiles at 0): the beat, the date
+  // reset, and the sweep along the satellite's track; a dissolve under reduced motion.
+  const landRadar = (m: maplibregl.Map, layerId: string, sourceId: string, url: string, presigned: string, bounds: [number, number, number, number] | undefined) => {
+    const pass = passOf(url);
+    seaFiles.current.set(layerId, { kind: 'radar', pass, url, data: null, ids: { source: sourceId, points: '', fill: layerId } });
+    showPass(pass);
+    setSeaFacts((x) => ({ ...x, passId: pass ?? x.passId }));
+    // The tiles can land after the pass's own targets (the raster waits on TiTiler): the beat never
+    // goes back to the radar once the argument on that pass has moved on.
+    if (!seaPassMovedOn(pass)) setSeaBeat('radar');
+    const target = aisLook('radar').radar;
+    const settle = (ms: number) => {
+      sweeps.current.delete(layerId);
+      if (!m.getLayer(layerId)) return;
+      m.setPaintProperty(layerId, 'raster-opacity-transition', { duration: ms, delay: 0 });
+      m.setPaintProperty(layerId, 'raster-opacity', aisLook(seaBeatRef.current).radar);
+    };
+    if (prefersReducedMotion() || !bounds) {
+      settle(1200);
+      return;
+    }
+    sweeps.current.set(layerId, () => {});
+    const ascending = (vesselRest?.passes.find((p) => p.pass_id === pass)?.orbit_state ?? 'ascending') !== 'descending';
+    void sea.radarPreview(presigned).then((image) => {
+      if (!sweeps.current.has(layerId) || !m.getLayer(layerId)) return;
+      if (!image) {
+        settle(900);
+        return;
+      }
+      // The sweep starts as the camera settles on the pass.
+      seaLater(() => {
+        if (!sweeps.current.has(layerId) || !m.getLayer(layerId)) return;
+        const cancel = sea.sweepRadar(m, layerId, image, bounds, ascending, target, () => {
+          settle(0);
+          seaLater(() => sea.dropSweep(m, layerId), 300);
+        });
+        sweeps.current.set(layerId, cancel);
+      }, m.isMoving() ? 1400 : 200);
+    });
+  };
+
+  // The floor: the seabed in, the basemap out (and back when the sea goes).
+  useEffect(() => {
+    seaOnRef.current = seaOn;
+    const m = map.current;
+    if (!m) return;
+    onStyle(m, () => {
+      if (!map.current) return;
+      if (seaOnRef.current) {
+        sea.seaFloorOn(m, BASEMAP_IDS);
+        sea.seaImages(m);
+      } else {
+        sea.seaFloorOff(m, BASEMAP_IDS);
+      }
+    });
+  }, [seaOn]);
+
+  // The furniture and the replay, with the resting state; the rest view and the seabed's tiles.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !vesselRest) return;
+    let disposed = false;
+    const warm = new AbortController();
+    onStyle(m, () => {
+      if (disposed || !map.current) return;
+      sea.seaImages(m);
+      sea.furnitureOn(m, vesselRest, preparedReplay);
+      const p = new sea.ReplayPlayer(m, preparedReplay, replayWindow(vesselRest), (t, n) =>
+        setSeaFacts((f) => (f.replayAt === t && f.vessels === n ? f : { ...f, replayAt: t, vessels: n })));
+      player.current = p;
+      p.setMode(prefersReducedMotion() || allLayersRef.current.some(isVesselLayer) ? 'hold' : 'loop');
+      if (allLayersRef.current.length === 0) fitSeaRest(m, 0);
+      const b = featureBounds([{ type: 'Feature', properties: {}, geometry: vesselRest.reserve as never }]);
+      if (b) sea.prefetchSeabed(b, [6, 7, 8, 9], warm.signal);
+      // And the fleet's pull-back, off Peru and Chile.
+      sea.prefetchSeabed(FLEET_VIEW, [3, 4, 5], warm.signal);
+    });
+    return () => {
+      disposed = true;
+      warm.abort();
+      player.current?.stop();
+      player.current = null;
+      try {
+        if (map.current?.getStyle()) sea.furnitureOff(map.current);
+      } catch {
+        // the map is already gone (unmount)
+      }
+    };
+    // fitSeaRest reads refs and the rest itself; the furniture follows the rest only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vesselRest, preparedReplay]);
+
+  // The replay's mode: loop at rest, run on to the pass while the agent works, hold once the pass is on.
+  useEffect(() => {
+    const p = player.current;
+    if (!p) return;
+    p.setMode(prefersReducedMotion() || vesselOnStage ? 'hold' : working ? 'forward' : 'loop');
+  }, [working, vesselOnStage]);
+
+  // The beat's look on the traffic and the radar.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !seaOn) return;
+    const earlier = !!stagePass && !!vesselRest && stagePass !== vesselRest.pass.pass_id;
+    const look = aisLook(seaBeat, earlier);
+    onStyle(m, () => {
+      sea.paintAis(m, look);
+      seaFiles.current.forEach((f, id) => {
+        if (f.kind === 'heard' || f.kind === 'unproven') sea.paintCoverage(m, f.kind, id, look.quietCoverage);
+        if (f.kind !== 'radar' || sweeps.current.has(id) || !m.getLayer(id)) return;
+        m.setPaintProperty(id, 'raster-opacity-transition', { duration: 700, delay: 0 });
+        m.setPaintProperty(id, 'raster-opacity', look.radar);
+      });
+    });
+  }, [seaBeat, stagePass, vesselRest, seaOn]);
+
+  // The tasking: the draft loaded (the beat, the officer's starting choice), the plate replaces the
+  // layers plate's body while it is up.
+  const onTaskingLoaded = (state: TaskingState) => {
+    setTaskingState(state);
+    setTaskBox(state.choice?.box ?? state.card.box.box);
+    const ids = state.card.candidates.map((c) => c.id);
+    setTaskExcluded(state.choice ? ids.filter((x) => !state.choice!.candidateIds.includes(x)) : []);
+    setSeaBeat(state.status === 'filed' ? 'filed' : 'tasking');
+    setIsLayerControlOpen(false);
+    backToFirstPass();
+    // Once per draft, everything the officer chooses from in the window between the plates (on a
+    // 1280 screen the boxes otherwise sit under the step column). Later loads (filed) keep the view.
+    const m = map.current;
+    if (m && taskingFramed.current !== state.card.taskingId) {
+      taskingFramed.current = state.card.taskingId;
+      frameTasking(m, state, state.choice?.box ?? state.card.box.box);
+    }
+  };
+  const taskingFramed = useRef<string | null>(null);
+  // The box the camera last framed for the tasking (a narrow window frames one box at a time).
+  const taskingFramedBox = useRef<number | null>(null);
+  const taskingNarrow = (m: maplibregl.Map) => {
+    const pad = seaPadding(STAGE_PADDING_NOW());
+    // A 1280 screen leaves about 570 px between the step column and the plate.
+    return m.getContainer().clientWidth - pad.left - pad.right < 800;
+  };
+  // Everything the officer chooses from in the window between the plates (on a 1280 screen the
+  // boxes otherwise sit under the step column). A narrow window takes the chosen box and the
+  // candidates only; the plate lists the other boxes.
+  const frameTasking = (m: maplibregl.Map, state: TaskingState, box: number) => {
+    taskingFramedBox.current = box;
+    const narrow = taskingNarrow(m);
+    const labels = new Set(state.card.candidates.map((c) => c.id));
+    const feats = [
+      ...(seaFileOf('boxes')?.[1].data?.features ?? []).filter((f) => !narrow || f.properties?.box === box),
+      ...(seaFileOf('targets', state.card.passId)?.[1].data?.features ?? []).filter((f) => labels.has(String(f.properties?.label ?? ''))),
+    ];
+    const b = featureBounds(feats);
+    // A candidate's label runs about 130 px to one side of its ring, either side: room for it on
+    // both, so no label ends under the step column or the plate.
+    if (b) seaFit(m, b, { maxZoom: 9, extra: { left: 130, right: 140 } });
+  };
+  // The latest render's framer, for the effect below (it reads the sea files, which live in refs).
+  const frameTaskingRef = useRef(frameTasking);
+  frameTaskingRef.current = frameTasking;
+  // On a narrow window a box chosen from the plate comes into view (a wide one shows all three).
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !taskingOn || taskingState?.status !== 'draft' || taskBox == null) return;
+    if (taskBox === taskingFramedBox.current || !taskingNarrow(m)) return;
+    frameTaskingRef.current(m, taskingState, taskBox);
+  }, [taskBox, taskingOn, taskingState]);
+  useEffect(() => {
+    // A new draft starts with nothing chosen.
+    setTaskingState(null);
+    setTaskExcluded([]);
+  }, [tasking?.key]);
+
+  // The officer's choice on the map.
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const boxes = seaFileOf('boxes')?.[0] ?? null;
+    const pass = taskingState?.card.passId;
+    const targets = (pass ? seaFileOf('targets', pass) : seaFileOf('targets'))?.[0] ?? null;
+    const paint = () => sea.paintTasking(m, boxes, targets, taskingOn && taskingState ? taskBox : null,
+      taskingOn ? taskExcluded : [], !!targets && revealed.current.has(targets));
+    // At once: the officer's click shows on the map the moment it lands. isStyleLoaded() stays false
+    // while the seabed's tiles stream after a camera move, and waiting for idle lagged the choice by
+    // seconds; the layers are already there, so only a style still loading waits.
+    try {
+      paint();
+    } catch {
+      onStyle(m, paint);
+    }
+  }, [taskingOn, taskingState, taskBox, taskExcluded, candidatesShown]);
+
+  // Clicks on the map choose: a box selects it, a candidate's ring drops or restores it.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !taskingOn || taskingState?.status !== 'draft') return;
+    const ids = new Set(taskingState.card.candidates.map((c) => c.id));
+    const layersFor = () => {
+      const boxes = seaFileOf('boxes')?.[0];
+      const targets = seaFileOf('targets', taskingState.card.passId)?.[0];
+      return {
+        rings: targets ? [sea.cid(targets, '-cand'), targets, sea.cid(targets, '-notes')].filter((id) => m.getLayer(id)) : [],
+        boxes: boxes && m.getLayer(sea.cid(boxes, '-hit')) ? [sea.cid(boxes, '-hit')] : [],
+      };
+    };
+    const hit = (e: maplibregl.MapMouseEvent) => {
+      const { rings, boxes } = layersFor();
+      const near: [maplibregl.PointLike, maplibregl.PointLike] = [[e.point.x - 12, e.point.y - 12], [e.point.x + 12, e.point.y + 12]];
+      const ring = rings.length ? m.queryRenderedFeatures(near, { layers: rings }).find((f) => f.properties?.status === 'candidate' && ids.has(String(f.properties?.label))) : undefined;
+      if (ring) return { candidate: String(ring.properties.label) };
+      const box = boxes.length ? m.queryRenderedFeatures(e.point, { layers: boxes })[0] : undefined;
+      const n = Number(box?.properties?.box);
+      return Number.isInteger(n) && taskingState.boxes.some((b) => b.box === n) ? { box: n } : null;
+    };
+    const onClick = (e: maplibregl.MapMouseEvent) => {
+      if (working) return;
+      const h = hit(e);
+      if (h && 'candidate' in h) setTaskExcluded((x) => toggled(x, h.candidate!));
+      else if (h && 'box' in h) setTaskBox(h.box!);
+    };
+    const onMove = (e: maplibregl.MapMouseEvent) => {
+      m.getCanvas().style.cursor = hit(e) ? 'pointer' : '';
+    };
+    m.on('click', onClick);
+    m.on('mousemove', onMove);
+    return () => {
+      m.off('click', onClick);
+      m.off('mousemove', onMove);
+      m.getCanvas().style.cursor = '';
+    };
+  }, [taskingOn, taskingState, working]);
+
+  // Every sea timer and sweep stops with the map.
+  useEffect(() => () => {
+    seaTimers.current.forEach(clearTimeout);
+    sweeps.current.forEach((cancel) => cancel());
+    if (forecastFit.current) clearTimeout(forecastFit.current);
+    if (fleetBack.current) clearTimeout(fleetBack.current);
+  }, []);
 
   // The light over a hillshade: the live layers (one per hillshade on the stage), the sun's
   // azimuth the dial shows, and the sweep in flight when the LiDAR lands.
@@ -715,6 +1314,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         maxzoom: 22
       }, beforeId);
     }
+    // The sea hides whatever basemap is (re)created: the act's ground is the seabed.
+    if (seaOnRef.current) sea.seaBasemap(mapInstance, BASEMAP_IDS, true);
   };
 
   // Handle base map style changes
@@ -934,6 +1535,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         const outlineLayerId = `${geometryId}-outline`;
         
         console.log(`➕ Adding new geometry to map`);
+
+        // Dark Vessels' files are the stage's by their own names: styled, stacked and staged as beats.
+        if (vesselGeometryHint(geometry.render, geometry.sourceUrl)) {
+          addSeaGeometry(currentMap, geometry, geometryId, fillLayerId);
+          return;
+        }
 
         // Detect a similarity result from find_similar_places: match cells carry a numeric
         // `similarity` and `tier: 'match'`; the example is `tier: 'query'`. Evidence colour:
@@ -1852,10 +2459,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
 
   // A geometry's fill layer travels with its companions: the outline, and for a similarity
   // result the dashed query outline and the rank labels.
+  // Dark Vessels' files carry more (their rings, halos, hairlines, hit areas: seaStage.ts).
   const geometryCompanionIds = (fillLayerId: string) =>
-    ['-outline', '-query', '-labels', '-keepout', '-hairline'].map(suffix => fillLayerId.replace('-fill', suffix));
-  // Every map layer that travels with a listed one: a geometry's fill companions, a raster's light.
-  const companionIds = (id: string) => (id.startsWith('cogLayer-') ? [`${id}${LIGHT_SUFFIX}`] : geometryCompanionIds(id));
+    ['-outline', '-query', '-labels', '-keepout', '-hairline', ...sea.SEA_COMPANION_SUFFIXES].map(suffix => fillLayerId.replace('-fill', suffix));
+  // Every map layer that travels with a listed one: a geometry's fill companions, a raster's light
+  // (and the radar's sweep while it draws).
+  const companionIds = (id: string) => (id.startsWith('cogLayer-') ? [`${id}${LIGHT_SUFFIX}`, `${id}-sweep`] : geometryCompanionIds(id));
 
   // Put the stack (top first) on the map: per listed layer, its map layers in their current order
   // (a geometry's fill, hairline, outline, labels travel together), bottom group first, each
@@ -1871,8 +2480,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         return style.filter((sid) => members.has(sid));
       })
       .filter((g) => g.length > 0);
-    // The rest relief is part of the floor, like the basemap: the stack draws over it.
-    const ceiling = stackCeiling(style, new Set(groups.flat()), [...BASEMAP_IDS, RELIEF_LAYER]);
+    // The rest relief and the seabed are part of the floor, like the basemap: the stack draws over them.
+    const ceiling = stackCeiling(style, new Set(groups.flat()), [...BASEMAP_IDS, RELIEF_LAYER, ...sea.SEA_FLOOR_IDS]);
     for (const [id, beforeId] of stackMoves(groups, ceiling)) {
       mapInstance.moveLayer(id, beforeId);
     }
@@ -1942,9 +2551,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         if (mapInstance.getSource(id)) mapInstance.removeSource(id);
       });
       forgetLight(`${layer.id}${LIGHT_SUFFIX}`);
+      // A radar still sweeping stops, and its sweep goes with it.
+      sweeps.current.get(layer.id)?.();
+      sweeps.current.delete(layer.id);
+      sea.dropSweep(mapInstance, layer.id);
       // Remove URL from tracking ref
       addedRasterUrls.current.delete(layer.url);
     }
+    seaFiles.current.delete(layer.id);
+    revealed.current.delete(layer.id);
+    dateHidden.current.delete(layer.id);
     dropFromStack(layer.id);
     
     setAllLayers(prev => prev.filter(l => l.id !== layerId));
@@ -1983,8 +2599,29 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         [layer.sourceId, `${layer.sourceId}-dem`].forEach((id) => {
           if (mapInstance.getSource(id)) mapInstance.removeSource(id);
         });
+        sea.dropSweep(mapInstance, layer.id);
       }
     });
+    // The sea goes back to its rest: the replay loops again, the clock reads the replay, the reserve in frame.
+    sweeps.current.forEach((cancel) => cancel());
+    sweeps.current.clear();
+    seaTimers.current.forEach(clearTimeout);
+    seaTimers.current = [];
+    if (forecastFit.current) clearTimeout(forecastFit.current);
+    if (fleetBack.current) clearTimeout(fleetBack.current);
+    seaFiles.current.clear();
+    revealed.current.clear();
+    dateHidden.current.clear();
+    firstPass.current = null;
+    stagePassRef.current = null;
+    setStagePass(null);
+    setCandidatesShown(false);
+    setSeaBeat('rest');
+    setSeaFacts((f) => ({ replayAt: f.replayAt, vessels: f.vessels }));
+    setTaskingState(null);
+    setTaskExcluded([]);
+    if (tasking) setTaskingDismissed(tasking.key);
+    if (vesselRest) fitSeaRest(mapInstance);
     stopSweep();
     lightLayers.current.clear();
     setLightCount(0);
@@ -2160,15 +2797,17 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // The archaeologist's terrain (a hillshade, a local relief model), by hint or file name.
           const terrainHint = isMethaneRaster ? null : terrainRasterHint(raster.render, raster.url);
           const isTerrainRaster = terrainHint !== null;
+          // Dark Vessels' radar pass: tinted over its local sea, swept in along the satellite's track.
+          const seaRadar = isMethaneRaster || isTerrainRaster ? null : vesselRasterHint(raster.render, raster.url);
           const hint: RenderHint | undefined =
-            methaneRasterHint(raster.render, raster.url) ?? terrainHint ?? raster.render ?? (isMethaneRaster ? METHANE_RASTER : undefined);
+            seaRadar ?? methaneRasterHint(raster.render, raster.url) ?? terrainHint ?? raster.render ?? (isMethaneRaster ? METHANE_RASTER : undefined);
           // The camera follows the methane act (the plume on arrival, then the ground scene after
           // it) and the archaeologist's: the scene "from space" lands flat on the site, then every
           // terrain product lands on the ground, tilted. The record on the stage marks that act.
           const inArchaeoAct = isTerrainRaster || groundOnRef.current ||
             allLayersRef.current.some(isTerrainLayer) || newLayerMetadata.some(isTerrainLayer);
           const followCamera =
-            isMethaneRaster || inArchaeoAct ||
+            !!seaRadar || isMethaneRaster || inArchaeoAct ||
             allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l)) ||
             newLayerMetadata.some((l) => isMethaneLayer(l));
           const hintParams = tileParamsFor(hint);
@@ -2189,7 +2828,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           }
           const liveLight = demPresigned !== null;
 
-          if (liveLight) {
+          if (seaRadar) {
+            // The stage's tint, whatever the hint said (utils/vesselLayers.ts radarColormap).
+            tileUrl = `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&${radarTileParams()}`;
+          } else if (liveLight) {
             tileUrl = `${TITILER_URL}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodedUrl}&bidx=1&rescale=${PAPER_RESCALE[0]},${PAPER_RESCALE[1]}&colormap_name=gray`;
           } else if (hintParams) {
             // The agent said how this layer looks (validated in utils/render.ts).
@@ -2223,7 +2865,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // This raster's own extent when the act needs it (the camera goes there): the hint's bounds,
           // else TiTiler's; otherwise the current geometry's, as before.
           let rasterBounds = bounds;
-          if (followCamera) {
+          if (seaRadar) {
+            // The sweep draws the COG's own preview over its own extent: TiTiler's bounds first.
+            rasterBounds = (await fetchCogBounds(presignedUrl)) ?? hint?.bounds ?? bounds;
+            if (abortController.signal.aborted) break;
+          } else if (followCamera) {
             rasterBounds = hint?.bounds ?? (await fetchCogBounds(presignedUrl)) ?? bounds;
             if (abortController.signal.aborted) break;
           }
@@ -2260,7 +2906,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // and other scenes join the bottom, just above the basemap, so an NDVI displayed after
           // its scene is never hidden under it. The layers plate lists the stack in the order the
           // map draws it, and the presenter can restack anything from there.
-          const isFinding = isMethaneRaster || isTerrainRaster || indexLegendFor(raster.url) !== null
+          const isFinding = !!seaRadar || isMethaneRaster || isTerrainRaster || indexLegendFor(raster.url) !== null
             || hint?.group === 'index' || hint?.group === 'change';
 
           // A coarse raster (the hint caps its zoom: TROPOMI's ~4 km cells) is hidden above that
@@ -2276,7 +2922,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             source: sourceId,
             ...(coarse ? { maxzoom: hint!.max_zoom } : {}),
             paint: {
-              'raster-opacity': reveal ? 0 : targetOpacity,
+              // The radar's tiles wait under its sweep (landRadar brings them in).
+              'raster-opacity': reveal || seaRadar ? 0 : targetOpacity,
               ...(reveal ? { 'raster-opacity-transition': { duration: REVEAL_MS, delay: 0 } } : {}),
             },
             layout: {
@@ -2336,6 +2983,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             }
           }
           placeInStack(layerId, isFinding ? 'aboveImagery' : 'bottom');
+          if (seaRadar) landRadar(mapInstance, layerId, sourceId, raster.url, presignedUrl, rasterBounds);
 
           // Track this layer with metadata
           newLayerMetadata.push({
@@ -2364,19 +3012,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           // The camera moves to the finding: the plume fills the frame; the ground scene after it
           // tightens a little further. In the methane act and the archaeologist's; other acts keep
           // today's framing.
-          if (followCamera && rasterBounds) {
+          // A radar pass whose targets (or reach) landed first keeps their closer frame.
+          const seaFramed = !!seaRadar && seaPassMovedOn(passOf(raster.url));
+          if (followCamera && rasterBounds && !seaFramed) {
             plumeFramed.current = true;
             // On the ground the camera lands on the site in the middle of its 3 km frame, not on the
             // frame (a replay adds the scene after the hillshade, so this holds for any raster once
             // the ground is up); the scene "from space" before any terrain still frames the whole clip.
             const [w, s, e, n] = groundOnRef.current ? siteWindow(rasterBounds) : rasterBounds;
             // A coarse raster frames below its own cap so it is still on screen when the camera lands.
-            const cap = coarse ? Math.max(1, hint!.max_zoom! - 0.5) : inArchaeoAct ? FRAME_MAX_ZOOM : isMethaneRaster ? 13 : 14;
+            const cap = seaRadar ? 9 : coarse ? Math.max(1, hint!.max_zoom! - 0.5) : inArchaeoAct ? FRAME_MAX_ZOOM : isMethaneRaster ? 13 : 14;
             // With the 3D columns on the stage the frame keeps their tilt; on the archaeologist's
             // ground it takes the low oblique view; otherwise it is flat.
             const columnsOnStage = allLayersRef.current.some((l) => methaneGeometryHint(l.render, l.url)?.kind === 'columns');
             mapInstance.fitBounds([[w, s], [e, n]], {
-              padding: STAGE_PADDING_NOW(),
+              padding: seaRadar ? seaPadding(STAGE_PADDING_NOW()) : STAGE_PADDING_NOW(),
               duration: 1800,
               maxZoom: cap,
               pitch: groundOnRef.current ? GROUND_PITCH : columnsOnStage ? COLUMNS_PITCH : 0,
@@ -2608,6 +3258,40 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         </div>
       );
     }
+    if (lg.kind === 'vessels') {
+      // Dark Vessels' targets by shape and words, never by colour alone. "Candidate" joins the key
+      // only once the stage has called one: nothing is called dark before the coverage check.
+      return (
+        <ul key={lg.key} className="map-legend map-legend--key" aria-label="Radar targets key">
+          <li><span className="sea-key sea-key--ring" aria-hidden="true" /><span className="map-legend__label">radar target, not yet explained</span></li>
+          <li><span className="sea-key sea-key--claimed" aria-hidden="true" /><span className="map-legend__label">a broadcast accounts for it</span></li>
+          <li><span className="sea-key sea-key--port" aria-hidden="true" /><span className="map-legend__label">at or near a port</span></li>
+          {candidatesShown && (
+            <li><span className="sea-key sea-key--candidate" aria-hidden="true" /><span className="map-legend__label">candidate, not an accusation</span></li>
+          )}
+        </ul>
+      );
+    }
+    if (lg.kind === 'coverage') {
+      return (
+        <ul key={lg.key} className="map-legend map-legend--key" aria-label="AIS coverage key">
+          <li><span className="sea-key sea-key--heard" aria-hidden="true" /><span className="map-legend__label">AIS heard: two vessels within 30 km</span></li>
+          <li><span className="sea-key sea-key--unproven" aria-hidden="true" /><span className="map-legend__label">unproven: no AIS is not evidence</span></li>
+        </ul>
+      );
+    }
+    if (lg.kind === 'seaheat') {
+      return (
+        <div key={lg.key} className="map-legend map-legend--stacked">
+          <span className="map-legend__name">{lg.label}</span>
+          <div className="map-legend__bar" role="img" aria-label={`${lg.label}: from clear, ${lg.low}, to bright, ${lg.high}`}>
+            <span className="map-legend__label">{lg.low}</span>
+            <span className="map-legend__ramp" style={{ background: `linear-gradient(90deg, transparent 0%, ${lg.colour} 70%, #e9eef3 100%)` }} aria-hidden="true" />
+            <span className="map-legend__label">{lg.high}</span>
+          </div>
+        </div>
+      );
+    }
     if (lg.kind === 'record') {
       return (
         <div key={lg.key} className="map-legend map-legend--sites" role="img" aria-label="A dot is a site on the public record; a ring marks a World Heritage site">
@@ -2637,7 +3321,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   };
 
   return (
-    <div className={`map-frame${lightCount > 0 ? ' map-frame--light' : ''}${restOn ? ' map-frame--dusk' : ''}`}>
+    <div className={`map-frame${lightCount > 0 ? ' map-frame--light' : ''}${restOn ? ' map-frame--dusk' : ''}${seaOn ? ' map-frame--sea' : ''}${taskingOn ? ' map-frame--tasking' : ''}`}>
       {/* Compare overlay */}
       {compareMode && (
         <CompareView
@@ -2652,6 +3336,34 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       {/* Space behind the watch globe; the canvas is transparent outside it. */}
       {globeOn && <Starfield />}
       <div ref={mapContainer} className="map-canvas" />
+
+      {/* Top centre, Dark Vessels: what the room is looking at, dated. */}
+      {seaOn && (
+        <div className="sea-clock-band">
+          <SeaClock beat={seaBeat} facts={{ ...seaFacts, replayPassId: vesselRest?.pass.pass_id }} />
+        </div>
+      )}
+
+      {/* Bottom right, Dark Vessels: the officer's decision, in the light plate's slot. */}
+      {taskingOn && tasking && (
+        <TaskingPlate
+          key={tasking.key}
+          sessionId={tasking.sessionId}
+          caseId={tasking.caseId}
+          draftKey={tasking.key}
+          busy={working}
+          box={taskBox}
+          excluded={taskExcluded}
+          onLoaded={onTaskingLoaded}
+          onBox={setTaskBox}
+          onToggle={(id) => setTaskExcluded((x) => toggled(x, id))}
+          onFiled={(id) => onTaskingFiled?.(id)}
+          onDismiss={() => {
+            setTaskingDismissed(tasking.key);
+            setSeaBeat('boxes');
+          }}
+        />
+      )}
 
       {/* Top right: the layers plate */}
       {allLayers.length > 0 && (
@@ -2700,9 +3412,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
                 </div>
               )}
 
-              {(legends.length > 0 || groundOn || restOn) && (
+              {(legends.length > 0 || groundOn || restOn || vesselOnStage) && (
                 <div className="map-layers__legends">
                   {legends.map(renderLegend)}
+                  {vesselOnStage && (
+                    // Global Fishing Watch's data (the detections, the AIS, the fleet) is on the map.
+                    <div className="map-legend map-legend--ground">
+                      <span className="map-legend__label">{SEA_ATTRIBUTION}</span>
+                    </div>
+                  )}
                   {restOn && (
                     // The rest view says what it is: the continent's relief stood up, lit at dusk.
                     <div className="map-legend map-legend--ground">
@@ -2805,7 +3523,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         )}
       </nav>
 
-      {/* Bottom right: the basemap plate */}
+      {/* Bottom right: the basemap plate (the sea's ground is the seabed, not a choice) */}
+      {seaOn ? (
+        <div className="map-plate map-basemap">
+          <span className="map-plate__title">Base</span>
+          <span className="map-basemap__fixed">Seabed</span>
+        </div>
+      ) : (
       <div className="map-plate map-basemap">
         <label className="map-plate__title" htmlFor="basemap-select">
           Base
@@ -2824,6 +3548,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           <option value="dark">Dark</option>
         </select>
       </div>
+      )}
     </div>
   );
 }

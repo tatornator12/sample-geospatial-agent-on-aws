@@ -11,6 +11,7 @@
 import { isMethaneLayer, isSimilarityLayer, type LayerMetadata } from './layerFormatting.ts';
 import { indexLegendFor, type ColormapName } from './render.ts';
 import { isTerrainLayer, terrainLegend, terrainRasterHint } from './archaeoLayers.ts';
+import { AIS, ORCHID, vesselKind } from './vesselLayers.ts';
 
 /** Move one entry from `from` to `to` (both indexes in the same list); a copy, never in place. */
 export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
@@ -152,13 +153,27 @@ export type StackLegend =
   /** The archaeologist's hillshade: a key, not a ramp (grey is the ground lit from the north-west). */
   | { kind: 'hillshade'; key: 'hillshade' }
   /** The catalogue marks at rest: a dot per site on the public record, a ring on a World Heritage one. */
-  | { kind: 'record'; key: 'record' };
+  | { kind: 'record'; key: 'record' }
+  /** Dark Vessels' targets: a ring the radar saw, a disc a broadcast accounts for, an orchid candidate. */
+  | { kind: 'vessels'; key: 'vessels' }
+  /** Dark Vessels' coverage: heard water outlined, unproven water hatched. */
+  | { kind: 'coverage'; key: 'coverage' }
+  /** Dark Vessels' history heat (the candidates' hue, from clear) and the fleet's (the AIS hue). */
+  | { kind: 'seaheat'; key: 'heat' | 'fleet'; label: string; low: string; high: string; colour: string };
 
 const MEASURE_LABEL: Record<string, string> = { 'ppm·m': 'CH4 enhancement', ppb: 'CH4 anomaly' };
 
 /** The legend a layer reads by, or null (true colour, boundaries, drawn shapes). */
 export function layerLegend(layer: LayerMetadata): StackLegend | null {
   if (isSimilarityLayer(layer)) return { kind: 'similar', key: 'similar' };
+  const sea = vesselKind(layer.url);
+  if (sea) {
+    if (sea === 'targets') return { kind: 'vessels', key: 'vessels' };
+    if (sea === 'heard' || sea === 'unproven') return { kind: 'coverage', key: 'coverage' };
+    if (sea === 'heat') return { kind: 'seaheat', key: 'heat', label: 'Radar targets with no AIS, seen before', low: 'fewer', high: 'more', colour: ORCHID };
+    if (sea === 'fleet') return { kind: 'seaheat', key: 'fleet', label: 'Squid fleet fishing hours', low: 'fewer', high: 'more', colour: AIS };
+    return null;
+  }
   if (isTerrainLayer(layer)) {
     if (layer.type === 'geometry') return layer.render?.kind === 'points' ? { kind: 'record', key: 'record' } : null;
     const legend = terrainLegend(terrainRasterHint(layer.render, layer.url));
@@ -204,7 +219,8 @@ export function stackLegends(layersTopFirst: readonly LayerMetadata[], shown: (i
     seen.add(legend.key);
     out.push(legend);
   }
-  const isKey = (l: StackLegend) => (l.kind === 'sites' || l.kind === 'similar' || l.kind === 'hillshade' || l.kind === 'record' ? 1 : 0);
+  const isKey = (l: StackLegend) =>
+    (l.kind === 'sites' || l.kind === 'similar' || l.kind === 'hillshade' || l.kind === 'record' || l.kind === 'vessels' || l.kind === 'coverage' ? 1 : 0);
   return out.sort((a, b) => isKey(a) - isKey(b));
 }
 

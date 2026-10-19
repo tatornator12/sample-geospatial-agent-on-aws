@@ -1571,6 +1571,335 @@
   color: var(--fog);
 }
 
+/* ---------------------------------------------------------------------------
+   Dark Vessels (Act 3): the sea at night. The seabed is the ground; behind the
+   canvas is the abyss. The one data colour (orchid) belongs to the candidates
+   and the history's heat; AIS is pale cyan. Amber stays the stage's: the
+   officer's Approve button is the only amber on this act.
+   --------------------------------------------------------------------------- */
+.map-frame--sea {
+  --orchid: #f07ad8;
+  --ais: #9fd3e6;
+  background: #03070d;
+}
+/* Nine layers and four keys outgrow the plate by the forecast: the list fades out over its own
+   bottom padding instead of cutting a key row in half. */
+.map-frame--sea .map-layers__body {
+  padding-bottom: 16px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+}
+.map-basemap__fixed {
+  padding-right: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fog);
+}
+
+/* The clock plate: top centre of the band the step column and the layers plate leave free. */
+.sea-clock-band {
+  position: absolute;
+  top: 16px;
+  left: calc(clamp(296px, 19vw, 380px) + 32px);
+  right: 352px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.sea-clock {
+  max-width: 760px;
+  padding: 10px 20px 12px;
+  text-align: center;
+}
+.sea-clock__lead {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--fog);
+  /* The clock keeps its spaces: "AIS replay  2026-10-12 00:18 UTC". */
+  white-space: pre-wrap;
+}
+.sea-clock__sub {
+  margin: 4px 0 0;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--label);
+  white-space: pre-wrap;
+  text-wrap: balance;
+}
+.sea-clock__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fog);
+}
+.sea-clock__lead .sea-clock__num {
+  font-weight: 500;
+}
+
+/* The legends' keys: each status by its shape as drawn on the map, and its words. */
+.map-legend--key {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 0;
+  list-style: none;
+}
+.map-legend--key li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.map-legend--key .map-legend__label {
+  white-space: normal;
+  line-height: 1.3;
+}
+.sea-key {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+}
+.sea-key--ring,
+.sea-key--claimed,
+.sea-key--candidate {
+  border-radius: 50%;
+}
+.sea-key--ring {
+  border: 1.5px solid var(--label);
+}
+/* A fog ring tied by a hairline to the AIS dot that claims it. */
+.sea-key--claimed {
+  position: relative;
+  border: 1.5px solid var(--fog);
+}
+.sea-key--claimed::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fog);
+  box-shadow: 0 0 0 1px var(--ais);
+}
+.sea-key--port {
+  width: 10px;
+  height: 10px;
+  margin: 4px;
+  background: var(--fog);
+}
+.sea-key--candidate {
+  border: 2.5px solid var(--orchid);
+}
+.sea-key--heard {
+  border: 1px solid rgba(233, 238, 243, 0.45);
+  background: rgba(233, 238, 243, 0.08);
+}
+.sea-key--unproven {
+  border: 1px solid var(--hairline);
+  background: repeating-linear-gradient(-45deg, rgba(143, 163, 184, 0.6) 0 1.4px, transparent 1.4px 7px);
+}
+
+/* The tasking plate: the officer's decision, bottom right in the light plate's slot. The layers
+   plate folds to its head while it is up. */
+.tasking-plate {
+  position: absolute;
+  right: 16px;
+  bottom: 76px;
+  z-index: 3;
+  width: 340px;
+  max-height: calc(100% - 76px - 84px);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 16px;
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+/* Where the console reaches under the right column (narrower screens), the plate stops above it. */
+@media (max-width: 1760px) {
+  .tasking-plate {
+    bottom: 172px;
+    max-height: calc(100% - 172px - 84px);
+  }
+}
+.tasking-plate__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.tasking-plate__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--fog);
+}
+/* Draft or filed, in label grey at regular weight: the amber belongs to the decision. */
+.tasking-plate__state {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--label);
+}
+.tasking-plate__state--filed {
+  color: var(--fog);
+}
+/* On a short screen the choices scroll; their last 16px fade over empty padding, so a clipped
+   line reads as more below, never as cut text. */
+.tasking-plate__body {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 16px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+}
+.tasking-plate__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.tasking-plate__group:disabled {
+  opacity: 1;
+}
+.tasking-plate__legend {
+  margin: 0 0 6px;
+  padding: 0;
+  font-size: 15px;
+  color: var(--label);
+}
+.tasking-plate__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tasking-plate__option:hover {
+  background: rgba(233, 238, 243, 0.04);
+}
+/* The chosen box: a fog edge and wash, as on the map (never amber). */
+.tasking-plate__option--on {
+  border-color: var(--hairline-strong);
+  background: rgba(233, 238, 243, 0.07);
+}
+.tasking-plate__group:disabled .tasking-plate__option {
+  cursor: default;
+}
+.tasking-plate__option input,
+.tasking-plate__check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--fog);
+}
+.tasking-plate__option input:focus-visible,
+.tasking-plate__check input:focus-visible,
+.tasking-plate .stage-btn:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+.tasking-plate__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tasking-plate__option-main {
+  font-size: 16px;
+  line-height: 1.3;
+  color: var(--fog);
+  white-space: pre-wrap;
+}
+.tasking-plate__option-sub {
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--label);
+}
+.tasking-plate__candidates {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tasking-plate__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.tasking-plate__check:hover {
+  background: rgba(233, 238, 243, 0.04);
+}
+.tasking-plate__id {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: var(--orchid);
+}
+.tasking-plate__check:has(input:not(:checked)) .tasking-plate__id {
+  color: var(--label);
+}
+.tasking-plate__where {
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--fog);
+}
+.tasking-plate__note {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--label);
+}
+.tasking-plate__foot {
+  flex: none;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+.tasking-plate__summary {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--fog);
+}
+.tasking-plate__line,
+.tasking-plate__status {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--fog);
+}
+.tasking-plate__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tasking-plate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.tasking-plate__error {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--error);
+}
+
 /* MapLibre chrome takes the dome as well. */
 .maplibregl-ctrl-attrib {
   background: color-mix(in srgb, var(--dome) 78%, transparent) !important;

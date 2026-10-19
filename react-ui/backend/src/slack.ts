@@ -16,6 +16,7 @@
  * never fails because of it.
  */
 import type { BriefCard } from './brief';
+import { taskingMessage, taskingWorkflowPayload, type FiledTasking } from './tasking';
 
 /**
  * The two Slack webhook shapes, and nothing else: this backend posts to Slack or to nowhere.
@@ -173,6 +174,34 @@ export async function postToSlack(url: string, payload: Record<string, unknown>,
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Where a filed patrol tasking (Act 3) is posted: SLACK_TASKING_WEBHOOK_URL when it is a Slack
+ * webhook (an app's or a workflow's: a copy of the brief's workflow with a tasking's wording takes
+ * the same twelve variables), else the brief's own URL only when that is an app's incoming webhook
+ * (the backend lays out the Block Kit itself). Never the brief's workflow trigger: its message says
+ * "brief", and a tasking is not one.
+ */
+export function taskingWebhookUrl(env: Record<string, string | undefined> = process.env): string | null {
+  const own = (env.SLACK_TASKING_WEBHOOK_URL ?? '').trim();
+  if (webhookKind(own)) return own;
+  const shared = slackWebhookUrl(env);
+  return shared && webhookKind(shared) === 'incoming' ? shared : null;
+}
+
+/** What to post for a tasking: Block Kit to an app's webhook, the twelve variables to a workflow trigger. */
+export function taskingPayloadFor(url: string, filed: FiledTasking): Record<string, unknown> {
+  return webhookKind(url) === 'workflow' ? taskingWorkflowPayload(filed) : taskingMessage(filed);
+}
+
+/** Fire and forget from the tasking approve route, as for a brief. */
+export function notifyTaskingFiled(filed: FiledTasking, env: Record<string, string | undefined> = process.env): void {
+  const url = taskingWebhookUrl(env);
+  if (!url) return;
+  void postToSlack(url, taskingPayloadFor(url, filed)).then((ok) => {
+    if (ok) console.log(`📣 Slack told about ${filed.card.taskingId}`);
+  });
 }
 
 /** Fire and forget from the approve route: the analyst's response never waits for Slack. */

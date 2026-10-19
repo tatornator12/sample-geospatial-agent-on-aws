@@ -6,7 +6,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
-import { getApiUrl, loadArchaeologyRecord, loadMethaneBaseline, prewarmSession } from '../services/api';
+import { getApiUrl, loadArchaeologyRecord, loadMethaneBaseline, loadVesselRest, prewarmSession } from '../services/api';
+import { taskingFiledMessage, type VesselRest } from '../utils/vesselLayers';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { MapView } from '../components/MapView';
@@ -79,6 +80,11 @@ export function Chat() {
   const [mapReady, setMapReady] = useState(true); // Controls MapView render delay on scenario switch
   const [agentWorking, setAgentWorking] = useState(false);
   const [tips, setTips] = useState<Tip[]>([]);
+  // Dark Vessels: the act's resting state, the session's tasking drafts, and the prompt the stage
+  // sends once the officer has filed on the map.
+  const [vesselRest, setVesselRest] = useState<VesselRest | null>(null);
+  const [taskingKey, setTaskingKey] = useState(0);
+  const [autoPrompt, setAutoPrompt] = useState<string | null>(null);
 
   // Track if this is the first run of the scenario effect
   const isFirstScenarioLoad = useRef(true);
@@ -298,6 +304,8 @@ export function Chat() {
     setScenarioError(null);
     setIsLoadingScenario(false);
     setTips([]);
+    setTaskingKey(0);
+    setAutoPrompt(null);
   };
 
   // Switching acts on the rail starts a fresh session: new id, cleared map, empty transcript.
@@ -382,6 +390,21 @@ export function Chat() {
     return () => { cancelled = true; };
   }, [selectedAgentId, sessionId, scenarioId, mapReady]);
 
+  // Dark Vessels' resting state is the sea at night: the reserve, its ports, and the latest pass's
+  // three days of AIS playing back over the seabed, the moment the act is chosen and after every
+  // reset, before any prompt. Fetched once per act choice; every session's map reuses it.
+  useEffect(() => {
+    if (selectedAgentId !== 'vessels') {
+      setVesselRest(null);
+      return;
+    }
+    let cancelled = false;
+    void loadVesselRest().then((rest) => {
+      if (!cancelled) setVesselRest(rest);
+    });
+    return () => { cancelled = true; };
+  }, [selectedAgentId]);
+
   const handleDrawnGeometry = (geojson: any) => {
     // Format the GeoJSON as a message to send to chat
     const message = `Analyze this area:\n\`\`\`json\n${JSON.stringify(geojson, null, 2)}\n\`\`\``;
@@ -399,6 +422,9 @@ export function Chat() {
             onDrawnGeometry={handleDrawnGeometry}
             working={agentWorking}
             tips={tips}
+            vesselRest={selectedAgentId === 'vessels' ? vesselRest : null}
+            tasking={{ sessionId, caseId: scenarioId || undefined, key: taskingKey }}
+            onTaskingFiled={(id) => setAutoPrompt(taskingFiledMessage(id))}
           />
         )}
       </div>
@@ -420,6 +446,9 @@ export function Chat() {
           onDrawnGeometryMessageSent={() => setDrawnGeometryMessage(null)}
           onWorkingChange={setAgentWorking}
           onTipsUpdate={setTips}
+          onTaskingDrafted={setTaskingKey}
+          autoPrompt={autoPrompt}
+          onAutoPromptSent={() => setAutoPrompt(null)}
         />
       </div>
     </div>

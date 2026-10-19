@@ -18,6 +18,15 @@ describe('parseRenderHint', () => {
     expect(parseRenderHint(JSON.stringify(VECTOR))).toEqual(VECTOR);
   });
 
+  it('accepts Dark Vessels\' maritime hints (agents/dark-vessels pass, ais and forecast tools)', () => {
+    const radar = { kind: 'raster', colormap: 'gray', rescale: [1, 255], group: 'maritime', legend: 'Radar backscatter', bounds: [-92.5, -2.4, -88.6, 2.1] };
+    const heat = { kind: 'points', group: 'maritime', legend: 'Dark targets seen before', property: 'v' };
+    const boxes = { kind: 'vector', group: 'maritime', legend: 'Patrol boxes', label: 'label' };
+    expect(parseRenderHint(radar)).toEqual(radar);
+    expect(parseRenderHint(heat)).toEqual(heat);
+    expect(parseRenderHint(boxes)).toEqual(boxes);
+  });
+
   it('returns null for absent or non-object input', () => {
     for (const bad of [undefined, null, '', 'plasma', 42, [], '{not json']) {
       expect(parseRenderHint(bad)).toBeNull();

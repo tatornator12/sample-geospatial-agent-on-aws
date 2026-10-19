@@ -4,6 +4,7 @@
 
 import type { RenderHint } from './render.ts';
 import { isTerrainLayer } from './archaeoLayers.ts';
+import { isVesselLayer } from './vesselLayers.ts';
 
 export interface LayerMetadata {
   id: string;
@@ -252,6 +253,8 @@ export function layerRowLabel(layer: LayerMetadata): string {
   // The archaeologist's terrain keeps the tool's title ("Great Circle, LiDAR hillshade"); the
   // scene cleaner would read "of" patterns into it.
   if (isTerrainLayer(layer)) return layer.name;
+  // Dark Vessels' layers keep the agent's short titles ("Radar, Oct 12 2026", "Heard water").
+  if (isVesselLayer(layer)) return layer.name;
   if (isSimilarityLayer(layer)) return formatSimilarityLabel(layer);
   if (layer.type === 'geometry') return layer.name;
   return formatLayerDisplayText(layer, 'tci');

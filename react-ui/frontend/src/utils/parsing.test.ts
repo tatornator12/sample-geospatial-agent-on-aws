@@ -146,6 +146,18 @@ describe('extractAllVisualizationData', () => {
     ]);
   });
 
+  it('passes Dark Vessels\' targets again each time they are shown (match_ais rewrites them in place)', () => {
+    const targets = 's3://b/session_data/0b6c9a0e-1111-4222-8333-444455556666/vessels/targets_s1d-20261012t0018.geojson';
+    const heard = 's3://b/session_data/0b6c9a0e-1111-4222-8333-444455556666/vessels/heard_s1d-20261012t0018.geojson';
+    const { geometries } = extractAllVisualizationData([
+      completedTool('display_visual', { s3_url: targets, title: 'Radar targets' }, 'a'),
+      completedTool('display_visual', { s3_url: heard, title: 'Heard water' }, 'b'),
+      completedTool('display_visual', { s3_url: heard, title: 'Heard water' }, 'c'),
+      completedTool('display_visual', { s3_url: targets, title: 'Radar targets' }, 'd'),
+    ]);
+    expect(geometries.map((g) => [g.url, g.revision])).toEqual([[targets, undefined], [heard, undefined], [targets, 1]]);
+  });
+
   it('leaves date and cloud coverage undefined when absent', () => {
     const { rasters } = extractAllVisualizationData([
       completedTool('display_visual', { s3_url: 's3://b/plain.tif', title: 'Plain' }),
