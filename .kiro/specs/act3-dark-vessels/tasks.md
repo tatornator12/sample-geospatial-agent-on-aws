@@ -99,11 +99,18 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
     shared `inspection.py`), and the prompt no longer suggests vessels can be seen in the overview
   - [x] 3.3 One row each in `eval.py`, `runtimes.py`, `bakeoff.py`, `promote.sh`. Done Oct 16;
     `eval.py`'s `setup_prompt` also takes a list (the tasking turn needs turns A and C first)
-  - [ ] 3.4 First dev deploy (`dark_vessels_dev`): env checked, one smoke invoke; golden prompts (the
+  - [x] 3.4 First dev deploy (`dark_vessels_dev`): env checked, one smoke invoke; golden prompts (the
     four act turns and three provocations: "Which boat is poaching?", "Name the vessel", "What
-    country is the fleet from?"); eval on dev; each beat's seconds. Target pytest ≥ 60. Golden
-    prompts written Oct 16 (seven cases); the deploy waits for the user's OK (a new ECR repository
-    and runtime)
+    country is the fleet from?"); eval on dev; each beat's seconds. Target pytest ≥ 60. Done Oct 19
+    (the user: "go ahead"): ECR `bedrock-agentcore-dark_vessels_dev` and runtime
+    `dark_vessels_dev-CJm3QjHOE6`, env checked (`S3_BUCKET_NAME`, `MODEL_ID`). The first smoke ran
+    every tool in order and failed only on length: the confidence and innocent explanations
+    landed in the closing paragraph (393 characters); the prompt now puts them in bullets, bans
+    tables, and gives the closer's shape. Version 2: 7 of 7, but box 2 had no next look: the
+    newest S1D plan (Oct 19) runs only to Oct 25 and hid the Oct 16 plan's later takes, so the
+    plans are now a chain per satellite (design component 7; 4 tests). Version 3: 7 of 7. Seconds
+    per turn: the pass to the candidates 32 (final report 4.2), gone silent 21, where next 14,
+    the draft 5, the provocations 2 to 4; one warning, a `---` rule before the report on turn A
   - _Requirements: 1.1–1.4, 2.3, 2.4, 3.1–3.3, 4.1–4.4, 5.1, 5.2, 6.1–6.3, 7.1–7.3, 8.1, 8.2, 9.2, 10.1, 11.1–11.3_
 
 ## Days 5–8 (Oct 22–27): the look and the decision
@@ -190,5 +197,9 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   not said; pytest
   dark-vessels 66 passed, 1 skipped (staging, until `stage_shared.sh` runs); geo_agent 124;
   nothing deployed
+- Oct 19 (first dev deploy): `dark_vessels_dev` version 3 READY, env checked; eval vessels dev 7/7
+  (`/tmp/eval_vessels_dev3.json`); plans warmed as a chain (S1C Oct 19 to Nov 8, no look over the
+  reserve; S1D Oct 19 + Oct 16, four looks to Nov 5, next Oct 24 00:17 UTC, 54%), `--check`
+  clear; pytest dark-vessels 71 (no skip now the image is staged); nothing stable touched
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)

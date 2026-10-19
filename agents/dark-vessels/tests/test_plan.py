@@ -90,6 +90,40 @@ def test_newest_plan_per_satellite_from_the_listing_page():
     }
 
 
+def test_a_short_newest_plan_does_not_hide_the_longer_ones_later_takes():
+    """Oct 19, 2026: ESA's newest S1D plan ran only to Oct 25, over the Oct 16 plan to Nov 5."""
+    html = """
+      <a href="/documents/d/sentinel/s1d_mp_user_20260915t185252_20261205t204800">odd, long, too old</a>
+      <a href="/documents/d/sentinel/s1d_mp_user_20261012t184114_20261018t204800">superseded, ended</a>
+      <a href="/documents/d/sentinel/s1d_mp_user_20261013t173113_20261102t193900">inside the Oct 16 one</a>
+      <a href="/documents/d/sentinel/s1d_mp_user_20261016t175423_20261105t200200">long</a>
+      <a href="/documents/d/sentinel/s1d_mp_user_20261019t190903_20261025t210300">short, newest</a>
+      <a href="https://documents/d/sentinel/s1d_mp_user_20261019t190903_20261025t210300">same, malformed</a>
+      <a href="/documents/d/sentinel/s1a_mp_user_20260625t173940_20260630t194000">retired</a>
+      <a href="/documents/d/sentinel/s1c_mp_user_20261019t173103_20261108t193600">one</a>
+    """
+    assert plan.plan_chain(html, now=utc(2026, 10, 19, 20)) == {
+        "s1c": ["/documents/d/sentinel/s1c_mp_user_20261019t173103_20261108t193600"],
+        "s1d": ["/documents/d/sentinel/s1d_mp_user_20261019t190903_20261025t210300",
+                "/documents/d/sentinel/s1d_mp_user_20261016t175423_20261105t200200"],
+    }
+    # Once the short plan has ended, only the long one is left.
+    assert plan.plan_chain(html, now=utc(2026, 10, 26))["s1d"] == ["/documents/d/sentinel/s1d_mp_user_20261016t175423_20261105t200200"]
+
+
+def test_merged_takes_follow_the_newest_plan_for_each_date():
+    def take(day, orbit):
+        return plan.DataTake("S1D", "IW", "DV", utc(2026, 10, day), utc(2026, 10, day, 0, 1), orbit, 1000 + day,
+                             box(-92, -2, -89, 1))
+    newer = ((utc(2026, 10, 19, 19), utc(2026, 10, 25, 21)), [take(24, 33)])
+    # The older plan's Oct 18 and Oct 24 fall inside the newer plan's reach: the newer one governs.
+    older = ((utc(2026, 10, 16, 17), utc(2026, 11, 5, 20)), [take(18, 128), take(24, 33), take(29, 106)])
+    merged = plan.merge_takes([newer, older])
+    assert [(t.start.day, t.relative_orbit) for t in merged] == [(24, 33), (29, 106)]        # no duplicate, Oct 29 kept
+    looks = plan.next_looks(merged, box(-91.55, -0.3, -91.35, -0.1), after=utc(2026, 10, 19, 20))
+    assert [lk.take.start.day for lk in looks] == [24, 29]
+
+
 def test_a_placemark_without_its_fields_is_skipped():
     doc = ('<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>x</name>'
            '<Placemark><name>bad</name><LinearRing><coordinates>0,0,0 1,0,0 1,1,0</coordinates></LinearRing></Placemark>'

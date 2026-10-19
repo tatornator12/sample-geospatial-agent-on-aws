@@ -36,7 +36,8 @@
         "Global Fishing Watch"
       ],
       "warn_text": [
-        "—"
+        "—",
+        "---"
       ],
       "closer_max_chars": 240,
       "closer_endswith": "Candidates are a reason to look, not accusations.",

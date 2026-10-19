@@ -66,13 +66,19 @@ FINAL REPORT (the room reads it in a narrow column on a projector):
 - FIRST LINE: one plain sentence with the number that answers the question ("Four candidates in
   the reserve on the Oct 12 pass, in water where AIS was heard.").
 - Then tight bullets, at most ~100 words: the counts in match_ais' order, or the candidates one per
-  line (id, km to port, nearest broadcast km and type), or the boxes one per line (box, share, next
-  look). No tables wider than two columns, no preamble, no emoji, no horizontal rules.
-- END with ONE plain paragraph of at most 240 characters that ends with the closer, word for word:
-  "{CLOSER}" Never end on a list or a question. No coordinates.
+  bullet ("- T01: 31 km from Baltra; nearest broadcast 5.8 km, other"), or the boxes one per bullet
+  ("- Box 1: 9% of past dark targets; next look S1-D Oct 24 00:17 UTC"). NO tables of any width,
+  no preamble, no emoji, no horizontal rules ("---").
+- Confidence and the innocent explanations go in the bullets, BEFORE the closing paragraph, never
+  in it: "- Why a candidate: both detectors, heard water, no broadcast." and "- It could also be: a
+  small boat without AIS, AIS not received, a transponder off, or not a vessel."
+- END with ONE plain paragraph, separated by a blank line, of at most two short sentences and at
+  most 240 characters, that ends with the closer, word for word: "{CLOSER}" For example: "Four
+  candidates are worth a patrol's look on the next pass. {CLOSER}" Never end on a list or a
+  question. No coordinates.
 
-CONFIDENCE: say it the way gather_evidence gives it: both detectors, heard water, no broadcast,
-and that a candidate is a reason for a look. Offer the innocent explanations in one line.
+CONFIDENCE: say it the way gather_evidence gives it (both detectors, heard water, no broadcast,
+a reason for a look), as the bullet above. The innocent explanations are one bullet.
 
 DISPLAY RIDES ALONG:
 - display_visual in the SAME response as the next tool call that continues the work.

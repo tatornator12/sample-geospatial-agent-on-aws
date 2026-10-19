@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from shapely.geometry import Polygon
 from shapely.geometry.base import BaseGeometry
@@ -127,6 +127,53 @@ def next_looks(takes: list[DataTake], area: BaseGeometry, after: datetime, min_s
             looks.append(Look(t, share))
     looks.sort(key=lambda lk: lk.take.start)
     return looks[:limit]
+
+
+def _stamp(s: str) -> datetime:
+    return datetime.strptime(s, "%Y%m%dt%H%M%S").replace(tzinfo=timezone.utc)
+
+
+PLAN_MAX_AGE_DAYS = 21      # ESA's usual horizon; an older plan is not the latest word on any day
+
+
+def plan_chain(html: str, now: datetime, max_age_days: int = PLAN_MAX_AGE_DAYS) -> dict[str, list[str]]:
+    """Per satellite, the plans on ESA's listing page that still say something about the future,
+    newest first: the newest plan, then each older plan that runs past every newer one. ESA
+    publishes short plans (about six days) over longer ones (about three weeks); a short newest plan
+    must not hide the longer one's later takes, which are still the latest published word on those
+    days. A plan wholly inside a newer one's period is superseded and left out, and so is one that
+    has ended (a retired satellite's last plan) or was published more than `max_age_days` ago (the
+    listing carries a few odd long plans, e.g. S1D's of Sep 15 to Dec 5, 2026)."""
+    oldest = (now - timedelta(days=max_age_days)).strftime("%Y%m%dt%H%M%S")
+    by: dict[str, set] = {}
+    for path, sat, start, stop in LINK_RE.findall(html):
+        if start >= oldest:
+            by.setdefault(sat, set()).add((start, stop, path))
+    out: dict[str, list[str]] = {}
+    for sat, plans in sorted(by.items()):
+        chain, reach = [], ""
+        for start, stop, path in sorted(plans, reverse=True):      # the stamps sort as text
+            if stop > reach:
+                chain.append((stop, path))
+                reach = stop
+        chain = [path for stop, path in chain if _stamp(stop) > now]
+        if chain:
+            out[sat] = chain
+    return out
+
+
+def merge_takes(plans: list[tuple[tuple[datetime, datetime] | None, list[DataTake]]]) -> list[DataTake]:
+    """One satellite's takes from a chain of plans (newest first, as plan_chain gives them): the
+    newest plan's takes, then each older plan's takes from where the newer ones stop. Each date is
+    governed by the newest plan that covers it, so a take dropped in a newer plan stays dropped."""
+    out: list[DataTake] = []
+    covered: datetime | None = None
+    for period, takes in plans:
+        out += takes if covered is None else [t for t in takes if t.start >= covered]
+        end = period[1] if period else max((t.stop for t in takes), default=covered)
+        if end is not None:
+            covered = end if covered is None else max(covered, end)
+    return out
 
 
 def plan_links(html: str) -> dict[str, str]:

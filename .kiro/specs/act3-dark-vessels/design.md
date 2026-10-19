@@ -196,10 +196,15 @@ the fleet stayed off Peru; the agent says it in one sentence and shows where the
 
 ### 7. `next_look`
 
-`plan.py` over the cached plans (`vessels/cache/plan/`, the newest per satellite); a plan older
-than 24 h triggers one refresh (8 s timeout: the listing page, then the newest KML per satellite);
-on failure, the cached plan with its date. Returns the next IW passes covering the asked share, and
-the first one's footprint for the map.
+`plan.py` over the cached plans (`vessels/cache/plan/`); a plan older than 24 h triggers one
+refresh (8 s timeout: the listing page, then the KMLs); on failure, the cached plans with their
+date. Per satellite the plans are a chain (`plan_chain`, `merge_takes`): the newest plan, then any
+older plan still running past it, each date taken from the newest plan that covers it. ESA lays
+six-day plans over three-week ones: on Oct 19 the newest S1D plan ran only to Oct 25, and taking
+it alone dropped the Oct 29 look west of Isabela, so box 2 said "no look planned yet" although the
+Oct 16 plan, still ESA's latest word for Oct 26 to Nov 5, has it. Plans published more than 21 days
+ago are left out (the listing carries an odd S1D plan of Sep 15 to Dec 5). Returns the next IW
+passes covering the asked share, and the first one's footprint for the map.
 
 ### 8. `reachable_area` (the silent vessel, decision 10)
 

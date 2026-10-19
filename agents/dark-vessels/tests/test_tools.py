@@ -136,6 +136,48 @@ def test_next_look_reads_the_plan_and_never_invents_one(vessels, monkeypatch):
     assert run(vessels.ft.next_look())["looks"] == []
 
 
+def test_next_look_refreshes_a_stale_plan_through_the_chain(vessels, monkeypatch):
+    """Over 24 h old, the runtime asks ESA itself: the listing's chain (here one long plan, the short
+    newest one already over) is fetched, merged and named; the looks come from it."""
+    from conftest import FIXTURES, PLAN_FIXTURE
+    listing = (f'<a href="/documents/d/sentinel/s1d_mp_user_20261012t184114_20261018t204800">short, over</a>'
+               f'<a href="/documents/d/sentinel/{PLAN_FIXTURE[:-4]}">long</a>').encode()
+    asked = []
+
+    class Reply:
+        def __init__(self, body):
+            self.body = body
+
+        def read(self):
+            return self.body
+
+    def urlopen(req, timeout=None):
+        url = getattr(req, "full_url", req)
+        asked.append(url)
+        return Reply(listing if url == vessels.ft.LISTING else (FIXTURES / PLAN_FIXTURE).read_bytes())
+
+    monkeypatch.setattr(vessels.ft, "_now", lambda: datetime(2026, 10, 19, 20, tzinfo=timezone.utc))
+    monkeypatch.setattr(vessels.ft.urllib.request, "urlopen", urlopen)
+    vessels.ft._plan_cache.clear()
+    out = run(vessels.ft.next_look())
+    assert out["plan"]["refreshed"] is True and out["plan"]["plans"]["s1d"]["name"] == PLAN_FIXTURE[:-4]
+    assert asked == [vessels.ft.LISTING, f"{vessels.ft.HOST}/documents/d/sentinel/{PLAN_FIXTURE[:-4]}"]
+    assert out["looks"] and out["looks"][0]["start"] >= "2026-10-19T20"
+
+
+def test_next_look_reads_a_cached_chain(vessels, fake_s3):
+    """latest.json from warm_vessels names a chain per satellite; each file is read and merged."""
+    from conftest import BUCKET, PLAN_FIXTURE
+    key = f"vessels/cache/plan/{PLAN_FIXTURE[:-4]}.kml"
+    fake_s3.put_object(Bucket=BUCKET, Key="vessels/cache/plan/latest.json", Body=json.dumps({
+        "fetched_at": "2026-10-16T17:30:00Z", "plans": {"s1d": {
+            "key": key, "name": PLAN_FIXTURE[:-4], "period": ["2026-10-16T17:54:23Z", "2026-11-05T20:02:00Z"],
+            "chain": [{"key": key, "name": PLAN_FIXTURE[:-4], "period": ["2026-10-16T17:54:23Z", "2026-11-05T20:02:00Z"]}]}}}))
+    vessels.ft._plan_cache.clear()
+    out = run(vessels.ft.next_look())
+    assert out["looks"] and out["plan"]["refreshed"] is False and out["plan"]["plans"]["s1d"]["name"] == PLAN_FIXTURE[:-4]
+
+
 def test_reachable_area_goes_by_water_and_keeps_the_reveal_for_last(vessels):
     out = run(vessels.ft.reachable_area())
     assert out["pass_id"] == SILENT and out["speed_kn"] == 6.0 and out["hours"] == 12.0 and out["reach_km"] == 133

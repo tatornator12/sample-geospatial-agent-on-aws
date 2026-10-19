@@ -6,10 +6,12 @@ the morning of the show that everything the act reads is there.
     AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py             # the day before and the morning of
     AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py --check     # fails loudly if anything is missing
 
-The plans: ESA's listing page names the newest plan per satellite (plan.plan_links); each KML is
-parsed (plan.parse_plan) before it is kept, and written to vessels/cache/plan/<name>.kml with
-vessels/cache/plan/latest.json naming them, their periods, and their IW takes over the reserve. The
-runtime's next_look reads latest.json and refreshes it itself only when it is more than 24 h old.
+The plans: per satellite, ESA's newest plan and any older one that still runs past it
+(plan.plan_chain: ESA lays six-day plans over three-week ones); each KML is parsed (plan.parse_plan)
+before it is kept, and written to vessels/cache/plan/<name>.kml with vessels/cache/plan/latest.json
+naming the chain, its span, and its IW takes over the reserve (plan.merge_takes: each date from the
+newest plan that covers it). The runtime's next_look reads latest.json and refreshes it itself only
+when it is more than 24 h old.
 
 The check: every pass on file (data/passes_v1.json) has its five products in the cache manifest and
 in the bucket; the history and the fleet are there; the plans are under 24 h old and run at least
@@ -53,32 +55,45 @@ def reserve():
     return shape(next(f["geometry"] for f in rec["features"] if f["properties"]["kind"] == "reserve"))
 
 
+def iso(t: datetime) -> str:
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def warm(dry: bool, bucket: str | None) -> int:
-    links = P.plan_links(fetch(LISTING).decode("utf-8", "replace"))
-    if not links:
-        raise SystemExit("ESA's listing page names no plan (has the page changed?)")
-    area = reserve()
+    html = fetch(LISTING).decode("utf-8", "replace")
     now = datetime.now(timezone.utc)
-    latest = {"fetched_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "source": LISTING, "plans": {}}
+    chains = P.plan_chain(html, now)
+    if not chains:
+        raise SystemExit("ESA's listing page names no current plan (has the page changed?)")
+    for sat in sorted(set(P.plan_links(html)) - set(chains)):   # a retired satellite's last plan (S1A's ended Jun 30, 2026)
+        print(f"{sat}: no current plan on the listing page; left out")
+    area = reserve()
+    latest = {"fetched_at": iso(now), "source": LISTING, "plans": {}}
     files = {}
-    for sat, path in links.items():
-        data = fetch(HOST + path, timeout=60)
-        period, takes = P.parse_plan(data)
-        if not takes or period is None:
-            raise SystemExit(f"{sat}: the plan at {path} parsed to no takes or no period")
-        name = path.rsplit("/", 1)[1]
-        if period[1] <= now:   # the listing still names a retired satellite's last plan (S1A's ended Jun 30, 2026)
-            print(f"{sat}: newest plan {name} ended {period[1]:%b %d, %Y}; left out")
-            continue
-        looks = P.next_looks(takes, area, after=now, min_share=0.2, limit=50)
-        latest["plans"][sat] = {"key": f"{PLAN_PREFIX}/{name}.kml", "name": name,
-                                "period": [period[0].strftime("%Y-%m-%dT%H:%M:%SZ"), period[1].strftime("%Y-%m-%dT%H:%M:%SZ")],
-                                "takes": len(takes), "iw_looks_over_reserve": len(looks),
+    for sat, paths in chains.items():
+        # The newest plan first, then any older plan that still runs past it (ESA lays a short plan
+        # over a three-week one; the long one's later takes are still the latest word on those days).
+        chain = []
+        for path in paths:
+            data = fetch(HOST + path, timeout=60)
+            period, takes = P.parse_plan(data)
+            if not takes or period is None:
+                raise SystemExit(f"{sat}: the plan at {path} parsed to no takes or no period")
+            name = path.rsplit("/", 1)[1]
+            files[name] = data
+            chain.append((name, period, takes))
+        merged = P.merge_takes([(period, takes) for _, period, takes in chain])
+        looks = P.next_looks(merged, area, after=now, min_share=0.2, limit=50)
+        newest, (start, _), _ = chain[0]
+        end = max(period[1] for _, period, _ in chain)
+        latest["plans"][sat] = {"key": f"{PLAN_PREFIX}/{newest}.kml", "name": newest, "period": [iso(start), iso(end)],
+                                "chain": [{"key": f"{PLAN_PREFIX}/{n}.kml", "name": n, "period": [iso(p[0]), iso(p[1])]}
+                                          for n, p, _ in chain],
+                                "takes": len(merged), "iw_looks_over_reserve": len(looks),
                                 "next": looks[0].as_dict() if looks else None}
-        files[name] = data
         nxt = looks[0].as_dict() if looks else None
-        print(f"{sat}: {name} ({len(takes)} takes, to {period[1]:%b %d}); IW looks over the reserve {len(looks)}"
-              + (f", next {nxt['start']} ({nxt['share']:.0%})" if nxt else ""))
+        print(f"{sat}: {' + '.join(n for n, _, _ in chain)} ({len(merged)} takes, to {end:%b %d}); "
+              f"IW looks over the reserve {len(looks)}" + (f", next {nxt['start']} ({nxt['share']:.0%})" if nxt else ""))
     if dry:
         return 0
     import boto3
@@ -134,10 +149,11 @@ def check(bucket: str) -> int:
             end = datetime.fromisoformat(p["period"][1].replace("Z", "+00:00"))
             if end - now < AHEAD:
                 problems.append(f"{sat}: its plan ends {p['period'][1]}, under three days ahead")
-            elif not exists(p["key"]):
-                problems.append(f"{sat}: {p['key']} missing")
+            elif any(not exists(c["key"]) for c in p.get("chain") or [p]):
+                problems.append(f"{sat}: a plan file is missing ({', '.join(c['key'] for c in p.get('chain') or [p])})")
             else:
-                print(f"ok   plan {sat:29s} {p['name']} (to {p['period'][1][:10]})")
+                names = " + ".join(c["name"] for c in p.get("chain") or [p])
+                print(f"ok   plan {sat:29s} {names} (to {p['period'][1][:10]})")
     except Exception as e:
         problems.append(f"plans: {type(e).__name__}")
     for p in problems:

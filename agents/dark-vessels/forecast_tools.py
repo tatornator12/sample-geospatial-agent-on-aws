@@ -82,21 +82,24 @@ def plan_takes() -> tuple[list, dict]:
         try:
             html = urllib.request.urlopen(urllib.request.Request(LISTING, headers={"User-Agent": "agentic-ai-for-earth-demo"}),
                                           timeout=PLAN_REFRESH_S).read().decode("utf-8", "replace")
-            for sat, path in P.plan_links(html).items():
-                data = urllib.request.urlopen(HOST + path, timeout=PLAN_REFRESH_S).read()
-                period, t = P.parse_plan(data)
-                if period and period[1] > now:
-                    takes += t
-                    source["plans"][sat] = {"name": path.rsplit("/", 1)[1], "to": period[1].strftime("%Y-%m-%dT%H:%MZ")}
+            # The newest plan per satellite and any older one still running past it (plan_chain).
+            for sat, paths in P.plan_chain(html, now).items():
+                chain = [P.parse_plan(urllib.request.urlopen(HOST + path, timeout=PLAN_REFRESH_S).read()) for path in paths]
+                takes += P.merge_takes(chain)
+                end = max(period[1] for period, _ in chain if period)
+                source["plans"][sat] = {"name": " + ".join(p.rsplit("/", 1)[1] for p in paths), "to": end.strftime("%Y-%m-%dT%H:%MZ")}
             source.update(refreshed=True, fetched_at=now.strftime("%Y-%m-%dT%H:%M:%SZ"))
         except Exception as e:
             logger.warning("next_look: the plan refresh failed (%s); using the cached plans", type(e).__name__)
-            takes = []
+            takes, source["plans"] = [], {}
     if not takes:
         for sat, p in latest["plans"].items():
-            body = vs._s3().get_object(Bucket=vs.config.S3_BUCKET_NAME, Key=p["key"])["Body"].read()
-            takes += P.parse_plan(body)[1]
-            source["plans"][sat] = {"name": p["name"], "to": p["period"][1]}
+            chain = []
+            for c in p.get("chain") or [p]:      # latest.json before Oct 19 named one plan per satellite
+                body = vs._s3().get_object(Bucket=vs.config.S3_BUCKET_NAME, Key=c["key"])["Body"].read()
+                chain.append(P.parse_plan(body))
+            takes += P.merge_takes(chain)
+            source["plans"][sat] = {"name": " + ".join(c["name"] for c in p.get("chain") or [p]), "to": p["period"][1]}
     _plan_cache.update(at=now, takes=takes, source=source)
     return takes, source
 
