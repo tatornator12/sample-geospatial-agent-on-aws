@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
-from datetime import datetime, timedelta
 
 import numpy as np
 from shapely.geometry import mapping
@@ -18,8 +16,8 @@ from pass_tools import _built, target_features, targets_for
 
 logger = logging.getLogger(__name__)
 
-CLAIM_KM = 5.0              # a broadcasting target's hairline to its AIS position at the pass minute
-OURS_MATCH_KM = 1.0         # one of our targets with an AIS position this close is broadcasting
+CLAIM_KM = vs.CLAIM_KM
+OURS_MATCH_KM = vs.OURS_MATCH_KM
 MAX_EVIDENCE = 6
 INNOCENT = [
     {"id": "small_boat_no_ais", "says": "a small boat that need not carry AIS",
@@ -33,26 +31,8 @@ INNOCENT = [
 ]
 
 
-def _t(iso: str) -> datetime:
-    return datetime.fromisoformat(iso.replace("Z", "+00:00"))
-
-
-def heads_at(replay: dict, when: datetime, max_gap_h: float = 3.0) -> list[dict]:
-    """Every replay track's position at `when`, interpolated between hourly fixes up to `max_gap_h` apart."""
-    out = []
-    for tr in replay["tracks"]:
-        ts = [_t(x) for x in tr["t"]]
-        if not ts or when < ts[0] - timedelta(minutes=30) or when > ts[-1] + timedelta(hours=1):
-            continue
-        i = max(0, sum(1 for t in ts if t <= when) - 1)
-        lon, lat = tr["c"][i]
-        if i + 1 < len(ts) and (ts[i + 1] - ts[i]) <= timedelta(hours=max_gap_h) and ts[i] <= when:
-            a = (when - ts[i]) / (ts[i + 1] - ts[i])
-            lon = lon + a * (tr["c"][i + 1][0] - lon)
-            lat = lat + a * (tr["c"][i + 1][1] - lat)
-        minutes = round(min(abs((when - t).total_seconds()) for t in ts) / 60)
-        out.append({"lon": lon, "lat": lat, "type": tr.get("type", "unknown"), "fix_minutes": minutes})
-    return out
+_t = vs.parse_t
+heads_at = vs.heads_at
 
 
 def _coverage_key(pass_id: str) -> str:
@@ -99,8 +79,10 @@ async def check_ais_coverage(pass_id: str) -> str:
     heard_shape = mended.shape
     unproven = reserve.difference(heard_shape)
     share = cv.heard_share(heard, water)
+    # The share rides on the drawing, so the stage quotes the tool's number, never its own measure.
     heard_url = vs.put_json(f"{vs.vessels_prefix()}heard_{pass_id}.geojson",
-                            vs.fc([{"type": "Feature", "properties": {"kind": "heard"}, "geometry": mapping(heard_shape.simplify(0.002))}]))
+                            vs.fc([{"type": "Feature", "properties": {"kind": "heard", "share": round(share, 3)},
+                                    "geometry": mapping(heard_shape.simplify(0.002))}]))
     unproven_url = vs.put_json(f"{vs.vessels_prefix()}unproven_{pass_id}.geojson",
                                vs.fc([{"type": "Feature", "properties": {"kind": "unproven"}, "geometry": mapping(unproven.simplify(0.002))}]))
     vs.put_json(_coverage_key(pass_id), {"pass_id": pass_id, "heard_share": round(share, 3),
@@ -154,12 +136,12 @@ async def match_ais(pass_id: str) -> str:
     n = 0
     for t in targets:
         t["heard"] = cv.is_heard(heard, grid, t["lon"], t["lat"])
-        near = min(heads, key=lambda h: vs.km((t["lon"], t["lat"]), (h["lon"], h["lat"])), default=None)
-        near_km = vs.km((t["lon"], t["lat"]), (near["lon"], near["lat"])) if near else math.inf
+        near, near_km = vs.nearest_head(t, heads)
         if t["status"] == "port":
             pass
-        elif t["gfw_matched"] or (t["source"] == "ours" and near_km <= OURS_MATCH_KM):
+        elif vs.broadcasts(t, near_km):
             t["status"] = "broadcasting"
+            t["claimed"] = True
             if near_km <= CLAIM_KM:
                 t["claim"] = [round(near["lon"], 5), round(near["lat"], 5)]
         elif not t["heard"]:

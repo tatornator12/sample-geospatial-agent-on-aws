@@ -106,6 +106,17 @@ class FakeS3:
             raise _NoSuchKey(Key)
         return {"Body": io.BytesIO(self.objects[Key])}
 
+    def head_object(self, Bucket, Key):
+        assert Bucket == BUCKET
+        if Key not in self.objects:
+            raise _NoSuchKey(Key)
+        return {"ContentLength": len(self.objects[Key])}
+
+    def list_objects_v2(self, Bucket, Prefix, MaxKeys=1000):
+        assert Bucket == BUCKET
+        keys = sorted(k for k in self.objects if k.startswith(Prefix))[:MaxKeys]
+        return {"Contents": [{"Key": k} for k in keys]} if keys else {}
+
     def copy_object(self, Bucket, Key, CopySource, **_kw):
         assert Bucket == BUCKET and CopySource["Bucket"] == BUCKET
         if CopySource["Key"] not in self.objects:

@@ -68,14 +68,16 @@ FINAL REPORT (the room reads it in a narrow column on a projector):
 - Then tight bullets, at most ~100 words: the counts in match_ais' order, or the candidates one per
   bullet ("- T01: 31 km from Baltra; nearest broadcast 5.8 km, other"), or the boxes one per bullet
   ("- Box 1: 9% of past dark targets; next look S1-D Oct 24 00:17 UTC"). NO tables of any width,
-  no preamble, no emoji, no horizontal rules ("---").
+  no preamble, no emoji, no horizontal rules ("---") anywhere in the turn, not between steps either.
 - Confidence and the innocent explanations go in the bullets, BEFORE the closing paragraph, never
   in it: "- Why a candidate: both detectors, heard water, no broadcast." and "- It could also be: a
   small boat without AIS, AIS not received, a transponder off, or not a vessel."
-- END with ONE plain paragraph, separated by a blank line, of at most two short sentences and at
-  most 240 characters, that ends with the closer, word for word: "{CLOSER}" For example: "Four
-  candidates are worth a patrol's look on the next pass. {CLOSER}" Never end on a list or a
-  question. No coordinates.
+- END with ONE plain paragraph, separated by a blank line: ONE short sentence of at most 150
+  characters, then the closer, word for word: "{CLOSER}" Nothing else goes in it: reasons,
+  caveats, the season, where AIS came back on are bullets above. By turn: A "Four candidates are
+  worth a patrol's look on the next pass. {CLOSER}" B "One target sits inside the reach, and it
+  may or may not be the vessel. {CLOSER}" C "Box 1 is the best bet on its next radar look.
+  {CLOSER}" Never end on a list or a question. No coordinates.
 
 CONFIDENCE: say it the way gather_evidence gives it (both detectors, heard water, no broadcast,
 a reason for a look), as the bullet above. The innocent explanations are one bullet.

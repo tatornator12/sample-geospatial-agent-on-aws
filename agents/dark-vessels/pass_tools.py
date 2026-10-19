@@ -97,11 +97,32 @@ def targets_for(pass_id: str) -> list[dict]:
     return out
 
 
+def claim_targets(pass_id: str, targets: list[dict]) -> None:
+    """The claim, in place: each target a broadcast accounts for at the pass minute (GFW matched it,
+    or it is ours alone with an AIS position within 1 km) is `claimed`, with the hairline's far end
+    (`claim`, the AIS position) when that is within 5 km. It is the same rule match_ais uses for
+    "broadcasting"; nothing here calls anything dark: the left-alone targets stay plain."""
+    built = _built(pass_id)
+    entry = vs.pass_entry(pass_id)
+    try:
+        replay = vs.cached(built["products"]["replay"]["key"])
+    except Exception as e:
+        logger.warning("detect_vessels: no replay for %s (%s); no claims drawn", pass_id, type(e).__name__)
+        return
+    heads = vs.heads_at(replay, vs.parse_t(entry["sensed"]))
+    for t in targets:
+        near, near_km = vs.nearest_head(t, heads)
+        if vs.broadcasts(t, near_km):
+            t["claimed"] = True
+            if near_km <= vs.CLAIM_KM:
+                t["claim"] = [round(near["lon"], 5), round(near["lat"], 5)]
+
+
 def target_features(targets: list[dict]) -> dict:
     feats = []
     for t in targets:
         props = {k: t[k] for k in ("status", "source", "port_km") if k in t}
-        for k in ("label", "claim", "pair_km", "peak_db", "heard"):
+        for k in ("label", "claimed", "claim", "pair_km", "peak_db", "heard"):
             if t.get(k) is not None:
                 props[k] = t[k]
         feats.append(vs.point(t["lon"], t["lat"], **props))
@@ -116,10 +137,10 @@ async def detect_vessels(pass_id: str) -> str:
     Args:
         pass_id: From find_pass.
 
-    Returns: JSON with counts (ours, gfw, both within 1 km, port: moored or near the five ports),
-    targets_s3_url (the targets for the map), render (pass it to display_visual unchanged),
-    attribution, next_steps. Nothing is called dark here: that waits for check_ais_coverage and
-    match_ais.
+    Returns: JSON with counts (ours, gfw, both within 1 km, port: moored or near the five ports,
+    claimed_by_ais: a broadcast at the pass minute accounts for them), targets_s3_url (the targets for
+    the map), render (pass it to display_visual unchanged), attribution, next_steps. Nothing is called
+    dark here: that waits for check_ais_coverage and match_ais.
     """
     entry = vs.pass_entry(pass_id)
     if entry is None:
@@ -127,11 +148,13 @@ async def detect_vessels(pass_id: str) -> str:
     if not _built(pass_id):
         return json.dumps({"error": f"The targets for {pass_id} are not built (scripts/build_vessel_cache.py)."})
     targets = targets_for(pass_id)
+    claim_targets(pass_id, targets)
     url = vs.put_json(f"{vs.vessels_prefix()}targets_{pass_id}.geojson", target_features(targets))
     counts = {"ours": sum(t["source"] in ("ours", "both") for t in targets),
               "gfw": sum(t["source"] in ("gfw", "both") for t in targets),
               "both": sum(t["source"] == "both" for t in targets),
               "port": sum(t["status"] == "port" for t in targets),
+              "claimed_by_ais": sum(bool(t.get("claimed")) for t in targets),
               "targets": len(targets)}
     return json.dumps({
         "pass_id": pass_id, "counts": counts, "targets_s3_url": url,

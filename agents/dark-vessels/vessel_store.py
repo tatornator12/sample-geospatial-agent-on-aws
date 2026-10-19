@@ -14,6 +14,7 @@ import math
 import os
 import re
 import time
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 
@@ -40,6 +41,8 @@ PORT_KM = 10.0
 PASS_ID_RE = re.compile(r"^s1[a-d]-\d{8}t\d{4}$")
 CANDIDATE_ID_RE = re.compile(r"^T\d{2}$")
 ATTRIBUTION = "Powered by Global Fishing Watch."
+CLAIM_KM = 5.0              # a broadcasting target's hairline to its AIS position at the pass minute
+OURS_MATCH_KM = 1.0         # one of our targets with an AIS position this close is broadcasting
 
 # Fixed sentences (the eval checks them word for word).
 ON_FILE_ONLY = "I only investigate passes on file."
@@ -79,6 +82,21 @@ def put_json(key: str, body) -> str:
 
 def get_json(key: str):
     return json.loads(_s3().get_object(Bucket=config.S3_BUCKET_NAME, Key=key)["Body"].read())
+
+
+def exists(key: str) -> bool:
+    """Whether an object is there (a HEAD: never the body). Any refusal reads as not there."""
+    try:
+        _s3().head_object(Bucket=config.S3_BUCKET_NAME, Key=key)
+        return True
+    except Exception:
+        return False
+
+
+def list_keys(prefix: str, limit: int = 200) -> list[str]:
+    """The keys under a prefix (one page; a session folder holds a few dozen)."""
+    page = _s3().list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=prefix, MaxKeys=limit)
+    return [o["Key"] for o in page.get("Contents", [])]
 
 
 def copy_into_session(src_key: str, dst_key: str, content_type: str = "image/tiff") -> str:
@@ -186,6 +204,38 @@ def reserve_grid() -> tuple[Grid, np.ndarray]:
     water = np.array([[rp.contains(Point(grid.west + (c + .5) * step, grid.south + (r + .5) * step)) for c in range(wd)]
                       for r in range(h)])
     return grid, water
+
+
+def parse_t(iso: str) -> datetime:
+    return datetime.fromisoformat(iso.replace("Z", "+00:00"))
+
+
+def heads_at(replay: dict, when: datetime, max_gap_h: float = 3.0) -> list[dict]:
+    """Every replay track's position at `when`, interpolated between hourly fixes up to `max_gap_h` apart."""
+    out = []
+    for tr in replay["tracks"]:
+        ts = [parse_t(x) for x in tr["t"]]
+        if not ts or when < ts[0] - timedelta(minutes=30) or when > ts[-1] + timedelta(hours=1):
+            continue
+        i = max(0, sum(1 for t in ts if t <= when) - 1)
+        lon, lat = tr["c"][i]
+        if i + 1 < len(ts) and (ts[i + 1] - ts[i]) <= timedelta(hours=max_gap_h) and ts[i] <= when:
+            a = (when - ts[i]) / (ts[i + 1] - ts[i])
+            lon = lon + a * (tr["c"][i + 1][0] - lon)
+            lat = lat + a * (tr["c"][i + 1][1] - lat)
+        minutes = round(min(abs((when - t).total_seconds()) for t in ts) / 60)
+        out.append({"lon": lon, "lat": lat, "type": tr.get("type", "unknown"), "fix_minutes": minutes})
+    return out
+
+
+def nearest_head(target: dict, heads: list[dict]) -> tuple[dict | None, float]:
+    near = min(heads, key=lambda h: km((target["lon"], target["lat"]), (h["lon"], h["lat"])), default=None)
+    return near, (km((target["lon"], target["lat"]), (near["lon"], near["lat"])) if near else math.inf)
+
+
+def broadcasts(target: dict, near_km: float) -> bool:
+    """A target AIS claims: GFW matched it to a broadcast, or it is ours alone with a broadcast within 1 km."""
+    return target["status"] != "port" and bool(target.get("gfw_matched") or (target["source"] == "ours" and near_km <= OURS_MATCH_KM))
 
 
 def fc(features: list[dict]) -> dict:

@@ -18,9 +18,10 @@ from strands.types.content import SystemContentBlock  # noqa: E402
 from strands.agent.conversation_manager import SlidingWindowConversationManager  # noqa: E402
 from strands.session.s3_session_manager import S3SessionManager  # noqa: E402
 
-from utils.tools import display_visual, inspect_image  # noqa: E402
+from utils.tools import inspect_image  # noqa: E402
 
 import vessels_config  # noqa: E402
+from display_tools import display_visual  # noqa: E402
 from ais_tools import check_ais_coverage, gather_evidence, match_ais  # noqa: E402
 from forecast_tools import fleet_pattern, next_look, predict_hotspots, reachable_area  # noqa: E402
 from pass_tools import detect_vessels, find_pass  # noqa: E402

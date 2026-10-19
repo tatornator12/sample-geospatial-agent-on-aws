@@ -44,10 +44,15 @@ def test_a_pass_not_on_file_is_refused_with_the_passes_on_file(vessels):
 
 def test_detect_vessels_counts_both_detectors_and_sets_the_port_boats_aside(vessels):
     out = run(vessels.pt.detect_vessels(STAR))
-    assert out["counts"] == {"ours": 5, "gfw": 5, "both": 4, "port": 1, "targets": 6}
+    assert out["counts"] == {"ours": 5, "gfw": 5, "both": 4, "port": 1, "claimed_by_ais": 1, "targets": 6}
     layer = vessels.s3.json(f"{PRE}targets_{STAR}.geojson")
     assert {f["properties"]["status"] for f in layer["features"]} == {"detected", "port"}
     assert "candidate" not in json.dumps(out)
+    # The claim beat (before coverage): the broadcast that accounts for C, its hairline's far end;
+    # the targets left alone carry nothing that calls them dark.
+    claimed = [f for f in layer["features"] if f["properties"].get("claimed")]
+    assert len(claimed) == 1 and claimed[0]["geometry"]["coordinates"][0] == pytest.approx(C[0], abs=0.01)
+    assert claimed[0]["properties"]["claim"] and all("label" not in f["properties"] for f in layer["features"])
 
 
 def test_nothing_is_a_candidate_before_the_coverage_check(vessels):
@@ -58,7 +63,8 @@ def test_nothing_is_a_candidate_before_the_coverage_check(vessels):
 def test_coverage_then_match_gives_every_status_in_order(vessels):
     cov = run(vessels.ais.check_ais_coverage(STAR))
     assert 0 < cov["heard_share"] < 0.2 and cov["unproven_means"] == "not evidence"
-    assert vessels.s3.json(f"{PRE}heard_{STAR}.geojson")["features"][0]["properties"]["kind"] == "heard"
+    heard_props = vessels.s3.json(f"{PRE}heard_{STAR}.geojson")["features"][0]["properties"]
+    assert heard_props == {"kind": "heard", "share": cov["heard_share"]}       # the stage quotes the tool's share
     out = run(vessels.ais.match_ais(STAR))
     assert out["counts"] == {"broadcasting": 1, "port": 1, "unproven": 1, "seen_once": 2, "candidate": 1}
     assert out["say_in_order"][0] == "broadcasting" and out["fixed_sentence"] == vessels.vs.CANDIDATE_SENTENCE
@@ -208,3 +214,29 @@ def test_the_tasking_is_drafted_from_the_records_and_only_the_officer_files_it(v
     filed = run(vessels.tk.tasking_status(tid))
     assert filed["status"] == "filed" and filed["say"] == "Filed by the officer. The agent did not file it."
     assert run(vessels.tk.tasking_status("../x"))["error"]
+
+
+# --- display_visual: only files this session wrote ------------------------------------------------
+
+def test_display_visual_passes_a_file_the_session_wrote(vessels):
+    import display_tools
+    url = vessels.vs.put_json(f"{vessels.vs.vessels_prefix()}fleet_2026-10.geojson", {"type": "FeatureCollection", "features": []})
+    out = json.loads(asyncio.run(display_tools.display_visual(url, "Squid fleet")))
+    assert out == {"status": "success"}
+
+
+def test_display_visual_refuses_a_mistyped_file_and_names_the_one_meant(vessels):
+    import display_tools
+    url = vessels.vs.put_json(f"{vessels.vs.vessels_prefix()}fleet_2026-10.geojson", {"type": "FeatureCollection", "features": []})
+    out = json.loads(asyncio.run(display_tools.display_visual(url.replace("2026-10", "2026_10"), "Squid fleet")))
+    assert "not in this session" in out["error"]
+    assert out["did_you_mean"] == url
+    # Nothing like it: refused without a guess.
+    out = json.loads(asyncio.run(display_tools.display_visual(url.replace("fleet_2026-10", "boxes_v2"), "Boxes")))
+    assert "did_you_mean" not in out and "not in this session" in out["error"]
+
+
+def test_display_visual_leaves_files_outside_the_session_to_the_stage(vessels):
+    import display_tools
+    out = json.loads(asyncio.run(display_tools.display_visual("s3://test-bucket/use-cases/vessels-galapagos/boxes.geojson", "Boxes")))
+    assert out == {"status": "success"}

@@ -231,6 +231,92 @@ def display(db: np.ndarray, shown: np.ndarray) -> tuple[np.ndarray, list[float]]
     return out, [round(lo, 2), round(hi, 2)]
 
 
+# The stage's radar (Oct 19, the Act 3 critique): on one stretch the near range burned (the column
+# medians ran 220 to 30 across the Oct 12 swath), so the brightest thing on the stage was empty sea.
+# The display is now the radar over its local sea: dB minus a smooth background (the median of the
+# open sea in blocks of about 17 km, filled and smoothed, then bilinear), so the sea sits in one low
+# band at every range and only what stands above it (vessels, rocks, the odd breaking wave) goes bright.
+FLAT_BLOCK_PX = 375                 # 0.15 deg at 0.0004 deg
+FLAT_RANGE_DB = (-4.0, 12.0)        # over the local sea, to 1..255
+FLAT_GAMMA = 0.9
+
+
+def _nan_fill(a: np.ndarray, passes: int = 40) -> np.ndarray:
+    """Fill NaN cells with the mean of their filled neighbours, outward, until none are left."""
+    a = a.copy()
+    for _ in range(passes):
+        holes = np.isnan(a)
+        if not holes.any():
+            break
+        p = np.pad(a, 1, constant_values=np.nan)
+        stack = np.stack([p[1 + dy:1 + dy + a.shape[0], 1 + dx:1 + dx + a.shape[1]]
+                          for dy in (-1, 0, 1) for dx in (-1, 0, 1) if dy or dx])
+        with np.errstate(invalid="ignore"):
+            mean = np.nanmean(stack, axis=0)
+        a[holes] = mean[holes]
+    return np.where(np.isnan(a), np.nanmedian(a), a)
+
+
+def _upsample(coarse: np.ndarray, shape: tuple[int, int], block: int) -> np.ndarray:
+    """Bilinear from block centres to every pixel, one axis at a time (numpy only)."""
+    cy = (np.arange(coarse.shape[0]) + 0.5) * block
+    cx = (np.arange(coarse.shape[1]) + 0.5) * block
+    xs = np.arange(shape[1]) + 0.5
+    rows = np.stack([np.interp(xs, cx, coarse[r]) for r in range(coarse.shape[0])])
+    ys = np.arange(shape[0]) + 0.5
+    out = np.empty(shape, dtype=np.float32)
+    for c0 in range(0, shape[1], 1024):
+        sl = rows[:, c0:c0 + 1024]
+        out[:, c0:c0 + 1024] = np.stack([np.interp(ys, cy, sl[:, j]) for j in range(sl.shape[1])], axis=1)
+    return out
+
+
+def flat_display(db: np.ndarray, shown: np.ndarray, block: int = FLAT_BLOCK_PX) -> tuple[np.ndarray, list[float]]:
+    """The radar over its local sea, to 1..255 (0 where nothing is shown)."""
+    h, w = db.shape
+    ny, nx = -(-h // block), -(-w // block)
+    coarse = np.full((ny, nx), np.nan, dtype=np.float32)
+    for j in range(ny):
+        for i in range(nx):
+            sl = (slice(j * block, (j + 1) * block), slice(i * block, (i + 1) * block))
+            vals = db[sl][shown[sl]]
+            if vals.size > 0.05 * block * block:
+                coarse[j, i] = np.median(vals[:: max(1, vals.size // 20_000)])
+    coarse = _nan_fill(coarse)
+    p = np.pad(coarse, 1, mode="edge")
+    coarse = sum(p[1 + dy:1 + dy + ny, 1 + dx:1 + dx + nx] for dy in (-1, 0, 1) for dx in (-1, 0, 1)) / 9.0
+    bg = _upsample(coarse, (h, w), block)
+    lo, hi = FLAT_RANGE_DB
+    out = np.zeros((h, w), dtype=np.uint8)
+    g = np.clip((db[shown] - bg[shown] - lo) / (hi - lo), 0, 1) ** FLAT_GAMMA
+    out[shown] = (1 + g * 254).astype(np.uint8)
+    return out, [lo, hi]
+
+
+def rebuild_displays(out: Path) -> dict[str, int]:
+    """Every pass's display again from its own vv (no radar read): the radar over its local sea."""
+    sizes = {}
+    for vv_path in sorted(out.glob("*_vv.tif")):
+        pid = vv_path.name[: -len("_vv.tif")]
+        disp_path = out / f"{pid}_display.tif"
+        t0 = time.time()
+        with rasterio.open(vv_path) as v:
+            raw = v.read(1)
+            transform, tags = v.transform, v.tags()
+        with rasterio.open(disp_path) as d:
+            shown = d.read(1) > 0          # the old display's mask: open sea, land and its 250 m buffer left out
+        db = np.where(raw != -32768, raw.astype(np.float32) / 100.0, np.nan)
+        del raw
+        disp, stretch = flat_display(db, shown & np.isfinite(db))
+        del db
+        tags = {k: tags[k] for k in ("PASS", "SENSED", "SOURCE") if k in tags}
+        sizes[pid] = write_cog(disp_path, disp, transform, 0, {
+            **tags, "NOTE": "VV over its local sea (dB minus the open sea's median in 17 km blocks), contrast only",
+            "STRETCH_DB": json.dumps(stretch)})
+        print(f"  {pid}: display over the local sea, {sizes[pid] / 1e6:.1f} MB in {time.time() - t0:.0f}s", flush=True)
+    return sizes
+
+
 # --- GFW ------------------------------------------------------------------------------------------
 
 def gfw_detections(day: date, area: tuple, reserve, ports) -> list[dict]:
@@ -590,8 +676,18 @@ def main() -> int:
     ap.add_argument("--chips", action="store_true", help=f"cut the evidence chips for the passes of the last build in {LOCAL}")
     ap.add_argument("--records-from-local", action="store_true",
                     help=f"rebuild the manifest records (and --update-passes) from the files in {LOCAL}, reading nothing remote")
+    ap.add_argument("--display", action="store_true",
+                    help=f"rebuild every pass's display from its vv in {LOCAL} (the radar over its local sea) and upload only those")
     ap.add_argument("--bucket")
     args = ap.parse_args()
+    if args.display:
+        sizes = rebuild_displays(LOCAL)
+        problems = scan(LOCAL)
+        if problems:
+            raise SystemExit(f"the identity scan found {len(problems)} problem(s): nothing uploaded")
+        if args.dry_run:
+            return 0
+        return upload_displays(LOCAL, bucket_name(args.bucket), sizes)
     if args.records_from_local:
         on_file = json.loads(PASSES.read_text())
         reserve, _, _ = records()
@@ -685,6 +781,28 @@ def upload(out: Path, bucket: str, built: dict, history: dict | None, fleet: dic
         raise SystemExit("the manifest failed the identity scan")
     s3.put_object(Bucket=bucket, Key=key, Body=body.encode(), ContentType="application/json")
     print(f"uploaded {len(list(out.iterdir()))} files to s3://{bucket}/{PREFIX}/; manifest: {len(manifest['passes'])} passes")
+    return 0
+
+
+def upload_displays(out: Path, bucket: str, sizes: dict[str, int]) -> int:
+    """Only the rebuilt displays, and their sizes and stretch in the manifest."""
+    import boto3
+    s3 = boto3.client("s3")
+    key = f"{PREFIX}/manifest.json"
+    manifest = json.loads(s3.get_object(Bucket=bucket, Key=key)["Body"].read())
+    for pid, size in sizes.items():
+        rec = manifest["passes"].get(pid)
+        if not rec:
+            print(f"  {pid}: not in the manifest; skipped")
+            continue
+        s3.upload_file(str(out / f"{pid}_display.tif"), bucket, f"{PREFIX}/{pid}_display.tif", ExtraArgs={"ContentType": "image/tiff"})
+        rec["products"]["display"]["bytes"] = size
+        rec["display"] = {"over_local_sea_db": list(FLAT_RANGE_DB), "block_km": 17}
+    body = json.dumps(manifest, indent=1)
+    if gfw.scan_identity(body):
+        raise SystemExit("the manifest failed the identity scan")
+    s3.put_object(Bucket=bucket, Key=key, Body=body.encode(), ContentType="application/json")
+    print(f"uploaded {len(sizes)} displays to s3://{bucket}/{PREFIX}/ and the manifest")
     return 0
 
 
