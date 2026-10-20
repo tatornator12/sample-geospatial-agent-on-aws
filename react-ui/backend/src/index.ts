@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand, StopRuntimeSessionCommand } from '@aws-sdk/client-bedrock-agentcore';
 import { S3Client, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import { checkS3Access } from './s3Access';
+import { abortOnClientClose, relayAgentStream } from './invokeStream';
 import { isScenarioId, scenarioAgent, scenarioLayers, scenarioToolCalls } from './scenario';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Readable } from 'stream';
@@ -321,6 +322,10 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
     console.log(`🔥 Scenario mode requested: ${scenario_id}`);
   }
 
+  // The stage ends a turn (New session, Stop, Esc) by dropping this request: from then on nothing
+  // is read from AgentCore or written here.
+  const abortSignal = abortOnClientClose(res).signal;
+
   // Set headers for SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -344,6 +349,10 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
       res.write(`: keepalive\n\n`);
     }
   }, 10000);
+  abortSignal.addEventListener('abort', () => {
+    clearInterval(keepaliveInterval);
+    console.log(`🛑 Client closed; aborted the agent stream (session ${sessionId}, agent "${agent.id}")`);
+  }, { once: true });
 
   try {
     const bedrockClient = bedrockClientFor(agent.region);
@@ -352,6 +361,7 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
       console.log(`⏳ Session ${sessionId} is still warming; waiting before invoking`);
       await warming;
     }
+    if (abortSignal.aborted) return;
     console.log(`Invoking agent "${agent.id}" (${agent.region}) with session: ${sessionId}`);
 
     // Build agent payload with proper typing
@@ -379,6 +389,7 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
       try {
         response = await bedrockClient.send(command, {
           requestTimeout: 300000,  // 5 min timeout for long tool executions
+          abortSignal,
         });
 
         if (attempt > 1) {
@@ -391,11 +402,14 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
       } catch (error) {
         lastError = error;
 
+        // The client left: an aborted call is never retried.
+        if (abortSignal.aborted) throw error;
         if (isThrottlingError(error) && attempt < maxRetries) {
           console.warn(`⏳ Rate limit hit on attempt ${attempt}/${maxRetries}. Waiting 5 seconds before retry...`);
           // Notify frontend about retry
           res.write(`data: ${JSON.stringify({ type: 'chunk', content: `\n[Rate limit hit, retrying in 5 seconds... (attempt ${attempt}/${maxRetries})]\n` })}\n\n`);
           await sleep(5000);
+          if (abortSignal.aborted) return;
           continue; // Retry
         } else {
           // Non-throttling error or max retries exceeded
@@ -408,84 +422,19 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
       throw lastError || new Error('Failed to invoke agent after retries');
     }
 
-    // Stream the response - mimicking Python's iter_lines() behavior
+    // Stream the response - mimicking Python's iter_lines() behavior (see invokeStream.ts)
     if (response.response) {
-      const stream = response.response as any;
-
-      // The response is an SSE stream from Bedrock, similar to Python version
-      let buffer = '';
-      let chunkCount = 0;
-      let totalBytes = 0;
-
       try {
-        for await (const chunk of stream) {
-          if (chunk) {
-            chunkCount++;
-            // Decode the chunk
-            const chunkText = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
-            totalBytes += chunkText.length;
-            buffer += chunkText;
-
-            if (chunkCount <= 3 || chunkCount % 10 === 0) {
-              console.log(`📦 Chunk #${chunkCount}: ${chunkText.length} bytes (total: ${totalBytes})`);
-            }
-
-            // Process complete lines (SSE format: "data: ...")
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.substring(6).trim();
-                if (data && data !== '[DONE]') {
-                  // Remove outer quotes if present (SSE wraps data in quotes)
-                  let cleaned = data;
-                  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-                    cleaned = cleaned.slice(1, -1);
-                    // After removing outer quotes, unescape the content
-                    // This converts {\"toolUseId\": ...} back to {"toolUseId": ...}
-                    cleaned = cleaned.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
-                  }
-
-                  if (cleaned) {
-                    // Send to frontend
-                    res.write(`data: ${JSON.stringify({ type: 'chunk', content: cleaned })}\n\n`);
-                  }
-                }
-              } else if (line.trim() && !line.startsWith(':')) {
-                // Log non-empty, non-comment lines that aren't data: prefixed
-                console.log(`⚠️ Non-data SSE line: ${line.substring(0, 100)}`);
-              }
-            }
-          }
+        const relay = await relayAgentStream(response.response as any, res, abortSignal);
+        if (relay.aborted) {
+          console.log(`🛑 Stopped relaying after ${relay.chunks} chunks, ${relay.bytes} bytes`);
+          return;
         }
-        console.log(`✅ Bedrock stream completed successfully (${chunkCount} chunks, ${totalBytes} bytes)`);
-      } catch (streamError) {
-        console.error(`❌ Error reading from Bedrock stream after ${chunkCount} chunks, ${totalBytes} bytes:`, streamError);
-        throw streamError;
       } finally {
         clearInterval(keepaliveInterval);
       }
-
-      // Process any remaining data in buffer
-      if (buffer.trim()) {
-        if (buffer.startsWith('data: ')) {
-          const data = buffer.substring(6).trim();
-          if (data && data !== '[DONE]') {
-            // Remove outer quotes if present (SSE wraps data in quotes)
-            let cleaned = data;
-            if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-              cleaned = cleaned.slice(1, -1);
-              // After removing outer quotes, unescape the content
-              cleaned = cleaned.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
-            }
-            if (cleaned) {
-              res.write(`data: ${JSON.stringify({ type: 'chunk', content: cleaned })}\n\n`);
-            }
-          }
-        }
-      }
     }
+    if (abortSignal.aborted) return;
 
     // Send completion event
     console.log('📡 Sending done event to frontend');
@@ -500,8 +449,10 @@ app.post('/api/agent/invoke', async (req: Request, res: Response) => {
     res.end();
 
   } catch (error) {
-    console.error('Error invoking agent:', error);
     clearInterval(keepaliveInterval);
+    // The client left (New session, Stop, Esc): the abort is the expected end, and nobody reads on.
+    if (abortSignal.aborted) return;
+    console.error('Error invoking agent:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     // Detect the AgentCore "runtime failed to start / crashed" condition.

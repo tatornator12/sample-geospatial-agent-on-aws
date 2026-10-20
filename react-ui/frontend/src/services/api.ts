@@ -76,13 +76,17 @@ export async function listAgents(): Promise<AgentList> {
 }
 
 /**
- * Stream agent responses using Server-Sent Events
+ * Stream agent responses using Server-Sent Events.
+ *
+ * `signal` ends the turn: the request is aborted, the body is cancelled (so the backend sees the
+ * client leave and stops the agent's stream), and the generator returns quietly.
  */
 export async function* streamAgentInvoke(
   prompt: string,
   sessionId: string,
   scenarioId?: string,
-  agentId?: string
+  agentId?: string,
+  signal?: AbortSignal
 ): AsyncGenerator<StreamEvent> {
   const payload: AgentInvokePayload = { prompt, sessionId };
   if (scenarioId) {
@@ -94,11 +98,22 @@ export async function* streamAgentInvoke(
   }
   console.log('📤 Agent payload:', payload);
 
-  const response = await fetch(`${API_URL}/api/agent/invoke`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(payload),
-  });
+  const isAbort = (error: unknown) =>
+    !!signal?.aborted || (error instanceof Error && error.name === 'AbortError');
+
+  if (signal?.aborted) return;
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/agent/invoke`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+      signal,
+    });
+  } catch (error) {
+    if (isAbort(error)) return; // the turn was ended before the stream opened
+    throw error;
+  }
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
@@ -112,13 +127,24 @@ export async function* streamAgentInvoke(
   const decoder = new TextDecoder();
   let buffer = '';
   let receivedDoneEvent = false;
+  // The stream ran to its end (the reader finished, or the backend said done).
+  let finished = false;
+  // Ending the turn cancels the body at once, so a pending read resolves and the connection closes.
+  const cancelBody = () => {
+    reader.cancel().catch(() => {
+      // already closed
+    });
+  };
+  signal?.addEventListener('abort', cancelBody);
 
   try {
     while (true) {
       const { done, value } = await reader.read();
+      if (signal?.aborted) return;
 
       if (done) {
         console.log('📡 Stream reader done');
+        finished = true;
         break;
       }
 
@@ -138,10 +164,12 @@ export async function* streamAgentInvoke(
               if (event.type === 'done') {
                 console.log('📡 Received done event from backend - exiting read loop');
                 receivedDoneEvent = true;
+                finished = true;
                 // Break out of both loops
                 return;
               }
               yield event;
+              if (signal?.aborted) return;
             } catch (e) {
               console.error('Failed to parse SSE data:', e);
             }
@@ -150,6 +178,9 @@ export async function* streamAgentInvoke(
       }
     }
   } catch (error) {
+    // The turn was ended (New session, Stop, Esc): not an error, nothing more to read.
+    if (isAbort(error)) return;
+
     // If we received a 'done' event and then got a network error, treat it as normal completion
     if (receivedDoneEvent && error instanceof Error && error.message === 'network error') {
       console.log('📡 Network error after done event - treating as normal completion');
@@ -185,6 +216,10 @@ export async function* streamAgentInvoke(
       return;
     }
   } finally {
+    signal?.removeEventListener('abort', cancelBody);
+    // Left before the end (aborted, or the caller stopped reading): close the connection too,
+    // so the backend stops relaying a turn nobody is reading.
+    if (!finished) cancelBody();
     try {
       reader.releaseLock();
       console.log('📡 Reader lock released');

@@ -125,7 +125,6 @@ export function ChatSidebar({
     onWorkingChange?.(isStreaming);
   }, [isStreaming, onWorkingChange]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [openEvidence, setOpenEvidence] = useState<{ item: EvidenceItem; imageUrl: string } | null>(null);
   const closeEvidence = useCallback(() => setOpenEvidence(null), []);
@@ -140,10 +139,17 @@ export function ChatSidebar({
     agentId,
     processing: false,
   });
+  // The turn in flight, if any. Ending it (New session, Stop, Esc, leaving the stage) aborts its
+  // request, so the backend stops relaying the agent, and every step of the turn checks it is
+  // still the current one before it touches the stage.
+  const turnRef = useRef<{ id: number; ctl: AbortController } | null>(null);
+  const turnSeq = useRef(0);
 
   useEffect(() => {
     // A new session while an agent is still streaming (act switched, New session pressed):
-    // stop that runtime; the old loop sees liveSessionRef move on and drops its events.
+    // end the turn and stop that runtime; nothing more from the old turn reaches the stage.
+    turnRef.current?.ctl.abort();
+    turnRef.current = null;
     const owner = streamOwnerRef.current;
     if (owner.processing && owner.sessionId !== sessionId) {
       owner.processing = false;
@@ -158,7 +164,6 @@ export function ChatSidebar({
     setStreamingTools([]);
     setIsStreaming(false);
     setIsProcessing(false);
-    setIsCancelling(false);
     scenarioDisplayedRef.current = false;
     // Clear any cached raster URLs from previous session
     (window as any).__lastRasterUrls = '';
@@ -177,6 +182,22 @@ export function ChatSidebar({
       ]);
     }
   }, [sessionId]);
+
+  // Leaving the stage (the replay gallery, How it works) mid-turn ends the turn and its runtime.
+  useEffect(
+    () => () => {
+      const turn = turnRef.current;
+      turnRef.current = null;
+      if (!turn) return;
+      turn.ctl.abort();
+      const owner = streamOwnerRef.current;
+      if (owner.processing) {
+        owner.processing = false;
+        void stopRuntimeSession(owner.sessionId, owner.agentId);
+      }
+    },
+    []
+  );
 
   // Handle drawn geometry message from map
   useEffect(() => {
@@ -243,24 +264,45 @@ export function ChatSidebar({
     onRastersUpdate([]);
   };
 
-  const handleCancelSession = async () => {
+  // Stop (the button or Esc): the turn ends here and now. Its request is aborted, so the backend
+  // stops relaying the agent and nothing more from it reaches the stage; the runtime is told to
+  // stop in the background, and the console is free at once.
+  const stopTurn = useCallback(() => {
+    const turn = turnRef.current;
+    if (!turn) return;
+    turnRef.current = null;
+    turn.ctl.abort();
+    streamOwnerRef.current.processing = false;
+    setIsStreaming(false);
+    setIsProcessing(false);
+    setMessages((prev) => [...prev, { role: 'assistant', content: 'Stopped by the presenter.' }]);
+    console.log('Stopped the turn; stopping session:', sessionId);
+    void stopRuntimeSession(sessionId, agentId).then((stopped) => {
+      if (!stopped) console.error('Could not stop the runtime session', sessionId);
+    });
+  }, [sessionId, agentId]);
+
+  // Esc stops a turn from anywhere on the stage (the console's input is disabled while the agent
+  // works, so it cannot hold the focus). Controls that own Escape keep it: a dialog, the evidence
+  // plate and the agent picker (they prevent the default), sliders, lists and fields.
+  useEffect(() => {
     if (!isProcessing) return;
-
-    setIsCancelling(true);
-    console.log('Cancelling session:', sessionId);
-
-    const success = await stopRuntimeSession(sessionId, agentId);
-
-    if (success) {
-      setIsStreaming(false);
-      setIsProcessing(false);
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Stopped by the presenter.' }]);
-    } else {
-      console.error('Failed to cancel session');
-    }
-
-    setIsCancelling(false);
-  };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const target = e.target;
+      if (
+        target instanceof Element &&
+        target.closest('input, select, [role="slider"], [role="listbox"], [role="menu"]')
+      ) {
+        return;
+      }
+      e.preventDefault();
+      stopTurn();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isProcessing, stopTurn]);
 
   const sendMessage = async (override?: string) => {
     const prompt = (override ?? userInput).trim();
@@ -268,9 +310,17 @@ export function ChatSidebar({
       return;
     }
 
+    // This turn's token: anything still in flight from an earlier one is ended, and every step
+    // below checks `stale()` before it changes the stage.
+    turnRef.current?.ctl.abort();
+    const myTurn = { id: ++turnSeq.current, ctl: new AbortController() };
+    turnRef.current = myTurn;
+    const stale = () => turnRef.current !== myTurn || liveSessionRef.current !== sessionId;
+    const myOwner = { sessionId, agentId, processing: true };
+
     setUserInput('');
     setIsProcessing(true);
-    streamOwnerRef.current = { sessionId, agentId, processing: true };
+    streamOwnerRef.current = myOwner;
 
     setMessages((prev) => [...prev, { role: 'user', content: prompt }]);
 
@@ -304,6 +354,8 @@ export function ChatSidebar({
               setTimeout(() => reject(new Error('Geometry loading timeout')), 15000)
             ),
           ]);
+          // The turn ended while the file loaded: it never reaches the new session's map.
+          if (stale()) return;
           if (geometry) {
             geometry.locationName = g.title;
             geometry.sourceUrl = g.url;
@@ -327,9 +379,9 @@ export function ChatSidebar({
     let streamCompletedNormally = false;
 
     try {
-      for await (const event of streamAgentInvoke(prompt, sessionId, scenarioId, agentId)) {
-        // Superseded by a newer session (act switched mid-run): drop the rest of this stream.
-        if (liveSessionRef.current !== sessionId) {
+      for await (const event of streamAgentInvoke(prompt, sessionId, scenarioId, agentId, myTurn.ctl.signal)) {
+        // Ended (New session, act switched, Stop, Esc): drop the rest of this stream.
+        if (stale()) {
           return;
         }
         if (event.type === 'chunk' && event.content) {
@@ -364,6 +416,7 @@ export function ChatSidebar({
             // overlays, ...). Multiple geometries stack as separate map layers.
             if (allGeometryData.length > 0) {
               await loadNewGeometries(allGeometryData);
+              if (stale()) return;
             }
 
             // Handle raster updates with debouncing to prevent excessive updates
@@ -382,7 +435,7 @@ export function ChatSidebar({
 
                 // Use setTimeout to defer raster updates and prevent blocking the stream
                 setTimeout(() => {
-                  onRastersUpdate(rasters);
+                  if (!stale()) onRastersUpdate(rasters);
                 }, 0);
 
                 lastRasterCount = allRasterData.length;
@@ -413,6 +466,10 @@ export function ChatSidebar({
         }
       }
 
+      // Ended while the last event was in flight (or the stream closed because it was ended):
+      // the turn's layers and answer never land in the session that follows.
+      if (stale()) return;
+
       // Mark stream as completed normally
       streamCompletedNormally = true;
 
@@ -430,6 +487,7 @@ export function ChatSidebar({
       // Final pass: load any geometries the streaming loop didn't get to.
       if (finalGeometryData.length > 0) {
         await loadNewGeometries(finalGeometryData);
+        if (stale()) return;
       }
 
       // Handle final raster updates
@@ -448,7 +506,7 @@ export function ChatSidebar({
 
           // Defer final raster update to prevent blocking
           setTimeout(() => {
-            onRastersUpdate(rasters);
+            if (!stale()) onRastersUpdate(rasters);
           }, 0);
 
           lastRasterCount = finalRasterData.length;
@@ -463,6 +521,7 @@ export function ChatSidebar({
         status: 'completed' as const,
       }));
 
+      if (stale()) return;
       setMessages((prev) => [
         ...prev,
         {
@@ -475,20 +534,21 @@ export function ChatSidebar({
     } catch (error) {
       console.error('Exception while calling agent:', error);
 
-      // Show user-friendly error message, unless a newer session owns the stage now.
-      if (liveSessionRef.current === sessionId) {
+      // Show user-friendly error message, unless the turn was ended or a newer one owns the stage.
+      if (!stale()) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errorMessage}` }]);
       }
     } finally {
-      // Only the stream that still owns the stage may clear the working state; a superseded
-      // stream finishing late must not stomp on a session that is already running again.
-      if (liveSessionRef.current === sessionId) {
+      // Only the turn that still owns the stage may clear the working state; an ended turn
+      // finishing late must not stomp on a session or a turn that is already running again.
+      if (turnRef.current === myTurn) {
+        turnRef.current = null;
         setIsStreaming(false);
         setIsProcessing(false);
       }
-      if (streamOwnerRef.current.sessionId === sessionId) {
-        streamOwnerRef.current.processing = false;
+      if (streamOwnerRef.current === myOwner) {
+        myOwner.processing = false;
       }
 
       if (!streamCompletedNormally) {
@@ -497,14 +557,11 @@ export function ChatSidebar({
     }
   };
 
+  // Esc while working is the window listener above (this field is disabled then).
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void sendMessage();
-    }
-    if (e.key === 'Escape' && isProcessing) {
-      e.preventDefault();
-      void handleCancelSession();
     }
   };
 
@@ -721,14 +778,9 @@ export function ChatSidebar({
           />
           <div className="docent-actions">
             {isProcessing ? (
-              <button
-                type="button"
-                className="stage-btn stage-btn--danger"
-                onClick={handleCancelSession}
-                disabled={isCancelling}
-              >
+              <button type="button" className="stage-btn stage-btn--danger" onClick={stopTurn}>
                 <Icon name="stop" size={14} />
-                {isCancelling ? 'Stopping' : 'Stop'}
+                Stop
               </button>
             ) : (
               <button type="submit" className="stage-btn stage-btn--primary" disabled={!canSend}>

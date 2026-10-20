@@ -3,7 +3,8 @@
  * module-level API URL resolves to http://localhost:3001.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { listAgents, prewarmSession } from './api.ts';
+import { listAgents, prewarmSession, streamAgentInvoke } from './api.ts';
+import type { StreamEvent } from '../types.ts';
 
 function fetchResponding(status: number, payload: unknown) {
   return vi.fn().mockResolvedValue({
@@ -84,5 +85,124 @@ describe('prewarmSession', () => {
 
     vi.stubGlobal('fetch', fetchResponding(503, { error: 'no runtime' }));
     expect(await prewarmSession('0123456789abcdef0123456789abcdef0123')).toBe(false);
+  });
+});
+
+describe('streamAgentInvoke', () => {
+  const SESSION = '0123456789abcdef0123456789abcdef0123';
+  const line = (event: StreamEvent) => `data: ${JSON.stringify(event)}\n\n`;
+
+  /** An SSE body that sends `lines` and then stays open; records whether it was cancelled.
+   * (ReadableStream is Node's global; jsdom does not replace it.) */
+  function openBody(lines: string[]) {
+    const state = { cancelled: false };
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const l of lines) controller.enqueue(encoder.encode(l));
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    });
+    return { body, state };
+  }
+
+  function fetchStreaming(body: unknown) {
+    return vi.fn().mockResolvedValue({ ok: true, status: 200, body });
+  }
+
+  it('passes the signal to fetch', async () => {
+    const { body } = openBody([line({ type: 'done' })]);
+    const fetchMock = fetchStreaming(body);
+    vi.stubGlobal('fetch', fetchMock);
+    const ctl = new AbortController();
+
+    const events: StreamEvent[] = [];
+    for await (const event of streamAgentInvoke('q', SESSION, undefined, 'dev', ctl.signal)) events.push(event);
+
+    expect(events).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/api/agent/invoke',
+      expect.objectContaining({ signal: ctl.signal })
+    );
+  });
+
+  it('ends quietly on abort mid-stream and cancels the body', async () => {
+    const { body, state } = openBody([line({ type: 'chunk', content: 'first' })]);
+    vi.stubGlobal('fetch', fetchStreaming(body));
+    const ctl = new AbortController();
+    const stream = streamAgentInvoke('q', SESSION, undefined, 'dev', ctl.signal);
+
+    const first = await stream.next();
+    expect(first.value).toEqual({ type: 'chunk', content: 'first' });
+
+    // The next read is pending on a body that stays open; ending the turn resolves it.
+    const pending = stream.next();
+    ctl.abort();
+    await expect(pending).resolves.toEqual({ done: true, value: undefined });
+    expect(state.cancelled).toBe(true);
+  });
+
+  it('returns without fetching or throwing when the signal is already aborted', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const ctl = new AbortController();
+    ctl.abort();
+
+    const events: StreamEvent[] = [];
+    for await (const event of streamAgentInvoke('q', SESSION, undefined, 'dev', ctl.signal)) events.push(event);
+
+    expect(events).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('treats an aborted fetch as the end of the turn, not an error', async () => {
+    const ctl = new AbortController();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
+      ctl.abort();
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }));
+
+    const events: StreamEvent[] = [];
+    for await (const event of streamAgentInvoke('q', SESSION, undefined, 'dev', ctl.signal)) events.push(event);
+
+    expect(events).toEqual([]);
+  });
+
+  it('still ends on a done event, without cancelling a finished body', async () => {
+    const { body, state } = openBody([line({ type: 'chunk', content: 'a' }), line({ type: 'done' })]);
+    vi.stubGlobal('fetch', fetchStreaming(body));
+
+    const events: StreamEvent[] = [];
+    for await (const event of streamAgentInvoke('q', SESSION)) events.push(event);
+
+    expect(events).toEqual([{ type: 'chunk', content: 'a' }]);
+    expect(state.cancelled).toBe(false);
+  });
+
+  it('still yields an error event', async () => {
+    const crash: StreamEvent = { type: 'error', code: 'RUNTIME_CRASH', message: 'RuntimeClientError' };
+    const { body } = openBody([line(crash), line({ type: 'done' })]);
+    vi.stubGlobal('fetch', fetchStreaming(body));
+
+    const events: StreamEvent[] = [];
+    for await (const event of streamAgentInvoke('q', SESSION)) events.push(event);
+
+    expect(events).toEqual([crash]);
+  });
+
+  it('closes the body when the caller stops reading early', async () => {
+    const { body, state } = openBody([line({ type: 'chunk', content: 'a' })]);
+    vi.stubGlobal('fetch', fetchStreaming(body));
+
+    const events: StreamEvent[] = [];
+    for await (const event of streamAgentInvoke('q', SESSION)) {
+      events.push(event);
+      break;
+    }
+
+    expect(events).toEqual([{ type: 'chunk', content: 'a' }]);
+    expect(state.cancelled).toBe(true);
   });
 });
