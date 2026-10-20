@@ -178,10 +178,14 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
     "go ahead"): written in `frontend-cdk/lib/geospatial-agent-stack.ts` with its IAM5 reason;
     `cdk synth` clean (cdk-nag passes; the statement lists exactly `briefs/*` and `taskings/*`).
     Live at the G4 frontend promotion (7.2), not before
-  - [ ] 5.4 End to end on dev: draft, choose, approve, `tasking_status` says filed, Slack. All but
-    Slack done Oct 19, five times from the local stage against `dark_vessels_dev` (box 2, three of
-    four candidates; `session_data/<sid>/taskings/` holds the filed record). Slack waits on
-    `SLACK_TASKING_WEBHOOK_URL`
+  - [x] 5.4 End to end on dev: draft, choose, approve, `tasking_status` says filed, Slack. Done Oct
+    19, five times from the local stage against `dark_vessels_dev` (box 2, three of four
+    candidates; `session_data/<sid>/taskings/` holds the filed record). Slack Oct 20: the tasking
+    has its own Workflow Builder workflow, "Patrol taskings" (ten Text variables,
+    `TASKING_WORKFLOW_VARIABLES`; the fixed sentences typed into its message), built by the user
+    and tested from a terminal; then one live approve from the stage
+    (`tasking-20261020T135453-7bb4c1`) posted to it. Production: the URL becomes the ECS secret at
+    the G4 frontend promotion (7.2), like the brief's
   - _Requirements: 10.1–10.4_
 
 ## Day 9 (Wednesday Oct 28): the replay case and the evals
