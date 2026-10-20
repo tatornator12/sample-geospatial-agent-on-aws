@@ -459,7 +459,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const sweeps = useRef(new Map<string, () => void>());
   const player = useRef<sea.ReplayPlayer | null>(null);
   const preparedReplay = useMemo(() => (vesselRest ? prepareReplay(vesselRest.replay.tracks) : []), [vesselRest]);
-  // True once this MapView's map exists. The sea effects below are declared before the map is
+  // True once this MapView's map has loaded. The sea effects below are declared before the map is
   // made, so on a remount (New session keys the map by session) they first run with no map;
   // this in their deps runs them again on the new map with the rest the stage already holds.
   const [mapLive, setMapLive] = useState(false);
@@ -1389,7 +1389,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         return { url };
       },
     });
-    setMapLive(true);
+    // Live once it has loaded: the sea's replay repaints its source every frame, and started on a
+    // map that has not fired `load` yet, it keeps `load` from ever firing (no basemap, no drawing).
+    const created = map.current;
+    created.once('load', () => {
+      if (map.current === created) setMapLive(true);
+    });
 
     // Add global error listener
     map.current.on('error', (e) => {
