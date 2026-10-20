@@ -2,10 +2,11 @@
  * The Stage. The map fills the frame edge to edge; the docent's overlays (step column,
  * caption band, transcript drawer) float over it and never reflow the map.
  */
-import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
+import { caseAgent } from '../utils/caseAgent';
 import { getApiUrl, loadArchaeologyRecord, loadMethaneBaseline, loadVesselRest, prewarmSession } from '../services/api';
 import { taskingFiledMessage, type VesselRest } from '../utils/vesselLayers';
 
@@ -62,8 +63,30 @@ interface ScenarioConfig {
 }
 
 export function Chat() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const scenarioId = searchParams.get('scenario');
+
+  // The stage's URL has one writer. Each edit builds on the last search the stage wrote this tick
+  // (React Router's setSearchParams reads the render's params, so a reset and the act sync in one
+  // tick would otherwise undo each other) and replaces the history entry.
+  const pendingSearch = useRef<string | null>(null);
+  useEffect(() => {
+    pendingSearch.current = null;
+  }, [location.search]);
+  const editStageUrl = useCallback(
+    (edit: (params: URLSearchParams) => void) => {
+      const base = new URLSearchParams(pendingSearch.current ?? location.search);
+      const next = new URLSearchParams(base);
+      edit(next);
+      if (next.toString() === base.toString()) return;
+      pendingSearch.current = `?${next.toString()}`;
+      setSearchParams(next, { replace: true });
+    },
+    [location.search, setSearchParams]
+  );
+
+  const { agents, selectedAgentId, selectedAgent, selectAgent, defaultAgentId } = useAgents();
 
   // A pre-warmed session (scripts/prewarm.py prints `/?session=<uuid>`) is adopted on load so
   // the first prompt on stage skips the runtime cold start. Anything else gets a fresh id.
@@ -93,18 +116,40 @@ export function Chat() {
   // left the baseline listed twice. Production builds never did, but the rehearsal view should
   // match what the stage shows.
   const scenarioLoadedFor = useRef<string | null>(null);
+  // The case whose act has been chosen (the case-agent effect below), once per loaded case.
+  const agentCheckedFor = useRef<string | null>(null);
+
+  // A fresh session on a clean stage: new id (a fresh map), no layers, tips or tasking.
+  const resetStage = useCallback(() => {
+    setSessionId(uuidv4());
+    setCurrentGeometry(null);
+    setCurrentRasters([]);
+    setDrawnGeometryMessage(null);
+    setScenarioConfig(null);
+    setScenarioError(null);
+    setIsLoadingScenario(false);
+    setTips([]);
+    setTaskingKey(0);
+    setAutoPrompt(null);
+  }, []);
 
   // Load scenario when scenarioId is present
   useEffect(() => {
     if (!scenarioId) {
+      // Leaving a case (the rail's Stage link, browser back): its layers and session go with it,
+      // and the act's resting state returns.
+      if (scenarioLoadedFor.current) resetStage();
       setScenarioConfig(null);
       setScenarioError(null);
       isFirstScenarioLoad.current = true;
       scenarioLoadedFor.current = null;
+      agentCheckedFor.current = null;
       return;
     }
     if (scenarioLoadedFor.current === scenarioId) return;
     scenarioLoadedFor.current = scenarioId;
+    // A reset or another case while this one loads: what it fetched never reaches the stage.
+    const superseded = () => scenarioLoadedFor.current !== scenarioId;
 
     // Only reset state when SWITCHING scenarios (not on initial mount)
     if (!isFirstScenarioLoad.current) {
@@ -143,6 +188,7 @@ export function Chat() {
         }
 
         const config: ScenarioConfig = await response.json();
+        if (superseded()) return;
         console.log('✅ Scenario config loaded:', config.name);
         setScenarioConfig(config);
 
@@ -158,6 +204,7 @@ export function Chat() {
             const render = parseRenderHint(layer.render) ?? undefined;
             if (layer.s3_url.toLowerCase().endsWith('.geojson')) {
               const geometry = await loadGeometry(layer.s3_url);
+              if (superseded()) return;
               if (geometry) {
                 geometry.locationName = layer.title;
                 geometry.sourceUrl = layer.s3_url;
@@ -181,6 +228,7 @@ export function Chat() {
 
         // Pre-load geometry
         const geometry = await loadGeometry(config.assets.geometry_url);
+        if (superseded()) return;
         if (geometry) {
           console.log('✅ Geometry pre-loaded');
           setCurrentGeometry(geometry);
@@ -284,33 +332,35 @@ export function Chat() {
 
       } catch (error) {
         console.error('❌ Error loading scenario:', error);
+        if (superseded()) return;
         const errorMessage = error instanceof Error ? error.message : 'Failed to load scenario';
         setScenarioError(errorMessage);
         setScenarioConfig(null);
       } finally {
-        setIsLoadingScenario(false);
+        if (!superseded()) setIsLoadingScenario(false);
       }
     };
 
     loadScenario();
-  }, [scenarioId]);
+  }, [scenarioId, resetStage]);
 
+  // New session (the console's button, a runtime crash, an act switch) clears the case too: the
+  // URL drops `?scenario` (and a pre-warmed `?session`) and names the act, so later prompts never
+  // carry the old case and the act's resting state returns.
   const handleSessionReset = () => {
-    setSessionId(uuidv4());
-    setCurrentGeometry(null);
-    setCurrentRasters([]);
-    setDrawnGeometryMessage(null);
-    setScenarioConfig(null);
-    setScenarioError(null);
-    setIsLoadingScenario(false);
-    setTips([]);
-    setTaskingKey(0);
-    setAutoPrompt(null);
+    resetStage();
+    scenarioLoadedFor.current = null;
+    agentCheckedFor.current = null;
+    isFirstScenarioLoad.current = true;
+    editStageUrl((params) => {
+      params.delete('scenario');
+      params.delete('session');
+      if (selectedAgentId) params.set('agent', selectedAgentId);
+    });
   };
 
   // Switching acts on the rail starts a fresh session: new id, cleared map, empty transcript.
   // The first non-null value is the initial selection, not a switch, so it does not reset.
-  const { agents, selectedAgentId, selectedAgent, selectAgent } = useAgents();
   const previousAgentId = useRef<string | null>(null);
   // A replay case selects its own act; that switch keeps the case on the stage.
   const scenarioAgentSwitch = useRef<string | null>(null);
@@ -328,18 +378,37 @@ export function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgentId]);
 
-  // Once per loaded case: if it belongs to another act the backend offers, switch to it so the
-  // prompts, the caption's speaker and any follow-up go to the right runtime.
-  const agentCheckedFor = useRef<string | null>(null);
+  // Once per loaded case: play it on its own act, else the act its link named (the gallery
+  // writes `?agent=`, and nothing rewrites it while the case is choosing), else the backend's
+  // default; never simply the act that happens to be selected. Switching keeps the case on the
+  // stage, so the prompts, the caption's speaker and any follow-up go to the right runtime.
   useEffect(() => {
     if (!scenarioConfig || !selectedAgentId || agentCheckedFor.current === scenarioConfig.id) return;
+    // A case the stage has just let go of (New session, an act switch) never picks the act again.
+    if (scenarioLoadedFor.current !== scenarioConfig.id) return;
     agentCheckedFor.current = scenarioConfig.id;
-    const wanted = scenarioConfig.agent;
-    if (wanted && wanted !== selectedAgentId && agents.some((a) => a.id === wanted)) {
+    const wanted = caseAgent({
+      caseAgent: scenarioConfig.agent,
+      linkAgent: searchParams.get('agent'),
+      defaultAgentId,
+      offered: agents.map((a) => a.id),
+    });
+    if (wanted && wanted !== selectedAgentId) {
       scenarioAgentSwitch.current = wanted;
       selectAgent(wanted);
     }
-  }, [scenarioConfig, selectedAgentId, agents, selectAgent]);
+  }, [scenarioConfig, selectedAgentId, agents, selectAgent, searchParams, defaultAgentId]);
+
+  // The URL names the act on the stage (replacing the entry), so a refresh lands on it. A case
+  // still choosing its act leaves the link's `?agent=` alone until it has chosen.
+  useEffect(() => {
+    if (!selectedAgentId) return;
+    if (scenarioId && agentCheckedFor.current !== scenarioId) return;
+    // The case's own switch is on its way: name that act once it is selected, not the one before.
+    if (scenarioAgentSwitch.current && scenarioAgentSwitch.current !== selectedAgentId) return;
+    if (searchParams.get('agent') === selectedAgentId) return;
+    editStageUrl((params) => params.set('agent', selectedAgentId));
+  }, [selectedAgentId, scenarioId, scenarioConfig, searchParams, editStageUrl]);
 
   // Every new session boots its runtime in the background the moment it exists, so the first
   // prompt on stage never pays the cold start. Once per session and agent (a replay case may

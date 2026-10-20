@@ -15,6 +15,10 @@ interface Scenario {
   agent?: string;
 }
 
+// Act 1, the Earth Analyst: the live demo runtime's id (AGENT_RUNTIMES, the backend's default).
+// A backend without it plays these cases on its default act instead (utils/caseAgent.ts).
+const EARTH_ANALYST = 'stable';
+
 const scenarios: Scenario[] = [
   {
     id: 'la-fires-2025',
@@ -27,6 +31,7 @@ const scenarios: Scenario[] = [
       { label: 'High Severity Burn', value: '29.4%' },
     ],
     status: 'available',
+    agent: EARTH_ANALYST,
   },
   {
     id: 'amazon-deforestation',
@@ -39,6 +44,7 @@ const scenarios: Scenario[] = [
       { label: 'EUDR Status', value: 'Non-Compliant' },
     ],
     status: 'available',
+    agent: EARTH_ANALYST,
   },
   {
     id: 'lake-mead-water',
@@ -51,6 +57,7 @@ const scenarios: Scenario[] = [
       { label: 'Drought Severity', value: 'Severe' },
     ],
     status: 'available',
+    agent: EARTH_ANALYST,
   },
   {
     id: 'methane-permian-2024',

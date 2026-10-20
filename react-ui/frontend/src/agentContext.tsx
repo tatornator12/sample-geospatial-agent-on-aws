@@ -19,6 +19,8 @@ interface AgentContextValue {
   /** Null until the list has loaded; after that always one of `agents`, or null if the list is empty. */
   selectedAgentId: string | null;
   selectedAgent: AgentSummary | null;
+  /** The backend's default act (`GET /api/agents`), or null before the list loads or if it has none. */
+  defaultAgentId: string | null;
   status: AgentStatus;
   selectAgent: (id: string) => void;
 }
@@ -44,6 +46,7 @@ function storeAgentId(id: string) {
 export function AgentProvider({ children }: { children: ReactNode }) {
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [backendDefault, setBackendDefault] = useState<string | null>(null);
   const [status, setStatus] = useState<AgentStatus>('loading');
 
   useEffect(() => {
@@ -52,8 +55,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       .then(({ agents: list, defaultAgentId }) => {
         if (cancelled) return;
         setAgents(list);
+        setBackendDefault(defaultAgentId);
         // `?agent=<id>` (printed by scripts/prewarm.py) wins over the remembered choice, so a
-        // pre-warmed session is opened on the agent that was warmed.
+        // pre-warmed session is opened on the agent that was warmed. The stage keeps `?agent=`
+        // on the act it shows (pages/Chat.tsx), so a refresh lands on that act too.
         const fromUrl = new URLSearchParams(window.location.search).get('agent');
         const stored = readStoredAgentId();
         const initial =
@@ -90,10 +95,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       agents,
       selectedAgentId,
       selectedAgent: agents.find((a) => a.id === selectedAgentId) ?? null,
+      defaultAgentId: backendDefault,
       status,
       selectAgent,
     }),
-    [agents, selectedAgentId, status, selectAgent]
+    [agents, selectedAgentId, backendDefault, status, selectAgent]
   );
 
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
