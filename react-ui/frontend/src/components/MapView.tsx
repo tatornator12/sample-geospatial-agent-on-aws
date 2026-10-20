@@ -459,6 +459,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const sweeps = useRef(new Map<string, () => void>());
   const player = useRef<sea.ReplayPlayer | null>(null);
   const preparedReplay = useMemo(() => (vesselRest ? prepareReplay(vesselRest.replay.tracks) : []), [vesselRest]);
+  // True once this MapView's map exists. The sea effects below are declared before the map is
+  // made, so on a remount (New session keys the map by session) they first run with no map;
+  // this in their deps runs them again on the new map with the rest the stage already holds.
+  const [mapLive, setMapLive] = useState(false);
   // Layers the date reset hid (another pass's), so the reset can bring back exactly those.
   const dateHidden = useRef(new Set<string>());
   // The tasking on the map: the draft (from the backend), the officer's box and the candidates left out.
@@ -784,7 +788,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         sea.seaFloorOff(m, BASEMAP_IDS);
       }
     });
-  }, [seaOn]);
+  }, [seaOn, mapLive]);
 
   // The furniture and the replay, with the resting state; the rest view and the seabed's tiles.
   useEffect(() => {
@@ -817,9 +821,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         // the map is already gone (unmount)
       }
     };
-    // fitSeaRest reads refs and the rest itself; the furniture follows the rest only.
+    // fitSeaRest reads refs and the rest itself; the furniture follows the rest (and the map) only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vesselRest, preparedReplay]);
+  }, [vesselRest, preparedReplay, mapLive]);
 
   // The replay's mode: loop at rest, run on to the pass while the agent works, hold once the pass is on.
   useEffect(() => {
@@ -843,7 +847,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         m.setPaintProperty(id, 'raster-opacity', look.radar);
       });
     });
-  }, [seaBeat, stagePass, vesselRest, seaOn]);
+  }, [seaBeat, stagePass, vesselRest, seaOn, mapLive]);
 
   // The tasking: the draft loaded (the beat, the officer's starting choice), the plate replaces the
   // layers plate's body while it is up.
@@ -1385,6 +1389,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         return { url };
       },
     });
+    setMapLive(true);
 
     // Add global error listener
     map.current.on('error', (e) => {
@@ -1512,6 +1517,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     });
 
     return () => {
+      setMapLive(false);
       map.current?.remove();
     };
   }, []);
