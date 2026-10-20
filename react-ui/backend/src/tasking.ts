@@ -315,64 +315,68 @@ export interface FiledTasking {
   bucket: string;
 }
 
-/** The Block Kit message for a Slack app's incoming webhook. */
-export function taskingMessage(f: FiledTasking): Record<string, unknown> {
+/**
+ * The variables the "Patrol taskings" Workflow Builder trigger declares, all of data type Text,
+ * keys exactly as written: Slack matches the payload's keys to the trigger's variables by name.
+ * The fixed sentences (who decided, what a candidate is, the attribution) are typed once into the
+ * workflow's message and are not sent. The backend's .env.example lists these keys beside
+ * SLACK_TASKING_WEBHOOK_URL; the test pins the list so the two never drift.
+ */
+export const TASKING_WORKFLOW_VARIABLES = [
+  'title', 'filed_by', 'filed_at', 'box', 'next_look', 'candidates', 'left_out', 'pass', 'tasking_id', 'markdown_key',
+] as const;
+
+export type TaskingWorkflowVariables = Record<(typeof TASKING_WORKFLOW_VARIABLES)[number], string>;
+
+/**
+ * The flat variables for the tasking's Workflow Builder trigger (SLACK_TASKING_WEBHOOK_URL only:
+ * the brief's workflow says "brief"). Lists arrive laid out, one bullet per line. Candidates by
+ * their id, distance from port and nearest broadcast; the box by its centre, never a target's
+ * position; no vessel identity reaches here (the card's validator refuses it).
+ */
+export function taskingWorkflowPayload(f: FiledTasking): TaskingWorkflowVariables {
   const { card, choice } = f;
   const kept = card.candidates.filter((c) => choice.candidateIds.includes(c.id));
-  const lookLine = choice.box.look ? choice.box.look.text : 'no look planned yet';
+  const dropped = card.candidates.filter((c) => !choice.candidateIds.includes(c.id));
+  const [w, s, e, n] = choice.box.bounds;
+  const k = card.counts;
+  const targets = k.broadcasting + k.port + k.unproven + k.seen_once + k.candidate;
+  const look = choice.box.look;
   return {
-    text: `Patrol tasking filed: box ${choice.box.box}, ${kept.length} candidates, Galápagos Marine Reserve`,
-    blocks: [
-      { type: 'header', text: { type: 'plain_text', text: 'Patrol tasking filed', emoji: false } },
-      {
-        type: 'section',
-        text: { type: 'mrkdwn', text: `*Box ${choice.box.box}*, Galápagos Marine Reserve · ${pct(choice.box.share)} of past dark targets\nNext radar look: ${plain(lookLine)}` },
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Candidates (${kept.length} of ${card.candidates.length})*\n` +
-            (kept.length ? kept.map((c) => `• ${plain(candidateLine(c))}`).join('\n') : '• none: a patrol of the box only'),
-        },
-      },
-      { type: 'section', text: { type: 'mrkdwn', text: plain(card.sentence) } },
-      {
-        type: 'context',
-        elements: [
-          { type: 'mrkdwn', text: `Filed by ${plain(f.filedBy)} at ${f.filedAt}. The officer decided; the agent drafted. ${plain(card.attribution)}` },
-          { type: 'mrkdwn', text: `\`${card.taskingId}\` · \`s3://${f.bucket}/${f.markdownKey}\`` },
-        ],
-      },
-    ],
+    title: `Box ${choice.box.box}, Galápagos Marine Reserve, ${kept.length} of ${card.candidates.length} candidates`,
+    filed_by: f.filedBy,
+    filed_at: utcMinute(f.filedAt),
+    box: `Box ${choice.box.box} held ${pct(choice.box.share)} of past dark targets; centre ${((s + n) / 2).toFixed(4)}, ${((w + e) / 2).toFixed(4)}`,
+    next_look: look ? `Sentinel-1${look.satellite.charAt(2)}, ${utcMinute(look.start)}` : 'none planned yet in ESA\'s published plan',
+    candidates: kept.length ? kept.map((c) => `• ${candidateLine(c)}`).join('\n') : '• None: a patrol of the box only.',
+    left_out: dropped.length ? dropped.map((c) => c.id).join(', ') : 'none',
+    pass: `${satelliteName(card.passId)}, ${utcMinute(card.passSensed)}. AIS was heard over ${pct(card.heardShare)} of the reserve; ` +
+      `${targets} radar targets, ${k.candidate} candidates.`,
+    tasking_id: card.taskingId,
+    markdown_key: `s3://${f.bucket}/${f.markdownKey}`,
   };
 }
 
-/**
- * The flat variables for a Workflow Builder trigger: the same twelve keys the brief's workflow
- * declares (slack.ts WORKFLOW_VARIABLES), so a copy of that workflow with a tasking's wording takes
- * it unchanged. It goes only to SLACK_TASKING_WEBHOOK_URL: the brief's workflow says "brief".
- */
-export function taskingWorkflowPayload(f: FiledTasking): Record<string, string> {
-  const { card, choice } = f;
-  const kept = card.candidates.filter((c) => choice.candidateIds.includes(c.id));
-  const [w, s, e, n] = choice.box.bounds;
+/** The Block Kit message for a Slack app's incoming webhook: the workflow's layout, set by the backend. */
+export function taskingMessage(f: FiledTasking): Record<string, unknown> {
+  const v = taskingWorkflowPayload(f);
+  const p = Object.fromEntries(Object.entries(v).map(([key, value]) => [key, plain(value)])) as TaskingWorkflowVariables;
+  const section = (text: string) => ({ type: 'section', text: { type: 'mrkdwn', text } });
   return {
-    title: `Patrol tasking: box ${choice.box.box}, ${kept.length} of ${card.candidates.length} candidates`,
-    place: 'Galápagos Marine Reserve',
-    coordinates: `${((s + n) / 2).toFixed(4)}, ${((w + e) / 2).toFixed(4)}`,
-    evidence: `${card.counts.candidate} candidates on the ${utcMinute(card.passSensed)} radar pass, in water where AIS was heard (${pct(card.heardShare)} of the reserve).`,
-    confidence: 'candidates, not accusations',
-    single_explanation: card.sentence,
-    hypotheses: kept.length ? kept.map((c) => `• ${candidateLine(c)}`).join('\n') : '• none: a patrol of the box only',
-    ground_record: [
-      `• Next radar look: ${choice.box.look ? choice.box.look.text : 'none planned yet'}`,
-      `• Box ${choice.box.box} held ${pct(choice.box.share)} of past dark targets`,
-      `• ${card.attribution}`,
-    ].join('\n'),
-    filed_by: f.filedBy,
-    filed_at: f.filedAt.slice(0, 16).replace('T', ' ') + ' UTC',
-    brief_id: card.taskingId,
-    markdown_key: `s3://${f.bucket}/${f.markdownKey}`,
+    text: `Patrol tasking filed: ${p.title}`,
+    blocks: [
+      { type: 'header', text: { type: 'plain_text', text: 'Patrol tasking filed', emoji: false } },
+      section(`*${p.title}*\nFiled by ${p.filed_by} at ${p.filed_at}. The officer decided; the agent drafted.`),
+      section(`*Where and when*\n${p.box}\nNext radar look: ${p.next_look}`),
+      section(`*Candidates*\n${p.candidates}\nLeft out by the officer: ${p.left_out}\n${plain(f.card.sentence)}`),
+      section(`*From the pass*\n${p.pass}`),
+      {
+        type: 'context',
+        elements: [
+          { type: 'mrkdwn', text: `${plain(f.card.attribution)} · \`${p.tasking_id}\`` },
+          { type: 'mrkdwn', text: `\`${p.markdown_key}\`` },
+        ],
+      },
+    ],
   };
 }

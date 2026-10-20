@@ -178,8 +178,8 @@ export async function postToSlack(url: string, payload: Record<string, unknown>,
 
 /**
  * Where a filed patrol tasking (Act 3) is posted: SLACK_TASKING_WEBHOOK_URL when it is a Slack
- * webhook (an app's or a workflow's: a copy of the brief's workflow with a tasking's wording takes
- * the same twelve variables), else the brief's own URL only when that is an app's incoming webhook
+ * webhook (an app's, or its own "Patrol taskings" workflow's, which declares
+ * TASKING_WORKFLOW_VARIABLES), else the brief's own URL only when that is an app's incoming webhook
  * (the backend lays out the Block Kit itself). Never the brief's workflow trigger: its message says
  * "brief", and a tasking is not one.
  */
@@ -190,7 +190,7 @@ export function taskingWebhookUrl(env: Record<string, string | undefined> = proc
   return shared && webhookKind(shared) === 'incoming' ? shared : null;
 }
 
-/** What to post for a tasking: Block Kit to an app's webhook, the twelve variables to a workflow trigger. */
+/** What to post for a tasking: Block Kit to an app's webhook, the tasking's ten variables to a workflow trigger. */
 export function taskingPayloadFor(url: string, filed: FiledTasking): Record<string, unknown> {
   return webhookKind(url) === 'workflow' ? taskingWorkflowPayload(filed) : taskingMessage(filed);
 }

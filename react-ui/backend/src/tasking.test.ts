@@ -14,9 +14,10 @@ import {
   taskingMessage,
   taskingRefusal,
   taskingWorkflowPayload,
+  TASKING_WORKFLOW_VARIABLES,
   type TaskingChoice,
 } from './tasking';
-import { taskingPayloadFor, taskingWebhookUrl, WORKFLOW_VARIABLES } from './slack';
+import { taskingPayloadFor, taskingWebhookUrl } from './slack';
 
 const SID = '3f0c9a8e-1b2c-4d5e-8f90-123456789abc';
 const TID = 'tasking-20261019T153000-a1b2c3';
@@ -219,12 +220,38 @@ describe('Slack for a filed tasking', () => {
     assert.equal(taskingWebhookUrl({ SLACK_TASKING_WEBHOOK_URL: 'https://example.com/x' }), null);
   });
 
-  it('gives a workflow exactly the twelve variables, and an app a Block Kit message', () => {
+  it('gives the tasking workflow exactly its ten variables, laid out, and an app a Block Kit message', () => {
     const vars = taskingPayloadFor(workflow, filed);
-    assert.deepEqual(Object.keys(vars).sort(), [...WORKFLOW_VARIABLES].sort());
-    assert.equal(vars.title, 'Patrol tasking: box 1, 2 of 3 candidates');
-    assert.equal((taskingPayloadFor(incoming, filed) as { blocks: unknown[] }).blocks.length, 5);
+    // The README's list, in its order: the workflow declares exactly these keys.
+    assert.deepEqual(Object.keys(vars), [...TASKING_WORKFLOW_VARIABLES]);
+    assert.deepEqual(vars, {
+      title: 'Box 1, Galápagos Marine Reserve, 2 of 3 candidates',
+      filed_by: 'officer',
+      filed_at: '2026-10-19 15:31 UTC',
+      box: 'Box 1 held 9% of past dark targets; centre -0.4000, -90.4500',
+      next_look: 'Sentinel-1D, 2026-10-24 00:17 UTC',
+      candidates: '• T01: 30.6 km from Baltra; nearest broadcast 5.8 km\n• T02: 31.0 km from Baltra; nearest broadcast 10.2 km',
+      left_out: 'T04',
+      pass: 'Sentinel-1D, 2026-10-12 00:18 UTC. AIS was heard over 30% of the reserve; 22 radar targets, 4 candidates.',
+      tasking_id: TID,
+      markdown_key: `s3://b/session_data/${SID}/taskings/${TID}.md`,
+    });
+    const blocks = (taskingPayloadFor(incoming, filed) as { blocks: unknown[] }).blocks;
+    assert.equal(blocks.length, 6);
     const text = JSON.stringify(taskingMessage(filed)) + JSON.stringify(taskingWorkflowPayload(filed));
-    assert.doesNotMatch(text, /illegal|poach|suspect|culprit|MMSI/i);
+    assert.match(text, /The officer decided; the agent drafted\./);
+    assert.match(text, /it is not an accusation\./);
+    assert.doesNotMatch(text, /illegal|poach|suspect|culprit|MMSI|—/i);
+  });
+
+  it('says so when the officer keeps no candidates, leaves none out, or the box has no look planned', () => {
+    const box3 = sessionBoxes(HOTSPOTS)[2];
+    const none = taskingWorkflowPayload({ ...filed, choice: { box: box3, candidateIds: [] } });
+    assert.equal(none.candidates, '• None: a patrol of the box only.');
+    assert.equal(none.left_out, 'T01, T02, T04');
+    assert.equal(none.next_look, 'none planned yet in ESA\'s published plan');
+    const all = taskingWorkflowPayload({ ...filed, choice: { box: card.box, candidateIds: ['T01', 'T02', 'T04'] } });
+    assert.equal(all.left_out, 'none');
+    assert.match(all.candidates, /T04: 24\.6 km from Puerto Baquerizo Moreno; no broadcast at the pass/);
   });
 });
