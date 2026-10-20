@@ -156,6 +156,20 @@ describe('New session mid-turn', () => {
   });
 });
 
+describe('Leaving the stage mid-turn', () => {
+  it('aborts the turn and stops its runtime when the stage unmounts', async () => {
+    setup();
+    const turn = await sendFirstPlate();
+    turn.push(chunk('Working. '));
+    await flush();
+
+    cleanup();
+
+    expect(turn.signal?.aborted).toBe(true);
+    expect(stopRuntimeSession).toHaveBeenCalledWith(S1, 'dev');
+  });
+});
+
 describe('Stop', () => {
   it('ends the turn at once, keeps a late tail out, and the next turn owns the console', async () => {
     setup();
