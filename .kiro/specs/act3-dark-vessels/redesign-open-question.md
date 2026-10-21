@@ -1204,6 +1204,11 @@ longest today is 109 characters (the coverage sub, `vesselLayers.ts:575`).
 - The heat and boxes files land together. MapView holds the heat beat for 5 s, then moves to the
   boxes beat (`seaLater`, `MapView.tsx:640-644`), so each figure is on screen beside its own layer.
   Under reduced motion the hold stays, because it is a dwell, not motion.
+- The boxes beat then holds at least 3 s before the next look's swath and countdown land
+  (`BOXES_HOLD_MS`, `lookHoldLeft` in `vesselLayers.ts`; gate B, W1, Oct 21). `next_look`'s file
+  lands during the heat's hold, which left the boxes' figure up for about 0.5 s at gate B. The look
+  now comes about 3 s later, still before the plate opens. Once the tasking plate is up the look
+  never takes the clock back from it (a replay lands every file at once).
 - `SeaFacts` gains `checkable`, `standard`, `heatCheck` (from the heat file's first feature) and
   `boxCheck` (from the box features), each validated as numbers in range.
 - The fleet and reach beats stay for the spares.
@@ -1232,6 +1237,10 @@ longest today is 109 characters (the coverage sub, `vesselLayers.ts:575`).
   Reserve water outside the swath then has neither wash nor hatch, and the new legend row says so.
   It needs the clipped areas, so it lands with task 7b, not task 1.
 - File kinds and statuses keep their names (`heard`, `unproven`).
+- At 1920 x 1080 the layers plate runs to 16 px above the basemap plate (`stage.css`, wider than
+  1760 px and taller than 800 px, where the console stops short of the right column), so at the
+  look beat its seven layers, the heat's ramp and both keys fit with no key row under the fade
+  (gate B, W3, Oct 21). The 720p rule and the other acts are unchanged.
 
 #### 3.8.4 The tasking and the officer sentence
 
@@ -1254,6 +1263,9 @@ longest today is 109 characters (the coverage sub, `vesselLayers.ts:575`).
 - The automatic follow-up goes. MapView's `onFiled` (`:3360`) no longer calls `onTaskingFiled`,
   and `Chat.tsx:427` passes nothing. `taskingFiledMessage` (`vesselLayers.ts:766`) stays for a
   presenter who asks.
+- Known 1280 behaviour (gate B, W4, accepted Oct 21): at 1280 x 720 the plate's body scrolls, so
+  box 3 sits under its fade and the candidates are below it. The summary, the box choices and
+  Approve stay reachable, and the show runs at 1920, where the body fits.
 - The camera's return goes to the pass the argument ended on, through a new pure
   `forecastPass(files)` in `vesselLayers.ts`. It picks the last pass whose targets were matched,
   else the last pass with targets. It replaces `firstPass` (`MapView.tsx:454`, `:537-540`, `:608`),

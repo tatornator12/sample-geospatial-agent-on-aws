@@ -97,6 +97,7 @@ import {
   heatHoldLeft,
   heavyBounds,
   isVesselLayer,
+  lookHoldLeft,
   lookStartFrom,
   passOf,
   prepareReplay,
@@ -514,6 +515,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   onRevealRef.current = onCandidatesRevealed;
   // When the heat went on (ms): its beat holds HEAT_HOLD_MS before the boxes' beat.
   const heatShownAt = useRef<number | null>(null);
+  // When the boxes' beat came up (ms): it holds BOXES_HOLD_MS before the next look lands (gate B, W1).
+  const boxesShownAt = useRef<number | null>(null);
   const seaTimers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const sweeps = useRef(new Map<string, () => void>());
   const player = useRef<sea.ReplayPlayer | null>(null);
@@ -713,6 +716,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           const heatCheck = heatCheckOf(feats);
           setSeaFacts((x) => ({ ...x, heatCheck }));
           heatShownAt.current = Date.now();
+          boxesShownAt.current = null;
           setSeaBeat('heat');
         } else {
           const boxCheck = boxCheckOf(feats);
@@ -720,9 +724,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         }
         // They land together: the heat's beat holds 5 s, then the boxes' (each figure beside its layer).
         if (seaFileOf('boxes')) {
+          const showBoxes = () => {
+            boxesShownAt.current = Date.now();
+            setSeaBeat('boxes');
+          };
           const wait = heatHoldLeft(seaFileOf('heat') ? heatShownAt.current : null, Date.now());
-          if (wait === 0) setSeaBeat('boxes');
-          else seaLater(() => { if (seaBeatRef.current === 'heat') setSeaBeat('boxes'); }, wait);
+          if (wait === 0) showBoxes();
+          else seaLater(() => { if (seaBeatRef.current === 'heat') showBoxes(); }, wait);
         }
         fitForecast();
         return;
@@ -740,7 +748,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         backToForecastPass();
         const label = String(feats.find((x) => typeof x.properties?.label === 'string')?.properties.label ?? '');
         setSeaFacts((x) => ({ ...x, look: label || undefined, lookStart: lookStartFrom(label, Date.now()) ?? undefined, now: Date.now() }));
-        setSeaBeat('look');
+        // Once the tasking plate is up (a replay lands every file at once), the clock stays on it.
+        if (seaBeatRef.current !== 'tasking' && seaBeatRef.current !== 'filed') setSeaBeat('look');
         return;
       }
       case 'reach': {
@@ -764,6 +773,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     const kind = vesselKind(url);
     const hint = vesselGeometryHint(data.render, url);
     if (!kind || kind === 'radar' || !hint) return;
+    // The boxes' beat holds 3 s before the next look's swath and countdown replace it (gate B, W1).
+    if (kind === 'look') {
+      const wait = lookHoldLeft(heatShownAt.current, boxesShownAt.current, Date.now());
+      if (wait > 0) {
+        seaLater(() => {
+          if (map.current === m && m.getStyle()) addSeaGeometry(m, data, geometryId, fillId);
+        }, wait);
+        return;
+      }
+    }
     const fc = data as unknown as SeaFC;
     // The same file again: match_ais rewrites the targets in place (statuses only), so the layer
     // stays and its data changes; any other file shown twice replaces its first showing.
@@ -2819,6 +2838,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     revealed.current.clear();
     dateHidden.current.clear();
     heatShownAt.current = null;
+    boxesShownAt.current = null;
     stagePassRef.current = null;
     setStagePass(null);
     setCandidatesShown(false);

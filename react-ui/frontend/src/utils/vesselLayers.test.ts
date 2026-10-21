@@ -23,12 +23,14 @@ import {
   filedFacts,
   forecastPass,
   HEAT_HOLD_MS,
+  BOXES_HOLD_MS,
   heatCheckOf,
   heatHoldLeft,
   fleetMonth,
   fleetPlaces,
   heavyBounds,
   isVesselLayer,
+  lookHoldLeft,
   lookStartFrom,
   loopTime,
   numberRuns,
@@ -483,6 +485,23 @@ describe('the clock plate', () => {
     expect(heatHoldLeft(null, on)).toBe(0);
     expect(heatHoldLeft(on, on - 3000)).toBe(5000);
     expect(heatHoldLeft(Number.NaN, on)).toBe(0);
+  });
+
+  it('holds the boxes beat 3 s before the next look replaces it (gate B, W1)', () => {
+    const on = Date.parse('2026-10-21T14:00:00Z');
+    expect(BOXES_HOLD_MS).toBe(3000);
+    // Gate B: next_look landed 0.5 s after the boxes beat, so the swath waits out the rest.
+    expect(lookHoldLeft(on, on + 5000, on + 5500)).toBe(2500);
+    expect(lookHoldLeft(on, on + 5000, on + 8000)).toBe(0);
+    // The look landing while the heat still holds waits for the heat's rest and then the whole boxes beat.
+    expect(lookHoldLeft(on, null, on + 1200)).toBe(3800 + 3000);
+    expect(lookHoldLeft(on, null, on)).toBe(HEAT_HOLD_MS + BOXES_HOLD_MS);
+    // No forecast on the stage, or the heat held and no boxes ever came: the look lands at once.
+    expect(lookHoldLeft(null, null, on)).toBe(0);
+    expect(lookHoldLeft(on, null, on + 6000)).toBe(0);
+    // A clock that went back holds the full beat at most; a broken time is no boxes beat.
+    expect(lookHoldLeft(null, on, on - 2000)).toBe(3000);
+    expect(lookHoldLeft(null, Number.NaN, on)).toBe(0);
   });
 });
 

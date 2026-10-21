@@ -726,6 +726,24 @@ export function heatHoldLeft(heatShownAt: number | null, now: number): number {
   return Math.max(0, HEAT_HOLD_MS - Math.max(0, now - heatShownAt));
 }
 
+/**
+ * The boxes are the prediction: their beat holds at least this long before the next look's swath
+ * and countdown replace it (gate B, W1: next_look's file lands during the heat's hold, which left
+ * the boxes' figure on the clock for half a second). A dwell, like the heat's.
+ */
+export const BOXES_HOLD_MS = 3000;
+
+/**
+ * How long the next look waits at `now` (ms) so the boxes' beat holds BOXES_HOLD_MS: the rest of it
+ * once the boxes' beat is up; while the heat still holds, the rest of the heat's hold and then the
+ * whole of the boxes'; 0 with no forecast on the stage (or once the heat held and no boxes came).
+ */
+export function lookHoldLeft(heatShownAt: number | null, boxesShownAt: number | null, now: number): number {
+  if (boxesShownAt !== null && Number.isFinite(boxesShownAt)) return Math.max(0, BOXES_HOLD_MS - Math.max(0, now - boxesShownAt));
+  const heat = heatHoldLeft(heatShownAt, now);
+  return heat > 0 ? heat + BOXES_HOLD_MS : 0;
+}
+
 /** The beat a newly landed layer puts on the stage (the targets' depends on whether match_ais ran). */
 export function beatFor(kind: VesselKind, counts?: TargetCounts): SeaBeat {
   switch (kind) {

@@ -1718,6 +1718,15 @@
     max-height: calc(100% - 176px);
   }
 }
+/* A wide, tall screen (the show's 1920 x 1080): the console stops short of the right column, so the
+   layers plate may run to 16 px above the basemap plate (its 20 px inset and 44 px). At the look
+   beat seven layers, the heat's ramp and both keys then fit with no key row under the fade
+   (gate B, W3). The tasking plate's threshold; a longer list still fades. */
+@media (min-width: 1761px) and (min-height: 801px) {
+  .map-frame--sea .map-layers {
+    max-height: calc(100% - 96px);
+  }
+}
 .map-basemap__fixed {
   padding-right: 10px;
   font-size: 15px;
