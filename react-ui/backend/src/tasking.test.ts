@@ -232,7 +232,7 @@ describe('Slack for a filed tasking', () => {
       next_look: 'Sentinel-1D, 2026-10-24 00:17 UTC',
       candidates: '• T01: 30.6 km from Baltra; nearest broadcast 5.8 km\n• T02: 31.0 km from Baltra; nearest broadcast 10.2 km',
       left_out: 'T04',
-      pass: 'Sentinel-1D, 2026-10-12 00:18 UTC. AIS was heard over 30% of the reserve; 22 radar targets, 4 candidates.',
+      pass: 'Sentinel-1D, 2026-10-12 00:18 UTC. AIS was received over 30% of the reserve. 22 radar targets, 4 candidates.',
       tasking_id: TID,
       markdown_key: `s3://b/session_data/${SID}/taskings/${TID}.md`,
     });
@@ -242,6 +242,25 @@ describe('Slack for a filed tasking', () => {
     assert.match(text, /The officer decided; the agent drafted\./);
     assert.match(text, /it is not an accusation\./);
     assert.doesNotMatch(text, /illegal|poach|suspect|culprit|MMSI|—/i);
+    // The stage's coverage words, never the retired ones (Slack is shown in Act 3, U15).
+    assert.doesNotMatch(text, /heard|unproven|not evidence/i);
+  });
+  it('says what the pass could check when the draft carries it, and leaves it out when absent or out of range', () => {
+    const checked = taskingCard(draft({ checkable_share: 0.19 }), TID)!;
+    assert.equal(checked.checkableShare, 0.19);
+    const vars = taskingWorkflowPayload({ ...filed, card: checked });
+    assert.equal(vars.pass,
+      'Sentinel-1D, 2026-10-12 00:18 UTC. AIS was received over 30% of the reserve; this pass could check 19%. 22 radar targets, 4 candidates.');
+    const fromThePass = (taskingMessage({ ...filed, card: checked }).blocks as Array<{ text?: { text: string } }>)[4].text!.text;
+    assert.equal(fromThePass, `*From the pass*\n${vars.pass}`);
+    assert.doesNotMatch(JSON.stringify(taskingMessage({ ...filed, card: checked })), /heard|unproven/i);
+    for (const bad of [1.5, -0.1, '0.19', null]) {
+      const c = taskingCard(draft({ checkable_share: bad }), TID)!;
+      assert.equal(c.checkableShare, null, String(bad));
+      assert.doesNotMatch(taskingWorkflowPayload({ ...filed, card: c }).pass, /could check/);
+    }
+    // The workflow's ten keys stay as they are, so the published workflow needs no change.
+    assert.deepEqual(Object.keys(vars), [...TASKING_WORKFLOW_VARIABLES]);
   });
 
   it('says so when the officer keeps no candidates, leaves none out, or the box has no look planned', () => {

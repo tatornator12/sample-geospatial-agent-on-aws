@@ -78,6 +78,11 @@ export interface TaskingCard {
   passSensed: string;
   counts: { broadcasting: number; port: number; unproven: number; seen_once: number; candidate: number };
   heardShare: number;
+  /**
+   * The share of the reserve the pass could check (imaged, with AIS received), when the draft carries
+   * it (the one-question run's coverage record); null for a draft without it, and the lines omit it.
+   */
+  checkableShare: number | null;
   /** The box the agent drafted (the officer may choose another of the session's boxes). */
   box: TaskingBox;
   candidates: TaskingCandidate[];
@@ -153,6 +158,8 @@ export function taskingCard(record: unknown, taskingId: string): TaskingCard | n
     seen_once: count(c.seen_once), candidate: count(c.candidate),
   };
   const heardShare = num(r.heard_share, 0, 1);
+  // Optional: a draft without it (or with a value outside 0 to 1) is filed, and the lines leave it out.
+  const checkableShare = num(r.checkable_share, 0, 1);
   // The draft carries its box's next look beside the box.
   const box = taskingBox({ ...(r.box as object ?? {}), next_look: r.look });
   if (!draftedAt || !passId || !passSensed || Object.values(counts).some((v) => v === null) || heardShare === null || !box) return null;
@@ -179,7 +186,7 @@ export function taskingCard(record: unknown, taskingId: string): TaskingCard | n
   if (!sentence || !attribution) return null;
   return {
     taskingId, draftedAt, passId, passSensed,
-    counts: counts as TaskingCard['counts'], heardShare, box, candidates,
+    counts: counts as TaskingCard['counts'], heardShare, checkableShare, box, candidates,
     check: hit !== null && total !== null && lift !== null ? { hit, total, lift } : null,
     notes: notes as string[], sentence, attribution,
   };
@@ -350,7 +357,9 @@ export function taskingWorkflowPayload(f: FiledTasking): TaskingWorkflowVariable
     next_look: look ? `Sentinel-1${look.satellite.charAt(2)}, ${utcMinute(look.start)}` : 'none planned yet in ESA\'s published plan',
     candidates: kept.length ? kept.map((c) => `• ${candidateLine(c)}`).join('\n') : '• None: a patrol of the box only.',
     left_out: dropped.length ? dropped.map((c) => c.id).join(', ') : 'none',
-    pass: `${satelliteName(card.passId)}, ${utcMinute(card.passSensed)}. AIS was heard over ${pct(card.heardShare)} of the reserve; ` +
+    // The stage's words: AIS received, and what the pass could check; never "heard" or "unproven".
+    pass: `${satelliteName(card.passId)}, ${utcMinute(card.passSensed)}. AIS was received over ${pct(card.heardShare)} of the reserve` +
+      `${card.checkableShare === null ? '' : `; this pass could check ${pct(card.checkableShare)}`}. ` +
       `${targets} radar targets, ${k.candidate} candidates.`,
     tasking_id: card.taskingId,
     markdown_key: `s3://${f.bucket}/${f.markdownKey}`,
