@@ -174,13 +174,21 @@ export function formatSimilarityLabel(layer: LayerMetadata): string {
   return `Places like ${example} · ${when}`;
 }
 
+// A recorded Earth Analyst case's scenes (react-ui/backend/src/index.ts, /api/scenario):
+// `use-cases/<id>/before/tci-<YYYY-MM-DD>.tif` and `.../after/tci-<YYYY-MM-DD>.tif`.
+const CASE_SCENE = /\/use-cases\/([a-z0-9-]{1,64})\/(?:before|after)\/tci-\d{4}-\d{2}-\d{2}\.tiff?$/i;
+
 /**
  * The place a clipped raster belongs to, from the agent's own file naming
  * (`<band>_clipped_<location>_<YYYY-MM-DD>.tif` in sentinel_utils): the basename without the
- * band prefix, the date suffix and the extension. Null when the URL is not in that form.
+ * band prefix, the date suffix and the extension. A replay case's before and after scenes belong
+ * to the case (its id). Null when the URL is in neither form.
  */
 export function rasterPlaceKey(layer: LayerMetadata): string | null {
-  const basename = (layer.url || '').split('/').pop() ?? '';
+  const url = layer.url || '';
+  const recorded = url.match(CASE_SCENE);
+  if (recorded) return `case:${recorded[1].toLowerCase()}`;
+  const basename = url.split('/').pop() ?? '';
   const m = basename.match(/^[a-z0-9]+_clipped_(.+)_(\d{4}-\d{2}-\d{2})\.tiff?$/i);
   return m ? m[1].toLowerCase() : null;
 }
@@ -229,8 +237,10 @@ export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 
     return formatSimilarityLabel(layer);
   }
   const cleanedName = cleanLayerName(layer.name);
-  // The title often already carries the date ("… Midland, Texas, 2023-12-28"); say it once.
-  const formattedDate = layer.date && !cleanedName.includes(layer.date) ? formatDate(layer.date) : '';
+  // The title often already carries the date ("… Midland, Texas, 2023-12-28", or the stage's own
+  // "True colour, Oct 01 2025 (after)"); say it once.
+  const formattedDate =
+    layer.date && !cleanedName.includes(layer.date) && !cleanedName.includes(formatDate(layer.date)) ? formatDate(layer.date) : '';
 
   if (layerType === 'spectral') {
     // Use same format as TCI: "Location Index Name - Date"

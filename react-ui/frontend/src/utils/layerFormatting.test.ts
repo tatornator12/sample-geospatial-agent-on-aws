@@ -11,6 +11,7 @@ import {
   formatSimilarityLabel,
   groupLayers,
   isSimilarityLayer,
+  layerRowLabel,
   rasterPlaceKey,
   type LayerMetadata,
 } from './layerFormatting.ts';
@@ -122,6 +123,21 @@ describe('findComparePair', () => {
   it('ignores same-place same-date duplicates and picks the widest span', () => {
     expect(findComparePair([folsom22, folsom23, folsom21, westPoint])).toEqual({ left: folsom21, right: folsom23 });
     expect(findComparePair([folsom21, layer({ ...folsom21, id: 'dup' })])).toBeNull();
+  });
+
+  it("pairs a replay case's recorded before and after scenes, and never two cases (B8, A1 P1-10)", () => {
+    const B = 's3://geospatial-agent-on-aws-1/use-cases';
+    const meadAfter = layer({ id: 'ma', type: 'raster', name: 'True colour, Oct 01 2025 (after)', url: `${B}/lake-mead-water/after/tci-2025-10-01.tif`, date: '2025-10-01' });
+    const meadBefore = layer({ id: 'mb', type: 'raster', name: 'True colour, Sep 27 2020 (before)', url: `${B}/lake-mead-water/before/tci-2020-09-27.tif`, date: '2020-09-27' });
+    const amazonAfter = layer({ id: 'aa', type: 'raster', name: 'True colour, Sep 28 2025 (after)', url: `${B}/amazon-deforestation/after/tci-2025-09-28.tif`, date: '2025-09-28' });
+    expect(rasterPlaceKey(meadAfter)).toBe('case:lake-mead-water');
+    expect(findComparePair([meadAfter, meadBefore])).toEqual({ left: meadBefore, right: meadAfter });
+    expect(findComparePair([meadAfter, amazonAfter])).toBeNull();
+    // Not a scene of the case: an index, or a file outside before/ and after/.
+    expect(rasterPlaceKey(layer({ ...meadAfter, url: `${B}/lake-mead-water/after/ndwi-2025-10-01.tif` }))).toBeNull();
+    expect(rasterPlaceKey(layer({ ...meadAfter, url: `${B}/lake-mead-water/tci-2025-10-01.tif` }))).toBeNull();
+    // The row prints the date once.
+    expect(layerRowLabel(meadAfter)).toBe('True colour, Oct 01 2025 (after)');
   });
 
   it('reads the place from the file name, not the title', () => {

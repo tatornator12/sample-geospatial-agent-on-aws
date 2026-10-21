@@ -18,6 +18,7 @@ import { ChatSidebar } from '../components/ChatSidebar';
 import type { GeometryData, RasterData } from '../types';
 import { getIdToken } from '../utils/auth';
 import { parseRenderHint } from '../utils/render';
+import { formatDate } from '../utils/layerFormatting';
 import type { Tip } from '../utils/steps';
 import '../stage.css';
 
@@ -242,98 +243,38 @@ export function Chat() {
           setCurrentGeometry(geometry);
         }
 
-        // Pre-load key rasters with explicit zIndex for stacking
-        // Higher zIndex = on top visually
+        // Pre-load key rasters with explicit zIndex for stacking (higher = on top): the after
+        // scene on top, the before scene under it (A1 P1-10), so the map shows the case's finding
+        // and the compare slider pairs the two (one case, two dates); each index the same way.
         const rasters: RasterData[] = [];
+        const when = (date: string | undefined, side: 'before' | 'after') =>
+          date ? `${formatDate(date)} (${side})` : `(${side})`;
 
-        // TCI Before (pre-fire sat image) - zIndex 4 (top)
-        if (config.assets.before?.tci) {
-          rasters.push({
-            url: config.assets.before.tci,
-            name: 'TCI Before',
-            date: config.dates.before,
-            zIndex: 4,
-          });
-        }
-
-        // TCI After (post-fire sat image) - zIndex 3
         if (config.assets.after?.tci) {
           rasters.push({
             url: config.assets.after.tci,
-            name: 'TCI After',
+            name: `True colour, ${when(config.dates.after, 'after')}`,
             date: config.dates.after,
+            zIndex: 4,
+          });
+        }
+        if (config.assets.before?.tci) {
+          rasters.push({
+            url: config.assets.before.tci,
+            name: `True colour, ${when(config.dates.before, 'before')}`,
+            date: config.dates.before,
             zIndex: 3,
           });
         }
 
-        // Load appropriate index based on index_type
-        const indexType = config.index_type || 'nbr'; // Default to NBR for backward compatibility
-        console.log(`📊 Loading index type: ${indexType}`);
-        console.log('📋 Full config:', config);
-        console.log('Available assets:', {
-          before: Object.keys(config.assets.before || {}),
-          after: Object.keys(config.assets.after || {}),
-        });
-        console.log('NDVI URLs:', {
-          before: config.assets.before?.ndvi,
-          after: config.assets.after?.ndvi,
-        });
-        
-        if (indexType === 'ndvi') {
-          // NDVI - Normalized Difference Vegetation Index (for vegetation/deforestation analysis)
-          if (config.assets.before?.ndvi) {
-            rasters.push({
-              url: config.assets.before.ndvi,
-              name: 'NDVI Before',
-              date: config.dates.before,
-              zIndex: 2,
-            });
-          }
-          if (config.assets.after?.ndvi) {
-            rasters.push({
-              url: config.assets.after.ndvi,
-              name: 'NDVI After',
-              date: config.dates.after,
-              zIndex: 1,
-            });
-          }
-        } else if (indexType === 'ndwi') {
-          // NDWI - Normalized Difference Water Index (for water/drought analysis)
-          if (config.assets.before?.ndwi) {
-            rasters.push({
-              url: config.assets.before.ndwi,
-              name: 'NDWI Before',
-              date: config.dates.before,
-              zIndex: 2,
-            });
-          }
-          if (config.assets.after?.ndwi) {
-            rasters.push({
-              url: config.assets.after.ndwi,
-              name: 'NDWI After',
-              date: config.dates.after,
-              zIndex: 1,
-            });
-          }
-        } else if (indexType === 'nbr') {
-          // NBR - Normalized Burn Ratio (for wildfire/burn analysis)
-          if (config.assets.before?.nbr) {
-            rasters.push({
-              url: config.assets.before.nbr,
-              name: 'NBR Before',
-              date: config.dates.before,
-              zIndex: 2,
-            });
-          }
-          if (config.assets.after?.nbr) {
-            rasters.push({
-              url: config.assets.after.nbr,
-              name: 'NBR After',
-              date: config.dates.after,
-              zIndex: 1,
-            });
-          }
-        }
+        // The case's index (NDVI for vegetation, NDWI for water, NBR for a burn; NBR when unset),
+        // after over before.
+        const indexType = config.index_type || 'nbr';
+        const label = indexType.toUpperCase();
+        const after = config.assets.after?.[indexType];
+        const before = config.assets.before?.[indexType];
+        if (after) rasters.push({ url: after, name: `${label}, ${when(config.dates.after, 'after')}`, date: config.dates.after, zIndex: 2 });
+        if (before) rasters.push({ url: before, name: `${label}, ${when(config.dates.before, 'before')}`, date: config.dates.before, zIndex: 1 });
 
         console.log('✅ Pre-loading rasters:', rasters.map(r => `${r.name} (z:${r.zIndex})`));
         setCurrentRasters(rasters);
