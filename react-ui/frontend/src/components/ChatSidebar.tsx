@@ -18,6 +18,7 @@ import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
 import { groupSteps, methaneDirFrom, parseTip, tipManifestUrl, type Tip } from '../utils/steps.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
+import { useReplayReveal } from '../hooks/useReplayReveal.ts';
 import { currentBriefId } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
@@ -162,6 +163,9 @@ export function ChatSidebar({
   const [openEvidence, setOpenEvidence] = useState<{ item: EvidenceItem; imageUrl: string } | null>(null);
   const closeEvidence = useCallback(() => setOpenEvidence(null), []);
   const scenarioDisplayedRef = useRef(false);
+  // The replay on the stage, revealed one recorded call at a time (B10); null when there is none.
+  const [replayKey, setReplayKey] = useState<string | null>(null);
+  const replaySeq = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   // The live session id, readable from inside a stream loop that closed over an older one.
@@ -198,6 +202,7 @@ export function ChatSidebar({
     setStreamNarration(NO_NARRATION);
     setIsStreaming(false);
     setIsProcessing(false);
+    setReplayKey(null);
     scenarioDisplayedRef.current = false;
     // Clear any cached raster URLs from previous session
     (window as any).__lastRasterUrls = '';
@@ -282,10 +287,11 @@ export function ChatSidebar({
         { role: 'user', content: userQuestion },
         { role: 'assistant', content: analysisText, tools: simulatedTools, ...(saw ? { saw } : {}) },
       ]);
+      setReplayKey(`${scenarioId ?? 'case'}#${++replaySeq.current}`);
 
       scenarioDisplayedRef.current = true;
     }
-  }, [scenarioConfig, scenarioError, isLoadingScenario, messages.length]);
+  }, [scenarioConfig, scenarioError, isLoadingScenario, messages.length, scenarioId]);
 
   // Keep the transcript pinned to the latest turn while it is open
   useEffect(() => {
@@ -651,8 +657,14 @@ export function ChatSidebar({
   const lastUserIndex = messages.map((m) => m.role).lastIndexOf('user');
   const earlierTurns = useMemo(() => pastTurns(messages), [messages]);
 
+  // A replay shows its work first: its recorded calls one at a time, the last lit, then the
+  // answer (B10). Only while the replay is the only turn on the stage; not on Dark Vessels.
+  const replayTools = !isStreaming && messages.length === 2 && replayKey ? lastAssistant?.tools ?? [] : [];
+  const reducedMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const reveal = useReplayReveal(replayKey, replayTools.length, reducedMotion);
+  const revealing = reveal.revealing && replayTools.length > 0 && agentId !== 'vessels';
   // Where the agent is: this turn's tools while working, the last turn's when finished.
-  const stepTools = isStreaming ? streamingTools : lastAssistant?.tools || [];
+  const stepTools = isStreaming ? streamingTools : revealing ? replayTools.slice(0, reveal.shown) : lastAssistant?.tools || [];
   // What the agent looked at: the inspect_image steps of the same turn, each with what the agent
   // said it saw (Dark Vessels' chips keep their titles alone: its copy is its own act's).
   const showSaw = agentId !== 'vessels';
@@ -712,15 +724,15 @@ export function ChatSidebar({
   // The step column: shown while the agent works and for the turn just finished. A turn that
   // drafted the brief ends on the brief card (it is the answer); any other turn ends on the answer.
   const draftedBrief = stepTools.some((t) => t.name === 'draft_brief');
-  const showBrief = !!briefId && !isStreaming;
-  const showAnswer = !isStreaming && !!answerText && !(showBrief && draftedBrief);
-  const showColumn = isStreaming || stepTools.length > 0 || showAnswer || earlierTurns.length > 0;
+  const showBrief = !!briefId && !isStreaming && !revealing;
+  const showAnswer = !isStreaming && !revealing && !!answerText && !(showBrief && draftedBrief);
+  const showColumn = isStreaming || revealing || stepTools.length > 0 || showAnswer || earlierTurns.length > 0;
   const columnTitle = isStreaming ? 'The agent is working' : stepTools.length > 0 ? 'What the agent did' : 'What the agent said';
   const [stepsOpen, setStepsOpen] = useState(true);
   // One status line for screen readers (S15): the lit step while working, then how the turn ended.
   const statusLine = lastUser
     ? stageStatusLine({
-        working: isStreaming,
+        working: isStreaming || revealing,
         tools: stepTools,
         answer: answerText,
         brief: showBrief && draftedBrief,
@@ -780,9 +792,9 @@ export function ChatSidebar({
   // rows (unless the presenter has a record open).
   const liveEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!isStreaming || !stepsOpen || columnRef.current?.querySelector('.earlier-turn__record')) return;
+    if (!(isStreaming || revealing) || !stepsOpen || columnRef.current?.querySelector('.earlier-turn__record')) return;
     liveEndRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [isStreaming, stepsOpen, streamingTools.length, streamNarration.latest]);
+  }, [isStreaming, revealing, stepsOpen, stepTools.length, streamNarration.latest]);
 
   return (
     <>
@@ -835,7 +847,7 @@ export function ChatSidebar({
               {stepTools.length > 0 && (
                 <StepColumn
                   steps={stepTools}
-                  live={isStreaming}
+                  live={isStreaming || revealing}
                   evidence={evidence}
                   onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
                   methaneDir={methaneDir}
@@ -849,7 +861,7 @@ export function ChatSidebar({
               {isStreaming && stepTools.length === 0 && <p className="stage-steps__reading">Reading the request</p>}
               {/* The agent's latest sentence, under the lit step (always the last row) while it works. */}
               {isStreaming && <NarrationLine key={`narration-${lastUserIndex}`} text={streamNarration.latest} />}
-              {isStreaming && <div ref={liveEndRef} className="stage-steps__live-end" />}
+              {(isStreaming || revealing) && <div ref={liveEndRef} className="stage-steps__live-end" />}
               {showBrief && (
                 <BriefCard
                   key={briefId}

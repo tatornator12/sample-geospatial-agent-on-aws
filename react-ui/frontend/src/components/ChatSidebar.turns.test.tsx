@@ -355,6 +355,43 @@ describe('The status line (B3, S15)', () => {
   });
 });
 
+describe('A replay shows its work, then its answer (B10, A1 P1-1)', () => {
+  const config = {
+    name: 'Newark',
+    location: 'Newark, Ohio',
+    dates: {},
+    narrative: 'REPLAY-ANSWER: the Octagon is clear from space.',
+    user_question: 'Show me the Newark Octagon',
+    tool_calls: [
+      { name: 'find_known_site', params: { site_id: 'newark-octagon' }, result: 'r' },
+      { name: 'show_terrain', params: {}, result: 'r' },
+      { name: 'measure_profile', params: { site_id: 'newark-octagon' }, result: 'r' },
+    ],
+  };
+
+  it('reveals the recorded calls in order with the last lit, the answer last', async () => {
+    const props = { agentId: 'archaeologist', agentLabel: 'AI Archaeologist', onSessionReset: vi.fn(), onGeometryUpdate: vi.fn(), onRastersUpdate: vi.fn() };
+    render(<ChatSidebar sessionId={S1} scenarioId="archaeologist-newark" scenarioConfig={config} {...props} />);
+    const seen: string[] = [];
+    const sample = () => {
+      const rows = document.querySelectorAll('.stage-step-column > li').length;
+      const lit = document.querySelector('.stage-step-column > li[aria-current="step"]') ? 'lit' : 'none';
+      const answer = document.querySelector('.stage-answer') ? 'answer' : 'no answer';
+      const at = `${rows} ${lit} ${answer}`;
+      if (seen[seen.length - 1] !== at) seen.push(at);
+    };
+    for (let i = 0; i < 14; i++) {
+      sample();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+    }
+    sample();
+    expect(seen).toEqual(['1 lit no answer', '2 lit no answer', '3 lit no answer', '3 none answer']);
+    expect(document.querySelector('.stage-answer')?.textContent).toContain('REPLAY-ANSWER');
+  });
+});
+
 describe('Runtime crash', () => {
   it('resets the session and shows the recovery notice on the new one', async () => {
     const { rerender, onSessionReset } = setup();
