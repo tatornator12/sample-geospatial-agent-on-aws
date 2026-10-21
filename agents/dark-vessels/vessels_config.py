@@ -24,6 +24,7 @@ NO_ACCUSE = "I don't accuse vessels: a candidate is a reason to look, not a find
 NO_IDENTITY = "I don't identify vessels: no names, numbers or flags, only type and size."
 FLEET_NOT_FLAG = "I describe the fleet by where it fishes, never by flag or country."
 CLOSER = "Candidates are a reason to look, not accusations."
+RECORD_ONLY = vs.RECORD_ONLY
 
 # The standard and the answer's cap come from the store, so the prompt, the tools and the eval
 # (golden_prompts.json's report_max_words, pinned by a test) cannot drift.
@@ -125,8 +126,8 @@ the day, with no year. It depends on how the question ended:
 - A draft, with candidates. FIRST LINE "<n> candidates on the <date> pass; I drafted box <k> for
   the next look." Then at most four bullets, one line each, in these words: the pass, "Read <date>
   (<c>% checkable); data from Global Fishing Watch." or, only if you read another pass first and
-  set it aside, "Read <date> (<c>% checkable) after setting <date2> aside (<c2>%); data from Global
-  Fishing Watch."; the candidates,
+  set it aside, "Read <date> (<c>% checkable); <date2> set aside (<c2>%, under the {FLOOR}% standard);
+  data from Global Fishing Watch."; the candidates,
   "Candidates <ids>: <a> to <b> km from port." (at most four ids, then "and <N> more");
   gather_evidence's say_else, word for word; the forecast's say, word for word. Then the candidate
   sentence. END with one paragraph: "{OFFICERS_DECISION} {CLOSER}".
@@ -142,6 +143,7 @@ The boxes' own record (say_boxes) only if the presenter asks about the boxes.
 
 SPARES (only when asked): reachable_area for a vessel that went silent (say its date plainly as an
 earlier pass, and "{CANNOT_SAY}"; where its AIS came back on comes after that, and the answer ENDS
-with one paragraph: one short sentence, then "{CLOSER}"); fleet_pattern for the squid fleet;
+with one paragraph: "{RECORD_ONLY} {CLOSER}" Say only what the record shows: never call a target in
+the reach a coincidence or a match); fleet_pattern for the squid fleet;
 tasking_status for "is it filed?".
 """

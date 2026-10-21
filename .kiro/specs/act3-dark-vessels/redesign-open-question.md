@@ -546,8 +546,8 @@ the day, with no year. It depends on how the question ended:
 - A draft, with candidates. FIRST LINE "<n> candidates on the <date> pass; I drafted box <k> for
   the next look." Then at most four bullets, one line each, in these words: the pass, "Read <date>
   (<c>% checkable); data from Global Fishing Watch." or, only if you read another pass first and
-  set it aside, "Read <date> (<c>% checkable) after setting <date2> aside (<c2>%); data from Global
-  Fishing Watch."; the candidates,
+  set it aside, "Read <date> (<c>% checkable); <date2> set aside (<c2>%, under the {FLOOR}% standard);
+  data from Global Fishing Watch."; the candidates,
   "Candidates <ids>: <a> to <b> km from port." (at most four ids, then "and <N> more");
   gather_evidence's say_else, word for word; the forecast's say, word for word. Then the candidate
   sentence. END with one paragraph: "{OFFICERS_DECISION} {CLOSER}".
@@ -563,9 +563,17 @@ The boxes' own record (say_boxes) only if the presenter asks about the boxes.
 
 SPARES (only when asked): reachable_area for a vessel that went silent (say its date plainly as an
 earlier pass, and "{CANNOT_SAY}"; where its AIS came back on comes after that, and the answer ENDS
-with one paragraph: one short sentence, then "{CLOSER}"); fleet_pattern for the squid fleet;
+with one paragraph: "{RECORD_ONLY} {CLOSER}" Say only what the record shows: never call a target in
+the reach a coincidence or a match); fleet_pattern for the squid fleet;
 tasking_status for "is it filed?".
 ```
+
+Gate B (Oct 21) closed gate A's two watch items the same way, in fixed words: the set-aside bullet
+states the set-aside pass's check against the standard, as the stage's "Checked:" line does (19
+words, so the longest legal answer is 120, at the cap), and the gone-silent spare's last paragraph
+is `RECORD_ONLY` ("That is all the record shows.") and the closer, never "a coincidence" or "a
+match" (`reachable_area`'s `next_steps` say the same). The golden `gone-silent` case forbids
+"coincid" and "a match" in the prose, and `named-pass`, a single pass, forbids "aside".
 
 Gate A attempt 1 (Oct 21) tightened the block above without changing its content: the pass and
 candidates bullets have fixed words (the longest legal answer is 117 words, pinned from these
@@ -1503,16 +1511,17 @@ lane item "Act 3 coverage and officer copy" (`summary.md:162`) is dropped, becau
   sentences, `say_else`, the longest `say` ("September", "100%", "14 times"), a set-aside pass, and
   seven candidates:
   - first line, "7 candidates on the Sep 30 pass; I drafted box 3 for the next look.": 15 words;
-  - pass bullet, "Read Sep 30 (22% checkable) after setting Aug 30 aside (10%); data from Global
-    Fishing Watch.": 16;
+  - pass bullet, "Read Sep 30 (22% checkable); Aug 30 set aside (10%, under the 15% standard); data
+    from Global Fishing Watch.": 19 (16 before gate B);
   - candidates bullet, "T01, T02, T03, T04 and 3 more, 12 to 31 km from port.": 13;
   - `say_else`: 15;
   - the `say`: 22;
   - the candidate sentence: 15;
   - the closing paragraph: 16.
 
-  The sample measures 116 words when split on whitespace, as `report_max_words` counts, with the
-  four bullet markers included. Also a pin that `golden_prompts.json`'s `report_max_words` equals
+  The sample measures 120 words when split on whitespace, as `report_max_words` counts, with the
+  four bullet markers included (the pinned test builds it from the prompt's templates; 117 before
+  gate B). Also a pin that `golden_prompts.json`'s `report_max_words` equals
   the constant.
 - Prompt pins on `build_prompt()`:
   - no `s1[a-d]-\d{8}`;

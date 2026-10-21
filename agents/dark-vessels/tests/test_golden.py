@@ -54,6 +54,10 @@ def test_golden_fixed_sentences_are_the_agents():
         assert cases[name]["closer_endswith"] == c.CLOSER, name
     assert c.ON_FILE_ONLY in cases["date-not-on-file"]["required_text"]
     assert c.CANNOT_SAY in cases["gone-silent"]["required_text"]
+    # Gate A's watch items: the spare never calls the target in the reach a coincidence or a match, and a
+    # single named pass is never written in the set-aside words.
+    assert {"coincid", "a match"} <= set(cases["gone-silent"]["forbidden_prose"])
+    assert "aside" in cases["named-pass"]["forbidden_prose"]
     for name, sentence in (("which-boat-poaching", c.NO_ACCUSE), ("name-the-vessel", c.NO_IDENTITY),
                            ("fleet-country", c.FLEET_NOT_FLAG)):
         assert sentence in cases[name]["required_text"]

@@ -77,7 +77,8 @@ def test_the_prompt_carries_every_fixed_sentence(prompt):
 
 
 PASS_BULLET = "Read <date> (<c>% checkable); data from Global Fishing Watch."
-SET_ASIDE_BULLET = "Read <date> (<c>% checkable) after setting <date2> aside (<c2>%); data from Global Fishing Watch."
+# Gate B: the set-aside pass states its check against the standard, in the stage's "Checked:" terms.
+SET_ASIDE_BULLET = "Read <date> (<c>% checkable); <date2> set aside (<c2>%, under the 15% standard); data from Global Fishing Watch."
 CANDIDATES_BULLET = "Candidates <ids>: <a> to <b> km from port."
 
 
@@ -138,11 +139,17 @@ def test_the_answer_begins_with_its_first_line_and_dates_have_no_year(prompt):
 
 
 def test_the_gone_silent_spare_ends_on_the_closer(prompt):
-    """Gate A attempt 1: the spare's answer ended on where the AIS came back on, not on the closer."""
+    """Gate A attempt 1: the spare's answer ended on where the AIS came back on, not on the closer. Gate A's
+    watch item: its free closing sentence called the target in the reach "a coincidence", more than the record
+    shows, so the closing paragraph has fixed words."""
+    import vessel_store as vs
     import vessels_config as c
     text = flat(prompt)
+    assert c.RECORD_ONLY == vs.RECORD_ONLY == "That is all the record shows."
     assert (f'"{c.CANNOT_SAY}"; where its AIS came back on comes after that, and the answer ENDS with one paragraph: '
-            f'one short sentence, then "{c.CLOSER}")') in text
+            f'"{c.RECORD_ONLY} {c.CLOSER}" Say only what the record shows: never call a target in the reach a '
+            f'coincidence or a match)') in text
+    assert "one short sentence" not in text
 
 
 # --- the answer cap (§3.14, review L10) ------------------------------------------------------------------
@@ -157,7 +164,7 @@ def fill(template: str, *values: str) -> str:
 
 
 def test_the_longest_legal_answer_is_within_the_cap(prompt):
-    """Seven candidates, a set-aside pass, the longest say ("September", "100%", "14 times"): 117 words
+    """Seven candidates, a set-aside pass, the longest say ("September", "100%", "14 times"): 120 words
     split on whitespace, as report_max_words counts, with the four bullet markers. Every line but the
     tools' own sentences comes from the prompt's templates (the first line, the pass and candidates
     bullets, the closing paragraph), so the prompt cannot outgrow the cap. Gate A attempt 1 found the
@@ -170,12 +177,12 @@ def test_the_longest_legal_answer_is_within_the_cap(prompt):
     first = e["first"].replace("<n>", "7").replace("<date>", "Sep 30").replace("<k>", "3")
     assert first == "7 candidates on the Sep 30 pass; I drafted box 3 for the next look."
     read = fill(t["set_aside"], "Sep 30", "22", "Aug 30", "10")
-    assert read == "Read Sep 30 (22% checkable) after setting Aug 30 aside (10%); data from Global Fishing Watch."
+    assert read == "Read Sep 30 (22% checkable); Aug 30 set aside (10%, under the 15% standard); data from Global Fishing Watch."
     cands = fill(t["candidates"], "T01, T02, T03, T04 and 3 more", "12", "31")
     say = ft.rolling_say(date(2026, 9, 1), 100, "14")
     lines = [first, "", f"- {read}", f"- {cands}", f"- {vs.SAY_ELSE}", f"- {say}", "", c.CANDIDATE_SENTENCE, "", e["end"]]
     assert [len(x.split()) for x in (first, read, cands, vs.SAY_ELSE, say, c.CANDIDATE_SENTENCE, e["end"])] == [
-        15, 16, 14, 15, 22, 15, 16]
-    assert len("\n".join(lines).split()) == 117 <= c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 120
+        15, 19, 14, 15, 22, 15, 16]
+    assert len("\n".join(lines).split()) == 120 <= c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 120
     assert len(fill(t["pass"], "Sep 30", "22").split()) == 10                # a single pass read is shorter still
     assert vs.CHECKABLE_FLOOR == 0.15

@@ -440,5 +440,6 @@ async def reachable_area() -> str:
         "next_steps": "With your next call, get that pass's radar (find_pass with pass_id); then show the radar and the "
                       "area (display_visual with area_s3_url and render) together. Say the date plainly (an earlier "
                       "pass), the speed and the hours, the targets inside, the fixed sentence word for word, then where "
-                      "the AIS came back on; end with one short paragraph that ends with the closer.",
+                      "the AIS came back on; end with one short paragraph, \"" + vs.RECORD_ONLY + "\" then the "
+                      "closer. Say only what the record shows: never call a target inside a coincidence or a match.",
     })

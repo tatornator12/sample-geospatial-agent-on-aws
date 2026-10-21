@@ -68,6 +68,8 @@ OURS_MATCH_KM = 1.0         # one of our targets with an AIS position this close
 ON_FILE_ONLY = "I only investigate passes on file."
 CANDIDATE_SENTENCE = "A candidate is a radar target with no broadcast nearby; it is not an accusation."
 CANNOT_SAY = "I cannot say which, if any, of these it is."
+# The gone-silent spare's last words before the closer: what the record shows, nothing about the targets in the reach.
+RECORD_ONLY = "That is all the record shows."
 RECEPTION_UNKNOWN = "reception unknown: no AIS there proves nothing"
 # gather_evidence's four innocent explanations in one sentence.
 SAY_ELSE = "Each could be a small boat, a missed or switched-off AIS, or not a vessel."

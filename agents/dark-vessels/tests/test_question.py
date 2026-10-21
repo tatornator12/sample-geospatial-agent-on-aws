@@ -610,7 +610,10 @@ def test_reachable_area_next_steps_get_the_radar_first_and_end_on_the_closer(ves
     """Gate A attempt 1: the spare showed the reach with no find_pass and ended on where the AIS came back on."""
     steps = run(vessels.ft.reachable_area())["next_steps"]
     assert steps.startswith("With your next call, get that pass's radar (find_pass with pass_id);")
-    assert steps.endswith("then where the AIS came back on; end with one short paragraph that ends with the closer.")
+    # Gate A's watch item: a free closing sentence called the target in the reach "a coincidence".
+    assert steps.endswith('then where the AIS came back on; end with one short paragraph, "That is all the record '
+                          'shows." then the closer. Say only what the record shows: never call a target inside a '
+                          'coincidence or a match.')
 
 
 def test_next_steps_name_no_call_order(vessels):
