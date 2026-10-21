@@ -37,8 +37,9 @@ export function evidenceUrlsFor(rasterS3Url: string, sessionId?: string): string
     const base = `s3://${shared[1]}/session_data/${sessionId}/inspections/${shared[2]}`;
     return [`${base}.png`, `${base}.jpg`];
   }
-  // A replay case keeps what the agent saw beside its rasters: use-cases/<id>/inspections/<stem>.
-  const replay = rasterS3Url.match(/^(s3:\/\/[^/]+\/use-cases\/[a-z0-9-]{1,64}\/)([A-Za-z0-9][A-Za-z0-9._-]*)$/);
+  // A replay case keeps what the agent saw beside its rasters: use-cases/<id>/inspections/<stem>
+  // (Dark Vessels' chips sit in the case's chips/ folder, as in a session's).
+  const replay = rasterS3Url.match(/^(s3:\/\/[^/]+\/use-cases\/[a-z0-9-]{1,64}\/)(?:chips\/)?([A-Za-z0-9][A-Za-z0-9._-]*)$/);
   // A session raster in any folder of the session (Dark Vessels' chips sit in vessels/chips/): the
   // agent saves what it saw by the raster's own name (geo_agent/utils/tools.py _inspection_key).
   const match = replay

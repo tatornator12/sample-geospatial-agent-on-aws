@@ -54,6 +54,9 @@ const NO_REVEALS: Readonly<Record<string, number>> = {};
 const COLUMN_HEAD_PX = 52;
 const COLUMN_FOOT_PX = 24;
 
+/** A tool-use id as a recorded case keeps it (the stream's own ids, vessel_store.TOOL_USE_ID_RE). */
+const RECORDED_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
 /**
  * Load tool calls from scenario config
  */
@@ -66,14 +69,20 @@ function loadToolCallsFromConfig(config: ScenarioConfig): ToolCall[] {
     return [];
   }
 
-  // Convert config tool calls to ToolCall format with unique IDs
-  return configToolCalls.map((tool: any, index: number) => ({
-    name: tool.name,
-    id: `tool_${Date.now()}_${index}`,
-    params: tool.params || {},
-    status: 'completed' as const,
-    result: tool.result || `Completed ${tool.name}`,
-  }));
+  // Convert config tool calls to ToolCall format with unique IDs. A call recorded with its tool-use
+  // id keeps it (Dark Vessels' board and decision files are named by it); any other gets one.
+  const seen = new Set<string>();
+  return configToolCalls.map((tool: any, index: number) => {
+    const recorded = typeof tool.id === 'string' && RECORDED_ID.test(tool.id) && !seen.has(tool.id) ? tool.id : null;
+    if (recorded) seen.add(recorded);
+    return {
+      name: tool.name,
+      id: recorded ?? `tool_${Date.now()}_${index}`,
+      params: tool.params || {},
+      status: 'completed' as const,
+      result: tool.result || `Completed ${tool.name}`,
+    };
+  });
 }
 
 /** A recorded call's `saw` (what the agent said it saw), by the replayed call's id; none recorded today. */

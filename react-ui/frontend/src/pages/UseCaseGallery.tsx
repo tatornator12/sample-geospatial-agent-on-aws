@@ -134,7 +134,7 @@ const scenarios: Scenario[] = [
   },
   {
     // The one open question (redesign §3.8.5, U11: the id stays across re-records). The metrics are
-    // worded to stay true on any take. Coming soon until task 9 records the case on dev.
+    // worded to stay true on any take. Recorded on dev by agents/dark-vessels/build_replay_case.py.
     id: 'vessels-open-question',
     name: 'Dark Vessels, Galápagos: one open question',
     description: 'One question about the Galápagos Marine Reserve: the agent weighs the radar passes on file, checks whether AIS reception there is good enough, chooses what to check next, and drafts a patrol tasking for the officer. Candidates, never accusations.',
@@ -143,7 +143,7 @@ const scenarios: Scenario[] = [
       { label: 'Agent decisions', value: 'the pass, what follows a thin pass, the box' },
       { label: 'Passes weighed', value: 'every pass on file' },
     ],
-    status: 'coming-soon',
+    status: 'available',
     agent: 'vessels',
   },
 ];

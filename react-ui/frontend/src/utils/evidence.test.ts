@@ -57,6 +57,18 @@ describe('evidenceUrlsFor', () => {
     expect(evidenceUrlsFor('s3://bucket/use-cases/Bad_Id/x.tif')).toBeNull();
     expect(evidenceUrlsFor('s3://bucket/use-cases/case/../x.tif')).toBeNull();
   });
+
+  it('finds a Dark Vessels chip\'s inspection beside the case\'s chips/ folder, as in a session (task 9)', () => {
+    expect(evidenceUrlsFor('s3://bucket/use-cases/vessels-open-question/chips/s1d-20261012t0018_T04.tif')?.[0]).toBe(
+      's3://bucket/use-cases/vessels-open-question/inspections/s1d-20261012t0018_T04.png'
+    );
+    expect(evidenceUrlsFor('s3://bucket/use-cases/vessels-open-question/radar_s1d-20261012t0018.tif')?.[0]).toBe(
+      's3://bucket/use-cases/vessels-open-question/inspections/radar_s1d-20261012t0018.png'
+    );
+    // Only the chips/ folder: no other folder, and never a path trick.
+    expect(evidenceUrlsFor('s3://bucket/use-cases/vessels-open-question/other/x.tif')).toBeNull();
+    expect(evidenceUrlsFor('s3://bucket/use-cases/vessels-open-question/chips/../x.tif')).toBeNull();
+  });
 });
 
 describe('extractEvidence', () => {

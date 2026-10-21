@@ -69,6 +69,24 @@ describe('UseCaseGallery', () => {
     }
   });
 
+  it('opens the Dark Vessels case on Act 3, available, in the words that stay true across re-records (task 9, §3.8.5)', () => {
+    expect(open('Dark Vessels, Galápagos: one open question')).toBe('/?scenario=vessels-open-question&agent=vessels');
+    cleanup();
+    render(
+      <MemoryRouter initialEntries={['/use-cases']}>
+        <UseCaseGallery />
+      </MemoryRouter>
+    );
+    const card = screen.getByRole('heading', { name: 'Dark Vessels, Galápagos: one open question' }).parentElement!.textContent ?? '';
+    expect(card).toContain('View Analysis');
+    expect(card).not.toContain('Coming Soon');
+    expect(card).toContain('Agent decisions');
+    expect(card).toContain('the pass, what follows a thin pass, the box');
+    expect(card).toContain('Passes weighed');
+    expect(card).toContain('every pass on file');
+    expect(card).toContain('Candidates, never accusations.');
+  });
+
   it('still opens the other acts\u2019 cases on their own act', () => {
     expect(open('Permian Basin Methane')).toBe('/?scenario=methane-permian-2024&agent=methane');
     cleanup();

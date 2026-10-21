@@ -126,6 +126,45 @@ describe('the board before the radar (N2)', () => {
   });
 });
 
+describe('the replay case (redesign §3.10, task 9)', () => {
+  it('replays the recorded calls under their own tool-use ids, so the column reads the case\'s board and decisions', async () => {
+    const dir = 's3://geo-bucket/use-cases/vessels-open-question/';
+    render(
+      <ChatSidebar
+        sessionId={S1}
+        agentId="vessels"
+        agentLabel="Dark Vessels (dev)"
+        scenarioId="vessels-open-question"
+        scenarioConfig={{
+          name: 'Dark Vessels, Galápagos: one open question',
+          location: 'Galápagos Marine Reserve',
+          dates: {},
+          narrative: '4 candidates on the Oct 12 pass; I drafted box 1 for the next look.',
+          user_question: 'Is anyone in the reserve without broadcasting, and where should the patrol look next?',
+          tool_calls: [
+            { id: 'tooluse_list1', name: 'list_passes', params: {}, result: 'The passes on file listed' },
+            { id: 'tooluse_read1', name: 'decide', params: { step: 'read_pass', because: 'newest_wide', pass_id: 's1d-20261012t0018' }, result: 'Decision recorded' },
+            { id: 'tooluse_dv1', name: 'display_visual', params: { s3_url: `${dir}radar_s1d-20261012t0018.tif`, title: 'Radar, Oct 12' }, result: 'Shown on the map' },
+            // A duplicate or malformed id is not trusted; the call gets one of its own.
+            { id: 'tooluse_dv1', name: 'find_pass', params: { when: 's1d-20261012t0018' }, result: 'Radar pass found' },
+            { id: 'bad id!', name: 'detect_vessels', params: { pass_id: 's1d-20261012t0018' }, result: 'Targets found on the water' },
+          ],
+        } as never}
+        onSessionReset={vi.fn()}
+        onGeometryUpdate={vi.fn()}
+        onRastersUpdate={vi.fn()}
+        vesselBucket="geo-bucket"
+        revealedPasses={{}}
+      />,
+    );
+    await flush();
+    const asked = vi.mocked(loadGeometry).mock.calls.map(([u]) => u);
+    expect(asked).toContain(`${dir}passes_tooluse_list1.json`);
+    expect(asked.some((u) => /passes_tool_\d+_0\.json$/.test(String(u)))).toBe(false);
+    expect(document.querySelector('.stage-step-column')?.textContent).toContain('Weigh the passes on file');
+  });
+});
+
 describe('the prepared plates (redesign §3.8.5, R6.6)', () => {
   it('marks Act 3\'s plates for the 15 px rule, and no other act\'s', () => {
     setup('vessels');
