@@ -188,7 +188,7 @@ line." `find_known_site` says `has_verified_transect`, so the agent knows which 
   prompts on `ai_archaeologist_dev`, the other agents' evals unchanged, a headless replay
   round-trip, Act 4 timed twice.
 
-## Act 4 run sheet (4 min, closer)
+## Act 4 run sheet (4 min, second act)
 
 | t | Beat | Prompt / action | What the room sees |
 |---|---|---|---|
@@ -198,12 +198,12 @@ line." `find_known_site` says `has_verified_transect`, so the agent knows which 
 | 1:20 | The agent's line | "Measure across a wall of the Newark Octagon, on a line you choose from the local relief." | The local relief lands and the agent looks at it, says which wall it will cross and which way, then measures: the step reads "NW–SE, the agent's line" (or the bearing it chose), the section draws under it. If the line crosses no bank it says "I cannot confirm a bank on this line." and what the LiDAR does show: a designed outcome, not a failure. About 30 s on dev |
 | 2:00 | Measure | "Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?" | LRM (red bank, blue ditch), transect line, the step reads "The record's verified line"; "362 m measured, about 366 m documented, bank +2.6 m, ditch −2.7 m". About 25 to 45 s on dev |
 | 2:50 | Like this | "Where else did they build like this?" | Sites of the same form from the catalogue (option B); the answer opens on the top match's name ("Fort Hill Earthworks & Nature Preserve, 133 km away, shares the Great Circle's form: a circle, a ditch, and an enclosure."); the top match's LiDAR. About 25 s on dev |
-| 3:40 | Close | | "Both are already on the World Heritage list. I only work with sites on the public record." Hand-off to the close |
+| 3:40 | Close | | "Both are already on the World Heritage list. I only work with sites on the public record." Hand-off to Methane Watch (Act 2), third in the show |
 
 Fallback if over 4:30 on rehearsal two: drop the Great Circle measure; "Where else, like this"
 then follows the Octagon, whose top form match is Hopeton Earthworks (87 km; avenue, circle,
 enclosure) by the catalogue's own ranking, not yet run on dev. Cut-list fallback (90-second
-teaser in the close): the replay's "under the grass" beat only.
+teaser in its second-act slot): the replay's "under the grass" beat only.
 
 Beat note, the agent's line on dev v14 (Oct 21): three Octagon runs, each find_known_site →
 show_terrain(lrm) → inspect_image → measure_profile with a bearing. Eval run 1 chose north-south

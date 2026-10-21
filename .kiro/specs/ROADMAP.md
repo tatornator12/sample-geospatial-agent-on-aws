@@ -7,13 +7,20 @@ not all up front, so requirements reflect what the data spikes actually showed.
 
 ## The show (four acts, one platform)
 
-| Act | Agent | Minutes | What the audience learns |
-|---|---|---|---|
-| 1 | Current agent + eyes + similarity | 7 | The agent sees imagery and finds places by example |
-| 2 | Methane Hunter (or Ground Motion Sentinel) | 7 | It senses the invisible and triages at scale |
-| 3 | Dark Vessels (decided Oct 12; Ground Motion lite dropped) | 8 | It investigates, gathers evidence, and acts with approval |
-| 4 | AI Archaeologist | 4 | Same eyes and similarity, a new domain: discovery |
-| — | Intro 2 min, close 2 min (teaser of the act not shown + observability trace) | 4 | |
+| In the show | Act | Agent | Minutes | What the audience learns |
+|---|---|---|---|---|
+| First | 1 | Current agent + eyes + similarity | 6 | The agent sees imagery and finds places by example |
+| Second | 4 | AI Archaeologist | 4 | Same eyes and similarity, a new domain: discovery |
+| Third | 2 | Methane Hunter (or Ground Motion Sentinel) | 6 | It senses the invisible and triages at scale |
+| Last, the closer | 3 | Dark Vessels (decided Oct 12; Ground Motion lite dropped) | 8 | It investigates, gathers evidence, and acts with approval |
+| | | Intro 3 min, close 1 min, questions 2 min (all four acts are shown, so no teaser; no observability trace unless one is built and rehearsed) | 6 | |
+
+Running order decided Oct 21 (the user): Act 1, Act 4, Act 2, then Act 3 closes the show. The act
+numbers stay the agents' names in the code and specs; only the order changed. Dark Vessels ends
+on one open question, a measured prediction and a patrol tasking the officer approves on the map,
+with the Slack post on a second screen as the final image. If Act 3 misses its gate B (Wed Oct 28
+12:00), Methane Watch (Act 2) closes the show, and Act 3 is cut or its four-turn version runs
+third. Clock times, cuts and fallbacks: `docs/demo/rehearsal-notes.md`.
 
 ## Specs, in order
 
@@ -23,7 +30,7 @@ not all up front, so requirements reflect what the data spikes actually showed.
 | 2 | `eyes-inspect-image` | Sep 22–26 | tool + gallery + cloudy-scene golden prompt pass | built and verified Sep 18 (dev v19, eval 7/7); formal gate run Sep 26 |
 | 3 | `similarity-search` | Sep 29–Oct 3 | G2: Release 1 promoted to `demo-stable`; Act 1 rehearsed (7 min) | built Sep 24; **G2 promoted Sep 24** (`deployed-2026-09-24`, stable v70 + CloudFront; UI build fix `deployed-2026-09-24-1712`); Act 1 rehearsal pending |
 | 4 | `methane-hunter` | Oct 6–17 | G3: Release 2; two agents in switcher; Acts 1–2 rehearsed | **Release 2 promoted Oct 12** (`deployed-2026-10-12`: Earth stable v72, Methane stable v3, CloudFront UI); user signed in and sees both agents; Turkmenistan cleared for the stage (13.1, Oct 12); Acts 1–2 rehearsal pending |
-| 5 | `ai-archaeologist` | Oct 20–24 (started early) | closer works on a public site; **Act 3 decision written down** | spec **approved Oct 12** (all 8 decisions); Act 3 decided Oct 12: Dark Vessels |
+| 5 | `ai-archaeologist` | Oct 20–24 (started early) | Act 4 works on a public site; **Act 3 decision written down** | spec **approved Oct 12** (all 8 decisions); Act 3 decided Oct 12: Dark Vessels |
 | 6 | `act3-dark-vessels` | Oct 16–30 (started early; Act 4 landed early) | G4: Release 3; full 30-minute run-through | spec second version Oct 15: **the Galápagos Marine Reserve** (GFW licence cleared Oct 16), **approved Oct 16** (all decisions; the silent-vessel beat in the run; orchid candidates); G4 moves to Friday Oct 30 (Oct 31 is a Saturday in 2026); spikes `docs/spikes/dark-vessels.md`, `docs/spikes/galapagos.md`; detector, plan, prediction and coverage modules built; day 1 records on file; the cache built (six passes, 110 files) and the agent package written (71 tests), star pass `s1d-20261012t0018` with 4 candidates on both detectors; the `taskings/*` grant written, live at G4; **on its dev runtime Oct 19** (`dark_vessels_dev`, eval 7/7); next the stage (tasks 4 and 5) |
 | 7 | `demo-readiness` | Nov 3–7 | freeze Nov 3; runbook, backup videos, prewarm, 2 timed rehearsals | not started |
 
