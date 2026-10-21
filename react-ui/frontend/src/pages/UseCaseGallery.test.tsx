@@ -44,6 +44,7 @@ afterEach(() => {
 describe('UseCaseGallery', () => {
   it.each([
     ['LA Palisades Fire', '/?scenario=la-fires-2025&agent=stable'],
+    ['Places like Central Park', '/?scenario=earth-places-like-central-park&agent=stable'],
     ['Amazon Deforestation', '/?scenario=amazon-deforestation&agent=stable'],
     ['Lake Mead Drought', '/?scenario=lake-mead-water&agent=stable'],
   ])('opens the Earth Analyst case %s on Act 1', (name, url) => {
@@ -53,8 +54,12 @@ describe('UseCaseGallery', () => {
   it('prints the Act 1 figures the cases support, and none of the wrong ones (A1 P0-4)', () => {
     renderGallery();
     const text = (name: string) => card(name).textContent ?? '';
-    expect(text('LA Palisades Fire')).toContain('Inside the perimeter');
-    expect(text('LA Palisades Fire')).toContain('96 km² (23,700 acres)');
+    // The re-recorded take's own figures (D9), not the perimeter's.
+    expect(text('LA Palisades Fire')).toContain('46.1 km²');
+    expect(text('LA Palisades Fire')).toContain('8,147.5 ha (31.9%)');
+    expect(text('LA Palisades Fire')).not.toContain('23,700 acres');
+    expect(text('Places like Central Park')).toContain('190,329');
+    expect(text('Places like Central Park')).toContain('West Point, 0.957');
     expect(text('Amazon Deforestation')).toContain('Forest lost since 2020');
     expect(text('Amazon Deforestation')).toContain('8.28 km² (23.2% of field)');
     expect(text('Amazon Deforestation')).toContain('EUDR Status');
@@ -83,7 +88,7 @@ describe('UseCaseGallery', () => {
       within(screen.getByRole('region', { name: act }))
         .getAllByRole('heading', { level: 3 })
         .map((h) => h.textContent);
-    expect(cases('Earth Analyst')).toEqual(['LA Palisades Fire', 'Amazon Deforestation', 'Lake Mead Drought']);
+    expect(cases('Earth Analyst')).toEqual(['LA Palisades Fire', 'Places like Central Park', 'Amazon Deforestation', 'Lake Mead Drought']);
     expect(cases('AI Archaeologist')).toEqual(['Newark Earthworks', 'The Great Circle, measured']);
     expect(cases('Methane Watch')).toEqual(['Permian Basin Methane', 'Methane Watch brief']);
     expect(cases('Dark Vessels')).toEqual(['Dark Vessels, Galápagos']);
@@ -94,7 +99,7 @@ describe('UseCaseGallery', () => {
   it('opens every available case from one native button (Tab, Enter and Space are the browser’s own)', () => {
     renderGallery();
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(7);
+    expect(buttons).toHaveLength(8);
     for (const button of buttons) {
       expect(button.tagName).toBe('BUTTON');
       expect(button.getAttribute('type')).toBe('button');

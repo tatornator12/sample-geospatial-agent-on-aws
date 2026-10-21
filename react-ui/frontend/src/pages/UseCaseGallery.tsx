@@ -26,10 +26,26 @@ const scenarios: Scenario[] = [
     name: 'LA Palisades Fire',
     description: 'Wildfire damage analysis in Pacific Palisades, California (January 2025)',
     icon: '/palisades_fire.png',
-    // Measured on the case's own perimeter (geometry.geojson, geodesic: 96.1 km², 23,745 acres).
-    // The burn severity split is not shown until it is measured (the replay is re-recorded, D9).
+    // The recorded take (Oct 21, geospatial_agent_dev v32), its own tools: calculator and
+    // calculate_environmental_impact (46,072,800 m² new burn), run_bandmath on the 2025-01-12 scene
+    // (high severity 81,475,200 m², 31.9% of the 16 km frame).
     metrics: [
-      { label: 'Inside the perimeter', value: '96 km² (23,700 acres)' },
+      { label: 'New burn since Nov 2024', value: '46.1 km²' },
+      { label: 'High severity, Jan 12', value: '8,147.5 ha (31.9%)' },
+    ],
+    status: 'available',
+    agent: EARTH_ANALYST,
+  },
+  {
+    id: 'earth-places-like-central-park',
+    name: 'Places like Central Park',
+    description: 'Search by example: Clay embeddings rank the places across New York State that look most like Central Park, and the agent looks at its top two',
+    icon: '/places_like_central_park.png',
+    // The recorded take (Oct 21, geospatial_agent_dev v32): find_similar_places compared 190,329
+    // cells for July 2025; rank 1 at cosine 0.9573, named West Point by reverse_geocode.
+    metrics: [
+      { label: 'Cells Compared', value: '190,329' },
+      { label: 'Top Match', value: 'West Point, 0.957' },
     ],
     status: 'available',
     agent: EARTH_ANALYST,
@@ -66,6 +82,8 @@ const scenarios: Scenario[] = [
     name: 'Permian Basin Methane',
     description: 'The strongest methane plume NASA EMIT saw over the Permian Basin in 2024, and the ground beneath it',
     icon: '/methane_permian.png',
+    // The recorded take (Oct 21, methane_hunter_dev v43): search_methane_plumes found 39 complexes,
+    // triage_plumes ranked the strongest at 8,130.7 ppm·m.
     metrics: [
       { label: 'Plume Complexes', value: '39 in 2024' },
       { label: 'Strongest Peak', value: '8,130.7 ppm·m' },
@@ -78,10 +96,12 @@ const scenarios: Scenario[] = [
     name: 'Methane Watch brief',
     description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, three ground-record checks and a draft brief for the analyst',
     icon: '/methane_watch.png',
-    // The recorded take (Oct 12, dev v36): south Caspian and Shanxi cued, the brief on Krasnovodsk.
+    // The recorded take (Oct 21, methane_hunter_dev v43): 9 areas scanned, Shanxi and the south
+    // Caspian cued; the brief follows Shanxi (check_recent_passes: 4 of 8 passes read since
+    // 2025-01-01 are candidates, the latest 2025-11-30).
     metrics: [
       { label: 'Watch Areas', value: '9 scanned, 2 cued' },
-      { label: 'Candidate Passes', value: '4 of 10 since 2025' },
+      { label: 'Candidate Passes', value: '4 of 8 at Shanxi since 2025' },
     ],
     status: 'available',
     agent: 'methane',
