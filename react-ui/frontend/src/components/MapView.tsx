@@ -3493,10 +3493,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       );
     }
     return (
-      <div key={lg.key} className="map-legend" role="img" aria-label="Colour ramp: lighter violet is less alike, deeper violet is more alike">
-        <span className="map-legend__label">less alike</span>
-        <span className="map-legend__ramp" aria-hidden="true" />
-        <span className="map-legend__label">more alike</span>
+      <div key={lg.key} className="map-legend map-legend--stacked">
+        <span className="map-legend__name">Similarity to the example</span>
+        <div className="map-legend__bar" role="img" aria-label="Colour ramp: similarity to the example, lighter violet is less alike, deeper violet is more alike">
+          <span className="map-legend__label">less alike</span>
+          <span className="map-legend__ramp" aria-hidden="true" />
+          <span className="map-legend__label">more alike</span>
+        </div>
       </div>
     );
   };
