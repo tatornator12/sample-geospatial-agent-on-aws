@@ -74,7 +74,8 @@
   z-index: 2;
   margin: 0 -16px 4px;
   padding: 6px 8px 0;
-  background: color-mix(in srgb, var(--plate) 96%, transparent);
+  /* Opaque: the column's text scrolls under the head and never shows through it. */
+  background: var(--plate);
 }
 .stage-steps__toggle {
   width: 100%;
