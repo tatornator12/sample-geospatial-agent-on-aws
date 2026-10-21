@@ -192,10 +192,12 @@ export function indexLegendFor(url: string): IndexLegend | null {
   if (u.includes('change_detection') || u.includes('change-detection')) {
     return { label: 'Change', ramp: 'rdylgn_r', lo: 0, hi: 0.5, low: 'no change', high: 'most change' };
   }
-  if (u.includes('ndvi_') || u.includes('ndvi-')) return { label: 'NDVI', ramp: 'rdylgn', lo: 0, hi: 1, low: 'bare', high: 'dense vegetation' };
+  // "no vegetation", not "bare": water and roofs read low too (Central Park's Reservoir, A1 P1-6).
+  if (u.includes('ndvi_') || u.includes('ndvi-')) return { label: 'NDVI', ramp: 'rdylgn', lo: 0, hi: 1, low: 'no vegetation', high: 'dense vegetation' };
   if (u.includes('ndwi_') || u.includes('ndwi-')) return { label: 'NDWI', ramp: 'blues', lo: -1, hi: 1, low: 'dry', high: 'open water' };
   if (u.includes('nbr_') || u.includes('nbr-') || u.includes('/nbr.')) {
-    return { label: 'NBR', ramp: 'spectral', lo: -1, hi: 1, low: 'severe burn', high: 'unburnt' };
+    // Raw NBR is not burn severity (that needs a before and after): low is burnt or bare ground.
+    return { label: 'NBR', ramp: 'spectral', lo: -1, hi: 1, low: 'burnt or bare', high: 'healthy vegetation' };
   }
   return null;
 }

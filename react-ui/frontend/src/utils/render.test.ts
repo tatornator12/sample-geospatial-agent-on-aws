@@ -97,6 +97,11 @@ describe('indexLegendFor (the Earth Analyst legends)', () => {
   it('names the ramp TiTiler draws for each index, by file name', () => {
     expect(indexLegendFor('s3://b/session_data/x/rasters/ndvi_clipped_geneva_2025-10-07.tif')).toMatchObject({ label: 'NDVI', ramp: 'rdylgn', lo: 0, hi: 1 });
     expect(indexLegendFor('s3://b/x/nbr_clipped_palisades_2025-01-20.tif')).toMatchObject({ label: 'NBR', ramp: 'spectral' });
+  });
+
+  it('words the ends as what the index measures: water is not "bare", raw NBR is not severity (B6, A1 P1-6)', () => {
+    expect(indexLegendFor('s3://b/x/ndvi_clipped_central_park_2026-10-06.tif')).toMatchObject({ low: 'no vegetation', high: 'dense vegetation' });
+    expect(indexLegendFor('s3://b/x/nbr_clipped_palisades_2025-01-20.tif')).toMatchObject({ low: 'burnt or bare', high: 'healthy vegetation' });
     expect(indexLegendFor('s3://b/x/ndwi_folsom.tif')).toMatchObject({ label: 'NDWI', ramp: 'blues' });
     expect(indexLegendFor('s3://b/x/change_detection_colorado.tif')).toMatchObject({ label: 'Change', ramp: 'rdylgn_r', hi: 0.5 });
     expect(indexLegendFor('s3://b/x/tci_clipped_geneva.tif')).toBeNull();
