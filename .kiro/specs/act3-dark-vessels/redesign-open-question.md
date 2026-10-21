@@ -208,6 +208,19 @@ evidence order: pass, detect, coverage, match, then words.
   stands). Gate A not green by Mon Oct 26 12:00, or gate B not green by Wed Oct 28 12:00, SHALL
   count as a failure. This amends requirement 12.5 (`requirements.md:259`) and decision 12
   (`design.md:394`), as U10 states; both were amended in the spec on Oct 21.
+  - The tag lacks task 1's `MapView.tsx` lines. `MapView.tsx` is a shared file and
+    `stage-fixes-1` had not merged into `develop` on Oct 21, so under the coordination rule they
+    moved to task 7b. They are: the key rows at `:3266` ("radar target, not yet explained", to read
+    "set aside: reception unknown, or one detector only" after the match), `:3267` ("a broadcast
+    accounts for it" to "matched to a ship's AIS") and `:3270` ("candidate, not an accusation" to
+    "candidate: no AIS where AIS was received"); the coverage legend rows at `:3278` ("AIS heard:
+    two vessels within 30 km" to "AIS received: other ships came through here near the pass") and
+    `:3279` ("unproven: no AIS is not evidence" to "reception unknown: no AIS here proves
+    nothing"); and at `:3343` the clock's facts gaining the officer's filed choice (`SeaFacts.tasking`:
+    box, kept, total, look start). The tagged version therefore still shows those five key and legend
+    rows in today's words, and its clock's filed sub reads "the approved box and candidates are on
+    the tasking plate" instead of "box {k} · {kept} of {n} candidates · next radar look …". The
+    filed sentence still shows once, on the plate.
 - R9.2 IF any of three eval runs on the Nov 5 data ends without a draft or takes over 120 s, THEN
   the backups SHALL be restored and the act SHALL be presented on the pre-rerun data.
 
@@ -1547,7 +1560,7 @@ item (§3.11).
 | 5 | `eval.py` additions (with `expected_after` and `required_text_by_ending`), `scripts/tests/`, and the golden prompts (§3.10): `gone-silent` set up with the question; `open-question` and `thin-pass` with `targets_{pass_id}` shown after each `match_ais`; `thin-pass` with its required text per ending; `fleet-season` defined; `unseen-in-the-reserve`, `where-next` and `draft-tasking` removed after the tag | eval | B | 0.5 d | 0 | pytest `scripts/tests`; `eval.py --dry-run --agent X` for earth, methane, archaeologist and vessels | Wed Oct 21 pm |
 | 6 | **Gate A**: dev deploy from the branch, env check, smoke, then eval of all cases plus `open-question --repeat 3`. Record seconds, paths and refusals. First attempt Fri Oct 23 pm: deploy, env check, smoke and `open-question` ×1, so Mon am is a rerun (U10) | agent | A | 0.5 d | 1, 3, 4, 5 | AC 2 to 4; **go/no-go 1**, by Mon Oct 26 12:00 | Fri Oct 23 pm (first attempt); Mon Oct 26 am (rerun, all cases) |
 | 7a | Stage pure parts on synthetic streams: `vesselSteps.ts`, `passDay`, the line templates (the `stop` lines as "Checked:"), the `no_candidates` lines and board state held until the reveal, `PassBoard`, `clockLines`, `forecastPass`, `vesselsDirFrom`, the height rules. Critique first | stage | B | 1.0 d | 1 | vitest, tsc | Thu Oct 22 |
-| 7b | Stage wiring: `VesselStepExtras` loads inside StepColumn with `key={turnSentAt}` (vitest with the column kept mounted), the MapView callback and heat hold, `revealedPasses` to the `no_candidates` lines and board state, the "outside the radar: not imaged" legend row, `Chat.tsx` and `ChatSidebar` props, the send time, `loadVesselRest` with no `bucket` leaving the fallback off (vitest), scroll into view and the answer scroll, clock facts, the two plates, step names, no auto follow-up, the gallery copy. Polish after | stage | B | 0.5 d | 6, 7a | vitest, tsc, build, design:check 0 | Mon Oct 26 pm |
+| 7b | Stage wiring: `VesselStepExtras` loads inside StepColumn with `key={turnSentAt}` (vitest with the column kept mounted), the MapView callback and heat hold, `revealedPasses` to the `no_candidates` lines and board state, the "outside the radar: not imaged" legend row, task 1's deferred `MapView.tsx` key and legend rows and the clock's filed facts (R9.1), `Chat.tsx` and `ChatSidebar` props, the send time, `loadVesselRest` with no `bucket` leaving the fallback off (vitest), scroll into view and the answer scroll, clock facts, the two plates, step names, no auto follow-up, the gallery copy. Polish after | stage | B | 0.5 d | 6, 7a | vitest, tsc, build, design:check 0 | Mon Oct 26 pm |
 | 8 | **Gate B**: rebase onto `develop` (after `stage-fixes-1`), then headless live runs against dev, ×3 at 1920 and ×1 at 1280; beat times; screenshots | stage | B | 0.25 d | 7b | AC 5 and 6; **go/no-go 2**, by Wed Oct 28 12:00: merge to `develop`, or the four-turn version goes to G4 | Tue Oct 27 am |
 | 9a | Pre-freeze rerun rehearsal on `vessels/cache/v1r` (§3.6): data build Tue pm; then the dev deploy with the prefix and `open-question --repeat 3`. Record paths, seconds and row counts | build, agent | A | 0.5 d | 2, 8 | AC 7 | Tue Oct 27 pm, then Wed Oct 28 am after gate B's go |
 | 9 | Replay case: builder (Mon), record on the task 9a data, stage it, card available | agent, stage | A | 0.5 d | 6 (builder), 8 and 9a (record) | AC 8; pytest refusals | Mon Oct 26 pm (builder), Wed Oct 28 pm |
