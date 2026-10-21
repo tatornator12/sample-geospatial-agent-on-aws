@@ -1667,6 +1667,47 @@
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
+/* GFW's attribution is the plate's foot, outside the scroll: its data is on the map, so its line
+   stays in view whatever the list and the keys need. Aligned with the legends' words. */
+.map-layers__foot {
+  flex: none;
+  padding: 0 18px 12px;
+}
+.map-layers__foot .map-legend__label {
+  display: block;
+  white-space: normal;
+  line-height: 1.35;
+}
+/* A short screen (720p): at the candidates beat four layers, two keys (six rows, four of them two
+   lines) and the foot fit the plate without a scroll. The rhythm tightens; the type stays 15 px,
+   the rows 36 px, and the grip still spans its row. The forecast's nine layers still fade. */
+@media (max-height: 800px) {
+  .map-frame--sea .map-layers__head {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .map-frame--sea .map-layers__body {
+    padding-top: 6px;
+    padding-bottom: 8px;
+    gap: 8px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 8px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 8px), transparent);
+  }
+  .map-frame--sea .map-row--stack {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .map-frame--sea .map-row--stack .map-row__grip {
+    margin: -2px 0;
+  }
+  .map-frame--sea .map-legend--key {
+    gap: 2px;
+    margin-top: 6px;
+  }
+  .map-frame--sea .map-legend--key .map-legend__label {
+    line-height: 1.15;
+  }
+}
 .map-basemap__fixed {
   padding-right: 10px;
   font-size: 15px;
