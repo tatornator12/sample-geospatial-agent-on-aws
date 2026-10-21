@@ -1,0 +1,201 @@
+{
+  "name": "Places like Central Park",
+  "description": "Search by example: Clay embeddings rank the places across New York State that look most like Central Park, and the agent looks at its top matches",
+  "location": "New York State",
+  "user_question": "Find places across New York State that look like Central Park",
+  "agent": "stable",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "geospatial_agent_dev",
+  "tool_calls": [
+    {
+      "name": "find_address_candidates",
+      "params": {
+        "singleLine": "Central Park, New York City, New York, USA"
+      },
+      "result": "Place found"
+    },
+    {
+      "name": "find_location_boundary",
+      "params": {
+        "location": "Central Park, New York City"
+      },
+      "result": "Boundary candidates found"
+    },
+    {
+      "name": "find_location_boundary",
+      "params": {
+        "location": "New York State"
+      },
+      "result": "Boundary candidates found"
+    },
+    {
+      "name": "get_best_geometry",
+      "params": {
+        "location": "Central Park, New York City",
+        "osm_s3_url": "s3://bucket/use-cases/earth-places-like-central-park/polygon_central_park_new_york_city.geojson",
+        "reference_lat": 40.78268,
+        "reference_lon": -73.96558
+      },
+      "result": "Boundary chosen"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/earth-places-like-central-park/polygon_central_park_new_york_city.geojson",
+        "title": "Central Park, New York City, Example Area"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "find_similar_places",
+      "params": {
+        "location": "Central Park, New York City",
+        "geometry_s3_url": "s3://bucket/use-cases/earth-places-like-central-park/polygon_central_park_new_york_city.geojson",
+        "search_region": "New York",
+        "top_k": 10
+      },
+      "result": "Similar places ranked with Clay embeddings"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/earth-places-like-central-park/similar_central_park_new_york_city_new_york_202507.geojson",
+        "title": "Places Similar to Central Park, New York State, July 2025"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -73.9603,
+        "y": 41.3983
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -73.7112,
+        "y": 43.4219
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -73.8202,
+        "y": 40.8809
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -73.8487,
+        "y": 40.8119
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": -73.6329,
+        "y": 40.6854
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[-73.9603, 41.3983]}",
+        "location": "West Point",
+        "radius_meters": 640
+      },
+      "result": "Area framed"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[-73.7112, 43.4219]}",
+        "location": "Lake George",
+        "radius_meters": 640
+      },
+      "result": "Area framed"
+    },
+    {
+      "name": "get_rasters",
+      "params": {
+        "location": "West Point",
+        "current_date_str": "2025-07-31",
+        "max_cloud": 30
+      },
+      "result": "Sentinel-2 scene fetched"
+    },
+    {
+      "name": "get_rasters",
+      "params": {
+        "location": "Lake George",
+        "current_date_str": "2025-07-31",
+        "max_cloud": 30
+      },
+      "result": "Sentinel-2 scene fetched"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/earth-places-like-central-park/tci_clipped_west_point_2025-06-03.tif",
+        "title": "West Point, NY, Sentinel-2 TCI, 2025-06-03",
+        "question": "What land cover is visible? Dense vegetation, open areas, water?"
+      },
+      "result": "Looked at the image",
+      "saw": "**West Point**: Dense green tree canopy with the Hudson River visible along the edge and some built structures, a mix of forest and institutional grounds very similar to Central Park's tree-and-path signature."
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/earth-places-like-central-park/tci_clipped_lake_george_2025-07-23.tif",
+        "title": "Lake George, NY, Sentinel-2 TCI, 2025-07-23",
+        "question": "What land cover is visible? Dense vegetation, open areas, water?"
+      },
+      "result": "Looked at the image",
+      "saw": "**Lake George**: Dense green vegetation (trees/shrubs) fringing the dark blue lake shoreline with a small town centre, the green-water-open-space mix echoes Central Park's layout."
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/earth-places-like-central-park/tci_clipped_west_point_2025-06-03.tif",
+        "title": "West Point, NY, Rank 1 Match (cosine 0.957), June 2025"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/earth-places-like-central-park/tci_clipped_lake_george_2025-07-23.tif",
+        "title": "Lake George, NY, Rank 2 Match (cosine 0.955), July 2025"
+      },
+      "result": "Shown on the map"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "tci_clipped_lake_george_2025-07-23.tif",
+        "title": "Lake George, NY, Rank 2 Match (cosine 0.955), July 2025"
+      },
+      {
+        "file": "tci_clipped_west_point_2025-06-03.tif",
+        "title": "West Point, NY, Rank 1 Match (cosine 0.957), June 2025"
+      },
+      {
+        "file": "polygon_central_park_new_york_city.geojson",
+        "title": "Central Park, New York City, Example Area"
+      },
+      {
+        "file": "similar_central_park_new_york_city_new_york_202507.geojson",
+        "title": "Places Similar to Central Park, New York State, July 2025"
+      }
+    ]
+  }
+}
