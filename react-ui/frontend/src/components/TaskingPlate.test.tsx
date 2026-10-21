@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import type { TaskingState } from '../services/api.ts';
-import { clockLines, type SeaBeat } from '../utils/vesselLayers.ts';
+import { clockLines, filedFacts, type SeaBeat, type SeaFacts } from '../utils/vesselLayers.ts';
 import { SeaClock } from './SeaClock.tsx';
 import { TaskingPlate } from './TaskingPlate.tsx';
 
@@ -30,10 +30,10 @@ const DRAFT: TaskingState = {
 const FILED: TaskingState = { ...DRAFT, status: 'filed', filedAt: '2026-10-20T14:37:12.000Z', filedBy: 'officer', choice: { box: 3, candidateIds: ['T01', 'T02', 'T03', 'T04'] } };
 
 const noop = () => {};
-function Stage({ beat }: { beat: SeaBeat }) {
+function Stage({ beat, facts = {} }: { beat: SeaBeat; facts?: SeaFacts }) {
   return (
     <>
-      <SeaClock beat={beat} facts={{}} />
+      <SeaClock beat={beat} facts={facts} />
       <TaskingPlate sessionId="s" draftKey={1} busy={false} box={null} excluded={[]}
         onLoaded={noop} onBox={noop} onToggle={noop} onFiled={noop} onDismiss={noop} />
     </>
@@ -53,6 +53,17 @@ describe('the tasking on stage (clock and plate together)', () => {
     expect(count(text, /did not file/)).toBe(1);
     expect(line.textContent).toBe('Filed by the officer at 2026-10-20 14:37 UTC. The agent did not file it.');
     expect(text).toContain(clockLines('filed', {}).sub);
+  });
+
+  it('with the filed facts the map passes, the clock states the choice and the filed sentence is still the plate\'s alone', async () => {
+    state.current = FILED;
+    const now = Date.parse('2026-10-20T14:37:00Z');
+    render(<Stage beat="filed" facts={{ now, tasking: filedFacts(FILED) }} />);
+    await screen.findByText(/Filed by the officer/);
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('box 3 · 4 of 4 candidates · next radar look in 3 d 9 h');
+    expect(count(text, /Filed by the officer/)).toBe(1);
+    expect(count(text, /did not file/)).toBe(1);
   });
 
   it('in the draft, says nothing is filed yet and the decision sentence nowhere on the clock or plate', async () => {
