@@ -209,11 +209,23 @@ export function capWords(s: string, max: number): string {
   return `${head}…`;
 }
 
-/** The latest sentence the agent finished saying this turn, for the line under the lit step. */
-export function latestNarration(raw: string): string | null {
+/**
+ * The latest sentence the agent finished saying this turn, for the line under the lit step. A
+ * sentence a chip's "Saw:" line already prints (`sawShown` says which inspect_image calls have a
+ * chip with a Saw line on the stage) is skipped, so the room reads it once, under the chip: the
+ * line keeps the sentence before it, and moves on with the next one that is not a Saw (a "Next
+ * I'll…" sentence, the next step's words).
+ */
+export function latestNarration(raw: string, { sawShown }: { sawShown?: (toolId: string) => boolean } = {}): string | null {
   const segs = segments(raw, false);
   for (let i = segs.length - 1; i >= 0; i--) {
-    const sentences = stageSentences(segs[i].text, { open: segs[i].open });
+    let sentences = stageSentences(segs[i].text, { open: segs[i].open });
+    const after = segs[i].after;
+    if (sawShown && after?.name === 'inspect_image' && after.id && sawShown(after.id)) {
+      // The same sentences, picked the same way, as sawByTool gives the chip.
+      const said = new Set(sawParts(sentences).used);
+      sentences = sentences.filter((s) => !said.has(s));
+    }
     if (sentences.length > 0) return capWords(sentences[sentences.length - 1], NARRATION_MAX);
   }
   return null;
@@ -222,18 +234,27 @@ export function latestNarration(raw: string): string | null {
 // "Next I'll compute the index" says what comes next, not what the agent saw.
 const PLANNING = /^(now|next|then|first|let me|i[’']?ll|i will|i[’']?m going to|i am going to)\b/i;
 
-/** The first sentences that describe, up to SAW_MAX; null when there are none. */
-function sawFrom(sentences: string[]): string | null {
+/** The first sentences that describe, up to SAW_MAX (null when there are none), and which they are. */
+function sawParts(sentences: string[]): { text: string | null; used: string[] } {
   let text = '';
+  const used: string[] = [];
   for (const s of sentences.filter((x) => !PLANNING.test(x))) {
     const next = text ? `${text} ${s}` : s;
     if (next.length > SAW_MAX) {
-      if (!text) text = capWords(s, SAW_MAX);
+      if (!text) {
+        text = capWords(s, SAW_MAX);
+        used.push(s);
+      }
       break;
     }
     text = next;
+    used.push(s);
   }
-  return text || null;
+  return { text: text || null, used };
+}
+
+function sawFrom(sentences: string[]): string | null {
+  return sawParts(sentences).text;
 }
 
 /**

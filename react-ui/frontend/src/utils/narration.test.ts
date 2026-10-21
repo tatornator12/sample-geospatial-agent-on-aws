@@ -251,6 +251,53 @@ describe('the live capture (Act 1 dev, "Vegetation, Central Park", Oct 21)', () 
     expect(sawByTool(prefix + rest, { finished: true })).toEqual({ tooluse_rwjq3T1pkqnbVkeEZcmOwV: SAW });
     expect(SAW.length).toBeLessThanOrEqual(SAW_MAX);
   });
+
+  it('beside its chip, shows the sentence once: under the chip, not again under the lit step', () => {
+    const chip = (id: string) => id === 'tooluse_rwjq3T1pkqnbVkeEZcmOwV';
+    // The live runtime says nothing else between tools, so the line stays empty; the Saw stays.
+    expect(latestNarration(prefix + rest.slice(0, 20), { sawShown: chip })).toBeNull();
+    expect(latestNarration(prefix + rest, { sawShown: chip })).toBeNull();
+    expect(sawByTool(prefix + rest, { finished: true })).toEqual({ tooluse_rwjq3T1pkqnbVkeEZcmOwV: SAW });
+  });
+});
+
+describe('latestNarration beside a Saw line (no sentence twice)', () => {
+  const inspect = (id: string) => tool(id, 'inspect_image', { s3_url: 's3://b/x.tif', title: 'X' });
+  const BEFORE = 'I found a clear Sentinel-2 scene from 2026-10-05.';
+  const SAW1 = 'The scene is clear, with no cloud over the site.';
+  const SAW2 = 'The walls of the Octagon show as a ring of trees around the golf course.';
+  const NEXT = "Next I'll compute the vegetation index.";
+  const shown = () => true;
+
+  it('keeps the sentence before the inspection while the Saw sentences stream', () => {
+    const raw = `${BEFORE} ${inspect('i1')}${SAW1} ${SAW2} `;
+    // Without a chip on the stage (Dark Vessels), the line is the latest sentence, as before.
+    expect(latestNarration(`${raw}Ne`)).toBe(SAW2);
+    expect(latestNarration(`${raw}Ne`, { sawShown: shown })).toBe(BEFORE);
+    expect(sawByTool(`${raw}Ne`)).toEqual({ i1: `${SAW1} ${SAW2}` });
+  });
+
+  it('moves on with the next sentence that is not a Saw (the plan, the next step)', () => {
+    const raw = `${BEFORE} ${inspect('i1')}${SAW1} ${SAW2} ${NEXT} ${tool('t2', 'run_bandmath')}`;
+    expect(latestNarration(raw, { sawShown: shown })).toBe(NEXT);
+    expect(latestNarration(`${raw}The index is on the map now. `, { sawShown: shown })).toBe(NEXT);
+    expect(latestNarration(`${raw}The index is on the map now. ${tool('t3', 'display_visual')}`, { sawShown: shown })).toBe(
+      'The index is on the map now.'
+    );
+  });
+
+  it('shows a sentence past the Saw length, which the chip does not print', () => {
+    const long = 'Dense canopy covers the north half of the site, and the golf course greens show as lighter, mown grass inside the walls.';
+    const raw = `${inspect('i1')}${SAW1} ${SAW2} ${long} ${tool('t2', 'run_bandmath')}`;
+    expect(sawByTool(raw, { finished: true }).i1).toBe(`${SAW1} ${SAW2}`);
+    expect(latestNarration(raw, { sawShown: shown })).toBe(capWords(long, NARRATION_MAX));
+  });
+
+  it('leaves an inspection with no chip on the stage alone', () => {
+    const raw = `${BEFORE} ${inspect('i1')}${SAW1} ${tool('t2', 'run_bandmath')}`;
+    expect(latestNarration(raw, { sawShown: (id) => id === 'other' })).toBe(SAW1);
+    expect(latestNarration(raw, { sawShown: shown })).toBe(BEFORE);
+  });
 });
 
 describe('boundedSaw and withSaw', () => {

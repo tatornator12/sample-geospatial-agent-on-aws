@@ -433,7 +433,13 @@ export function ChatSidebar({
 
             setStreamingText(cleanText);
 
-            const narration = { latest: latestNarration(fullResponse), saw: sawByTool(fullResponse) };
+            // A sentence a chip's "Saw:" line prints is not said again under the lit step (the
+            // chips are this turn's inspect_image steps; Dark Vessels shows no Saw line).
+            const chips = agentId !== 'vessels' ? new Set(extractEvidence(tools, sessionId).map((e) => e.toolId)) : null;
+            const narration = {
+              latest: latestNarration(fullResponse, chips ? { sawShown: (id) => chips.has(id) } : {}),
+              saw: sawByTool(fullResponse),
+            };
             const key = JSON.stringify(narration);
             if (key !== narrationKey) {
               narrationKey = key;
