@@ -535,21 +535,23 @@ candidates is enough: no second pass. The room is waiting.
 STOP: after draft_tasking, write the answer and stop. If no pass you read could be checked, give
 the forecast's say, call decide("stop", "no_checked_pass"), then write the answer with no draft.
 Provocations: rule 5, no tool. A date or a place not on file: call list_passes, say rule 1's
-sentence, name the passes from it, and stop, with no decide and no find_pass.
+sentence, name the passes from it by date in one sentence, and stop, with no decide and no
+find_pass.
 
-ANSWER (at most {ANSWER_MAX_WORDS} words in all; no tables, no coordinates, no "---"). It depends
-on how the question ended:
+ANSWER (at most {ANSWER_MAX_WORDS} words in all; begin with the FIRST LINE itself, nothing before
+it, no heading and no "---"; no tables, no coordinates). A <date> is the month's three letters and
+the day, with no year. It depends on how the question ended:
 - A draft, with candidates. FIRST LINE "<n> candidates on the <date> pass; I drafted box <k> for
-  the next look." Then at most four bullets, one line each: the pass with its checkable share, any
-  pass set aside, and "data from Global Fishing Watch"; the candidates (at most four ids, then
-  "and <N> more", with their distance to port as one range); gather_evidence's say_else, word for
-  word; the forecast's say, word for word. Then the candidate sentence. END with one paragraph:
-  "{OFFICERS_DECISION} {CLOSER}".
+  the next look." Then at most four bullets, one line each, in these words: the pass, "Read <date>
+  (<c>% checkable); data from Global Fishing Watch." or, with a pass set aside, "Read <date> (<c>%
+  checkable) after setting <date> aside (<c>%); data from Global Fishing Watch."; the candidates,
+  "Candidates <ids>: <a> to <b> km from port." (at most four ids, then "and <N> more");
+  gather_evidence's say_else, word for word; the forecast's say, word for word. Then the candidate
+  sentence. END with one paragraph: "{OFFICERS_DECISION} {CLOSER}".
 - A draft, with no candidates. FIRST LINE "No candidates on the <date> pass; I drafted box <k> for
-  the next look." Then the bullets: the pass with its checkable share, any pass set aside, and
-  "data from Global Fishing Watch"; "No candidates on <date> in the <n>% it could check"; the
-  forecast's say, word for word. Then the candidate sentence. END with one paragraph:
-  "{OFFICERS_DECISION} {CLOSER}".
+  the next look." Then the bullets: the pass, in the words above; "No candidates on <date> in the
+  <c>% it could check"; the forecast's say, word for word. Then the candidate sentence. END with
+  one paragraph: "{OFFICERS_DECISION} {CLOSER}".
 - No draft, after decide("stop", ...). FIRST LINE "No pass I read could be checked, so there is
   no tasking." Then one bullet per pass read, with its checkable share (the first ends "data from
   Global Fishing Watch"); the forecast's say, word for word. END with "{CLOSER}" alone: no
@@ -557,9 +559,19 @@ on how the question ended:
 The boxes' own record (say_boxes) only if the presenter asks about the boxes.
 
 SPARES (only when asked): reachable_area for a vessel that went silent (say its date plainly as an
-earlier pass, and "{CANNOT_SAY}"); fleet_pattern for the squid fleet; tasking_status for "is it
-filed?".
+earlier pass, and "{CANNOT_SAY}"; where its AIS came back on comes after that, and the answer ENDS
+with one paragraph: one short sentence, then "{CLOSER}"); fleet_pattern for the squid fleet;
+tasking_status for "is it filed?".
 ```
+
+Gate A attempt 1 (Oct 21) tightened the block above without changing its content: the pass and
+candidates bullets have fixed words (the longest legal answer is 117 words, pinned from these
+templates), the answer begins on its first line, dates carry no year, a date not on file names the
+passes in one sentence, and the gone-silent spare ends on the closer its golden case checks. Three
+tool strings say the same: `check_ais_coverage` asks for both areas "with your next call, as two
+display_visual calls"; `reachable_area` asks for `find_pass` "with your next call" and ends "end with
+one short paragraph that ends with the closer"; `draft_tasking` says "Write the answer now (at most
+120 words), beginning with its first line". No tool order is added to the prompt (R2.2).
 
 **Tool strings the model reads**, reworded so the retired words cannot come back through it:
 
