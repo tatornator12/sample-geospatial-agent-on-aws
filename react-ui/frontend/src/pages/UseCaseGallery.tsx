@@ -25,10 +25,10 @@ const scenarios: Scenario[] = [
     name: 'LA Palisades Fire',
     description: 'Wildfire damage analysis in Pacific Palisades, California (January 2025)',
     icon: '/palisades_fire.png',
+    // Measured on the case's own perimeter (geometry.geojson, geodesic: 96.1 km², 23,745 acres).
+    // The burn severity split is not shown until it is measured (the replay is re-recorded, D9).
     metrics: [
-      { label: 'Total Area Burned', value: '21,000 acres' },
-      // { label: 'Structures at Risk', value: '4,200 buildings' },
-      { label: 'High Severity Burn', value: '29.4%' },
+      { label: 'Inside the perimeter', value: '96 km² (23,700 acres)' },
     ],
     status: 'available',
     agent: EARTH_ANALYST,
@@ -40,7 +40,8 @@ const scenarios: Scenario[] = [
     icon: '/amazon_eudr.png',
     metrics: [
       // { label: 'Field Area', value: '3,574 hectares' },
-      { label: 'Dense Vegetation Loss', value: '15.71 km² (44.0%)' },
+      // The narrative's net loss of dense and very dense forest (15.71 km² is the 2025 dense area, a gain).
+      { label: 'Forest lost since 2020', value: '8.28 km² (23.2% of field)' },
       { label: 'EUDR Status', value: 'Non-Compliant' },
     ],
     status: 'available',

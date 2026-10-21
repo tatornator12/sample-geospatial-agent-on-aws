@@ -1,6 +1,6 @@
 {
   "name": "LA Palisades Fire - January 2025",
-  "description": "Wildfire damage analysis for the Palisades Fire that started January 7, 2025 in Pacific Palisades, California. This catastrophic wildfire burned over 21,000 acres and threatened thousands of structures in the coastal community.",
+  "description": "Wildfire damage analysis for the Palisades Fire that started January 7, 2025 in Pacific Palisades, California. About 96 km² (23,700 acres) lies inside the mapped perimeter.",
   "location": "Pacific Palisades, Los Angeles County, California",
   "user_question": "Analyze the burn damage from the Palisades Fire in Pacific Palisades, California that started in January 2025.",
   "dates": {
@@ -105,7 +105,7 @@
       "params": {
         "expression": "Statistical analysis of burn severity and area calculations"
       },
-      "result": "Computed burn area statistics: 21,000 acres burned with 29.4% high severity damage"
+      "result": "Measured the area inside the mapped perimeter: about 96 km² (23,700 acres)"
     }
   ]
 }
