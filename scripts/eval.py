@@ -9,6 +9,9 @@ and asserts:
     between are fine, order matters);
   * no forbidden_text (e.g. "Error:") appears anywhere in the stream.
 
+The closing paragraph (closer_*) is the last paragraph of the prose, a tool call counting as a
+paragraph break, so a closer streamed right after a tool call is read alone.
+
 Exit code 0 when every prompt passes, 1 otherwise. A runtime crash
 (RuntimeClientError-style) is a failure and prints the raw stream tail.
 
@@ -292,6 +295,25 @@ def observations(text: str) -> list[str]:
     return out
 
 
+def prose(text: str) -> str:
+    """The stream minus its tool-call objects, each call standing as a paragraph break."""
+    out, last = [], 0
+    for start, end, _ in tool_spans(text):
+        out.append(text[last:start])
+        out.append("\n\n")
+        last = end
+    out.append(text[last:])
+    return "".join(out)
+
+
+def closing_paragraph(text: str) -> str:
+    """The spoken closer: the prose's last paragraph. A tool call is a paragraph break, so a closer
+    streamed straight after a call is not joined to the call's JSON (the four-turn draft-tasking flake,
+    Oct 21: 298 and 595 'chars' for a 165-character answer)."""
+    paragraphs = [p.strip() for p in prose(text).strip().split("\n\n") if p.strip()]
+    return paragraphs[-1] if paragraphs else ""
+
+
 def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str | None = None) -> tuple[bool, str, dict]:
     """Run one golden prompt; returns (passed, detail, record). With `s3` and `bucket`, forbidden
     text is checked with the session's registry sentences removed (see registry_lines)."""
@@ -342,27 +364,20 @@ def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str 
     for required in case.get("required_text", []):
         if required not in text:
             problems.append(f"required text {required!r} missing")
+    # The spoken closing paragraph: the prose's last, a tool call counting as a break (closing_paragraph).
+    closer = closing_paragraph(text)
     # closer_max_chars: the spoken closing paragraph must fit the stage caption band.
     limit = case.get("closer_max_chars")
-    if limit:
-        paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
-        closer = paragraphs[-1] if paragraphs else ""
-        if len(closer) > limit:
-            problems.append(f"closing paragraph is {len(closer)} chars (> {limit})")
+    if limit and len(closer) > limit:
+        problems.append(f"closing paragraph is {len(closer)} chars (> {limit})")
     # closer_endswith: the spoken closing paragraph (the last one) must end with this phrase.
     suffix = case.get("closer_endswith")
-    if suffix:
-        paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
-        closer = paragraphs[-1] if paragraphs else ""
-        if not closer.endswith(suffix):
-            problems.append(f"closing paragraph does not end with {suffix!r}")
+    if suffix and not closer.endswith(suffix):
+        problems.append(f"closing paragraph does not end with {suffix!r}")
     # closer_forbidden: phrases the spoken closer must not contain (coordinates: the room hears places).
-    if case.get("closer_forbidden"):
-        paragraphs = [p.strip() for p in text.strip().split("\n\n") if p.strip()]
-        closer = paragraphs[-1] if paragraphs else ""
-        for bad in case["closer_forbidden"]:
-            if bad in closer:
-                problems.append(f"closing paragraph contains {bad!r}")
+    for bad in case.get("closer_forbidden", []):
+        if bad in closer:
+            problems.append(f"closing paragraph contains {bad!r}")
 
     # Characters of prose (everything that is not a tool-call object): a proxy for how much
     # the model wrote, which is what the room waits on at the end of a turn.
