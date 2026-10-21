@@ -26,6 +26,8 @@ I'll compare water levels at Lake Mead between this year and five years ago usin
 - This represents a **10.9% decrease** in water surface area
 - The exposed lakebed increased by **33.9 km²** (from 173.0 to 206.9 km²)
 
+The west end, Las Vegas Bay, lies outside this scene and is not counted.
+
 The NDWI maps clearly show the recession of the reservoir's water levels, with significantly more exposed shoreline and lakebed visible in 2025 compared to 2020. The darker blue areas (high NDWI values) indicating water bodies have noticeably shrunk, particularly visible in the northern and eastern portions of the reservoir.
 
 This decline is consistent with the ongoing drought conditions affecting the Colorado River Basin and Lake Mead's well-documented water level crisis.
