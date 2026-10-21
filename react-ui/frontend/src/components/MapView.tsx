@@ -109,6 +109,7 @@ import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
 import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
 import { whenStyleReady } from '../utils/styleReady.ts';
+import { createTileHealth } from '../utils/tileHealth.ts';
 import { getSectionCursor, setSectionCursor, useSectionCursor } from '../utils/sectionCursor.ts';
 import { Starfield } from './Starfield.tsx';
 import { LightPlate } from './LightPlate.tsx';
@@ -198,6 +199,16 @@ interface SeaFile {
 }
 type SeaFC = { type: 'FeatureCollection'; features: Array<{ type: 'Feature'; properties: Record<string, unknown>; geometry: { type: string; coordinates: unknown } | null }> };
 
+/** A set with `id` in it, or the same set when it already was (so React keeps the render). */
+const withId = (s: ReadonlySet<string>, id: string): ReadonlySet<string> => (s.has(id) ? s : new Set([...s, id]));
+/** A set without `id`, or the same set when it never had it. */
+const withoutId = (s: ReadonlySet<string>, id: string): ReadonlySet<string> => {
+  if (!s.has(id)) return s;
+  const next = new Set(s);
+  next.delete(id);
+  return next;
+};
+
 /** Run once the style can take layers (isStyleLoaded is false while tiles stream; idle is the backstop). */
 function onStyle(m: maplibregl.Map, fn: () => void) {
   if (m.isStyleLoaded()) {
@@ -222,6 +233,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const addedRasterUrls = useRef<Set<string>>(new Set()); // Track added raster URLs to prevent duplicates
   // Geometries waiting for the style (utils/styleReady.ts), cancelled if the map goes first.
   const styleWaits = useRef<Set<{ cancel: () => void }>>(new Set());
+  // Rasters that have not drawn a tile (utils/tileHealth.ts): their rows say so and their legends
+  // leave the plate. The listeners per raster layer, so a removed layer takes them with it.
+  const tileHealth = useRef(createTileHealth());
+  const tileWatch = useRef<Map<string, () => void>>(new Map());
+  const [failedLayers, setFailedLayers] = useState<ReadonlySet<string>>(() => new Set());
   const [rasterVisibility, setRasterVisibility] = useState<Record<string, boolean>>({});
   const [isLayerControlOpen, setIsLayerControlOpen] = useState(true);
   const [drawMode, setDrawMode] = useState<'none' | 'point' | 'polygon'>('none');
@@ -2565,6 +2581,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         if (mapInstance.getSource(id)) mapInstance.removeSource(id);
       });
       forgetLight(`${layer.id}${LIGHT_SUFFIX}`);
+      // Its tile listeners and its failed flag go with it.
+      tileWatch.current.get(layer.id)?.();
+      tileWatch.current.delete(layer.id);
+      tileHealth.current.forget(layer.sourceId);
       // A radar still sweeping stops, and its sweep goes with it.
       sweeps.current.get(layer.id)?.();
       sweeps.current.delete(layer.id);
@@ -2576,6 +2596,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     revealed.current.delete(layer.id);
     dateHidden.current.delete(layer.id);
     dropFromStack(layer.id);
+    setFailedLayers((prev) => withoutId(prev, layerId));
     
     setAllLayers(prev => prev.filter(l => l.id !== layerId));
     setRasterVisibility(prev => {
@@ -2643,6 +2664,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     setLightHeight(LIGHT_ALTITUDE);
     transects.current.clear();
     setSectionCursor(null);
+    tileWatch.current.forEach((off) => off());
+    tileWatch.current.clear();
+    tileHealth.current = createTileHealth();
+    setFailedLayers(new Set());
 
     // Clear all layers (basemap is dynamic and not tracked here)
     setAllLayers([]);
@@ -3050,11 +3075,27 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
 
           console.log(`✅ [${i}] Raster successfully added to map:`, raster.name, `Layer ID: ${layerId}`, `Visible: ${isVisible}`);
 
-          // Add error listener for tile loading
-          mapInstance.on('error', (e: any) => {
-            if (e.sourceId === sourceId) {
-              console.error(`❌ Tile loading error for ${raster.name}:`, e);
+          // Tile errors are logged; a raster that draws no tile at all says so in its row and its
+          // legend leaves the plate, until a tile draws (utils/tileHealth.ts). Dark Vessels' radar
+          // passes keep their own sweep and are not flagged (Act 3 is unchanged).
+          const onTileError = (e: maplibregl.ErrorEvent & { sourceId?: string }) => {
+            if (e.sourceId !== sourceId) return;
+            console.error(`❌ Tile loading error for ${raster.name}:`, e);
+            if (!seaRadar && tileHealth.current.failed(sourceId)) {
+              console.warn(`⚠️ No tile of ${raster.name} has loaded: marked as not loaded`);
+              setFailedLayers((prev) => withId(prev, layerId));
             }
+          };
+          const onTileData = (e: maplibregl.MapSourceDataEvent) => {
+            if (e.sourceId === sourceId && e.tile && tileHealth.current.loaded(sourceId)) {
+              setFailedLayers((prev) => withoutId(prev, layerId));
+            }
+          };
+          mapInstance.on('error', onTileError);
+          mapInstance.on('sourcedata', onTileData);
+          tileWatch.current.set(layerId, () => {
+            mapInstance.off('error', onTileError);
+            mapInstance.off('sourcedata', onTileData);
           });
         } catch (error) {
           console.error(`❌ [${i}] Raster layer error for ${raster.name}:`, error);
@@ -3135,9 +3176,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
 
   const isShown = (id: string) => rasterVisibility[id] !== false;
   const isDrawn = (layer: LayerMetadata) => isShown(layer.id) && !outOfRange(layer, zoom);
+  // A raster that drew no tile has no colours on the map to read, so its legend leaves the plate.
   const legends = stackLegends(stackLayers, (id) => {
     const layer = stackLayers.find((l) => l.id === id);
-    return !!layer && isDrawn(layer);
+    return !!layer && isDrawn(layer) && !failedLayers.has(id);
   });
 
   // A row's own controls: visibility, the name (click to fly there; a ramp strip under a measured
@@ -3145,9 +3187,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   // remove. The stack adds the grip in front.
   const renderRowControls = (layer: LayerMetadata, label: string) => {
     const isVisible = isShown(layer.id);
-    const hiddenByZoom = isVisible && outOfRange(layer, zoom);
+    // A raster whose tiles all failed says so (the presenter must not describe what is not there).
+    const failed = failedLayers.has(layer.id);
+    const hiddenByZoom = isVisible && !failed && outOfRange(layer, zoom);
     const legend = layerLegend(layer);
     const strip = legend && 'ramp' in legend ? rampGradient(legend.ramp) : null;
+    const noteId = failed ? `${layer.id}-failed` : hiddenByZoom ? `${layer.id}-range` : undefined;
     return (
       <>
         <input
@@ -3166,11 +3211,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             className="map-row__name"
             onClick={() => flyToLayer(layer.id)}
             title={hiddenByZoom ? `Zoom out to ${label}` : `Fly to ${label}`}
-            aria-describedby={hiddenByZoom ? `${layer.id}-range` : undefined}
+            aria-describedby={noteId}
           >
             <span className="map-row__text">{label}</span>
           </button>
-          {strip && !hiddenByZoom && <span className="map-row__ramp" style={{ background: strip }} aria-hidden="true" />}
+          {strip && !hiddenByZoom && !failed && <span className="map-row__ramp" style={{ background: strip }} aria-hidden="true" />}
+          {failed && (
+            <span className="map-row__note map-row__note--failed" id={`${layer.id}-failed`} role="status">
+              {isTerrainLayer(layer) ? 'LiDAR did not load' : 'Did not load'}
+            </span>
+          )}
           {hiddenByZoom && (
             <span className="map-row__note" id={`${layer.id}-range`}>
               Shows only when zoomed out

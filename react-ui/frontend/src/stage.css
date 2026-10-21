@@ -1156,6 +1156,10 @@
   color: var(--label);
   padding-bottom: 4px;
 }
+/* A raster whose tiles all failed: the row says so in the error colour, in place of its ramp. */
+.map-row__note--failed {
+  color: var(--error);
+}
 
 /* The lists: "On top" (vectors, fixed) and the imagery stack (drag to restack). */
 .map-stack-wrap {
