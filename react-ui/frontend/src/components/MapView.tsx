@@ -211,6 +211,8 @@ interface MapViewProps {
   tasking?: { sessionId: string; caseId?: string; key: number };
   /** The officer filed the tasking on the map: the agent is told next. */
   onTaskingFiled?: (taskingId: string) => void;
+  /** A raster is on the map (its URL): a replay's held layer waits for the scene before it. */
+  onRasterLanded?: (url: string) => void;
 }
 
 /** A sea file on the stage: its kind and pass (by its name), its data and its map ids. */
@@ -249,12 +251,17 @@ function onStyle(m: maplibregl.Map, fn: () => void) {
   m.once('idle', run);
 }
 
-export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, working = false, tips = [], vesselRest = null, tasking, onTaskingFiled }: MapViewProps) {
+export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, working = false, tips = [], vesselRest = null, tasking, onTaskingFiled, onRasterLanded }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
   const [allLayers, setAllLayers] = useState<LayerMetadata[]>([]); // Persistent layer tracking
   const addedRasterUrls = useRef<Set<string>>(new Set()); // Track added raster URLs to prevent duplicates
+  // The latest callback, read when a raster lands (the raster effect depends on `rasters` alone).
+  const onRasterLandedRef = useRef(onRasterLanded);
+  useEffect(() => {
+    onRasterLandedRef.current = onRasterLanded;
+  }, [onRasterLanded]);
   // Geometries waiting for the style (utils/styleReady.ts), cancelled if the map goes first.
   const styleWaits = useRef<Set<{ cancel: () => void }>>(new Set());
   // Rasters that have not drawn a tile (utils/tileHealth.ts): their rows say so and their legends
@@ -2971,7 +2978,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           const inArchaeoAct = isTerrainRaster || groundOnRef.current ||
             allLayersRef.current.some(isTerrainLayer) || newLayerMetadata.some(isTerrainLayer);
           const followCamera =
-            !!seaRadar || isMethaneRaster || inArchaeoAct ||
+            !!seaRadar || isMethaneRaster || inArchaeoAct || raster.frame === true ||
             allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l)) ||
             newLayerMetadata.some((l) => isMethaneLayer(l));
           const hintParams = tileParamsFor(hint);
@@ -3164,6 +3171,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           // CRITICAL FIX: Only add URL to ref AFTER layer is successfully added to map
           // This prevents race condition where ref is updated but layer isn't added due to abort
           addedRasterUrls.current.add(raster.url);
+          onRasterLandedRef.current?.(raster.url);
 
 
           // The archaeologist's ground stands up under the first terrain product and stays until

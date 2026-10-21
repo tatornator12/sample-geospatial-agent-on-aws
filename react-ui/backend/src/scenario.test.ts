@@ -40,6 +40,13 @@ describe('scenarioLayers', () => {
     assert.equal(scenarioLayers({ assets: { layers: many } }, B, ID).length, 12);
   });
 
+  it('passes a whole delay_ms from 0 to 15,000 and drops anything else', () => {
+    const delays = [8000, 0, 15000, 15001, -1, 2.5, '8000', null];
+    const layers = scenarioLayers({ assets: { layers: delays.map((delay_ms, i) => ({ file: `l${i}.tif`, delay_ms })) } }, B, ID);
+    assert.deepEqual(layers.map((l) => l.delay_ms), [8000, 0, 15000, undefined, undefined, undefined, undefined, undefined]);
+    assert.equal('delay_ms' in layers[3], false);
+  });
+
   it('points a hillshade hint\'s DEM at the case prefix and drops anything that is not a dem file', () => {
     const A = 'archaeologist-newark';
     const hint = { kind: 'raster', colormap: 'gray', group: 'terrain' };

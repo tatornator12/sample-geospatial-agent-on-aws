@@ -2,7 +2,8 @@
  * The parts of a replay case's config.json that go beyond the before/after scheme:
  *
  *   agent          which act the case belongs to (the UI selects it)
- *   assets.layers  [{file, title, render}] what goes on the map, in order
+ *   assets.layers  [{file, title, render, delay_ms}] what goes on the map, in order (delay_ms holds
+ *                  a layer back, so the true colour stands alone first as it did live)
  *   tool_calls     the recorded steps; their `s3://bucket/use-cases/<id>/…` placeholders point here
  *
  * config.json is committed, reviewed content, but it is still read from S3 and handed to the
@@ -15,11 +16,14 @@ export interface ScenarioLayer {
   s3_url: string;
   title: string;
   render?: Record<string, unknown>;
+  /** Milliseconds the stage waits before landing this layer (a whole number, 0 to MAX_DELAY_MS). */
+  delay_ms?: number;
 }
 
 const LAYER_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(tif|tiff|geojson)$/;
 const AGENT_ID = /^[a-z][a-z0-9-]{0,31}$/;
 const MAX_LAYERS = 12;
+const MAX_DELAY_MS = 15_000;
 
 export function scenarioAgent(config: unknown): string | undefined {
   const agent = (config as { agent?: unknown } | null)?.agent;
@@ -33,7 +37,7 @@ export function scenarioLayers(config: unknown, bucket: string, scenarioId: stri
   const out: ScenarioLayer[] = [];
   for (const entry of raw.slice(0, MAX_LAYERS)) {
     if (!entry || typeof entry !== 'object') continue;
-    const { file, title, render } = entry as Record<string, unknown>;
+    const { file, title, render, delay_ms } = entry as Record<string, unknown>;
     if (typeof file !== 'string' || !LAYER_FILE.test(file)) continue;
     const layer: ScenarioLayer = {
       s3_url: `s3://${bucket}/use-cases/${scenarioId}/${file}`,
@@ -41,6 +45,9 @@ export function scenarioLayers(config: unknown, bucket: string, scenarioId: stri
     };
     if (render && typeof render === 'object' && !Array.isArray(render)) {
       layer.render = withCaseDem(render as Record<string, unknown>, bucket, scenarioId);
+    }
+    if (Number.isInteger(delay_ms) && (delay_ms as number) >= 0 && (delay_ms as number) <= MAX_DELAY_MS) {
+      layer.delay_ms = delay_ms as number;
     }
     out.push(layer);
   }

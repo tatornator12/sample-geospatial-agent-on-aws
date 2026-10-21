@@ -47,5 +47,7 @@ export interface RasterData {
   date?: string; // Optional date from title or params
   cloudCoverage?: string; // Optional cloud coverage percentage
   zIndex?: number; // Layer stacking order (higher = on top)
+  /** The camera moves to this raster when it lands: a replay's scene standing alone before a held layer. */
+  frame?: boolean;
   render?: RenderHint; // Validated display_visual `render` hint, when the agent sent one
 }

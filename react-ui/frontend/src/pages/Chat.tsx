@@ -19,6 +19,7 @@ import type { GeometryData, RasterData } from '../types';
 import { getIdToken } from '../utils/auth';
 import { parseRenderHint } from '../utils/render';
 import { formatDate } from '../utils/layerFormatting';
+import { holdAfterLanding, holdMs, type Held, type HeldAfterLanding } from '../utils/heldLayers';
 import type { Tip } from '../utils/steps';
 import '../stage.css';
 
@@ -45,8 +46,9 @@ interface ScenarioConfig {
   /** The act the case belongs to (e.g. `methane`); the stage selects it when the case loads. */
   agent?: string;
   assets: {
-    /** The case's own map, in order (backend-validated URLs inside the case's prefix). */
-    layers?: Array<{ s3_url: string; title: string; render?: unknown }>;
+    /** The case's own map, in order (backend-validated URLs inside the case's prefix); a layer
+     *  with `delay_ms` lands that long after the rest (utils/heldLayers.ts). */
+    layers?: Array<{ s3_url: string; title: string; render?: unknown; delay_ms?: unknown }>;
     geometry_url: string;
     before: {
       tci: string;
@@ -127,9 +129,20 @@ export function Chat() {
   const scenarioLoadedFor = useRef<string | null>(null);
   // The case whose act has been chosen (the case-agent effect below), once per loaded case.
   const agentCheckedFor = useRef<string | null>(null);
+  // A case's held layers (the Octagon's hillshade): they wait for the scene before them to land,
+  // then for their own delay. A reset or another case cancels them, so it never sees a layer of
+  // the case it left land late.
+  const heldLayers = useRef<HeldAfterLanding | null>(null);
+  useEffect(() => {
+    const held = heldLayers; // the ref object itself: its timers are set long after mount
+    return () => held.current?.cancel();
+  }, []);
+  const handleRasterLanded = useCallback((url: string) => heldLayers.current?.landed(url), []);
 
   // A fresh session on a clean stage: new id (a fresh map), no layers, tips or tasking.
   const resetStage = useCallback(() => {
+    heldLayers.current?.cancel();
+    heldLayers.current = null;
     setSessionId(uuidv4());
     setCurrentGeometry(null);
     setCurrentRasters([]);
@@ -157,6 +170,8 @@ export function Chat() {
     }
     if (scenarioLoadedFor.current === scenarioId) return;
     scenarioLoadedFor.current = scenarioId;
+    heldLayers.current?.cancel();
+    heldLayers.current = null;
     // A reset or another case while this one loads: what it fetched never reaches the stage.
     const superseded = () => scenarioLoadedFor.current !== scenarioId;
 
@@ -205,10 +220,13 @@ export function Chat() {
 
         // A case that lists its own layers (the Methane Hunter's) renders exactly those, with
         // the agent's recorded render hints, re-validated here like live ones. The first raster
-        // listed stacks on top.
+        // listed stacks on top. A raster with `delay_ms` is held back that long after the rest have
+        // landed, so they stand alone first, as they did live (the Octagon's true colour, then its
+        // hillshade).
         const layers = Array.isArray(config.assets?.layers) ? config.assets.layers : [];
         if (layers.length > 0) {
           const rasters: RasterData[] = [];
+          const held: Held<RasterData>[] = [];
           for (const [i, layer] of layers.entries()) {
             const render = parseRenderHint(layer.render) ?? undefined;
             if (layer.s3_url.toLowerCase().endsWith('.geojson')) {
@@ -222,16 +240,26 @@ export function Chat() {
               }
             } else {
               const date = layer.s3_url.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
-              rasters.push({
+              const raster: RasterData = {
                 url: layer.s3_url,
                 name: layer.title,
                 date,
                 zIndex: layers.length - i,
                 ...(render?.kind === 'raster' ? { render } : {}),
-              });
+              };
+              const wait = holdMs(layer.delay_ms);
+              if (wait > 0) held.push({ item: raster, delayMs: wait });
+              else rasters.push(raster);
             }
           }
-          setCurrentRasters(rasters);
+          // The scene standing alone is framed, as the live turn framed it before the LiDAR came.
+          setCurrentRasters(held.length > 0 ? rasters.map((r) => ({ ...r, frame: true })) : rasters);
+          heldLayers.current = holdAfterLanding(
+            rasters.map((r) => r.url),
+            held,
+            (raster) => setCurrentRasters((current) => [...current, raster]),
+            superseded
+          );
           return;
         }
 
@@ -443,6 +471,7 @@ export function Chat() {
             key={sessionId}
             geometry={currentGeometry}
             rasters={currentRasters}
+            onRasterLanded={handleRasterLanded}
             // No drawing on the archaeologist's act: a shape over unrecorded ground is the one way
             // the stage could look as if it marked a new site (only the public record is shown).
             drawRail={stageAgentId !== 'archaeologist'}
