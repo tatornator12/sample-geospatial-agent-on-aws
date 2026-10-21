@@ -170,7 +170,8 @@ export function StepColumn({
               aria-current={lit ? 'step' : undefined}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '28px 1fr',
+                // The dot, its gap and a two-digit number at 15px (the Back Row Rule) on one line.
+                gridTemplateColumns: '32px 1fr',
                 alignItems: 'center',
                 columnGap: theme.spacing.sm,
                 padding: '6px 0',
@@ -181,11 +182,12 @@ export function StepColumn({
               <span
                 style={{
                   ...theme.typography.mono,
-                  fontSize: '13px',
+                  fontSize: '15px',
                   color: lit ? theme.colors.primary : done ? theme.colors.success : theme.colors.secondary,
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <span
@@ -216,9 +218,17 @@ export function StepColumn({
                   <span
                     style={{
                       ...theme.typography.labelCaps,
-                      fontSize: '11px',
+                      // 15px (the Back Row Rule) in sentence case, not tracked caps: at 15px the
+                      // caps no longer fit beside a lit name in the 296px column at 1280, and a
+                      // row that grows while lit shifts the list on every step.
+                      fontSize: '15px',
+                      letterSpacing: 'normal',
+                      textTransform: 'none',
                       color: theme.colors.primary,
                       marginLeft: theme.spacing.sm,
+                      // Kept whole: when a long name leaves no room, the label goes to the next line.
+                      display: 'inline-block',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     working
