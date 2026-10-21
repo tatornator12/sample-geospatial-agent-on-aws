@@ -221,7 +221,9 @@ evidence order: pass, detect, coverage, match, then words.
     officer's filed choice (`SeaFacts.tasking`: box, kept, total, look start, from the filed
     tasking), so the filed sub reads "box {k} · {kept} of {n} candidates · next radar look …". The
     filed sentence still shows once, on the plate. The "outside the radar: not imaged" row stays
-    with task 7b (it needs the clipped areas).
+    with task 7b (it needs the clipped areas): it is commit `357ef15`, after the tag, so the
+    fallback does not hold it, and it shows only when the coverage carries the checkable share,
+    which the four-turn path never writes.
   - The longer rows run to two lines, so at 1280×720 the candidates beat overflowed the layers
     plate (review B2, task 1 fix pass 2). The tag also holds the layout that keeps them in view:
     GFW's attribution is the plate's foot, outside its scroll (`MapView.tsx`), and below 800 px of
@@ -1648,7 +1650,9 @@ it was chosen from are in revision 3 and the notes.
     design (R9.1). The copy fixes include the `MapView.tsx` key and legend rows and the clock's
     filed facts (user decision Oct 21: option 1), with the layers plate's 720p layout that keeps
     those rows and GFW's attribution in view (review B2); the tag moves again to the rebased commit
-    once `stage-fixes-1` merges, so the fallback carries the stage fixes too.
+    once `stage-fixes-1` merges, so the fallback carries the stage fixes too. Task 1's one deferred
+    legend row, "outside the radar: not imaged", landed with task 7b in `357ef15` (it needs the
+    clipped areas), so the tag does not hold it.
   - This amends requirement 12.5 (`requirements.md:259`, "the build SHALL be rerun on Nov 5") and
     decision 12 (`design.md:394`). Both were amended in the spec on Oct 21.
 - **U11. Replay case id.** `vessels-open-question`, stable across re-records. This departs from
