@@ -1,16 +1,30 @@
 /**
  * The act picker on the exhibit rail: which agent is on stage.
  *
- * A quiet trigger showing the current agent's name opens a floating plate listing every
- * agent with its one-line description. Selection is a listbox (arrow keys, Home/End,
- * Enter/Space, Escape) so the presenter can switch acts without the mouse. The picker
- * renders nothing when only one agent is configured — a single-runtime deployment keeps
- * its plain rail.
+ * A quiet trigger showing the current act's name opens a floating plate listing the acts in
+ * show order, each with its room name and the intro deck's line (utils/acts.ts), never a
+ * runtime suffix, a deploy note or an act number. In rehearsal (the dev server or `?dev=1`)
+ * the other runtimes follow under "Rehearsal", each named for its act with its `?agent=` id in
+ * mono. Selection is a listbox (arrow keys, Home/End, Enter/Space, Escape) so the presenter can
+ * switch acts without the mouse; the "Rehearsal" heading is not an option. The picker renders
+ * nothing when only one agent is offered: a single-runtime deployment keeps its plain rail.
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useRef, useState } from 'react';
 import { useAgents } from '../agentContext';
 import { theme } from '../theme';
 import { Icon } from './Icons';
+
+/** A rehearsal runtime's `?agent=` id beside its act's name, so two runtimes of one act differ. */
+function RuntimeId({ id }: { id: string }) {
+  return (
+    <span
+      className="mono"
+      style={{ marginLeft: '6px', fontSize: '15px', fontWeight: 400, color: theme.colors.secondary }}
+    >
+      · {id}
+    </span>
+  );
+}
 
 export function AgentPicker() {
   const { agents, selectedAgentId, selectedAgent, selectAgent, status } = useAgents();
@@ -124,7 +138,8 @@ export function AgentPicker() {
         <span style={{ ...theme.typography.labelCaps, fontSize: '11px', color: theme.colors.secondary }}>
           Agent
         </span>
-        <span>{selectedAgent.label}</span>
+        <span>{selectedAgent.roomName}</span>
+        {selectedAgent.rehearsalOnly && <RuntimeId id={selectedAgent.id} />}
         <Icon
           name="chevron-down"
           size={14}
@@ -165,50 +180,69 @@ export function AgentPicker() {
           {agents.map((agent, index) => {
             const isSelected = agent.id === selectedAgentId;
             const isActive = index === activeIndex;
+            // The first rehearsal runtime opens its own group, under a heading that is not an option.
+            const opensRehearsal = agent.rehearsalOnly && !agents[index - 1]?.rehearsalOnly;
             return (
-              <li
-                key={agent.id}
-                id={`${listboxId}-${agent.id}`}
-                role="option"
-                aria-selected={isSelected}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => choose(agent.id)}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  backgroundColor: isSelected
-                    ? theme.colors.primaryContainer
-                    : isActive
-                      ? theme.states.hover
-                      : 'transparent',
-                  transition: `background-color ${theme.transitions.short}`,
-                }}
-              >
-                <span
+              <Fragment key={agent.id}>
+                {opensRehearsal && (
+                  <li
+                    role="presentation"
+                    style={{
+                      ...theme.typography.labelCaps,
+                      fontSize: '11px',
+                      color: theme.colors.secondary,
+                      padding: '12px 12px 6px',
+                      marginTop: '6px',
+                      borderTop: `1px solid ${theme.colors.outline}`,
+                    }}
+                  >
+                    Rehearsal
+                  </li>
+                )}
+                <li
+                  id={`${listboxId}-${agent.id}`}
+                  role="option"
+                  aria-selected={isSelected}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => choose(agent.id)}
                   style={{
-                    display: 'block',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    lineHeight: 1.4,
-                    color: isSelected ? theme.colors.primary : theme.colors.onSurface,
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    backgroundColor: isSelected
+                      ? theme.colors.primaryContainer
+                      : isActive
+                        ? theme.states.hover
+                        : 'transparent',
+                    transition: `background-color ${theme.transitions.short}`,
                   }}
                 >
-                  {agent.label}
-                </span>
-                {agent.description && (
                   <span
                     style={{
                       display: 'block',
                       fontSize: '15px',
+                      fontWeight: 600,
                       lineHeight: 1.4,
-                      color: theme.colors.secondary,
+                      color: isSelected ? theme.colors.primary : theme.colors.onSurface,
                     }}
                   >
-                    {agent.description}
+                    {agent.roomName}
+                    {agent.rehearsalOnly && <RuntimeId id={agent.id} />}
                   </span>
-                )}
-              </li>
+                  {agent.roomDescription && (
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: '15px',
+                        lineHeight: 1.4,
+                        color: theme.colors.secondary,
+                      }}
+                    >
+                      {agent.roomDescription}
+                    </span>
+                  )}
+                </li>
+              </Fragment>
             );
           })}
         </ul>
