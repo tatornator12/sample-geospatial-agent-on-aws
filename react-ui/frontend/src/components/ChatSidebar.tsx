@@ -1018,7 +1018,7 @@ export function ChatSidebar({
                   </div>
                   {msg.tools && msg.tools.length > 0 && (
                     <div className="transcript-turn__tools">
-                      <ToolCallDisplay tools={msg.tools} />
+                      <ToolCallDisplay tools={msg.tools} plainNames={agentId !== 'vessels'} />
                     </div>
                   )}
                 </div>
@@ -1035,7 +1035,7 @@ export function ChatSidebar({
                   </div>
                   {streamingTools.length > 0 && (
                     <div className="transcript-turn__tools">
-                      <ToolCallDisplay tools={streamingTools} />
+                      <ToolCallDisplay tools={streamingTools} plainNames={agentId !== 'vessels'} />
                     </div>
                   )}
                 </div>

@@ -6,17 +6,21 @@ import { useState } from 'react';
 import type { ToolCall } from '../types.ts';
 import { theme } from '../theme';
 import { Icon } from './Icons';
+import { stepName } from '../utils/stageCopy.ts';
 
 interface ToolCallDisplayProps {
   tools: ToolCall[];
+  /** Name each call as the step column does ("Fetch Sentinel-2"), not by its function name. */
+  plainNames?: boolean;
 }
 
 interface ToolCallItemProps {
   tool: ToolCall;
   index: number;
+  plainNames: boolean;
 }
 
-function ToolCallItem({ tool, index }: ToolCallItemProps) {
+function ToolCallItem({ tool, index, plainNames }: ToolCallItemProps) {
   const [expanded, setExpanded] = useState(false);
   const running = tool.status === 'executing';
   const markerColor = running ? theme.colors.primary : theme.colors.success;
@@ -70,8 +74,12 @@ function ToolCallItem({ tool, index }: ToolCallItemProps) {
           />
           {String(index + 1).padStart(2, '0')}
         </span>
-        <span style={{ ...theme.typography.mono, fontSize: '14px', color: theme.colors.onSurface }}>
-          {tool.name}
+        <span
+          style={plainNames
+            ? { ...theme.typography.bodyMedium, fontSize: '15px', color: theme.colors.onSurface }
+            : { ...theme.typography.mono, fontSize: '14px', color: theme.colors.onSurface }}
+        >
+          {plainNames ? stepName(tool.name) : tool.name}
         </span>
         <span
           style={{
@@ -183,7 +191,7 @@ function ToolCallItem({ tool, index }: ToolCallItemProps) {
   );
 }
 
-export function ToolCallDisplay({ tools }: ToolCallDisplayProps) {
+export function ToolCallDisplay({ tools, plainNames = false }: ToolCallDisplayProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (tools.length === 0) {
@@ -230,7 +238,10 @@ export function ToolCallDisplay({ tools }: ToolCallDisplayProps) {
         }}
       >
         <span>
-          {uniqueToolList.length} step{uniqueToolList.length !== 1 ? 's' : ''}
+          {/* Calls, not steps: the step column folds repeated calls into one step. */}
+          {plainNames
+            ? `${uniqueToolList.length} tool call${uniqueToolList.length !== 1 ? 's' : ''}`
+            : `${uniqueToolList.length} step${uniqueToolList.length !== 1 ? 's' : ''}`}
         </span>
         <span
           aria-hidden="true"
@@ -247,7 +258,7 @@ export function ToolCallDisplay({ tools }: ToolCallDisplayProps) {
       {expanded && (
         <div style={{ padding: `${theme.spacing.sm} ${theme.spacing.sm} ${theme.spacing.sm}` }}>
           {uniqueToolList.map((tool, index) => (
-            <ToolCallItem key={tool.id || index} tool={tool} index={index} />
+            <ToolCallItem key={tool.id || index} tool={tool} index={index} plainNames={plainNames} />
           ))}
         </div>
       )}
