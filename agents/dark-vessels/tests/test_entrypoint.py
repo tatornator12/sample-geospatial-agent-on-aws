@@ -106,6 +106,12 @@ def test_the_tool_surface_is_the_act_and_the_platforms_eyes(entry):
     assert not hasattr(entry, "mcp_client")
 
 
+def test_no_tool_the_model_reads_names_a_pass(entry):
+    """§3.14's docstring pin over every tool the agent holds, the platform's eyes included."""
+    for t in entry.LOCAL_TOOLS:
+        assert not re.search(r"s1[a-d]-\d{8}", t.__doc__ or "", re.I), t.__name__
+
+
 def test_prompt_carries_the_fixed_sentences_and_the_wording_rules():
     import vessels_config as c
     p = c.build_prompt("2026-10-16")
@@ -116,10 +122,11 @@ def test_prompt_carries_the_fixed_sentences_and_the_wording_rules():
     assert c.ON_FILE_ONLY == "I only investigate passes on file."
     assert c.CANDIDATE_SENTENCE == "A candidate is a radar target with no broadcast nearby; it is not an accusation."
     assert "No em dashes" in p and "—" not in p
-    assert "four turns" in p and "Has a vessel gone silent near here?" in p
+    # One open question (redesign §3.4): no prepared turns; the pins are in test_prompt.py.
+    assert "four turns" not in p and "GOAL: one open question about the reserve." in p
     # The room's words for coverage (R4.3): the retired ones cannot come back through the prompt.
     assert not re.search(r"heard water|\bunproven\b|not evidence|could be heard|\bheard\b|best bet", p, re.I)
-    assert "AIS received" in p and "AIS reception unknown" in p and c.vs.SAY_ELSE in p
+    assert "AIS received" in p and "AIS reception unknown" in p and "say_else, word for" in p
 
 
 _CASE = {

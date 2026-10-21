@@ -1,8 +1,8 @@
 """The open question (redesign §3.5, §3.14): the turn, list_passes and the question's state, decide's
 13 pairs with its common rules and the `asked` matcher, the gate, the two-pass budget, the question
 open only in its own turn (review M1), match_ais' standard and its next steps (M2), the stale-record
-checks, predict_hotspots(pass_id), draft_tasking's three checks, tasking_status(""), the answer cap
-and the docstring pins. FakeS3 (conftest), no network."""
+checks, predict_hotspots(pass_id), draft_tasking's three checks, tasking_status("") and the docstring
+pins. FakeS3 (conftest), no network."""
 import asyncio
 import inspect
 import itertools
@@ -747,24 +747,7 @@ def test_tasking_status_with_no_id_reads_the_newest_draft(vessels):
     assert run(vessels.tk.tasking_status("../x"))["error"]
 
 
-# --- the answer's cap and the pins -------------------------------------------------------------------------
-
-def test_the_longest_legal_answer_is_within_the_cap():
-    """Seven candidates, a set-aside pass, the longest say ("September", "100%", "14 times"): 116 words
-    split on whitespace, as report_max_words counts, with the four bullet markers."""
-    import forecast_tools as ft
-    import vessel_store as vs
-    import vessels_config as c
-    say = ft.rolling_say(date(2026, 9, 1), 100, "14")
-    lines = ["7 candidates on the Sep 30 pass; I drafted box 3 for the next look.", "",
-             "- Read Sep 30 (22% checkable) after setting Aug 30 aside (10%); data from Global Fishing Watch.",
-             "- T01, T02, T03, T04 and 3 more, 12 to 31 km from port.",
-             f"- {vs.SAY_ELSE}", f"- {say}", "", vs.CANDIDATE_SENTENCE, "", f"{vs.OFFICERS_DECISION} {c.CLOSER}"]
-    assert [len(x.split()) for x in (lines[0], lines[2][2:], lines[3][2:], vs.SAY_ELSE, say, vs.CANDIDATE_SENTENCE, lines[-1])] == \
-        [15, 16, 13, 15, 22, 15, 16]
-    assert len("\n".join(lines).split()) == 116 <= vs.ANSWER_MAX_WORDS == 120
-    assert vs.CHECKABLE_FLOOR == 0.15
-
+# --- the docstring pins (the answer cap is in test_prompt.py, with the prompt's templates) -----------------
 
 def _tool_functions():
     import ais_tools
