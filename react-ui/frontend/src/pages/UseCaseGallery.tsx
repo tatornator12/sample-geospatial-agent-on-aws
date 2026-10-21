@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { theme } from '../theme';
+import { SHOW_ACTS, actFor } from '../utils/acts';
+import './gallery.css';
 
 interface Scenario {
   id: string;
@@ -127,6 +128,22 @@ const scenarios: Scenario[] = [
   },
 ];
 
+/** The page's acts, in show order, each with the cases that play on it (the Act 3 card included). */
+function casesByAct() {
+  return SHOW_ACTS.map((act) => ({
+    act,
+    id: `replay-act-${act.roomName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    cases: scenarios.filter((scenario) => actFor(scenario.agent)?.roomName === act.roomName),
+  })).filter((group) => group.cases.length > 0);
+}
+
+/**
+ * Replay cases (S10): recorded runs grouped by act in show order. Each available case is one
+ * button that covers its card (the whole card opens it; Tab, Enter and Space work natively); the
+ * button is quiet at rest and lit amber only under the pointer or the keyboard's focus, so one
+ * call to action at most is amber (the One Spotlight Rule). A case still being recorded says
+ * "Coming soon" and has no button.
+ */
 export function UseCaseGallery() {
   const navigate = useNavigate();
 
@@ -137,184 +154,54 @@ export function UseCaseGallery() {
   };
 
   return (
-    <div className="page-content" style={{ padding: theme.spacing.xxl }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <h2
-          style={{
-            ...theme.typography.headlineLarge,
-            marginBottom: theme.spacing.sm,
-            color: theme.colors.onBackground,
-          }}
-        >
-          Featured Impact Scenarios
-        </h2>
-        <p
-          style={{
-            ...theme.typography.bodyLarge,
-            color: theme.colors.secondary,
-            marginBottom: theme.spacing.xl,
-          }}
-        >
-          Pre-loaded satellite analysis scenarios with quantifiable environmental impact metrics
+    <div className="page-content gallery">
+      <div className="gallery__inner">
+        <h1 className="gallery__title">Replay cases</h1>
+        <p className="gallery__lead">
+          Recorded runs of each act. A replay shows what the agent did without calling it again; the map still needs
+          the network.
         </p>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: theme.spacing.lg,
-          }}
-        >
-          {scenarios.map((scenario) => (
-            <div
-              key={scenario.id}
-              onClick={() => handleScenarioClick(scenario)}
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.borderRadius.md,
-                padding: theme.spacing.lg,
-                boxShadow: theme.elevation.level1,
-                transition: theme.transitions.medium,
-                cursor: scenario.status === 'available' ? 'pointer' : 'not-allowed',
-                opacity: scenario.status === 'coming-soon' ? 0.6 : 1,
-                position: 'relative',
-              }}
-              onMouseEnter={(e) => {
-                if (scenario.status === 'available') {
-                  e.currentTarget.style.boxShadow = theme.elevation.level3;
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = theme.elevation.level1;
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              {/* Image Header */}
-              <div
-                style={{
-                  width: '100%',
-                  height: '180px',
-                  backgroundColor: theme.colors.surfaceVariant,
-                  borderRadius: theme.borderRadius.sm,
-                  marginBottom: theme.spacing.md,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}
-              >
-                <img
-                  src={scenario.icon}
-                  alt={scenario.name}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-                {scenario.status === 'coming-soon' && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: theme.spacing.md,
-                      padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
-                      backgroundColor: theme.colors.surface,
-                      borderRadius: theme.borderRadius.sm,
-                      ...theme.typography.bodyMedium,
-                      color: theme.colors.secondary,
-                    }}
-                  >
-                    Coming Soon
-                  </div>
-                )}
-              </div>
-
-              {/* Title */}
-              <h3
-                style={{
-                  ...theme.typography.titleLarge,
-                  marginBottom: theme.spacing.xs,
-                  color: theme.colors.onSurface,
-                }}
-              >
-                {scenario.name}
-              </h3>
-
-              {/* Description */}
-              <p
-                style={{
-                  ...theme.typography.bodyMedium,
-                  color: theme.colors.secondary,
-                  marginBottom: theme.spacing.md,
-                }}
-              >
-                {scenario.description}
-              </p>
-
-              {/* Metrics */}
-              {scenario.metrics.length > 0 && (
-                <div
-                  style={{
-                    borderTop: `1px solid ${theme.colors.outlineVariant}`,
-                    paddingTop: theme.spacing.md,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: theme.spacing.xs,
-                  }}
-                >
-                  {scenario.metrics.map((metric, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <span
-                        style={{
-                          ...theme.typography.bodyMedium,
-                          color: theme.colors.secondary,
-                        }}
+        {casesByAct().map(({ act, id, cases }) => (
+          <section key={id} className="gallery__act" aria-labelledby={id}>
+            <h2 id={id} className="gallery__act-name">
+              {act.roomName}
+            </h2>
+            <ul className="gallery__cases">
+              {cases.map((scenario) => {
+                const available = scenario.status === 'available';
+                return (
+                  <li key={scenario.id} className={`case-card${available ? '' : ' case-card--soon'}`}>
+                    <img className="case-card__image" src={scenario.icon} alt="" width={640} height={360} />
+                    <h3 className="case-card__name">{scenario.name}</h3>
+                    <p className="case-card__description">{scenario.description}</p>
+                    {scenario.metrics.length > 0 && (
+                      <dl className="case-card__metrics">
+                        {scenario.metrics.map((metric) => (
+                          <div key={metric.label} className="case-card__metric">
+                            <dt>{metric.label}</dt>
+                            <dd>{metric.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    {available ? (
+                      <button
+                        type="button"
+                        className="case-card__open"
+                        aria-label={`Open the replay: ${scenario.name}`}
+                        onClick={() => handleScenarioClick(scenario)}
                       >
-                        {metric.label}
-                      </span>
-                      <span
-                        style={{
-                          ...theme.typography.labelLarge,
-                          color: theme.colors.onSurface,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {metric.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* CTA Button for available scenarios */}
-              {scenario.status === 'available' && (
-                <div
-                  style={{
-                    marginTop: theme.spacing.md,
-                    padding: `${theme.spacing.sm} ${theme.spacing.md}`,
-                    backgroundColor: theme.colors.primary,
-                    color: theme.colors.onPrimary,
-                    borderRadius: theme.borderRadius.sm,
-                    textAlign: 'center',
-                    ...theme.typography.labelLarge,
-                    fontWeight: 600,
-                  }}
-                >
-                  View Analysis →
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                        Open the replay
+                      </button>
+                    ) : (
+                      <p className="case-card__soon">Coming soon</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
       </div>
     </div>
   );
