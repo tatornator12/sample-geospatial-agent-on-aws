@@ -196,3 +196,10 @@ describe('stageStatusLine (B3, S15)', () => {
     expect(stageStatusLine({ working: false, tools: [], answer: '' })).toBe('');
   });
 });
+
+describe('stageAnswerText and emoji (P2, Act 1)', () => {
+  it('drops the emoji a recorded narrative carries', () => {
+    expect(stageAnswerText('🔥 **Burn Analysis**\n\n🌳 Dense canopy ✅ remains.')).toBe('**Burn Analysis**\n\nDense canopy remains.');
+    expect(stageAnswerText('No emoji here: 3.4 km².')).toBe('No emoji here: 3.4 km².');
+  });
+});

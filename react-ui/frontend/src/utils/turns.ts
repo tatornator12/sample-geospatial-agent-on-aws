@@ -31,7 +31,9 @@ export const STAGE_TABLE_ROWS = 5;
  * is never folded in as "(,)" or left as "," (A1 P1-5).
  */
 export function stageAnswerText(raw: string): string {
-  return stagePunctuation(capTableRows(twoColumnTables(blankDashCells(raw.trim())), STAGE_TABLE_ROWS));
+  // A replay's recorded narrative can carry emoji ("🔥 Burn Analysis"); the stage drops them.
+  const plain = raw.replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]+\s?/gu, '').trim();
+  return stagePunctuation(capTableRows(twoColumnTables(blankDashCells(plain)), STAGE_TABLE_ROWS));
 }
 
 /** What the transcript records when the prompt never reached the stage backend (S8). */
