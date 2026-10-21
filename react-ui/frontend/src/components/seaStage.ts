@@ -735,10 +735,13 @@ export function arrive(map: M, kind: Exclude<VesselKind, 'radar'>, fill: string)
 
 /**
  * The coverage as the argument moves on: while the candidates are read the reception-unknown hatch
- * halves so the orchid rings carry the frame; under the forecast both areas step back so the
- * history's heat and the boxes read (the key still says what they are).
+ * halves and the region words step back a little, so the orchid rings carry the frame; under the
+ * forecast both areas step back and their words go, so the history's heat and the boxes read and
+ * no word placed for the coverage's view ends under a plate after the camera moves (the key still
+ * says what they are).
  */
 export function paintCoverage(map: M, kind: 'heard' | 'unproven', fill: string, quiet: CoverageQuiet): void {
+  if (quiet !== 'none') setPaint(map, cid(fill, '-labels'), 'text-opacity', quiet === 'all' ? 0 : COVERAGE_LABEL_QUIET);
   if (kind === 'heard') {
     setPaint(map, fill, 'fill-opacity', quiet === 'all' ? 0.03 : SEA_OPACITY.heard);
     setPaint(map, cid(fill, '-outline'), 'line-opacity', quiet === 'all' ? 0.15 : 0.35);
