@@ -222,6 +222,11 @@ evidence order: pass, detect, coverage, match, then words.
     tasking), so the filed sub reads "box {k} · {kept} of {n} candidates · next radar look …". The
     filed sentence still shows once, on the plate. The "outside the radar: not imaged" row stays
     with task 7b (it needs the clipped areas).
+  - The longer rows run to two lines, so at 1280×720 the candidates beat overflowed the layers
+    plate (review B2, task 1 fix pass 2). The tag also holds the layout that keeps them in view:
+    GFW's attribution is the plate's foot, outside its scroll (`MapView.tsx`), and below 800 px of
+    height Act 3's plate tightens its rhythm with the type at 15 px (`stage.css`). The strings are
+    unchanged.
   - The fallback also carries the stage fixes. Once `stage-fixes-1` merges into `develop`, the
     branch is rebased onto `develop` (`MapView.tsx` keeping both sides), the frontend gates and the
     four-turn eval on dev are rerun, and `act3-four-turn-fallback` moves to that rebased commit.
@@ -1625,8 +1630,9 @@ it was chosen from are in revision 3 and the notes.
     commit tagged `act3-four-turn-fallback`, which task 1 makes after the four-turn golden cases
     pass on dev with its copy fixes; that commit holds the copy fixes and nothing else from this
     design (R9.1). The copy fixes include the `MapView.tsx` key and legend rows and the clock's
-    filed facts (user decision Oct 21: option 1); the tag moves again to the rebased commit once
-    `stage-fixes-1` merges, so the fallback carries the stage fixes too.
+    filed facts (user decision Oct 21: option 1), with the layers plate's 720p layout that keeps
+    those rows and GFW's attribution in view (review B2); the tag moves again to the rebased commit
+    once `stage-fixes-1` merges, so the fallback carries the stage fixes too.
   - This amends requirement 12.5 (`requirements.md:259`, "the build SHALL be rerun on Nov 5") and
     decision 12 (`design.md:394`). Both were amended in the spec on Oct 21.
 - **U11. Replay case id.** `vessels-open-question`, stable across re-records. This departs from
