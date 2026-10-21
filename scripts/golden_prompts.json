@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py. expected_tools is a SUBSEQUENCE match against the tool calls streamed by the agent (extra tools in between are fine); forbidden_text must not appear anywhere in the stream. Calibrated against the dev runtime 2026-09-17 (task 9.4) and re-calibrated 2026-09-18 for eyes (inspect_image after every imagery fetch). ArcGIS MCP tools (find_address_candidates, reverse_geocode) are deliberately NOT expected: the agent drops them gracefully when the MCP is unreachable and the gate must not fail on a third-party outage.",
+  "_comment": "Golden prompts for scripts/eval.py. expected_tools is a SUBSEQUENCE match against the tool calls streamed by the agent (extra tools in between are fine); forbidden_text must not appear anywhere in the stream. Calibrated against the dev runtime 2026-09-17 (task 9.4) and re-calibrated 2026-09-18 for eyes (inspect_image after every imagery fetch). cloudy-scene re-calibrated Oct 20: asserts the rejection (Bergen as of 2025-09-15: the top-ranked scene, 2025-09-06, is mostly cloud over the city (aoi_cloud_pct 47.6%), so the agent calls get_rasters again with exclude_dates and inspects the clear 2025-07-18 scene; it usually inspects the cloudy scene first but may turn it down from the numbers alone, so no inspection is asserted between the two fetches; 2025-11-15 picked a clear scene first and never rejected). ArcGIS MCP tools (find_address_candidates, reverse_geocode) are deliberately NOT expected: the agent drops them gracefully when the MCP is unreachable and the gate must not fail on a third-party outage.",
   "prompts": [
     {
       "name": "vegetation-central-park",
@@ -39,8 +39,8 @@
     },
     {
       "name": "cloudy-scene",
-      "prompt": "Show vegetation health for Bergen, Norway as of 2025-11-15",
-      "expected_tools": ["get_rasters", "inspect_image", "run_bandmath", "display_visual"],
+      "prompt": "Show vegetation health for Bergen, Norway as of 2025-09-15",
+      "expected_tools": ["get_rasters", "get_rasters", "inspect_image", "run_bandmath", "display_visual"],
       "forbidden_text": ["Error:"]
     },
     {

@@ -34,10 +34,20 @@ describe('stageCopyFor', () => {
 
   it('falls back to the Earth Analyst for dev, stable, unknown and absent ids', () => {
     const earth = stageCopyFor(undefined);
-    expect(earth.prompts).toHaveLength(5);
+    expect(earth.prompts).toHaveLength(6);
     for (const id of ['dev', 'stable', 'nope', 'toString', '__proto__']) {
       expect(stageCopyFor(id)).toBe(earth);
     }
+  });
+});
+
+describe('the Earth Analyst plates', () => {
+  it('puts the cloudy day second, sent as the golden prompt cloudy-scene', () => {
+    const earth = stageCopyFor('dev');
+    expect(earth.prompts.map((p) => p.label)).toEqual([
+      'Vegetation, Central Park', 'A cloudy day, Bergen', 'Wildfire, Pacific Palisades', 'Water, Folsom Lake', 'Scan Colorado', 'Places like Central Park',
+    ]);
+    expect(earth.prompts[1]).toEqual({ label: 'A cloudy day, Bergen', prompt: 'Show vegetation health for Bergen, Norway as of 2025-09-15' });
   });
 });
 
@@ -62,6 +72,7 @@ describe('stepName', () => {
     expect(stepName('match_ais')).toBe('Match targets to broadcasts');
     expect(stepName('draft_tasking')).toBe('Draft the tasking');
     expect(stepName('tasking_status')).toBe('Check the tasking');
+    expect(stepName('run_change_detection')).toBe('Map the change');
     expect(stepName('some_new_tool')).toBe('some new tool');
     expect(stepName('constructor')).toBe('constructor');
   });

@@ -37,6 +37,7 @@ recorded in `design.md` under "Deviations recorded during the build".
     - Rule 7 + block (one sentence of evidence, the 30 % rule, exclude_dates ≤ 2 retries, both TCIs for comparisons, ≤ 4 inspections/turn, grey = outside AOI), sequential-dependency list, all four workflow examples
   - [x] 4.2 Deploy dev; three manual prompts (clear scene, cloudy Bergen, drawn polygon) — confirm the inspect → sentence → display order and one rejection with `exclude_dates` in the logs
     - Dev v5. Order confirmed on all seven golden prompts (two-date prompts inspect both TCIs). Sentence confirmed verbatim for Hyde Park: "…the park reads as a mix of green vegetation and brownish/dry grass patches, with the Serpentine lake clearly visible as a dark body of water." Renders 0.2–0.4 s in the runtime. **Not observed live: a rejection** — Bergen's window held a 97.9 % clear scene on Sep 18, so `exclude_dates` was never triggered by weather; the path is covered by unit tests (1.3, 3.3) as Requirement 3.4 allows. Re-check on a cloudier day before Friday
+    - Oct 20: the rejection is now gated live. `cloudy-scene` moved to Bergen as of 2025-09-15 and asserts the second `get_rasters`; it rejected 2025-09-06 (AOI cloud 47.6%) in all five dev runs (similarity-search task 9.2)
   - _Requirements: 3.1, 3.2, 3.3_
 
 - [x] 5. Evidence chips (frontend)

@@ -68,6 +68,17 @@ before Friday (task 1.4 records the before/after guard).
   - [ ] 7.4 Update `ROADMAP.md`: row 3 status, G2 result; note anything deferred to Week 4
   - _Requirements: 6.3, 6.4, 6.5_
 
+- [x] 9. Agentic moments (Oct 20, stage review D5)
+  - [x] 9.1 Step details for scene choice and tool choice (`react-ui/frontend/src/utils/steps.ts`): Fetch Sentinel-2 says its window ("Scenes from 2025-07-17 to 2025-09-15"; several windows "Scenes in the 60 days to … and …"; no valid date "Scenes from the last 60 days") and, in mono, the scenes the agent turned down ("skipping 2025-09-06", from `exclude_dates`, at most three); Fetch Sentinel-2 scenes says "Two 60-day windows, to <d1> and to <d2>"; Scan for change says the area from its numeric `bbox` ("About 9,500 km², so an embedding scan" above 5,000 km², "About 4,800 km², scanned on the embedding grid" below, "A whole region, on the embedding grid" without a box) and the two months in mono; Map the change (new step name for `run_change_detection`) says "Pixel by pixel, for areas up to 5,000 km²" with its two dates. Dates print only as `^\d{4}-\d{2}-\d{2}$` days that survive a `Date.UTC` round trip, areas only from four finite numbers (spherical box area, two significant figures, `en-GB` grouping), months only as integers in range; the region name is never printed. `SCENE_WINDOW_DAYS = 60` and `PIXEL_LIMIT_KM2 = 5000` mirror `sentinel_utils.py` and `config.py`. Critique skipped: text in an existing style (`.step-detail`, 15 px)
+  - [x] 9.2 Does `cloudy-scene` reject a scene on dev? Bergen as of 2025-11-15 did not: run 1 (12:26, 30 s) fetched once and used 2025-09-26 (AOI cloud 2.1%). An offline pre-screen through the real `get_filtered_images` ranking and SCL read (5 km box) found Bergen as of 2025-09-15: top scene 2025-09-06 at 48.9% cloud, next 2025-07-18 at 3.6%. Dev runs on the new prompt, all on `geospatial_agent_dev` with no deploy:
+    - run 2 (12:31, 35 s): `get_rasters`, `inspect_image` 2025-09-06 (AOI cloud 47.6%), `get_rasters(exclude_dates="2025-09-06")`, `inspect_image` 2025-07-18 (4.8%), NDVI, closer on 2025-07-18
+    - run 3 (12:32, 34 s): the same
+    - full eval 1 (12:46, 49 s): rejected 2025-09-06 from its numbers without inspecting it, then inspected and used 2025-07-18; failed the first expectation (`inspect_image` between the fetches), so the golden prompt now asserts `get_rasters, get_rasters, inspect_image, run_bandmath, display_visual`
+    - stage check in the browser (12:47, 39 s): inspected 2025-09-06, rejected, used 2025-07-18
+    - full eval 2 (12:52, 56 s): inspected 2025-09-06, rejected, used 2025-07-18
+  - [x] 9.3 Plate "A cloudy day, Bergen" (second Earth plate, the golden prompt word for word) and the run sheet's Judgement beat at 1:30 (design.md); the Folsom compare is now the spare
+  - Results: vitest 248/248 (20 files; was 237), `npx tsc -b` 0, `npm run build` 0, detector `[]`, eslint on the four touched files 0; eval on dev 8/8 (347 s, cloudy-scene 56 s) after a 7/8 run that failed only on the first cloudy-scene expectation. No `geo_agent/` change, no deploy
+
 ## Gate log
 
 ### G2 — Wednesday 2026-09-24 (early): PROMOTED, rehearsal pending

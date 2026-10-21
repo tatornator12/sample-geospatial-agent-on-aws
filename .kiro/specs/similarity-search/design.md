@@ -335,17 +335,20 @@ boundary rather than widening it:
 
 | t | Beat | Prompt / action | What the room sees |
 |---|---|---|---|
-| 0:00 | Open | New session on Earth Analyst (pre-warmed) | Map, four prepared plates + "Places like Central Park" |
+| 0:00 | Open | New session on Earth Analyst (pre-warmed) | Map, six prepared plates |
 | 0:20 | Eyes | Vegetation, Central Park | Boundary, TCI, evidence chip, "I see…" sentence, NDVI, spoken closer |
-| 1:30 | Turn | "That is one park. Now the whole state." | |
-| 1:40 | Similarity | Places like Central Park | Ten violet cells ranked across NY, legend, names arrive, two evidence chips of the top matches, table + closer |
-| 3:40 | Popup | Click rank 1 | Popup: rank, similarity, coordinates |
-| 4:00 | Compare | Water, Folsom Lake | Two TCIs, two inspections, NDWI ×2, "Compare before and after" slider |
-| 6:00 | Close | Open the transcript drawer, point at the numbers | Table in the drawer; caption's spoken closer |
-| 6:40 | Hand-off | "Same eyes, same search, new domains next." | |
+| 1:30 | Judgement | A cloudy day, Bergen | Fetch Sentinel-2 with "Scenes from 2025-07-17 to 2025-09-15"; the chip of the cloudy 2025-09-06 scene and the sentence that turns it down (47.6% cloud over the city); Fetch Sentinel-2 again with "skipping 2025-09-06" in mono; the clear 2025-07-18 chip; NDVI; a closer that names the scene used (35 to 56 s of agent time). In one of five dev runs the agent turned the cloudy scene down from its numbers without looking, so the first chip was missing; "skipping 2025-09-06" was there in all five |
+| 2:40 | Turn | "That is one park. Now the whole state." | |
+| 2:50 | Similarity | Places like Central Park | Ten violet cells ranked across NY, legend, names arrive, two evidence chips of the top matches, table + closer |
+| 4:50 | Popup | Click rank 1 | Popup: rank, similarity, coordinates |
+| 5:10 | Close | Open the transcript drawer, point at the numbers | Table in the drawer; caption's spoken closer |
+| 5:50 | Hand-off | "Same eyes, same search, new domains next." | |
 
-Fallback if over 7:30 on rehearsal two: drop the Folsom compare (the eyes are already shown
-in beat 2), or replace it with the Colorado scan only if narration before the 20 s step has
+Spare: the Folsom compare (Water, Folsom Lake: two TCIs, two inspections, NDWI ×2, "Compare
+before and after" slider), at 5:10, only if rehearsal two runs under 5:30. Its two
+inspections repeat the eyes beat; the cloudy beat shows judgement instead. The Colorado scan
+can take the spare slot instead (its step says "A whole region, on the embedding grid" and
+"2019-07 · 2024-07"; the area line needs a box), only if narration before the 20 s step has
 been added.
 
 ## Decisions (approved Sep 24, ahead of the Monday cadence)

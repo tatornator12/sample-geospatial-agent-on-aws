@@ -6,6 +6,10 @@ import {
   groupDetail,
   groupName,
   groupSteps,
+  bboxAreaKm2,
+  dayMinus,
+  excludedDays,
+  isoDay,
   methaneDirFrom,
   parseManifest,
   parseTip,
@@ -56,6 +60,111 @@ describe('groupDetail', () => {
     const withDisplay = groupSteps([call('scan_tropomi', { area: 'south caspian' }), call('display_visual'), call('check_recent_passes', { lat: 1, lon: 2 })]);
     expect(groupDetail(withDisplay[2], withDisplay.slice(0, 2))?.text).toBe('Following the TROPOMI tip');
     expect(groupDetail(groupSteps([call('check_recent_passes', { lat: 'north', lon: 1 })])[0])).toEqual({ text: 'Recent EMIT passes' });
+  });
+});
+
+describe('groupDetail: Earth Analyst', () => {
+  const one = (name: string, params: Record<string, unknown>) => groupDetail(groupSteps([call(name, params)])[0]);
+
+  it('prints the 60-day window that ends on the requested date (Bergen)', () => {
+    expect(one('get_rasters', { location: 'Bergen', current_date_str: '2025-11-15' })).toEqual({ text: 'Scenes from 2025-09-16 to 2025-11-15' });
+    // Leap years and month ends come from the calendar, not from the model.
+    expect(one('get_rasters', { current_date_str: '2024-03-01' })?.text).toBe('Scenes from 2024-01-01 to 2024-03-01');
+    expect(one('get_rasters', { current_date_str: ' 2025-11-15 ' })?.text).toBe('Scenes from 2025-09-16 to 2025-11-15');
+  });
+
+  it('says which scenes the agent turned down, valid days only, sorted', () => {
+    const d = one('get_rasters', { current_date_str: '2025-11-15', exclude_dates: '2025-11-02, <b>x</b>, 2025-13-40, 2025-10-28' });
+    expect(d).toEqual({ text: 'Scenes from 2025-09-16 to 2025-11-15', mono: 'skipping 2025-10-28 · 2025-11-02' });
+    expect(one('get_rasters', { current_date_str: '2025-11-15', exclude_dates: ['2025-11-02', '2025-11-02', 7, '2025-02-30'] })?.mono).toBe('skipping 2025-11-02');
+    expect(one('get_rasters', { current_date_str: '2025-11-15', exclude_dates: '2025-11-01;2025-11-03' })?.mono).toBe('skipping 2025-11-01 · 2025-11-03');
+    // At most three days on the stage.
+    expect(one('get_rasters', { exclude_dates: '2025-11-04,2025-11-03,2025-11-02,2025-11-01' })?.mono).toBe('skipping 2025-11-01 · 2025-11-02 · 2025-11-03');
+    expect(one('get_rasters', { current_date_str: '2025-11-15', exclude_dates: '' })).toEqual({ text: 'Scenes from 2025-09-16 to 2025-11-15' });
+  });
+
+  it('never prints a date it cannot validate', () => {
+    expect(one('get_rasters', { current_date_str: '<script>' })).toEqual({ text: 'Scenes from the last 60 days' });
+    expect(one('get_rasters', { current_date_str: '2025-13-40' })).toEqual({ text: 'Scenes from the last 60 days' });
+    expect(one('get_rasters', { current_date_str: '2025-11-15T00:00' })).toEqual({ text: 'Scenes from the last 60 days' });
+    expect(one('get_rasters', {})).toEqual({ text: 'Scenes from the last 60 days' });
+    const d = one('get_rasters', { current_date_str: 20251115, exclude_dates: '<img src=x>' });
+    expect(d).toEqual({ text: 'Scenes from the last 60 days' });
+  });
+
+  it('names each window when one step fetched several', () => {
+    const [g] = groupSteps([
+      call('get_rasters', { current_date_str: '2024-07-01' }),
+      call('get_rasters', { current_date_str: '2019-07-01', exclude_dates: '2019-06-20' }),
+    ]);
+    expect(groupDetail(g)).toEqual({ text: 'Scenes in the 60 days to 2019-07-01 and 2024-07-01', mono: 'skipping 2019-06-20' });
+    const days = ['2021-07-01', '2020-07-01', '2022-07-01', '2023-07-01'];
+    const [three] = groupSteps(days.slice(0, 3).map((d) => call('get_rasters', { current_date_str: d })));
+    expect(groupDetail(three)?.text).toBe('Scenes in the 60 days to 2020-07-01, 2021-07-01 and 2022-07-01');
+    const [four] = groupSteps(days.map((d) => call('get_rasters', { current_date_str: d })));
+    expect(groupDetail(four)?.text).toBe('Scenes in the 60 days to each of 4 dates');
+  });
+
+  it('prints both windows of a two-date fetch', () => {
+    expect(one('get_rasters_for_dates', { date1_str: '2024-12-31', date2_str: '2025-03-01', exclude_dates: '2025-02-20' })).toEqual({
+      text: 'Two 60-day windows, to 2024-12-31 and to 2025-03-01',
+      mono: 'skipping 2025-02-20',
+    });
+    expect(one('get_rasters_for_dates', { date1_str: '2024-12-31', date2_str: 'after the fire' })).toEqual({ text: 'Two 60-day windows' });
+  });
+
+  it('says how big the scanned area is, and why that means the embedding grid', () => {
+    // [-105, 39, -104, 40]: R² × 1° × (sin 40° − sin 39°) ≈ 9,540 km² (checked by hand).
+    expect(one('scan_region_change', { region: 'Colorado', bbox: [-105, 39, -104, 40], year1: 2019, month1: 7, year2: 2024, month2: 7 })).toEqual({
+      text: 'About 9,500 km², so an embedding scan',
+      mono: '2019-07 · 2024-07',
+    });
+    // Half the height: ≈ 4,753 km², under the pixel limit.
+    expect(one('scan_region_change', { bbox: [-105, 39.5, -104, 40] })).toEqual({ text: 'About 4,800 km², scanned on the embedding grid' });
+    // A JSON string of four numbers is read the same way.
+    expect(one('scan_region_change', { bbox: '[-105, 39, -104, 40]' })?.text).toBe('About 9,500 km², so an embedding scan');
+  });
+
+  it('falls back to the whole region when the box is not four valid numbers, and never prints the region', () => {
+    for (const bbox of [[-104, 39, -105, 40], [Number.NaN, 39, -104, 40], ['-105', '39', '-104', '40'], [-105, 39, -104], '<b>Colorado</b>', [-200, 39, -104, 40]]) {
+      expect(one('scan_region_change', { region: '<b>Colorado</b>', bbox })).toEqual({ text: 'A whole region, on the embedding grid' });
+    }
+    const d = one('scan_region_change', { region: 'Colorado', year1: 2019, month1: 13, year2: 2024, month2: 7 });
+    expect(d).toEqual({ text: 'A whole region, on the embedding grid' });
+    expect(JSON.stringify(d)).not.toContain('Colorado');
+    expect(one('scan_region_change', { year1: '2019', month1: 7, year2: 2024, month2: 7 })?.mono).toBeUndefined();
+    expect(one('scan_region_change', { year1: 2019.5, month1: 7, year2: 2024, month2: 7 })?.mono).toBeUndefined();
+  });
+
+  it('says pixel-level change works up to the pixel limit, with the two dates', () => {
+    expect(one('run_change_detection', { location: 'Folsom', date1_str: '2021-08-30', date2_str: '2022-08-25' })).toEqual({
+      text: 'Pixel by pixel, for areas up to 5,000 km²',
+      mono: '2021-08-30 · 2022-08-25',
+    });
+    expect(one('run_change_detection', { date1_str: '2021-08-30', date2_str: 'later' })).toEqual({ text: 'Pixel by pixel, for areas up to 5,000 km²' });
+  });
+
+  it('leaves the methane details as they were', () => {
+    const [g] = groupSteps([call('thermal_anomalies', { nights: 14 })]);
+    expect(groupDetail(g)).toEqual({ text: 'VIIRS night-time heat, last 14 nights' });
+    expect(one('nearby_infrastructure', {})).toEqual({ text: 'Overture Maps, by type, within 2 km' });
+    expect(one('registry_lookup', { radius_km: 3 })).toEqual({ text: 'OGIM public registry, operators of record, within 3 km' });
+    expect(one('inspect_image', { s3_url: 's3://b/x.tif' })).toBeNull();
+  });
+});
+
+describe('isoDay, dayMinus, excludedDays and bboxAreaKm2', () => {
+  it('validate model-written values', () => {
+    expect(isoDay('2024-02-29')).toBe('2024-02-29');
+    expect(isoDay('2025-02-29')).toBeNull();
+    expect(isoDay('2025-00-10')).toBeNull();
+    expect(isoDay(null)).toBeNull();
+    expect(dayMinus('2025-01-15', 60)).toBe('2024-11-16');
+    expect(excludedDays(undefined)).toEqual([]);
+    expect(excludedDays({ a: '2025-01-01' })).toEqual([]);
+    expect(bboxAreaKm2([-105, 39, -104, 40])).toBeCloseTo(9540, -1);
+    expect(bboxAreaKm2('not json')).toBeNull();
+    expect(bboxAreaKm2([0, 10, 1, 10])).toBeNull();
   });
 });
 

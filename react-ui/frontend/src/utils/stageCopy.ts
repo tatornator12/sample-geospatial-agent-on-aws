@@ -21,6 +21,9 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
   default: {
     prompts: [
       { label: 'Vegetation, Central Park', prompt: 'Show vegetation health for Central Park, New York' },
+      // The judgement beat (the golden prompt cloudy-scene, word for word): the first scene is cloudy
+      // over the city, so the agent turns it down and fetches the next one.
+      { label: 'A cloudy day, Bergen', prompt: 'Show vegetation health for Bergen, Norway as of 2025-09-15' },
       {
         label: 'Wildfire, Pacific Palisades',
         prompt: 'Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025',
@@ -101,6 +104,7 @@ const STEP_NAMES: Record<string, string> = {
   calculator: 'Calculate',
   calculate_environmental_impact: 'Estimate the impact',
   scan_region_change: 'Scan for change',
+  run_change_detection: 'Map the change',
   find_similar_places: 'Find similar places',
   protected_area_context: 'Check protected areas',
   watch_baseline: 'Build the baseline',

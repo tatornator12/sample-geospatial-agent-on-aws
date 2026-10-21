@@ -5,7 +5,8 @@
  *
  * Only tool INPUTS reach the UI over the stream, and they are model-written: nothing here prints
  * an input verbatim. Watch areas are printed only when they are one of the tool's own names;
- * coordinates only as numbers.
+ * coordinates only as numbers; dates only as validated ISO days (YYYY-MM-DD that is a real
+ * date); areas only computed from numeric inputs (a region's name is never printed).
  */
 import type { ToolCall } from '../types.ts';
 import { stepName } from './stageCopy.ts';
@@ -164,9 +165,80 @@ function coord(value: unknown, digits: number): string | null {
   return Number.isFinite(n) ? n.toFixed(digits) : null;
 }
 
+// Mirrors get_all_images_from_gdf's days_delta (geo_agent/utils/sentinel_utils.py:45): get_rasters
+// searches the 60 days that END on current_date_str.
+export const SCENE_WINDOW_DAYS = 60;
+// Mirrors MAX_CHANGE_DETECTION_AREA_KM2 (geo_agent/config.py:430): run_change_detection works pixel
+// by pixel up to this area; anything larger goes to scan_region_change's embedding grid.
+export const PIXEL_LIMIT_KM2 = 5000;
+const EARTH_RADIUS_KM = 6371.0088;
+
+/** A model-written date as an ISO day, only when it is YYYY-MM-DD and a real date; else null. */
+export function isoDay(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [y, m, d] = v.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d ? v : null;
+}
+
+/** The ISO day `days` before a valid ISO day. */
+export function dayMinus(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - days)).toISOString().slice(0, 10);
+}
+
+/** The scenes the agent rejected (exclude_dates, a comma or semicolon separated string or a list): valid days only, sorted, at most 3. */
+export function excludedDays(value: unknown): string[] {
+  const parts = typeof value === 'string' ? value.split(/[,;]/) : Array.isArray(value) ? value : [];
+  const days = parts.map(isoDay).filter((d): d is string => d !== null);
+  return [...new Set(days)].sort().slice(0, 3);
+}
+
+/** A [west, south, east, north] box in degrees (a list of 4 numbers, or a JSON string of one) as km², or null. */
+export function bboxAreaKm2(value: unknown): number | null {
+  let v = value;
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(v) || v.length !== 4 || !v.every((x) => typeof x === 'number' && Number.isFinite(x))) return null;
+  const [w, s, e, n] = v as number[];
+  if (!(w < e && s < n && w >= -180 && e <= 180 && s >= -90 && n <= 90)) return null;
+  const rad = Math.PI / 180;
+  return EARTH_RADIUS_KM ** 2 * (e - w) * rad * (Math.sin(n * rad) - Math.sin(s * rad));
+}
+
+/** An area for the room: two significant figures, grouped the British way ("9,500"). */
+function areaText(km2: number): string {
+  return Number(km2.toPrecision(2)).toLocaleString('en-GB');
+}
+
+function month(year: unknown, mon: unknown): string | null {
+  return Number.isInteger(year) && Number.isInteger(mon) && (year as number) >= 2000 && (year as number) <= 2100 && (mon as number) >= 1 && (mon as number) <= 12
+    ? `${year}-${String(mon).padStart(2, '0')}`
+    : null;
+}
+
+/** "a", "a and b", "a, b and c". */
+function listed(items: string[]): string {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/** The "skipping …" line: the scenes the agent inspected and turned down, across the group's calls. */
+function skipping(group: StepGroup): { mono?: string } {
+  const days = excludedDays(group.calls.flatMap((c) => excludedDays(c.params?.exclude_dates)));
+  return days.length > 0 ? { mono: `skipping ${days.join(' · ')}` } : {};
+}
+
 /**
  * The line under a step: the watch areas a scan covered, or the point EMIT was cued on (with the
- * adapt line when a TROPOMI tip came first). Null when there is nothing safe to say.
+ * adapt line when a TROPOMI tip came first); for the Earth Analyst, the scene window and the scenes
+ * it skipped, or the area that chose the embedding grid. Null when there is nothing safe to say.
  */
 export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text: string; mono?: string; points?: string[] } | null {
   if (group.name === 'scan_tropomi') {
@@ -195,6 +267,49 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
   if (group.name === 'registry_lookup') {
     const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 5);
     return { text: `OGIM public registry, operators of record, within ${typeof r === 'number' ? r : 2} km` };
+  }
+  // The Earth Analyst: the window it searched and the scenes it turned down, then the size of the
+  // area that decided between the embedding grid and pixel-level change.
+  if (group.name === 'get_rasters') {
+    const ends = [...new Set(group.calls.map((c) => isoDay(c.params?.current_date_str)).filter((d): d is string => !!d))].sort();
+    const text =
+      ends.length === 1
+        ? `Scenes from ${dayMinus(ends[0], SCENE_WINDOW_DAYS)} to ${ends[0]}`
+        : ends.length > 3
+          ? `Scenes in the ${SCENE_WINDOW_DAYS} days to each of ${ends.length} dates`
+          : ends.length > 1
+            ? `Scenes in the ${SCENE_WINDOW_DAYS} days to ${listed(ends)}`
+            : `Scenes from the last ${SCENE_WINDOW_DAYS} days`;
+    return { text, ...skipping(group) };
+  }
+  if (group.name === 'get_rasters_for_dates') {
+    const pair = group.calls
+      .map((c) => [isoDay(c.params?.date1_str), isoDay(c.params?.date2_str)])
+      .find(([a, b]) => a !== null && b !== null);
+    const text = pair ? `Two ${SCENE_WINDOW_DAYS}-day windows, to ${pair[0]} and to ${pair[1]}` : `Two ${SCENE_WINDOW_DAYS}-day windows`;
+    return { text, ...skipping(group) };
+  }
+  if (group.name === 'scan_region_change') {
+    const area = group.calls.map((c) => bboxAreaKm2(c.params?.bbox)).find((a): a is number => a !== null);
+    const text =
+      area === undefined
+        ? 'A whole region, on the embedding grid'
+        : area > PIXEL_LIMIT_KM2
+          ? `About ${areaText(area)} km², so an embedding scan`
+          : `About ${areaText(area)} km², scanned on the embedding grid`;
+    const months = group.calls
+      .map((c) => [month(c.params?.year1, c.params?.month1), month(c.params?.year2, c.params?.month2)])
+      .find(([a, b]) => a !== null && b !== null);
+    return { text, ...(months ? { mono: `${months[0]} · ${months[1]}` } : {}) };
+  }
+  if (group.name === 'run_change_detection') {
+    const dates = group.calls
+      .map((c) => [isoDay(c.params?.date1_str), isoDay(c.params?.date2_str)])
+      .find(([a, b]) => a !== null && b !== null);
+    return {
+      text: `Pixel by pixel, for areas up to ${PIXEL_LIMIT_KM2.toLocaleString('en-GB')} km²`,
+      ...(dates ? { mono: `${dates[0]} · ${dates[1]}` } : {}),
+    };
   }
   return null;
 }
