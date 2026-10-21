@@ -9,5 +9,6 @@ export function stagePunctuation(text: string): string {
   return text
     .replace(/^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm, '')
     .replace(/(\d)\s*[–—]\s*(\d)/g, '$1 to $2')   // a range: 2024–2025 reads "2024 to 2025"
+    .replace(/\b([NSEW]{1,3})[–—]([NSEW]{1,3})\b/g, '$1 to $2')   // a bearing: NNW–SSE reads "NNW to SSE"
     .replace(/\s*[—–]\s*/g, ', ');
 }

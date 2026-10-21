@@ -17,3 +17,12 @@ describe('stagePunctuation', () => {
     expect(stagePunctuation('a -- b')).toBe('a -- b');
   });
 });
+
+describe('a bearing range (P2, Act 2)', () => {
+  it('reads "NNW to SSE", never "NNW, SSE"', () => {
+    expect(stagePunctuation('The plume runs NNW–SSE for 2 km.')).toBe('The plume runs NNW to SSE for 2 km.');
+    expect(stagePunctuation('A line E—W through the centre.')).toBe('A line E to W through the centre.');
+    // A dash between words still reads as a comma.
+    expect(stagePunctuation('Clear — the walls show.')).toBe('Clear, the walls show.');
+  });
+});
