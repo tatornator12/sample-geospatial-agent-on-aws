@@ -32,6 +32,7 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from eval import extract_tool_calls, new_session_id, resolve_agent_arn, stream_invoke, tool_spans  # noqa: E402
+from replay_case import house_style, saw_by_tool, shown, styled_params, write_sid  # noqa: E402
 
 FILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(tif|tiff|geojson|json|png|jpg)$")
 CASE_ID_RE = re.compile(r"^archaeologist-[a-z0-9-]{1,50}$")
@@ -59,6 +60,9 @@ CASES = {
         "name": "Newark Earthworks",
         "description": "The Octagon Earthworks from space, then under the grass: 1 m LiDAR shows the eight-sided enclosure and its circle beneath a former golf course",
         "location": "Newark, Ohio",
+        # The live turn shows the true colour first and the LiDAR later; the replay holds the
+        # hillshade this long so the room sees the scene from space alone first (stage review D10).
+        "hold_terrain_ms": 8000,
     },
     "great-circle": {
         "id": "archaeologist-great-circle",
@@ -88,7 +92,12 @@ def main() -> int:
     parser.add_argument("--prompt", help="Prompt to record; defaults to the preset's")
     parser.add_argument("--target", choices=["dev", "stable"], default="dev")
     parser.add_argument("--region", default="us-east-1")
-    parser.add_argument("--out", help="Output folder; defaults to use-cases/<id>")
+    parser.add_argument("--out", help="Output folder, anywhere; defaults to use-cases/<id>")
+    parser.add_argument("--sid-file", help="Also write the take's full session id here (for scripts/replay_numbers.py)")
+    parser.add_argument("--stream-file", help="Also write the raw stream here (it names the bucket: keep it out of the repo)")
+    parser.add_argument("--hold-terrain-ms", type=int, default=None,
+                        help="Hold the terrain layer this long when a true-colour layer is also listed "
+                             "(0 to 15000; default 8000 for octagon, 0 otherwise)")
     args = parser.parse_args()
 
     preset = CASES[args.case]
@@ -97,18 +106,23 @@ def main() -> int:
         raise SystemExit("case id must look like archaeologist-<lowercase-words> (the backend's scenario id rule)")
     prompt = args.prompt or preset["prompt"]
     out = Path(args.out or REPO_ROOT / "use-cases" / case_id)
+    hold_ms = preset.get("hold_terrain_ms", 0) if args.hold_terrain_ms is None else args.hold_terrain_ms
+    if not 0 <= hold_ms <= 15000:
+        raise SystemExit("--hold-terrain-ms must be 0 to 15000 (the backend drops anything else)")
 
     arn = resolve_agent_arn(args.target, "archaeologist")
     sid = new_session_id()
     client = boto3.client("bedrock-agentcore", region_name=args.region)
     print(f"Recording {case_id} on {arn.rsplit('/', 1)[1]} (session {sid[:13]}…)")
+    write_sid(args.sid_file, sid)
     text, _ = stream_invoke(client, arn, prompt, 900, sid)
+    if args.stream_file:
+        Path(args.stream_file).write_text(text)
     tools = extract_tool_calls(text)
     spans = tool_spans(text)
-    narrative = (text[spans[-1][1]:] if spans else text).strip()
-    # The room reads this; dashes become commas so the saved copy matches the house style.
-    narrative = re.sub(r"\|\s*[\u2013\u2014]\s*\|", "| |", narrative)  # an empty table cell
-    narrative = re.sub(r"\s*[\u2013\u2014]\s*", ", ", narrative)
+    # The room reads this; dashes become commas (a range "to") so the saved copy matches the house style.
+    narrative = house_style((text[spans[-1][1]:] if spans else text).strip())
+    saw = saw_by_tool(text)
     if not CLOSER_RE.search(narrative):
         raise SystemExit("the recorded answer never names the designation; not a usable replay case")
     low = text.lower()
@@ -175,7 +189,7 @@ def main() -> int:
 
     tool_calls, layers, seen = [], [], set()
     for t in tools:
-        params = dict(tool_input(t))
+        params = styled_params(dict(tool_input(t)))
         for k in ("s3_url", "geometry_s3_url"):
             if isinstance(params.get(k), str):
                 new = rewrite(params[k])
@@ -188,7 +202,10 @@ def main() -> int:
             params["render"] = {**params["render"], **({"dem": new} if new else {})}
             if not new:
                 params["render"].pop("dem", None)
-        tool_calls.append({"name": t["name"], "params": params, "result": RESULTS.get(t["name"], "Done")})
+        call = {"name": t["name"], "params": params, "result": RESULTS.get(t["name"], "Done")}
+        if t["name"] == "inspect_image" and saw.get(t.get("toolUseId")):
+            call["saw"] = saw[t["toolUseId"]]  # what the agent said it saw (the chip's Saw line)
+        tool_calls.append(call)
         if t["name"] == "display_visual" and "s3_url" in params:
             name = params["s3_url"].rsplit("/", 1)[-1]
             if name in seen:
@@ -207,6 +224,11 @@ def main() -> int:
     layers.sort(key=order)
     if not any(l["file"].startswith(("hillshade_", "lrm")) for l in layers):
         raise SystemExit("the recorded turn never put the LiDAR on the map; record it again")
+    # The true colour stands alone first, as it did live: the stage lands the terrain after delay_ms.
+    if hold_ms and any(l["file"].startswith("tci_") for l in layers):
+        for l in layers:
+            if l["file"].startswith(("hillshade_", "lrm")):
+                l["delay_ms"] = hold_ms
 
     config = {
         "name": preset["name"],
@@ -222,8 +244,9 @@ def main() -> int:
     }
     (out / "config.json").write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
     (out / "narrative.md").write_text(narrative + "\n")
-    print(f"Wrote {out.relative_to(REPO_ROOT)}: {len(tool_calls)} tool calls, layers {[l['file'] for l in layers]}")
-    print(f"Stage it:  aws s3 sync {out.relative_to(REPO_ROOT)}/ s3://<S3_BUCKET_NAME>/use-cases/{case_id}/")
+    print(f"Wrote {shown(out)}: {len(tool_calls)} tool calls, layers {[l['file'] for l in layers]}"
+          + (f", terrain held {hold_ms} ms" if any("delay_ms" in l for l in layers) else ""))
+    print(f"Stage it:  aws s3 sync {shown(out)}/ s3://<S3_BUCKET_NAME>/use-cases/{case_id}/")
     return 0
 
 
