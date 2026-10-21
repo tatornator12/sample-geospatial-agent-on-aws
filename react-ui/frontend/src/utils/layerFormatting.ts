@@ -136,6 +136,21 @@ export function isSimilarityLayer(layer: LayerMetadata): boolean {
 }
 
 /**
+ * The match a click on the similarity map means, from the features under the pointer: the first
+ * one on the earliest layer of `layerOrder` (its rank label, then its dot, then the cell). A rank
+ * label can stand over another match's cell; the label wins, so one popup opens and it names the
+ * rank the presenter clicked (B7).
+ */
+export function clickedMatch<F extends { layer?: { id?: string } }>(features: F[] | undefined, layerOrder: string[]): F | undefined {
+  if (!features || features.length === 0) return undefined;
+  for (const id of layerOrder) {
+    const hit = features.find((f) => f.layer?.id === id);
+    if (hit) return hit;
+  }
+  return features[0];
+}
+
+/**
  * A Methane Hunter layer: by the agent's hint (`group: 'methane'` or `'watch'`), or, when the
  * hint is absent or was dropped, by the tools' own file names: `ch4plm_<granule>.tif` plume
  * rasters anywhere; under `/methane/` (a session) or `/use-cases/methane-*` (a replay case) the

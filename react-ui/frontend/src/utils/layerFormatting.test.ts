@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   boundsWithin,
+  clickedMatch,
   findComparePair,
   formatDate,
   formatLayerDisplayText,
@@ -43,6 +44,26 @@ describe('isSimilarityLayer', () => {
     expect(isSimilarityLayer(layer({ url: 's3://b/similar_x/geometries/central_park.geojson' }))).toBe(false);
     expect(isSimilarityLayer(layer({ url: 's3://b/g/similar_central_park_new_york_202507.tif' }))).toBe(false);
     expect(isSimilarityLayer(layer({ url: '' }))).toBe(false);
+  });
+});
+
+describe('clickedMatch (B7: rank 1 opens from its label)', () => {
+  const order = ['g-labels', 'g-dots', 'g-fill'];
+  const at = (id: string, rank: number) => ({ layer: { id }, properties: { rank } });
+
+  it('takes the rank label over another match\'s cell under it', () => {
+    // The 1920 replay: rank 1's label stood over match 7's cell, and the cell's popup opened.
+    expect(clickedMatch([at('g-fill', 7), at('g-labels', 1)], order)?.properties.rank).toBe(1);
+  });
+
+  it('takes the dot over a cell, and the cell when nothing else is there', () => {
+    expect(clickedMatch([at('g-fill', 7), at('g-dots', 2)], order)?.properties.rank).toBe(2);
+    expect(clickedMatch([at('g-fill', 7)], order)?.properties.rank).toBe(7);
+  });
+
+  it('is undefined with nothing under the pointer', () => {
+    expect(clickedMatch([], order)).toBeUndefined();
+    expect(clickedMatch(undefined, order)).toBeUndefined();
   });
 });
 

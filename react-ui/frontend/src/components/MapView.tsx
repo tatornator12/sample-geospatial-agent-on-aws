@@ -10,6 +10,7 @@ import type { GeometryData, RasterData } from '../types.ts';
 import { TITILER_URL, TITILER_API_KEY, TERRAIN_TILES_URL } from '../config.ts';
 import {
   boundsWithin,
+  clickedMatch,
   findComparePair,
   groupLayers,
   isMethaneLayer,
@@ -2114,9 +2115,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               },
             });
             // Popup with the numbers only (rank, similarity, centre) so nothing model-written
-            // is ever injected into setHTML. A match opens from its cell, its dot or its rank.
+            // is ever injected into setHTML. A match opens from its cell, its dot or its rank:
+            // one listener for the three layers, so a rank label standing over another match's
+            // cell opens one popup, for the label's own match (clickedMatch).
+            const matchLayers = [`${geometryId}-labels`, `${geometryId}-dots`, fillLayerId];
             const openMatch = (e: maplibregl.MapLayerMouseEvent) => {
-              const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
+              const p: Record<string, unknown> = clickedMatch(e.features, matchLayers)?.properties || {};
               const rank = Number.isFinite(Number(p.rank)) ? Number(p.rank) : null;
               const sim = Number.isFinite(Number(p.similarity)) ? Number(p.similarity).toFixed(4) : null;
               const lat = Number.isFinite(Number(p.center_lat)) ? Number(p.center_lat).toFixed(4) : null;
@@ -2129,8 +2133,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
                 (km !== null ? `<div class="similar-popup__row"><span>From example</span><code>${km} km</code></div>` : '');
               new maplibregl.Popup({ className: 'similar-popup' }).setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
             };
-            for (const id of [fillLayerId, `${geometryId}-dots`, `${geometryId}-labels`]) {
-              currentMap.on('click', id, openMatch);
+            currentMap.on('click', matchLayers, openMatch);
+            for (const id of matchLayers) {
               currentMap.on('mouseenter', id, () => {
                 currentMap.getCanvas().style.cursor = 'pointer';
               });
