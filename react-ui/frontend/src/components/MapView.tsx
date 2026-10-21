@@ -109,7 +109,7 @@ import {
 import * as sea from './seaStage.ts';
 import { SeaClock } from './SeaClock.tsx';
 import { TaskingPlate } from './TaskingPlate.tsx';
-import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
+import { globeZoom, stagePadding } from '../utils/stageLayout.ts';
 import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
 import { stageTransectFeatures } from '../utils/transectMarks.ts';
@@ -1871,7 +1871,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
               const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }) : 'n/a');
               const html =
-                `<strong>Plumes on ${num(p[property])} dates</strong>` +
+                `<strong>Plumes on ${num(p[property])} ${Number(p[property]) === 1 ? 'date' : 'dates'}</strong>` +
                 `<div class="similar-popup__row"><span>NASA plumes</span><code>${num(p.plumes)}</code></div>` +
                 `<div class="similar-popup__row"><span>First</span><code>${isoDay(p.first)}</code></div>` +
                 `<div class="similar-popup__row"><span>Last</span><code>${isoDay(p.last)}</code></div>`;
@@ -2347,13 +2347,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             if (!rasterOnStage) {
               const centre = globeCentre(geometry.features as Parameters<typeof globeCentre>[0]);
               // The globe sits in space between the plates: the column and the layers plate at the
-              // sides, the console below, a margin at the top (no plate there at rest).
+              // sides, the console below (as measured), a margin at the top (no plate there at
+              // rest). Padding, not an offset: on the globe an offset only turns the sphere, and
+              // the disc stayed in the middle of the frame, under the console at 1280x720.
               const globePad = { ...STAGE_PADDING_NOW(), top: 24 };
               const box = currentMap.getContainer();
               currentMap.easeTo({
                 center: centre ?? [40, 30],
                 zoom: globeZoom(box.clientWidth, box.clientHeight, globePad),
-                offset: globeOffset(globePad),
+                padding: globePad,
                 pitch: 0,
                 bearing: 0,
                 duration: 2000,
