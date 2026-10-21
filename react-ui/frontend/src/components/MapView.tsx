@@ -110,6 +110,7 @@ import * as sea from './seaStage.ts';
 import { SeaClock } from './SeaClock.tsx';
 import { TaskingPlate } from './TaskingPlate.tsx';
 import { globeZoom, stagePadding } from '../utils/stageLayout.ts';
+import { cameraForStage, fitStage, NO_PADDING, pointBox, releasePadding } from '../utils/stageCamera.ts';
 import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
 import { stageTransectFeatures } from '../utils/transectMarks.ts';
@@ -2319,20 +2320,20 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               currentMap.flyTo({ ...cam, duration: 2400 });
             } else {
               const all = marksBounds(geometry.features as Parameters<typeof marksBounds>[0]) ?? boundsArray;
-              currentMap.fitBounds([[all[0], all[1]], [all[2], all[3]]], {
+              fitStage(currentMap, [[all[0], all[1]], [all[2], all[3]]], {
                 padding: STAGE_PADDING_NOW(), duration: 1800, maxZoom: 6, pitch: 0, bearing: 0,
               });
             }
           } else if (terrainHint.label) {
             // The transect: the camera comes down to the earthwork, on the ground's own tilt.
-            currentMap.fitBounds(bounds, {
+            fitStage(currentMap, bounds, {
               padding: STAGE_PADDING_NOW(), duration: 1800, maxZoom: TRANSECT_MAX_ZOOM,
               pitch: groundOnRef.current ? GROUND_PITCH : 0, bearing: groundOnRef.current ? GROUND_BEARING : 0,
             });
           } else if (!groundOnRef.current) {
             // A site's frame before any terrain: frame it flat (out of the rest view's tilt); the
             // terrain that follows tilts the view.
-            currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: FRAME_MAX_ZOOM, pitch: 0, bearing: 0 });
+            fitStage(currentMap, bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: FRAME_MAX_ZOOM, pitch: 0, bearing: 0 });
           }
           return;
         }
@@ -2356,7 +2357,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               // The globe sits in space between the plates: the column and the layers plate at the
               // sides, the console below (as measured), a margin at the top (no plate there at
               // rest). Padding, not an offset: on the globe an offset only turns the sphere, and
-              // the disc stayed in the middle of the frame, under the console at 1280x720.
+              // the disc stayed in the middle of the frame, under the console at 1280x720. The
+              // map keeps this padding until the next finding's fit eases it out (fitStage), or a
+              // clear lets it go: no fit is ever padded twice (GB-R2).
               const globePad = { ...STAGE_PADDING_NOW(), top: 24 };
               const box = currentMap.getContainer();
               currentMap.easeTo({
@@ -2369,27 +2372,33 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               });
             }
           } else if (methaneHint.kind === 'columns') {
-            // The columns are read at a tilt, over the pass they were built from.
-            const cam = currentMap.cameraForBounds(bounds, { padding: STAGE_PADDING_NOW() });
+            // The columns are read at a tilt, over the pass they were built from. Framed with the
+            // stage's padding only; any padding the globe left on the map eases out on the way.
+            const cam = cameraForStage(currentMap, bounds, { padding: STAGE_PADDING_NOW() });
             plumeFramed.current = true;
             currentMap.easeTo({
               ...(cam?.center ? { center: cam.center } : {}),
               zoom: Math.min(cam?.zoom ?? 12, 13),
               pitch: COLUMNS_PITCH,
               bearing: -20,
+              padding: NO_PADDING,
               duration: 2200,
             });
           } else if (!rasterOnStage) {
             // The frame rule, methane edition: once a plume raster is on the stage it owns the frame
             // (a replay case lands the footprints and the plume together; the plume wins). A set
             // that spans the world frames its top ranks, or rank 1 (A2 P1-7), never the box's
-            // middle (Utah to New South Wales is centred on Africa).
+            // middle (Utah to New South Wales is centred on Africa). Rank 1 alone is framed as a
+            // point at zoom 5, clear of the plates, by a fit (an easeTo with padding would leave
+            // it on the map, GB-R2), and eases so the globe stays a globe on the way.
             const frame = footprintFrame(geometry.features as Parameters<typeof footprintFrame>[0]);
             if (frame && 'center' in frame) {
-              currentMap.easeTo({ center: frame.center, zoom: frame.zoom, padding: STAGE_PADDING_NOW(), pitch: 0, bearing: 0, duration: 1800 });
+              fitStage(currentMap, pointBox(frame.center), {
+                padding: STAGE_PADDING_NOW(), maxZoom: frame.zoom, pitch: 0, bearing: 0, duration: 1800, linear: true,
+              });
             } else {
               const b = frame?.bounds;
-              currentMap.fitBounds(b ? [[b[0], b[1]], [b[2], b[3]]] : bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 11 });
+              fitStage(currentMap, b ? [[b[0], b[1]], [b[2], b[3]]] : bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 11 });
             }
           }
           return;
@@ -2406,7 +2415,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         } else {
           // Every act frames its finding clear of the plates (the step column, the caption band,
           // the layers plate), so what the camera lands on is what the room sees.
-          currentMap.fitBounds(bounds, {
+          fitStage(currentMap, bounds, {
             padding: isSimilarity ? SIMILARITY_PADDING_NOW() : STAGE_PADDING_NOW(), duration: 1500, maxZoom: 15,
             ...(groundOnRef.current ? { pitch: GROUND_PITCH, bearing: GROUND_BEARING } : {}),
           });
@@ -2582,7 +2591,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     // A coarse raster is only drawn below its zoom cap: land half a level under it.
     const cap = layer.type === 'raster' ? layer.render?.max_zoom : undefined;
     
-    mapInstance.fitBounds(
+    fitStage(
+      mapInstance,
       [[west, south], [east, north]],
       {
         padding: isSimilarityLayer(layer) ? SIMILARITY_PADDING_NOW() : STAGE_PADDING_NOW(),
@@ -2723,6 +2733,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
 
     const mapInstance = map.current;
     const count = allLayers.length;
+    // The watch globe's padding goes with the globe, before any rest frame below is fitted (GB-R2).
+    releasePadding(mapInstance);
 
     allLayers.forEach(layer => {
       if (layer.type === 'geometry') {
@@ -3184,7 +3196,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             // With the 3D columns on the stage the frame keeps their tilt; on the archaeologist's
             // ground it takes the low oblique view; otherwise it is flat.
             const columnsOnStage = allLayersRef.current.some((l) => methaneGeometryHint(l.render, l.url)?.kind === 'columns');
-            mapInstance.fitBounds([[w, s], [e, n]], {
+            // fitStage: with no padding held on the map (always so on the sea) this is fitBounds.
+            fitStage(mapInstance, [[w, s], [e, n]], {
               padding: seaRadar ? seaPadding(SEA_PADDING_BASE()) : STAGE_PADDING_NOW(),
               duration: 1800,
               maxZoom: cap,
