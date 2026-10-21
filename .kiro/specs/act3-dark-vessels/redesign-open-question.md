@@ -486,6 +486,17 @@ standard and the budget are not open, on purpose.
 The same data and the same question tend to give the same path. The claim is that a different
 situation gives a different path, not that the agent is random.
 
+**Task 9a result (Oct 21, `vessels/cache/v1r`, the Oct 17 pass added; Oct 18 waits for GFW's
+AIS).** On the rerun data the first pick differs from v1: in all four `open-question` runs the
+agent passed over the newest pass, Oct 17 (orbit 106, 31% imaged, 8% checkable), with
+`newest_wide`, and read Oct 12. Its line names the reason: "the newest pass that saw over half the
+reserve (53%)". On v1 the reason is `newest`. No run read and set aside the newest pass, so the
+stage never claims that set-aside. The presenter points at the board instead: "the newest pass is
+Oct 17, but it saw only about a third of the reserve, so the agent chose Oct 12 and told us why".
+The read-and-set-aside path is shown only by the spare plate "Same question, end of August".
+Every run drafted, in 44 to 75 s, with 0 refusals, so task 9a gives no U14 signal. Task 10's run
+sheet carries these lines.
+
 ### 3.4 The prompt (`vessels_config.py`) and the entrypoint
 
 Every block, kept, replaced or deleted:
