@@ -126,6 +126,16 @@ describe('the board before the radar (N2)', () => {
   });
 });
 
+describe('the prepared plates (redesign §3.8.5, R6.6)', () => {
+  it('marks Act 3\'s plates for the 15 px rule, and no other act\'s', () => {
+    setup('vessels');
+    expect(document.querySelector('.docent-prepared')?.classList.contains('docent-prepared--vessels')).toBe(true);
+    cleanup();
+    setup('earth');
+    expect(document.querySelector('.docent-prepared')?.classList.contains('docent-prepared--vessels')).toBe(false);
+  });
+});
+
 describe('the answer\'s first line in view when the turn ends (R6.10)', () => {
   it('lands a vessel answer taller than the column\'s room at its first line', async () => {
     answerHeight = 600;   // the room under the head and above the fade is 500 - 52 - 24 = 424

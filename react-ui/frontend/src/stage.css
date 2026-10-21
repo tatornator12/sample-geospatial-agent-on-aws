@@ -895,6 +895,10 @@
 .docent-plate:disabled {
   opacity: 0.45;
 }
+/* Act 3's plates carry its redesign's copy, which the stage sets at 15px (the Back Row Rule). */
+.docent-prepared--vessels .docent-plate {
+  font-size: 15px;
+}
 .docent-session {
   margin-left: auto;
   font-family: var(--font-mono);

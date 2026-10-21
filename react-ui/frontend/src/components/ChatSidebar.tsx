@@ -988,7 +988,8 @@ export function ChatSidebar({
           </div>
         </form>
 
-        <div className="docent-prepared">
+        {/* Act 3's plates carry its redesign's copy, set at 15 px (the Back Row Rule, redesign §3.8.5). */}
+        <div className={`docent-prepared${agentId === 'vessels' ? ' docent-prepared--vessels' : ''}`}>
           <span className="docent-prepared__label">Prepared</span>
           {copy.prompts.map((p) => (
             <button
