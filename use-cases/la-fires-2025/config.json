@@ -1,111 +1,209 @@
 {
-  "name": "LA Palisades Fire - January 2025",
-  "description": "Wildfire damage analysis for the Palisades Fire that started January 7, 2025 in Pacific Palisades, California. About 96 km² (23,700 acres) lies inside the mapped perimeter.",
-  "location": "Pacific Palisades, Los Angeles County, California",
-  "user_question": "Analyze the burn damage from the Palisades Fire in Pacific Palisades, California that started in January 2025.",
-  "dates": {
-    "before": "2024-12-18",
-    "after": "2025-03-08",
-    "fire_start": "2025-01-07"
-  },
-  "center_coordinates": {
-    "lat": 34.0796,
-    "lon": -118.5932
-  },
-  "index_type": "nbr",
-  "scenario_version": "1.0",
-  "created_date": "2025-11-25",
+  "name": "LA Palisades Fire",
+  "description": "The January 2025 Palisades Fire seen from Sentinel-2: the burn scar in the Normalized Burn Ratio, before and after",
+  "location": "Pacific Palisades, Los Angeles",
+  "user_question": "Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025",
+  "agent": "stable",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "geospatial_agent_dev",
   "tool_calls": [
+    {
+      "name": "find_address_candidates",
+      "params": {
+        "singleLine": "Pacific Palisades, Los Angeles, California, USA"
+      },
+      "result": "Place found"
+    },
     {
       "name": "find_location_boundary",
       "params": {
-        "location_name": "Pacific Palisades, Los Angeles County, California"
+        "location": "Pacific Palisades, Los Angeles, California"
       },
-      "result": "Found boundary for Pacific Palisades, Los Angeles County, California"
+      "result": "Boundary candidates found"
+    },
+    {
+      "name": "get_best_geometry",
+      "params": {
+        "location": "Pacific Palisades, Los Angeles, California",
+        "reference_lat": 34.046119,
+        "reference_lon": -118.524261
+      },
+      "result": "Boundary chosen"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\": \"Feature\", \"geometry\": {\"type\": \"Point\", \"coordinates\": [-118.524261, 34.046119]}, \"properties\": {}}",
+        "location": "Pacific Palisades Fire AOI",
+        "radius_meters": 8000
+      },
+      "result": "Area framed"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/la-fires-2025/geometry.geojson",
-        "title": "Pacific Palisades Fire Boundary"
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/point_bbox_pacific_palisades_fire_aoi.geojson",
+        "title": "Pacific Palisades Fire AOI (8 km radius)"
       },
-      "result": "Displayed fire analysis area boundary on map"
+      "result": "Shown on the map"
     },
     {
-      "name": "get_rasters",
+      "name": "get_rasters_for_dates",
       "params": {
-        "location": "Pacific Palisades, Los Angeles County, California",
-        "date": "2024-12-18",
-        "cloud_coverage_max": 20
+        "location": "Pacific Palisades",
+        "date1_str": "2024-12-31",
+        "date2_str": "2025-03-01",
+        "geometry_s3_url": "s3://bucket/use-cases/la-fires-2025/point_bbox_pacific_palisades_fire_aoi.geojson",
+        "max_cloud": 30
       },
-      "result": "Retrieved satellite imagery for 2024-12-18 (pre-fire baseline)"
+      "result": "Sentinel-2 scenes fetched"
     },
     {
-      "name": "get_rasters",
+      "name": "inspect_image",
       "params": {
-        "location": "Pacific Palisades, Los Angeles County, California",
-        "date": "2025-03-08",
-        "cloud_coverage_max": 20
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/tci_clipped_pacific_palisades_2024-11-08.tif",
+        "title": "Pre-fire: Pacific Palisades, 2024-11-08",
+        "question": "What is the land cover and vegetation state before the fire?"
       },
-      "result": "Retrieved satellite imagery for 2025-03-08 (post-fire assessment)"
+      "result": "Looked at the image",
+      "saw": "**Pre-fire (2024-11-08):** Dense dark-green chaparral and scrub covering the Santa Monica Mountains hillsides, with the Pacific Palisades residential area visible along the coast."
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/tci_clipped_pacific_palisades_2025-01-12.tif",
+        "title": "Post-fire: Pacific Palisades, 2025-01-12",
+        "question": "Is there visible burn damage or smoke from the January 2025 wildfire?"
+      },
+      "result": "Looked at the image",
+      "saw": "**Post-fire (2025-01-12):** The hillsides are dramatically darker/ashen, a large grey-brown burn scar is clearly visible across the upper slopes, with the residential area visibly impacted."
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/tci_clipped_pacific_palisades_2024-11-08.tif",
+        "title": "Pre-fire: Pacific Palisades, 2024-11-08"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/tci_clipped_pacific_palisades_2025-01-12.tif",
+        "title": "Post-fire: Pacific Palisades, 2025-01-12"
+      },
+      "result": "Shown on the map"
     },
     {
       "name": "run_bandmath",
       "params": {
-        "location": "Pacific Palisades, Los Angeles County, California",
+        "location": "Pacific Palisades",
         "index_type": "NBR",
-        "date_str": "2024-12-18"
+        "date_str": "2024-11-08",
+        "geometry_s3_url": "s3://bucket/use-cases/la-fires-2025/point_bbox_pacific_palisades_fire_aoi.geojson"
       },
-      "result": "Calculated NBR (Normalized Burn Ratio) for pre-fire baseline"
+      "result": "Index computed"
     },
     {
       "name": "run_bandmath",
       "params": {
-        "location": "Pacific Palisades, Los Angeles County, California",
+        "location": "Pacific Palisades",
         "index_type": "NBR",
-        "date_str": "2025-03-08"
+        "date_str": "2025-01-12",
+        "geometry_s3_url": "s3://bucket/use-cases/la-fires-2025/point_bbox_pacific_palisades_fire_aoi.geojson"
       },
-      "result": "Calculated NBR (Normalized Burn Ratio) for post-fire assessment"
-    },
-    
-    {
-      "name": "display_visual",
-      "params": {
-        "s3_url": "s3://bucket/use-cases/la-fires-2025/before/tci-2024-12-18.tif",
-        "title": "Pacific Palisades True Color Image - 2024-12-18 (Pre-Fire)"
-      },
-      "result": "Displayed pre-fire satellite image"
+      "result": "Index computed"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/la-fires-2025/before/nbr-2024-12-18.tif",
-        "title": "Pacific Palisades NBR - 2024-12-18 (Pre-Fire Baseline)"
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/nbr_clipped_pacific_palisades_2024-11-08.tif",
+        "title": "Pre-fire NBR: Pacific Palisades, 2024-11-08"
       },
-      "result": "Displayed pre-fire NBR baseline"
+      "result": "Shown on the map"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/la-fires-2025/after/tci-2025-03-08.tif",
-        "title": "Pacific Palisades True Color Image - 2025-03-08 (Post-Fire)"
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/nbr_clipped_pacific_palisades_2025-01-12.tif",
+        "title": "Post-fire NBR: Pacific Palisades, 2025-01-12"
       },
-      "result": "Displayed post-fire satellite image"
-    },
-    {
-      "name": "display_visual",
-      "params": {
-        "s3_url": "s3://bucket/use-cases/la-fires-2025/after/nbr-2025-03-08.tif",
-        "title": "Pacific Palisades NBR - 2025-03-08 (Post-Fire Assessment)"
-      },
-      "result": "Displayed post-fire NBR assessment showing burn severity"
+      "result": "Shown on the map"
     },
     {
       "name": "calculator",
       "params": {
-        "expression": "Statistical analysis of burn severity and area calculations"
+        "expression": "(81475200 + 69070000) - (69267600 + 35204800)",
+        "mode": "evaluate"
       },
-      "result": "Measured the area inside the mapped perimeter: about 96 km² (23,700 acres)"
+      "result": "Calculated"
+    },
+    {
+      "name": "calculate_environmental_impact",
+      "params": {
+        "affected_area_m2": 46072800,
+        "index_type": "NBR"
+      },
+      "result": "Impact estimated"
+    },
+    {
+      "name": "run_change_detection",
+      "params": {
+        "location": "Pacific Palisades",
+        "date1_str": "2024-11-08",
+        "date2_str": "2025-01-12",
+        "geometry_s3_url": "s3://bucket/use-cases/la-fires-2025/point_bbox_pacific_palisades_fire_aoi.geojson"
+      },
+      "result": "Done"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/change_detection_pacific_palisades_2024-11-08_to_2025-01-12.tif",
+        "title": "Spectral Change Map: Pacific Palisades, Nov 2024 → Jan 2025"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/la-fires-2025/change_detection_imad_pacific_palisades_2024-11-08_to_2025-01-12.tif",
+        "title": "iMAD Change Map: Pacific Palisades, Nov 2024 → Jan 2025"
+      },
+      "result": "Shown on the map"
     }
-  ]
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "change_detection_pacific_palisades_2024-11-08_to_2025-01-12.tif",
+        "title": "Spectral Change Map: Pacific Palisades, Nov 2024 → Jan 2025"
+      },
+      {
+        "file": "change_detection_imad_pacific_palisades_2024-11-08_to_2025-01-12.tif",
+        "title": "iMAD Change Map: Pacific Palisades, Nov 2024 → Jan 2025"
+      },
+      {
+        "file": "nbr_clipped_pacific_palisades_2024-11-08.tif",
+        "title": "Pre-fire NBR: Pacific Palisades, 2024-11-08"
+      },
+      {
+        "file": "nbr_clipped_pacific_palisades_2025-01-12.tif",
+        "title": "Post-fire NBR: Pacific Palisades, 2025-01-12"
+      },
+      {
+        "file": "tci_clipped_pacific_palisades_2025-01-12.tif",
+        "title": "Post-fire: Pacific Palisades, 2025-01-12"
+      },
+      {
+        "file": "tci_clipped_pacific_palisades_2024-11-08.tif",
+        "title": "Pre-fire: Pacific Palisades, 2024-11-08"
+      },
+      {
+        "file": "point_bbox_pacific_palisades_fire_aoi.geojson",
+        "title": "Pacific Palisades Fire AOI (8 km radius)"
+      }
+    ]
+  }
 }
