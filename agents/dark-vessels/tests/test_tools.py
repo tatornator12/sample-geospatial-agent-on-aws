@@ -62,12 +62,17 @@ def test_nothing_is_a_candidate_before_the_coverage_check(vessels):
 
 def test_coverage_then_match_gives_every_status_in_order(vessels):
     cov = run(vessels.ais.check_ais_coverage(STAR))
-    assert 0 < cov["heard_share"] < 0.2 and cov["unproven_means"] == "not evidence"
+    assert 0 < cov["heard_share"] < 0.2 and cov["unproven_means"] == "reception unknown: no AIS there proves nothing"
+    # The room's words: AIS received and reception unknown, never heard water, unproven or not evidence.
+    assert (cov["heard_render"]["legend"], cov["unproven_render"]["legend"]) == ("AIS received", "AIS reception unknown")
+    assert cov["rule"].startswith("received: ")
+    assert not re.search(r"heard water|unproven|not evidence|could be heard", cov["rule"] + cov["unproven_means"], re.I)
     heard_props = vessels.s3.json(f"{PRE}heard_{STAR}.geojson")["features"][0]["properties"]
     assert heard_props == {"kind": "heard", "share": cov["heard_share"]}       # the stage quotes the tool's share
     out = run(vessels.ais.match_ais(STAR))
     assert out["counts"] == {"broadcasting": 1, "port": 1, "unproven": 1, "seen_once": 2, "candidate": 1}
     assert out["say_in_order"][0] == "broadcasting" and out["fixed_sentence"] == vessels.vs.CANDIDATE_SENTENCE
+    assert set(out["say_as"]) == set(out["say_in_order"]) and out["say_as"]["unproven"] == "reception unknown"
     (cand,) = out["candidates"]
     assert cand["id"] == "T01" and cand["port"] == "Baltra" and cand["port_km"] == pytest.approx(37.2, abs=0.5)
     assert 0 < cand["nearest_ais_km"] < 10
@@ -87,6 +92,9 @@ def test_gather_evidence_brings_the_chip_and_the_innocent_explanations(vessels):
     assert index_style(ev["chip_s3_url"]).name == "radar_chip"      # inspect_image shows the sea dark
     assert ev["nearest_broadcast"]["type"] in ("fishing", "cargo", "passenger") and ev["shore_km"] > 0
     assert {e["id"] for e in out["innocent_explanations"]} == {"small_boat_no_ais", "reception_or_equipment", "transponder_off", "not_a_vessel"}
+    assert out["say_else"] == "Each could be a small boat, a missed or switched-off AIS, or not a vessel."
+    assert len(out["say_else"].split()) == 15 and "being received" in out["confidence"]
+    assert not re.search(r"\bheard\b|unproven|not evidence", out["confidence"] + json.dumps(out["innocent_explanations"]))
     assert run(vessels.ais.gather_evidence(STAR, ["X1"]))["error"]
     text = json.dumps(out).lower()
     for word in ("illegal", "poach", "suspect", "mmsi", "flag"):
@@ -212,7 +220,11 @@ def test_the_tasking_is_drafted_from_the_records_and_only_the_officer_files_it(v
     vessels.s3.put_object(Bucket="test-bucket", Key=f"session_data/{SESSION}/taskings/{tid}.filed.json",
                           Body=json.dumps({"status": "filed", "filed_at": "2026-10-16T18:05:00Z"}))
     filed = run(vessels.tk.tasking_status(tid))
-    assert filed["status"] == "filed" and filed["say"] == "Filed by the officer. The agent did not file it."
+    # The filed sentence lives on the plate only; the agent says when, never who.
+    assert filed["status"] == "filed" and filed["say"] == "Yes, it is on file: filed at 18:05 UTC."
+    vessels.s3.put_object(Bucket="test-bucket", Key=f"session_data/{SESSION}/taskings/{tid}.filed.json",
+                          Body=json.dumps({"status": "filed"}))
+    assert run(vessels.tk.tasking_status(tid))["say"] == "Yes, it is on file."
     assert run(vessels.tk.tasking_status("../x"))["error"]
 
 

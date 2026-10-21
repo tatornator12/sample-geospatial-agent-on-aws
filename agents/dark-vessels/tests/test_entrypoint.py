@@ -3,6 +3,7 @@ surface (the act's tools and the platform's eyes, no open search, no MCP), and t
 sentences. The runtime-only frameworks are stubbed."""
 import asyncio
 import importlib
+import re
 import sys
 import types
 
@@ -86,6 +87,9 @@ def test_prompt_carries_the_fixed_sentences_and_the_wording_rules():
     assert c.CANDIDATE_SENTENCE == "A candidate is a radar target with no broadcast nearby; it is not an accusation."
     assert "No em dashes" in p and "—" not in p
     assert "four turns" in p and "Has a vessel gone silent near here?" in p
+    # The room's words for coverage (R4.3): the retired ones cannot come back through the prompt.
+    assert not re.search(r"heard water|\bunproven\b|not evidence|could be heard|\bheard\b|best bet", p, re.I)
+    assert "AIS received" in p and "AIS reception unknown" in p and c.vs.SAY_ELSE in p
 
 
 _CASE = {
