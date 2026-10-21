@@ -62,6 +62,12 @@ def surface(dets: list[Detection], grid: Grid, before: date | None = None, after
         rc = grid.cell(d.lon, d.lat)
         if rc is not None:
             out[rc] += d.n
+    return _smooth(out, spread, water)
+
+
+def _smooth(counts: np.ndarray, spread: int, water: np.ndarray | None) -> np.ndarray:
+    """Counts spread over (2·spread+1)² cells, zero where `water` is false (the map's one fit)."""
+    out = counts
     if spread > 0:
         k = 2 * spread + 1
         padded = np.pad(out, spread)
@@ -109,6 +115,90 @@ def backtest(dets: list[Detection], grid: Grid, cut: date, until: date | None = 
         held = int(round(test[top_mask(train, s, water)].sum()))
         out.append(Check(share=s, held=held, total=total))
     return out
+
+
+@dataclass(frozen=True)
+class Rolling:
+    """The rolling check: before each radar day the map is refitted on everything before that day,
+    and that day's dark targets are counted in its top `share` of the water and in the boxes drawn
+    from the same fit."""
+    share: float            # of the water in the top cells
+    held: int               # dark targets in the top cells, over every radar day
+    total: int              # dark targets on those days
+    days: int               # radar days: days in the window with one or more dark targets on the water
+    days_hit: int           # radar days with one or more in the top cells
+    boxes_held: int
+    boxes_days_hit: int
+    boxes_share: float      # of the water in the boxes, the mean over the radar days
+
+    @property
+    def hit(self) -> float:
+        return self.held / self.total if self.total else 0.0
+
+    @property
+    def lift(self) -> float:
+        return self.hit / self.share if self.share else 0.0
+
+    @property
+    def boxes_hit(self) -> float:
+        return self.boxes_held / self.total if self.total else 0.0
+
+    @property
+    def boxes_lift(self) -> float:
+        return self.boxes_hit / self.boxes_share if self.boxes_share else 0.0
+
+    def as_dict(self) -> dict:
+        return {"share_of_water": self.share, "held": self.held, "total": self.total, "days": self.days,
+                "days_hit": self.days_hit, "hit": round(self.hit, 3), "lift": round(self.lift, 1),
+                "boxes_held": self.boxes_held, "boxes_days_hit": self.boxes_days_hit,
+                "boxes_share_of_water": round(self.boxes_share, 4), "boxes_hit": round(self.boxes_hit, 3),
+                "boxes_lift": round(self.boxes_lift, 1)}
+
+
+def rolling_check(dets: list[Detection], grid: Grid, since: date, until: date, share: float = 0.05, spread: int = 0,
+                  water: np.ndarray | None = None, box_cells: int = 4, n_boxes: int = 3) -> Rolling:
+    """For each radar day in [since, until), refit on everything before it, the same way as the map
+    (`surface`), and count that day's dark targets in the fit's top `share` of the water and in the
+    `n_boxes` patrol boxes that fit draws. It measures the method, not today's boxes."""
+    h, w = grid.shape
+    cells = []
+    for d in dets:
+        rc = grid.cell(d.lon, d.lat)
+        if rc is not None:
+            cells.append((d.day, rc[0], rc[1], d.n))
+    cells.sort(key=lambda x: x[0])
+    on_water = (lambda r, c: True) if water is None else (lambda r, c: bool(water[r, c]))
+    test_days = sorted({day for day, r, c, _ in cells if since <= day < until and on_water(r, c)})
+    n_water = int(water.sum()) if water is not None else h * w
+    counts = np.zeros((h, w), dtype=np.float64)
+    i = held = total = days_hit = boxes_held = boxes_days = 0
+    box_shares = []
+    for day in test_days:
+        while i < len(cells) and cells[i][0] < day:
+            _, r, c, n = cells[i]
+            counts[r, c] += n
+            i += 1
+        score = _smooth(counts, spread, water)
+        top = top_mask(score, share, water)
+        in_boxes = np.zeros((h, w), dtype=bool)
+        for b in patrol_boxes(score, grid, size=box_cells, k=n_boxes):
+            r0, c0 = grid.cell(b.bounds[0] + grid.step / 2, b.bounds[1] + grid.step / 2)
+            in_boxes[r0:r0 + box_cells, c0:c0 + box_cells] = True
+        if water is not None:
+            in_boxes &= water
+        box_shares.append(float(in_boxes.sum()) / n_water if n_water else 0.0)
+        today = np.zeros((h, w), dtype=np.float64)
+        for d, r, c, n in cells:
+            if d == day and on_water(r, c):
+                today[r, c] += n
+        k, kb = int(round(today[top].sum())), int(round(today[in_boxes].sum()))
+        total += int(round(today.sum()))
+        held += k
+        boxes_held += kb
+        days_hit += k > 0
+        boxes_days += kb > 0
+    return Rolling(share=share, held=held, total=total, days=len(test_days), days_hit=days_hit, boxes_held=boxes_held,
+                   boxes_days_hit=boxes_days, boxes_share=float(np.mean(box_shares)) if box_shares else 0.0)
 
 
 @dataclass(frozen=True)
