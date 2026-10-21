@@ -5,6 +5,9 @@
 #   DEPLOY_TARGET=stable CONFIRM_STABLE=yes ./deploy.sh # dark_vessels, reads .env (promotion only)
 #   DRY_RUN=1 DEPLOY_TARGET=dev ./deploy.sh             # print the commands, run nothing
 #
+# VESSEL_CACHE_PREFIX (task 9a's rehearsal, e.g. vessels/cache/v1r) is passed to the runtime only
+# when .env.dev sets it, and only on dev; unset, the runtime reads vessels/cache/v1.
+#
 # The runtime never calls Global Fishing Watch and never holds its token: GFW_API_TOKEN in .env is
 # for the offline build (scripts/build_vessel_cache.py) only and is never passed below.
 set -e
@@ -27,6 +30,19 @@ for var in "${required_vars[@]}"; do
         exit 1
     fi
 done
+
+cache_env=()
+if [ -n "${VESSEL_CACHE_PREFIX:-}" ]; then
+    if [ "${DEPLOY_TARGET}" != "dev" ]; then
+        echo "Error: VESSEL_CACHE_PREFIX is for the dev runtime only; remove it from ${ENV_FILE}." >&2
+        exit 1
+    fi
+    if ! [[ "${VESSEL_CACHE_PREFIX}" =~ ^vessels/cache/v1[a-z0-9-]*$ ]]; then
+        echo "Error: VESSEL_CACHE_PREFIX must match ^vessels/cache/v1[a-z0-9-]*\$ (got ${VESSEL_CACHE_PREFIX})." >&2
+        exit 1
+    fi
+    cache_env=(--env "VESSEL_CACHE_PREFIX=${VESSEL_CACHE_PREFIX}")
+fi
 
 MODEL_ID="${MODEL_ID:-us.anthropic.claude-sonnet-4-6}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
@@ -57,6 +73,7 @@ echo "   S3 Bucket: ${S3_BUCKET_NAME}"
 echo "   Model: ${MODEL_ID}"
 echo "   Region: ${AWS_REGION}"
 echo "   ECR Repo: ${ECR_REPO_NAME}"
+echo "   Cache prefix: ${VESSEL_CACHE_PREFIX:-vessels/cache/v1 (default)}"
 echo ""
 
 # Shared platform code + requirements + Dockerfile into this build context (gitignored).
@@ -86,6 +103,7 @@ run "${AGENTCORE_BIN}" launch \
     --env "MODEL_ID=${MODEL_ID}" \
     --env "BEDROCK_MODEL_ID=${MODEL_ID}" \
     --env "DISABLE_ADOT_OBSERVABILITY=${DISABLE_ADOT_OBSERVABILITY:-true}" \
+    "${cache_env[@]}" \
     --auto-update-on-conflict
 
 echo ""

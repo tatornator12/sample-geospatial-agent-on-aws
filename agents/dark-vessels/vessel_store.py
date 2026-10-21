@@ -1,5 +1,6 @@
 """Dark Vessels: what every tool shares. The passes on file, the records (the reserve, its ports, the
-land), the cache in the project bucket (vessels/cache/v1/, built by scripts/build_vessel_cache.py),
+land), the cache in the project bucket (vessels/cache/v1/ or VESSEL_CACHE_PREFIX, built by
+scripts/build_vessel_cache.py),
 the session's folder (session_data/<sid>/vessels/), and the fixed sentences.
 
 The runtime reads only the bucket and the session (and, in next_look, ESA's plan). It never calls
@@ -33,7 +34,24 @@ logger = logging.getLogger(__name__)
 HERE = Path(__file__).resolve().parent
 PASSES_PATH = HERE / "data" / "passes_v1.json"
 RECORDS_PATH = HERE / "data" / "reserve_v1.geojson"
-CACHE_PREFIX = "vessels/cache/v1"
+DEFAULT_CACHE_PREFIX = "vessels/cache/v1"
+CACHE_PREFIX_RE = re.compile(r"^vessels/cache/v1[a-z0-9-]*$")
+
+
+def _cache_prefix() -> str:
+    """The cache's prefix: VESSEL_CACHE_PREFIX when it is one (task 9a's rehearsal sets
+    vessels/cache/v1r on dev only), else vessels/cache/v1. Only the manifest key follows it; every
+    product key comes from the manifest's records."""
+    raw = os.environ.get("VESSEL_CACHE_PREFIX", "").strip()
+    if not raw:
+        return DEFAULT_CACHE_PREFIX
+    if CACHE_PREFIX_RE.fullmatch(raw):
+        return raw
+    logger.warning("VESSEL_CACHE_PREFIX is not a vessel cache prefix; reading %s", DEFAULT_CACHE_PREFIX)
+    return DEFAULT_CACHE_PREFIX
+
+
+CACHE_PREFIX = _cache_prefix()
 PLAN_PREFIX = "vessels/cache/plan"
 MANIFEST_KEY = f"{CACHE_PREFIX}/manifest.json"
 CACHE_TTL_S = 300
