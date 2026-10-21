@@ -15,6 +15,7 @@ import {
   rasterPlaceKey,
   type LayerMetadata,
 } from './layerFormatting.ts';
+import { isVesselLayer } from './vesselLayers.ts';
 
 function layer(over: Partial<LayerMetadata>): LayerMetadata {
   return { id: 'l1', sourceId: 's1', name: 'Layer', url: '', type: 'geometry', ...over };
@@ -166,5 +167,15 @@ describe('the watch baseline row (B11, A2 P1-4)', () => {
     // A footprints layer keeps the agent's title.
     const fp = layer({ id: 'f', type: 'geometry', name: 'Permian plumes, 2024', url: 's3://b/use-cases/methane-permian-2024/plumes_permian_2024.geojson' });
     expect(layerRowLabel(fp)).toBe('Permian plumes, 2024');
+  });
+});
+
+describe('row names in the stage punctuation (P2, Act 1)', () => {
+  it("reads a model's dash in a title as a comma, and leaves Dark Vessels' rows alone", () => {
+    const example = layer({ id: 'q', type: 'geometry', name: 'Central Park — Example Area', url: 's3://b/session_data/s/geometries/central_park.geojson' });
+    expect(layerRowLabel(example)).toBe('Central Park, Example Area');
+    const sea = layer({ id: 'v', type: 'geometry', name: 'Targets — pass 1', url: 's3://b/session_data/s/vessels/targets_s1d-20261012t0018.geojson' });
+    expect(isVesselLayer(sea)).toBe(true);
+    expect(layerRowLabel(sea)).toBe('Targets — pass 1');
   });
 });

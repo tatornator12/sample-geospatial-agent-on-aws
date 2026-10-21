@@ -6,6 +6,7 @@ import type { RenderHint } from './render.ts';
 import { isTerrainLayer } from './archaeoLayers.ts';
 import { isVesselLayer } from './vesselLayers.ts';
 import { WATCH_SITES_ROW, methaneGeometryHint } from './methaneLayers.ts';
+import { stagePunctuation } from './caption.ts';
 
 export interface LayerMetadata {
   id: string;
@@ -257,9 +258,16 @@ export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 
 /**
  * The name a layer's row shows in the layers plate: the agent's title for methane layers,
  * boundaries and drawn shapes; "Places like … · Mon YYYY" for a similarity map; the cleaned
- * place and date for every other raster (true colour, indices, change maps).
+ * place and date for every other raster (true colour, indices, change maps). A dash the model
+ * put in a title reads as the stage's punctuation ("Central Park, Example Area"); Dark Vessels'
+ * rows keep their own titles.
  */
 export function layerRowLabel(layer: LayerMetadata): string {
+  if (isVesselLayer(layer)) return layer.name;
+  return stagePunctuation(rowLabel(layer));
+}
+
+function rowLabel(layer: LayerMetadata): string {
   // The watch baseline (at rest and the mission's own) is named by the stage, not by its title:
   // what the dots are and the years they cover (A2 P1-4).
   if (layer.type === 'geometry') {
