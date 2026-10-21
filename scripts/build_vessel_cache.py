@@ -7,6 +7,12 @@ bucket under vessels/cache/v1/. Nothing here runs on stage; the agent only reads
     AWS_PROFILE=main .venv/bin/python scripts/build_vessel_cache.py --pass s1d-20261012t0018
     AWS_PROFILE=main .venv/bin/python scripts/build_vessel_cache.py --history              # history and fleet only
     ... --update-passes     # write the build's counts (both detectors) back into data/passes_v1.json
+    ... --imaged [--dry-run]            # each pass's imaged cells and metadata into the manifest, from
+                                        # its display in the bucket (no radar read, no GFW call)
+    ... --backup 2026-11-05 [--dry-run] # the manifest, history, fleet and rest to <prefix>/backup-<date>/
+    ... --restore 2026-11-05            # and back (server-side copies; nothing is ever deleted)
+    ... --prefix vessels/cache/v1r --seed-from vessels/cache/v1   # task 9a: the rehearsal's manifest
+    ... --prefix vessels/cache/v1r ...  # every write to the rehearsal prefix (task 9a only)
 
 Per pass (agents/dark-vessels/data/passes_v1.json, the star, the alternates and the silent vessel):
 
@@ -39,6 +45,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 import time
 import urllib.request
@@ -69,7 +76,11 @@ from predict import Grid  # noqa: E402
 
 PASSES = AGENT / "data" / "passes_v1.json"
 RECORDS = AGENT / "data" / "reserve_v1.geojson"
-PREFIX = "vessels/cache/v1"
+PREFIX = "vessels/cache/v1"                 # every write goes here; --prefix moves it (task 9a only)
+PREFIX_RE = re.compile(r"^vessels/cache/v1[a-z0-9-]*$")       # the runtime's VESSEL_CACHE_PREFIX rule
+BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")  # the stage's rule for the rest file's bucket
+BACKUP_FILES = ("manifest.json", "history_v1.json", "fleet_v1.json", "rest_v1.json")
+CELL_DEG = 0.05                             # the reserve's grid (decision 3): heard, imaged, checkable
 LOCAL = Path("/tmp/vessels_cache/v1")
 RECORDS_OUT = LOCAL.parent / "records_v1.json"      # the last build's manifest records, beside (not in) the upload
 STAC = "https://planetarycomputer.microsoft.com/api/stac/v1/search"
@@ -144,6 +155,48 @@ def records():
     ports = [f["geometry"]["coordinates"] for f in rec["features"] if f["properties"]["kind"] == "port"]
     land = unary_union([shape(f["geometry"]) for f in rec["features"] if f["properties"]["kind"] == "land"])
     return reserve, ports, land
+
+
+def reserve_grid(reserve) -> tuple[Grid, np.ndarray]:
+    """The reserve's 0.05 deg grid and its water cells (cell centre in the reserve), as the runtime's."""
+    rp = prep(reserve)
+    rw, rs, re_, rn = reserve.bounds
+    grid = Grid(round(math.floor(rw / CELL_DEG) * CELL_DEG, 2), round(math.floor(rs / CELL_DEG) * CELL_DEG, 2),
+                round(math.ceil(re_ / CELL_DEG) * CELL_DEG, 2), round(math.ceil(rn / CELL_DEG) * CELL_DEG, 2), CELL_DEG)
+    hh, ww = grid.shape
+    water = np.array([[rp.contains(Point(grid.west + (c + .5) * CELL_DEG, grid.south + (r + .5) * CELL_DEG))
+                       for c in range(ww)] for r in range(hh)])
+    return grid, water
+
+
+def imaged_mask(disp: np.ndarray, transform, grid: Grid, water: np.ndarray) -> np.ndarray:
+    """The water cells the pass imaged: its display is > 0 at the cell's centre (the design notes'
+    method). A centre off the raster, on land or in its 250 m margin reads 0, so it is not imaged."""
+    hh, ww = grid.shape
+    rows, cols = np.mgrid[0:hh, 0:ww]
+    lon = grid.west + (cols + 0.5) * grid.step
+    lat = grid.south + (rows + 0.5) * grid.step
+    inv = ~transform
+    px = np.floor(inv.a * lon + inv.b * lat + inv.c).astype(int)
+    py = np.floor(inv.d * lon + inv.e * lat + inv.f).astype(int)
+    inside = (px >= 0) & (px < disp.shape[1]) & (py >= 0) & (py < disp.shape[0])
+    out = np.zeros(grid.shape, dtype=bool)
+    out[inside] = disp[py[inside], px[inside]] > 0
+    return out & water
+
+
+def imaged_fields(imaged: np.ndarray, grid: Grid, water: np.ndarray) -> dict:
+    """A record's imaged share and cells (runs per grid row, row 0 at the south, as cv.cell_runs)."""
+    n = int(water.sum())
+    return {"imaged_share": round(float(imaged.sum()) / n, 3) if n else 0.0,
+            "imaged_cells": cv.cell_runs(imaged),
+            "imaged_grid": [grid.west, grid.south, grid.east, grid.north, grid.step]}
+
+
+def pass_meta(entry: dict) -> dict:
+    """The pass's metadata from its entry on file, for the manifest record."""
+    return {"satellite": entry.get("satellite"), "orbit_state": entry.get("orbit_state"),
+            "relative_orbit": entry.get("relative_orbit")}
 
 
 # --- the radar -----------------------------------------------------------------------------------
@@ -382,6 +435,7 @@ def build_pass(entry: dict, out: Path, reserve, ports, land) -> dict:
     del cdb
     disp, stretch = display(rad["db"], rad["sea_shown"])
     products["display"] = write_cog(out / f"{pid}_display.tif", disp, rad["transform"], 0, {**tags, "STRETCH_DB": json.dumps(stretch)})
+    imaged = imaged_mask(disp, rad["transform"], *reserve_grid(reserve))
     del disp
     rp = prep(reserve)
     pixel_m = 10 * FACTOR
@@ -433,22 +487,17 @@ def build_pass(entry: dict, out: Path, reserve, ports, land) -> dict:
     rp_rows = [r for r in rows if r[1] <= sensed + timedelta(hours=1)]
     products["replay"] = write_json(out / f"{pid}_replay.json", replay(rp_rows, sensed - timedelta(hours=REPLAY_H), sensed))
     rec = summarise(entry, rad["bounds"], rad["frames"], stretch, targets, theirs, fixes,
-                    len({r[0] for r in rp_rows}), products, reserve, round(time.time() - started, 1))
+                    len({r[0] for r in rp_rows}), products, reserve, round(time.time() - started, 1), imaged)
     return rec
 
 
 def summarise(entry: dict, bounds, frames, stretch, targets, theirs, fixes, n_tracks: int, products: dict, reserve,
-              seconds) -> dict:
-    """A pass's manifest record: the counts the star rule needs, now with both detectors."""
+              seconds, imaged: np.ndarray) -> dict:
+    """A pass's manifest record: the counts the star rule needs, now with both detectors, and the
+    pass's metadata and imaged cells (the open question's coverage, R7.1)."""
     pid = entry["pass_id"]
     sensed = datetime.fromisoformat(entry["sensed"].replace("Z", "+00:00"))
-    rp = prep(reserve)
-    step = 0.05
-    rw, rs, re_, rn = reserve.bounds
-    grid = Grid(round(math.floor(rw / step) * step, 2), round(math.floor(rs / step) * step, 2),
-                round(math.ceil(re_ / step) * step, 2), round(math.ceil(rn / step) * step, 2), step)
-    hh, ww = grid.shape
-    water = np.array([[rp.contains(Point(grid.west + (c + .5) * step, grid.south + (r + .5) * step)) for c in range(ww)] for r in range(hh)])
+    grid, water = reserve_grid(reserve)
     heard = cv.heard_cells(fixes, grid, sensed, water=water)
     away = [g for g in theirs if not g["matched"] and g["in_reserve"] and g["port_km"] >= PORT_KM]
     in_heard = [g for g in away if cv.is_heard(heard, grid, g["lon"], g["lat"])]
@@ -459,7 +508,8 @@ def summarise(entry: dict, bounds, frames, stretch, targets, theirs, fixes, n_tr
               "candidates_both": sum(g["n"] for g in in_heard if "ours" in g),
               "seen_once": sum(g["n"] for g in in_heard if "ours" not in g)}
     pair_km = [g["pair_km"] for g in theirs if "pair_km" in g]
-    rec = {"pass_id": pid, "role": entry["role"], "sensed": entry["sensed"], "bounds": bounds,
+    rec = {"pass_id": pid, "role": entry["role"], "sensed": entry["sensed"], **pass_meta(entry),
+           **imaged_fields(imaged, grid, water), "bounds": bounds,
            "frames": frames, "stretch_db": stretch, "counts": counts,
            "pair_km_median": round(float(np.median(pair_km)), 2) if pair_km else None,
            "fixes": len(fixes), "replay_tracks": n_tracks,
@@ -467,7 +517,8 @@ def summarise(entry: dict, bounds, frames, stretch, targets, theirs, fixes, n_tr
                         for k, b in products.items()},
            "seconds": seconds}
     print(f"    ours {counts['ours']} ({counts['ours_in_reserve']} in the reserve), GFW {counts['gfw']}, both {counts['both']} "
-          f"(median {rec['pair_km_median']} km); heard {counts['heard_share']:.1%}; candidates {counts['candidates_both']} "
+          f"(median {rec['pair_km_median']} km); imaged {rec['imaged_share']:.1%}, heard {counts['heard_share']:.1%}; "
+          f"candidates {counts['candidates_both']} "
           f"with both detectors, {counts['seen_once']} seen once; {seconds}s, "
           f"{sum(products.values()) / 1e6:.1f} MB", flush=True)
     return rec
@@ -486,12 +537,13 @@ def records_from_local(out: Path, entries: list[dict], reserve, until: date) -> 
         n_tracks = len(json.loads((out / f"{pid}_replay.json").read_text())["tracks"])
         with rasterio.open(out / f"{pid}_display.tif") as ds:
             stretch = json.loads(ds.tags().get("STRETCH_DB", "null"))
+            imaged = imaged_mask(ds.read(1), ds.transform, *reserve_grid(reserve))
         products = {k: (out / f"{pid}_{k}.{'tif' if k in ('vv', 'display') else 'json'}").stat().st_size
                     for k in ("vv", "display", "targets", "presence", "replay")}
         frames = [{"id": s, "sensed": entry["sensed"]} for s in entry["scenes"]]
         print(f"  {pid} ({entry['role']}), from {out}", flush=True)
         built[pid] = summarise(entry, doc["bounds"], frames, stretch, doc["ours"], doc["gfw"], fixes, n_tracks, products,
-                               reserve, None)
+                               reserve, None, imaged)
     history = fleet = None
     if (out / "history_v1.json").exists():
         h = json.loads((out / "history_v1.json").read_text())
@@ -665,7 +717,121 @@ def bucket_name(arg: str | None) -> str:
     raise SystemExit("no bucket (pass --bucket)")
 
 
-def main() -> int:
+def _s3():
+    import boto3
+    return boto3.client("s3")
+
+
+def valid_prefix(prefix: str) -> str:
+    if not isinstance(prefix, str) or not PREFIX_RE.fullmatch(prefix):
+        raise SystemExit(f"not a vessel cache prefix: {prefix!r} (must match {PREFIX_RE.pattern})")
+    return prefix
+
+
+def _backup_folder(day: str) -> str:
+    try:
+        ok = re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) and date.fromisoformat(day)
+    except ValueError:
+        ok = False
+    if not ok:
+        raise SystemExit(f"not a date: {day!r} (YYYY-MM-DD)")
+    return f"{PREFIX}/backup-{day}"
+
+
+def _has(s3, bucket: str, key: str) -> bool:
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+        return True
+    except Exception:
+        return False
+
+
+def _copy(s3, bucket: str, src: str, dst: str, dry: bool) -> None:
+    print(f"  {'[dry-run] ' if dry else ''}copy s3://{bucket}/{src} -> {dst}", flush=True)
+    if not dry:
+        s3.copy_object(Bucket=bucket, Key=dst, CopySource={"Bucket": bucket, "Key": src})
+
+
+def backup(bucket: str, day: str, dry: bool) -> int:
+    """The manifest, history, fleet and rest copied server-side into <prefix>/backup-<date>/. Refuses a
+    folder that already holds anything, so a backup is never written over."""
+    s3 = _s3()
+    folder = _backup_folder(day)
+    if s3.list_objects_v2(Bucket=bucket, Prefix=f"{folder}/", MaxKeys=1).get("Contents"):
+        raise SystemExit(f"s3://{bucket}/{folder}/ already exists: a backup is never written over (pick another date)")
+    if not _has(s3, bucket, f"{PREFIX}/manifest.json"):
+        raise SystemExit(f"no manifest at s3://{bucket}/{PREFIX}/: nothing to back up")
+    copied = 0
+    for name in BACKUP_FILES:
+        if _has(s3, bucket, f"{PREFIX}/{name}"):
+            _copy(s3, bucket, f"{PREFIX}/{name}", f"{folder}/{name}", dry)
+            copied += 1
+        else:
+            print(f"  {name}: not under {PREFIX}/; not backed up", flush=True)
+    print(f"{'[dry-run] ' if dry else ''}backed up {copied} files to s3://{bucket}/{folder}/")
+    return 0
+
+
+def restore(bucket: str, day: str, dry: bool) -> int:
+    """A backup's files copied back over the live ones (the rerun's no-go). Nothing is deleted: a new
+    pass's products stay in the bucket, unlisted by the restored manifest."""
+    s3 = _s3()
+    folder = _backup_folder(day)
+    if not _has(s3, bucket, f"{folder}/manifest.json"):
+        raise SystemExit(f"no backup at s3://{bucket}/{folder}/")
+    for name in BACKUP_FILES:
+        if _has(s3, bucket, f"{folder}/{name}"):
+            _copy(s3, bucket, f"{folder}/{name}", f"{PREFIX}/{name}", dry)
+    print(f"{'[dry-run] ' if dry else ''}restored s3://{bucket}/{PREFIX}/ from {folder}/")
+    return 0
+
+
+def seed(bucket: str, seed_from: str, dry: bool) -> int:
+    """Task 9a: the rehearsal prefix starts from another prefix's manifest, and only that. Its records
+    keep pointing at that prefix's objects, which nothing here writes."""
+    s3 = _s3()
+    seed_from = valid_prefix(seed_from)
+    if seed_from == PREFIX:
+        raise SystemExit("--seed-from names the prefix being written: pass --prefix")
+    if _has(s3, bucket, f"{PREFIX}/manifest.json"):
+        raise SystemExit(f"s3://{bucket}/{PREFIX}/manifest.json already exists: a seed never writes over a manifest")
+    if not _has(s3, bucket, f"{seed_from}/manifest.json"):
+        raise SystemExit(f"no manifest at s3://{bucket}/{seed_from}/")
+    _copy(s3, bucket, f"{seed_from}/manifest.json", f"{PREFIX}/manifest.json", dry)
+    return 0
+
+
+def backfill_imaged(bucket: str, entries: list[dict], reserve, dry: bool) -> int:
+    """Every built pass's metadata and imaged cells into the manifest, from its display in the bucket
+    (so it does not rely on /tmp/vessels_cache/v1/ surviving). Adds fields; changes no other."""
+    from rasterio.io import MemoryFile
+    s3 = _s3()
+    key = f"{PREFIX}/manifest.json"
+    manifest = json.loads(s3.get_object(Bucket=bucket, Key=key)["Body"].read())
+    grid, water = reserve_grid(reserve)
+    on_file = {e["pass_id"]: e for e in entries}
+    for pid, rec in manifest["passes"].items():
+        t0 = time.time()
+        body = s3.get_object(Bucket=bucket, Key=rec["products"]["display"]["key"])["Body"].read()
+        with MemoryFile(body) as mf, mf.open() as ds:
+            imaged = imaged_mask(ds.read(1), ds.transform, grid, water)
+        rec.update(**(pass_meta(on_file[pid]) if pid in on_file else {}), **imaged_fields(imaged, grid, water))
+        print(f"  {pid}: imaged {rec['imaged_share']:.1%} of the reserve ({int(imaged.sum())} cells, "
+              f"{len(rec['imaged_cells'])} runs){'' if pid in on_file else '; not on file, no metadata'} "
+              f"({time.time() - t0:.0f}s)", flush=True)
+    body = json.dumps(manifest, indent=1)
+    if gfw.scan_identity(body):
+        raise SystemExit("the manifest failed the identity scan")
+    if dry:
+        print(f"[dry-run] manifest not written ({len(body) / 1e3:.0f} kB)")
+        return 0
+    s3.put_object(Bucket=bucket, Key=key, Body=body.encode(), ContentType="application/json")
+    print(f"wrote s3://{bucket}/{key}: {len(manifest['passes'])} passes with their imaged cells")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    global PREFIX
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--pass", dest="passes", action="append", help="build only these pass ids (repeatable)")
     ap.add_argument("--history", action="store_true", help="build the history and the fleet only")
@@ -678,8 +844,28 @@ def main() -> int:
                     help=f"rebuild the manifest records (and --update-passes) from the files in {LOCAL}, reading nothing remote")
     ap.add_argument("--display", action="store_true",
                     help=f"rebuild every pass's display from its vv in {LOCAL} (the radar over its local sea) and upload only those")
+    ap.add_argument("--imaged", action="store_true",
+                    help="each built pass's metadata and imaged cells into the manifest, from its display in the bucket")
+    ap.add_argument("--backup", metavar="DATE", help="copy the manifest, history, fleet and rest to <prefix>/backup-DATE/")
+    ap.add_argument("--restore", metavar="DATE", help="copy them back from <prefix>/backup-DATE/ (nothing is deleted)")
+    ap.add_argument("--prefix", default=PREFIX, help=f"where every write goes (default {PREFIX}; task 9a: vessels/cache/v1r)")
+    ap.add_argument("--seed-from", metavar="PREFIX", help="start --prefix from this prefix's manifest only (task 9a)")
     ap.add_argument("--bucket")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+    PREFIX = valid_prefix(args.prefix)
+    actions = [a for a in ("backup", "restore", "seed_from", "imaged") if getattr(args, a)]
+    if len(actions) > 1:
+        raise SystemExit(f"one of --backup, --restore, --seed-from and --imaged at a time (got {', '.join(actions)})")
+    if args.backup:
+        return backup(bucket_name(args.bucket), args.backup, args.dry_run)
+    if args.restore:
+        return restore(bucket_name(args.bucket), args.restore, args.dry_run)
+    if args.seed_from:
+        return seed(bucket_name(args.bucket), args.seed_from, args.dry_run)
+    if args.imaged:
+        on_file = json.loads(PASSES.read_text())
+        reserve, _, _ = records()
+        return backfill_imaged(bucket_name(args.bucket), on_file["passes"] + [on_file["silent_vessel"]], reserve, args.dry_run)
     if args.display:
         sizes = rebuild_displays(LOCAL)
         problems = scan(LOCAL)
@@ -758,9 +944,21 @@ def main() -> int:
     return upload(out, bucket, built, history, fleet) or (1 if failed else 0)
 
 
+def stray_keys(built: dict, history: dict | None, fleet: dict | None) -> list[str]:
+    """Record keys outside the prefix being written: records built for another prefix (a --dry-run
+    with one --prefix, then --upload-local with another) would point the manifest at files not there."""
+    keys = [p["key"] for rec in built.values() for p in rec["products"].values()]
+    keys += [k for rec in built.values() for k in (rec.get("chips") or {}).values()]
+    keys += [r["key"] for r in (history, fleet) if r]
+    return [k for k in keys if k.rsplit("/", 1)[0] != PREFIX]
+
+
 def upload(out: Path, bucket: str, built: dict, history: dict | None, fleet: dict | None) -> int:
-    import boto3
-    s3 = boto3.client("s3")
+    stray = stray_keys(built, history, fleet)
+    if stray:
+        raise SystemExit(f"{len(stray)} record key(s) are not under {PREFIX}/ (e.g. {stray[0]}): rebuild with this "
+                         f"--prefix; nothing uploaded")
+    s3 = _s3()
     for p in sorted(out.iterdir()):
         ctype = "image/tiff" if p.suffix == ".tif" else "application/json"
         s3.upload_file(str(p), bucket, f"{PREFIX}/{p.name}", ExtraArgs={"ContentType": ctype})
@@ -786,8 +984,7 @@ def upload(out: Path, bucket: str, built: dict, history: dict | None, fleet: dic
 
 def upload_displays(out: Path, bucket: str, sizes: dict[str, int]) -> int:
     """Only the rebuilt displays, and their sizes and stretch in the manifest."""
-    import boto3
-    s3 = boto3.client("s3")
+    s3 = _s3()
     key = f"{PREFIX}/manifest.json"
     manifest = json.loads(s3.get_object(Bucket=bucket, Key=key)["Body"].read())
     for pid, size in sizes.items():

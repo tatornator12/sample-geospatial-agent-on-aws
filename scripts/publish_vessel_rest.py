@@ -2,8 +2,10 @@
 """Act 3's resting state for the stage (task 4.3): what the room sees the moment Dark Vessels is
 chosen, before any prompt. One file, `vessels/cache/v1/rest_v1.json`, beside the cache it is cut from:
 
-    pass       the star pass (id, satellite, sensed, orbit state): the replay runs up to its minute
-    replay     the star pass's AIS replay as built (three days of hourly positions per track, numbered
+    pass       the rest pass (id, satellite, sensed, orbit state): the replay runs up to its minute.
+               The star by default (the four-turn version's); with --newest, the newest pass on file
+               (the open question's, once it is on stable: R7.3)
+    replay     that pass's AIS replay as built (three days of hourly positions per track, numbered
                for this pass only, type only; no identity was ever in it)
     reserve    the Galápagos Marine Reserve's outline (WDPA through GFW, as data/reserve_v1.geojson)
     ports      the five ports (name and position)
@@ -11,23 +13,26 @@ chosen, before any prompt. One file, `vessels/cache/v1/rest_v1.json`, beside the
     passes     every pass on file (id, satellite, sensed, orbit state): the stage dates and sweeps any
                radar the agent shows, from its file name
     attribution
+    bucket     the project bucket, so the stage can read a session's decision files before the first
+               URL streams (the early board, §3.8.1); it must pass the stage's bucket rule
 
 The backend serves it at /api/vessels/rest (a fixed key: the browser never names one). Run after
 every cache build:
 
-    AWS_PROFILE=main .venv/bin/python scripts/publish_vessel_rest.py [--dry-run]
+    AWS_PROFILE=main .venv/bin/python scripts/publish_vessel_rest.py [--newest] [--dry-run]
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import vessels_gfw as gfw  # noqa: E402
-from build_vessel_cache import PASSES, PREFIX, RECORDS, bucket_name  # noqa: E402
+from build_vessel_cache import BUCKET_RE, PASSES, PREFIX, RECORDS, bucket_name  # noqa: E402
 
 KEY = f"{PREFIX}/rest_v1.json"
 # The stage's island names, at each island's middle (the stage keeps them off the traffic).
@@ -37,10 +42,28 @@ ISLANDS = [("Isabela", -91.12, -0.62), ("Fernandina", -91.55, -0.38), ("Santa Cr
 ATTRIBUTION = "Powered by Global Fishing Watch."
 
 
-def rest_payload(manifest: dict, replay: dict, records: dict, on_file: dict) -> dict:
-    star_id = next(pid for pid, p in manifest["passes"].items() if p.get("role") == "star")
+def _s3():
+    import boto3
+    return boto3.client("s3")
+
+
+def star_pass(manifest: dict) -> str:
+    return next(pid for pid, p in manifest["passes"].items() if p.get("role") == "star")
+
+
+def newest_pass(manifest: dict, on_file: dict) -> str:
+    """The newest pass on file that is built (the spare's earlier pass is never a candidate)."""
+    built = [e for e in on_file["passes"] if e["pass_id"] in manifest["passes"]]
+    if not built:
+        raise SystemExit("no pass on file is in the manifest")
+    return max(built, key=lambda e: datetime.fromisoformat(e["sensed"].replace("Z", "+00:00")))["pass_id"]
+
+
+def rest_payload(manifest: dict, replay: dict, records: dict, on_file: dict, pass_id: str, bucket: str) -> dict:
+    if not BUCKET_RE.fullmatch(bucket or ""):
+        raise SystemExit(f"the bucket {bucket!r} fails the stage's bucket rule ({BUCKET_RE.pattern})")
     entries = {e["pass_id"]: e for e in on_file["passes"] + [on_file["silent_vessel"]]}
-    star = entries[star_id]
+    rest = entries[pass_id]
     reserve = next(f["geometry"] for f in records["features"] if f["properties"]["kind"] == "reserve")
     # Places carry `label`, never `name`: the identity scan refuses that key anywhere (it is a vessel's).
     ports = [{"label": f["properties"]["name"], "coordinates": f["geometry"]["coordinates"]}
@@ -48,8 +71,8 @@ def rest_payload(manifest: dict, replay: dict, records: dict, on_file: dict) -> 
     tracks = [{"n": t["n"], "type": t.get("type", "unknown"), "t": t["t"], "c": t["c"]} for t in replay["tracks"]]
     return {
         "version": 1,
-        "pass": {"pass_id": star_id, "satellite": star.get("satellite"), "sensed": star["sensed"],
-                 "orbit_state": star.get("orbit_state")},
+        "pass": {"pass_id": pass_id, "satellite": rest.get("satellite"), "sensed": rest["sensed"],
+                 "orbit_state": rest.get("orbit_state")},
         "replay": {"start": replay["start"], "end": replay["end"], "tracks": tracks},
         "reserve": reserve,
         "ports": ports,
@@ -57,27 +80,32 @@ def rest_payload(manifest: dict, replay: dict, records: dict, on_file: dict) -> 
         "passes": [{"pass_id": e["pass_id"], "satellite": e.get("satellite"), "sensed": e["sensed"],
                     "orbit_state": e.get("orbit_state"), "role": e.get("role")} for e in entries.values()],
         "attribution": ATTRIBUTION,
+        "bucket": bucket,
     }
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--newest", action="store_true", help="the newest pass on file's replay (default: the star's)")
     ap.add_argument("--dry-run", action="store_true", help="build and scan, upload nothing")
     ap.add_argument("--bucket")
-    args = ap.parse_args()
-    import boto3
-    s3 = boto3.client("s3")
+    args = ap.parse_args(argv)
     bucket = bucket_name(args.bucket)
+    if not BUCKET_RE.fullmatch(bucket):
+        raise SystemExit(f"the bucket {bucket!r} fails the stage's bucket rule ({BUCKET_RE.pattern})")
+    s3 = _s3()
+    on_file = json.loads(PASSES.read_text())
     manifest = json.loads(s3.get_object(Bucket=bucket, Key=f"{PREFIX}/manifest.json")["Body"].read())
-    star_id = next(pid for pid, p in manifest["passes"].items() if p.get("role") == "star")
-    replay_key = manifest["passes"][star_id]["products"]["replay"]["key"]
+    pass_id = newest_pass(manifest, on_file) if args.newest else star_pass(manifest)
+    replay_key = manifest["passes"][pass_id]["products"]["replay"]["key"]
     replay = json.loads(s3.get_object(Bucket=bucket, Key=replay_key)["Body"].read())
-    body = json.dumps(rest_payload(manifest, replay, json.loads(RECORDS.read_text()), json.loads(PASSES.read_text())),
+    body = json.dumps(rest_payload(manifest, replay, json.loads(RECORDS.read_text()), on_file, pass_id, bucket),
                       ensure_ascii=False, separators=(",", ":"))
     problems = gfw.scan_identity(body)
     if problems:
         raise SystemExit(f"the identity scan failed: {problems[:3]}")
-    print(f"{KEY}: {len(body) / 1e3:.0f} kB, star {star_id}, {len(replay['tracks'])} tracks; identity scan clean")
+    print(f"{KEY}: {len(body) / 1e3:.0f} kB, {'newest' if args.newest else 'star'} {pass_id}, "
+          f"{len(replay['tracks'])} tracks, bucket {bucket}; identity scan clean")
     if args.dry_run:
         return 0
     s3.put_object(Bucket=bucket, Key=KEY, Body=body.encode(), ContentType="application/json")

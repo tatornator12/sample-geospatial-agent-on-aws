@@ -5,6 +5,7 @@ the morning of the show that everything the act reads is there.
     AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py --dry-run   # fetch and parse, upload nothing
     AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py             # the day before and the morning of
     AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py --check     # fails loudly if anything is missing
+    AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py --check --newest   # and the rest is the newest pass's
 
 The plans: per satellite, ESA's newest plan and any older one that still runs past it
 (plan.plan_chain: ESA lays six-day plans over three-week ones); each KML is parsed (plan.parse_plan)
@@ -14,8 +15,10 @@ newest plan that covers it). The runtime's next_look reads latest.json and refre
 when it is more than 24 h old.
 
 The check: every pass on file (data/passes_v1.json) has its five products in the cache manifest and
-in the bucket; the history and the fleet are there; the plans are under 24 h old and run at least
-three days past now. Exit 1 on any failure, with the reason.
+in the bucket, and its imaged cells in the manifest (R7.4); the history and the fleet are there;
+rest_v1.json carries a `bucket` that passes the stage's bucket rule (with --newest, its pass is the
+newest pass on file); the plans are under 24 h old and run at least three days past now. Exit 1 on
+any failure, with the reason.
 """
 from __future__ import annotations
 
@@ -34,7 +37,8 @@ AGENT = ROOT / "agents" / "dark-vessels"
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(AGENT))
 import plan as P  # noqa: E402
-from build_vessel_cache import PASSES, PREFIX, RECORDS, bucket_name  # noqa: E402
+from build_vessel_cache import BUCKET_RE, PASSES, PREFIX, RECORDS, bucket_name  # noqa: E402
+from publish_vessel_rest import KEY as REST_KEY, newest_pass  # noqa: E402
 
 LISTING = "https://sentinels.copernicus.eu/web/sentinel/copernicus/sentinel-1/acquisition-plans"
 HOST = "https://sentinels.copernicus.eu"
@@ -57,6 +61,15 @@ def reserve():
 
 def iso(t: datetime) -> str:
     return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _s3():
+    import boto3
+    return boto3.client("s3")
 
 
 def warm(dry: bool, bucket: str | None) -> int:
@@ -106,9 +119,8 @@ def warm(dry: bool, bucket: str | None) -> int:
     return 0
 
 
-def check(bucket: str) -> int:
-    import boto3
-    s3 = boto3.client("s3")
+def check(bucket: str, newest: bool = False) -> int:
+    s3 = _s3()
     problems = []
 
     def exists(key: str) -> bool:
@@ -131,8 +143,11 @@ def check(bucket: str) -> int:
         missing = [k for k, p in rec["products"].items() if not exists(p["key"])]
         if missing or len(rec["products"]) < 5:
             problems.append(f"{e['pass_id']}: products missing {missing or 'some'}")
+        elif not rec.get("imaged_cells") or rec.get("imaged_share") is None:
+            problems.append(f"{e['pass_id']}: no imaged cells in the manifest (run build_vessel_cache.py --imaged)")
         else:
-            print(f"ok   {e['pass_id']:20s} {e['role']:13s} built {rec.get('built_at')}; candidates {rec['counts']['candidates_both']}")
+            print(f"ok   {e['pass_id']:20s} {e['role']:13s} built {rec.get('built_at')}; imaged {rec['imaged_share']:.0%}; "
+                  f"candidates {rec['counts']['candidates_both']}")
     for part in ("history", "fleet"):
         rec = manifest.get(part)
         if not rec or not exists(rec["key"]):
@@ -140,8 +155,23 @@ def check(bucket: str) -> int:
         else:
             print(f"ok   {part:34s} built {rec.get('built_at')}")
     try:
+        rest = json.loads(s3.get_object(Bucket=bucket, Key=REST_KEY)["Body"].read())
+    except Exception as e:
+        rest = None
+        problems.append(f"rest_v1.json: unreadable ({type(e).__name__}): run publish_vessel_rest.py")
+    if rest is not None:
+        rest_pass = (rest.get("pass") or {}).get("pass_id")
+        if not isinstance(rest.get("bucket"), str) or not BUCKET_RE.fullmatch(rest["bucket"]):
+            problems.append(f"rest_v1.json: no bucket that passes the stage's rule ({rest.get('bucket')!r}): "
+                            f"run publish_vessel_rest.py")
+        elif newest and manifest.get("passes") and rest_pass != newest_pass(manifest, on_file):
+            problems.append(f"rest_v1.json: its pass {rest_pass} is not the newest on file "
+                            f"({newest_pass(manifest, on_file)}): run publish_vessel_rest.py --newest")
+        else:
+            print(f"ok   {'rest_v1.json':34s} pass {rest_pass}, bucket {rest['bucket']}" + (" (the newest)" if newest else ""))
+    try:
         latest = json.loads(s3.get_object(Bucket=bucket, Key=f"{PLAN_PREFIX}/latest.json")["Body"].read())
-        now = datetime.now(timezone.utc)
+        now = _now()
         fetched = datetime.fromisoformat(latest["fetched_at"].replace("Z", "+00:00"))
         if now - fetched > MAX_AGE:
             problems.append(f"plans fetched {latest['fetched_at']}, more than 24 h ago: run warm_vessels.py")
@@ -162,14 +192,18 @@ def check(bucket: str) -> int:
     return 1 if problems else 0
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dry-run", action="store_true", help="fetch and parse the plans, upload nothing")
     ap.add_argument("--check", action="store_true", help="check the cache and the plans; exit 1 on any failure")
+    ap.add_argument("--newest", action="store_true", help="with --check: the rest file's pass is the newest on file")
     ap.add_argument("--bucket")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+    if args.newest and not args.check:
+        raise SystemExit("--newest goes with --check")
     started = time.time()
-    rc = check(bucket_name(args.bucket)) if args.check else warm(args.dry_run, None if args.dry_run else bucket_name(args.bucket))
+    rc = (check(bucket_name(args.bucket), args.newest) if args.check
+          else warm(args.dry_run, None if args.dry_run else bucket_name(args.bucket)))
     print(f"{time.time() - started:.0f}s")
     return rc
 

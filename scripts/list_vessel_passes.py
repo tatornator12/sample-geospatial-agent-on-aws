@@ -3,6 +3,12 @@
 star chosen by design decision 3, into agents/dark-vessels/data/passes_v1.json.
 
   .venv/bin/python scripts/list_vessel_passes.py [--until 2026-10-13] [--shortlist 8]
+  .venv/bin/python scripts/list_vessel_passes.py --until 2026-11-03 --newest 6 --min-share 0.2 --append
+
+With --append (the rerun, R7.2), the passes on file are kept as they are and the newest IW passes
+after them, up to GFW's newest radar day, whose footprint covers at least --min-share of the reserve,
+are added with role `on_file`, at most --newest of them. No star and no candidate filter: the
+footprint share only selects. It prints GFW's newest radar and AIS days (the runbook's step 2).
 
 A pass is one satellite's frames on one orbit on one day (Planetary Computer `sentinel-1-grd`).
 GFW's detections (public-global-sar-presence, region public-mpa-all 11753, so inside the reserve
@@ -158,8 +164,84 @@ def presence_fixes(pass_time: datetime, area: dict) -> list[cv.Fix]:
     return cv.fixes_from_tracks(rows, pass_time)
 
 
+def sensed_at(e: dict) -> datetime:
+    return datetime.fromisoformat(e["sensed"].replace("Z", "+00:00"))
+
+
+def iw_only(items: list[dict]) -> list[dict]:
+    """The frames in Interferometric Wide swath mode (the mode the passes on file are in)."""
+    return [i for i in items if i["properties"].get("sar:instrument_mode") == "IW"]
+
+
+def pick_new(passes: list[dict], on_file: dict, newest: int, min_share: float, last_day: date) -> list[dict]:
+    """The rerun's rule (R7.2): the newest `newest` passes after the newest pass on file, sensed on or
+    before `last_day` (GFW's newest radar day), whose footprint covers at least `min_share` of the
+    reserve. No star and no candidate filter."""
+    known = {e["pass_id"] for e in on_file["passes"] + [on_file["silent_vessel"]]}
+    after = max(sensed_at(e) for e in on_file["passes"])
+    ok = [p for p in passes if p["pass_id"] not in known and p["_time"] > after and p["_time"].date() <= last_day
+          and p["reserve_share"] >= min_share]
+    return sorted(ok, key=lambda p: p["_time"], reverse=True)[:newest]
+
+
+def appended(on_file: dict, picked: list[dict], min_share: float) -> dict:
+    """The file with the picked passes after the passes on file, which are kept as they are."""
+    note = f"on file by the rerun's rule: among the newest IW passes over at least {min_share:.0%} of the reserve"
+    new = [{"pass_id": p["pass_id"], "role": "on_file", "satellite": p["satellite"], "sensed": p["sensed"],
+            "orbit_state": p["orbit_state"], "relative_orbit": p["relative_orbit"], "scenes": p["scenes"],
+            "reserve_share": p["reserve_share"], "provisional": True, "note": note}
+           for p in sorted(picked, key=lambda p: p["_time"])]
+    return {**on_file, "passes": on_file["passes"] + new}
+
+
+def gfw_newest_days(until: date, area: dict) -> tuple[date | None, date | None]:
+    """GFW's newest radar day (a detection in the reserve) and newest AIS day (a vessel heard over it),
+    in the 30 days before `until`."""
+    start = until - timedelta(days=30)
+    radar = [d["day"] for d in sar_rows(start, until, False) + sar_rows(start, until, True)]
+    rep = gfw.report(PRESENCE, area, f"{start},{until}", "DAILY", "LOW", group_by="VESSEL_ID", keys=True)
+    ais = [r["date"][:10] for ent in rep.get("entries", []) for _, rs in ent.items() for r in rs or []]
+    return (date.fromisoformat(max(radar)) if radar else None, date.fromisoformat(max(ais)) if ais else None)
+
+
+def append(until: date, newest: int, min_share: float) -> int:
+    on_file = json.loads(OUT.read_text())
+    rec = json.loads(RECORDS.read_text())
+    reserve = shape(next(f["geometry"] for f in rec["features"] if f["properties"]["kind"] == "reserve"))
+    w, s, e, n = reserve.bounds
+    area = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
+            "geometry": mapping(box(w - 0.3, s - 0.3, e + 0.3, n + 0.3))}]}
+    after = max(sensed_at(x) for x in on_file["passes"])
+    radar_day, ais_day = gfw_newest_days(until, area)
+    print(f"GFW's newest radar day {radar_day}, newest AIS day {ais_day} (before {until})")
+    if radar_day is None:
+        raise SystemExit("GFW has no radar day in the 30 days before --until: nothing to add")
+    passes = passes_from(iw_only(stac_items((w, s, e, n), after.date().isoformat(), until.isoformat())), reserve)
+    picked = pick_new(passes, on_file, newest, min_share, radar_day)
+    for p in sorted(picked, key=lambda p: p["_time"]):
+        late = ais_day is None or p["_time"].date() >= ais_day
+        print(f"  add {p['pass_id']} {p['sensed']} orbit {p['relative_orbit']} {p['orbit_state']}, footprint "
+              f"{p['reserve_share']:.0%}" + ("; GFW's AIS may not cover its window yet" if late else ""))
+    if not picked:
+        print(f"no pass after {after:%Y-%m-%d} qualifies; {OUT.relative_to(ROOT)} unchanged")
+        return 0
+    OUT.write_text(json.dumps(appended(on_file, picked, min_share), ensure_ascii=False, indent=1) + "\n")
+    print(f"{OUT.relative_to(ROOT)}: {len(picked)} passes added; {len(on_file['passes'])} kept as they were")
+    return 0
+
+
 def main(argv):
     until = date.fromisoformat(argv[argv.index("--until") + 1]) if "--until" in argv else date(2026, 10, 13)
+    if "--append" in argv:
+        if "--newest" not in argv:
+            raise SystemExit("--append needs --newest N")
+        newest = int(argv[argv.index("--newest") + 1])
+        min_share = float(argv[argv.index("--min-share") + 1]) if "--min-share" in argv else 0.2
+        if newest < 1 or not 0 < min_share <= 1:
+            raise SystemExit("--newest is at least 1 and --min-share is in (0, 1]")
+        return append(until, newest, min_share)
+    if "--newest" in argv or "--min-share" in argv:
+        raise SystemExit("--newest and --min-share go with --append")
     shortlist = int(argv[argv.index("--shortlist") + 1]) if "--shortlist" in argv else 8
     rec = json.loads(RECORDS.read_text())
     reserve = shape(next(f["geometry"] for f in rec["features"] if f["properties"]["kind"] == "reserve"))

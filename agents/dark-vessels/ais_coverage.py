@@ -105,6 +105,24 @@ def is_heard(heard: np.ndarray, grid: Grid, lon: float, lat: float) -> bool:
     return bool(rc is not None and heard[rc])
 
 
+def cell_runs(cells: np.ndarray) -> list[list[int]]:
+    """A grid's set cells as runs along each row, [row, first col, last col + 1], row 0 at the south.
+    The build stores a pass's imaged cells this way in the manifest: a swath is a few runs a row."""
+    runs = []
+    for r in range(cells.shape[0]):
+        edges = np.flatnonzero(np.diff(np.concatenate(([0], cells[r].astype(np.int8), [0]))))
+        runs += [[r, int(a), int(b)] for a, b in zip(edges[::2], edges[1::2])]
+    return runs
+
+
+def cells_from_runs(runs: Iterable[Iterable[int]], shape: tuple[int, int]) -> np.ndarray:
+    """`cell_runs` back to a boolean grid of `shape`."""
+    out = np.zeros(shape, dtype=bool)
+    for r, a, b in runs:
+        out[r, a:b] = True
+    return out
+
+
 def _cell_box(grid: Grid, r: int, c: int) -> BaseGeometry:
     return box(*grid.bounds(r, c))
 
