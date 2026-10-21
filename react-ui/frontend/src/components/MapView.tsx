@@ -3522,6 +3522,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         <ul key={lg.key} className="map-legend map-legend--key" aria-label="AIS coverage key">
           <li><span className="sea-key sea-key--heard" aria-hidden="true" /><span className="map-legend__label">AIS received: other ships came through here near the pass</span></li>
           <li><span className="sea-key sea-key--unproven" aria-hidden="true" /><span className="map-legend__label">reception unknown: no AIS here proves nothing</span></li>
+          {/* Both areas lie inside the radar when the coverage carries what the pass can check, so
+              reserve water outside the swath is plain sea, and the key says why (review L6). */}
+          {seaFacts.checkable !== undefined && (
+            <li><span className="sea-key sea-key--outside" aria-hidden="true" /><span className="map-legend__label">outside the radar: not imaged</span></li>
+          )}
         </ul>
       );
     }

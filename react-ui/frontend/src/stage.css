@@ -1819,6 +1819,10 @@
   border: 1px solid rgba(233, 238, 243, 0.45);
   background: rgba(233, 238, 243, 0.08);
 }
+/* Plain sea: reserve water the pass never imaged, so neither wash nor hatch (an outline, no fill). */
+.sea-key--outside {
+  border: 1px solid var(--hairline-strong);
+}
 .sea-key--unproven {
   border: 1px solid var(--hairline);
   background: repeating-linear-gradient(-45deg, rgba(143, 163, 184, 0.6) 0 1.4px, transparent 1.4px 7px);
