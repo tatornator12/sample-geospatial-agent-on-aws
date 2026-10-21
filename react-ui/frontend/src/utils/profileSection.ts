@@ -7,12 +7,15 @@
  * and the axis says so instead of a footnote).
  */
 import type { Feature } from 'geojson';
+import { heightText, markRoles, stageMarkLabel, type MarkRole } from './transectMarks.ts';
 
 export interface ProfileMark {
   kind: 'bank' | 'ditch';
   atM: number;
   offsetM: number;
+  /** As the stage prints it: the tool's label, a crest inside the ring as a "rise" (utils/transectMarks.ts). */
   label: string;
+  role: MarkRole;
 }
 
 export interface ProfileData {
@@ -53,16 +56,22 @@ export function profileFromFeatures(features: Feature[], sourceUrl: string | und
     samples.push([d, num(row[1])]);
   }
   if (samples.length < 2) return null;
-  const marks: ProfileMark[] = [];
+  const read: Array<Omit<ProfileMark, 'role'>> = [];
   for (const f of features) {
     if (f.geometry?.type !== 'Point') continue;
     const q = (f.properties ?? {}) as Record<string, unknown>;
     const atM = num(q.at_m);
     const offsetM = num(q.offset_m);
     if ((q.kind !== 'bank' && q.kind !== 'ditch') || atM === null || offsetM === null) continue;
-    marks.push({ kind: q.kind, atM, offsetM, label: typeof q.label === 'string' ? q.label.slice(0, 24) : '' });
+    read.push({ kind: q.kind, atM, offsetM, label: typeof q.label === 'string' ? q.label.slice(0, 24) : '' });
   }
-  marks.sort((a, b) => a.atM - b.atM);
+  read.sort((a, b) => a.atM - b.atM);
+  const roles = markRoles(read);
+  const marks: ProfileMark[] = read.map((m, i) => ({
+    ...m,
+    role: roles[i],
+    label: stageMarkLabel(m.kind, m.label, m.offsetM, roles[i]),
+  }));
   return {
     siteId,
     label: typeof p.label === 'string' ? p.label.slice(0, 80) : '',
@@ -213,9 +222,8 @@ export function distanceAtX(layout: Pick<SectionLayout, 'x0' | 'x1'>, lengthM: n
 export function cursorWords(atM: number, height: number | null): string {
   const at = `at ${Math.round(atM)} m`;
   if (height === null) return `${at}, no LiDAR return`;
-  const h = Math.round(height * 10) / 10;
-  const z = h > 0 ? `+${h.toFixed(1)} m` : h < 0 ? `−${Math.abs(h).toFixed(1)} m` : '0.0 m';
-  return `${at}, ${z}`;
+  // Rounded the way the marks are, so the cursor on a mark reads the mark's own figure.
+  return `${at}, ${heightText(height)}`;
 }
 
 type LngLat = [number, number];
@@ -270,7 +278,8 @@ export function nearestAlong(coords: LngLat[], p: LngLat): number | null {
 
 /** One sentence for the room and the screen reader: what the section shows. */
 export function sectionDescription(p: ProfileData, exaggeration: number): string {
-  const marks = p.marks.map((m) => `${m.kind} ${m.offsetM >= 0 ? '+' : '−'}${Math.abs(m.offsetM).toFixed(1)} m at ${Math.round(m.atM)} m`).join(', ');
+  // Each mark in the words the map prints (the tool's own figure), not re-rounded here.
+  const marks = p.marks.map((m) => `${m.label || `${m.kind} ${heightText(m.offsetM)}`} at ${Math.round(m.atM)} m`).join(', ');
   const span = p.spanM !== null ? `, ${Math.round(p.spanM)} m bank to bank` : '';
   return `Cross-section along the transect, ${Math.round(p.lengthM)} m, heights about ${exaggeration} times exaggerated${span}${marks ? `: ${marks}` : ''}.`;
 }

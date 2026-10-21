@@ -100,6 +100,50 @@ describe('sectionLayout', () => {
   });
 });
 
+describe('the Great Circle as the tool measured it (one figure per mark, Eagle Mound a rise)', () => {
+  // The file's own marks: two inner ditches, and two crests inside the ring where the record has
+  // Eagle Mound. 2.25 m is "+2.2 m" in the tool's label (half to even).
+  const GC: Feature[] = [
+    FEATURES[0],
+    ...([
+      ['bank', 1.81, 33, 'bank +1.8 m'],
+      ['ditch', -2.54, 45, 'ditch −2.5 m'],
+      ['bank', 2.02, 208, 'bank +2.0 m'],
+      ['bank', 2.25, 227, 'bank +2.2 m'],
+      ['ditch', -2.68, 383, 'ditch −2.7 m'],
+      ['bank', 2.62, 395, 'bank +2.6 m'],
+    ] as const).map(([kind, offset, at, label]): Feature => ({
+      type: 'Feature',
+      properties: { kind, offset_m: offset, at_m: at, label },
+      geometry: { type: 'Point', coordinates: [-82.433 + at / 85000, 40.041] },
+    })),
+  ];
+  const gc = profileFromFeatures(GC, URL)!;
+
+  it('reads the crests inside the ring as rises, in the tool\'s own figures', () => {
+    expect(gc.marks.map((m) => m.role)).toEqual(['outer-bank', 'inner-ditch', 'interior', 'interior', 'inner-ditch', 'outer-bank']);
+    expect(gc.marks.map((m) => m.label)).toEqual(['bank +1.8 m', 'ditch −2.5 m', 'rise +2.0 m', 'rise +2.2 m', 'ditch −2.7 m', 'bank +2.6 m']);
+  });
+
+  it('describes the mark at 227 m as the map prints it: +2.2 m, never +2.3 m', () => {
+    const d = sectionDescription(gc, 12);
+    expect(d).toContain('rise +2.2 m at 227 m');
+    expect(d).toContain('rise +2.0 m at 208 m');
+    expect(d).not.toContain('+2.3');
+    expect(d).not.toMatch(/bank \+2\.[02] m/);
+  });
+
+  it('still labels the tallest bank and the deepest ditch in the drawing', () => {
+    const labelled = sectionLayout(gc, 320, 120).marks.filter((m) => m.labelled).map((m) => m.label);
+    expect(labelled).toEqual(['ditch −2.7 m', 'bank +2.6 m']);
+  });
+
+  it('reads the cursor on a tie the same way (2.25 m is +2.2 m)', () => {
+    expect(cursorWords(227, 2.25)).toBe('at 227 m, +2.2 m');
+    expect(cursorWords(138, 0.25)).toBe('at 138 m, +0.2 m');
+  });
+});
+
 describe('the section cursor arithmetic', () => {
   const p = profileFromFeatures(FEATURES, URL)!;
   const line = FEATURES[0].geometry as unknown as { coordinates: Array<[number, number]> };

@@ -108,6 +108,7 @@ import { TaskingPlate } from './TaskingPlate.tsx';
 import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
 import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
+import { stageTransectFeatures } from '../utils/transectMarks.ts';
 import { whenStyleReady } from '../utils/styleReady.ts';
 import { createTileHealth } from '../utils/tileHealth.ts';
 import { getSectionCursor, setSectionCursor, useSectionCursor } from '../utils/sectionCursor.ts';
@@ -1590,11 +1591,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         // catalogue's marks at rest. Fog, never a data ramp: these are places on the record.
         const terrainHint: RenderHint | null = isMethane ? null : terrainGeometryHint(geometry.render, geometry.sourceUrl);
         const isTerrain = terrainHint !== null;
+        // The transect's marks carry the words the map prints (utils/transectMarks.ts).
+        const isTransect = !!terrainHint && terrainHint.kind !== 'points' && !!terrainHint.label;
 
         try {
           currentMap.addSource(geometryId, {
             type: 'geojson',
-            data: geometry,
+            data: isTransect && terrainHint?.label
+              ? { ...geometry, features: stageTransectFeatures(geometry.features, terrainHint.label) }
+              : geometry,
           });
 
           // Detect a change-scan layer: cells carry a numeric change_score.
@@ -1693,9 +1698,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               paint: { 'text-opacity': 0 },
             });
           } else if (isTerrain && terrainHint.label) {
-            // The transect: a fog line across the earthwork, a mark where each bank and ditch was
-            // read, and the tool's own label beside it ("bank +1.8 m", "ditch −2.5 m") in mono.
-            const { line, marks } = transectParts(geometry.features as Parameters<typeof transectParts>[0]);
+            // The transect: a fog line across the earthwork on a dark casing (the relief model's
+            // middle is near-white, and a bare fog line vanished into it), a mark where each bank
+            // and ditch was read, and the tool's own label ("bank +1.8 m", "ditch −2.5 m") in mono
+            // beside the four marks that define the span; the rises inside the ring are the
+            // section's to read.
+            const { line } = transectParts(geometry.features as Parameters<typeof transectParts>[0]);
             // The section cursor's line: where on the map a distance along the section falls.
             const profile = profileFromFeatures(geometry.features as Parameters<typeof profileFromFeatures>[0], geometry.sourceUrl);
             const lineCoords = (line?.geometry?.coordinates as Array<[number, number]> | undefined)
@@ -1706,12 +1714,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
             const isLine: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'LineString'];
             const isBank: maplibregl.FilterSpecification = ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'bank']];
             const isDitch: maplibregl.FilterSpecification = ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'ditch']];
+            // Dome, not amber: amber on this line is the section cursor's dot alone.
+            currentMap.addLayer({
+              id: `${geometryId}-casing`,
+              type: 'line',
+              source: geometryId,
+              filter: isLine,
+              paint: { 'line-color': '#0f141b', 'line-width': 5.5, 'line-opacity': 0.85 },
+              layout: { visibility: 'visible', 'line-cap': 'round' },
+            });
             currentMap.addLayer({
               id: fillLayerId,
               type: 'line',
               source: geometryId,
               filter: isLine,
-              paint: { 'line-color': '#e9eef3', 'line-width': 2, 'line-opacity': 0.9 },
+              paint: { 'line-color': '#e9eef3', 'line-width': 3, 'line-opacity': 0.95 },
               layout: { visibility: 'visible', 'line-cap': 'round' },
             });
             // A bank is a filled dot (the ground rises), a ditch a ring (the ground drops).
@@ -1738,20 +1755,22 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
               },
               layout: { visibility: 'visible' },
             });
+            // Placed with collision checks: a bank and its ditch 12 m apart take opposite sides
+            // (the variable anchors), and a label that cannot fit is dropped, never overprinted.
             currentMap.addLayer({
               id: `${geometryId}-labels`,
               type: 'symbol',
               source: geometryId,
-              filter: ['==', ['geometry-type'], 'Point'],
+              filter: ['all', ['==', ['geometry-type'], 'Point'], ['!=', ['coalesce', ['get', 'stage_label'], ''], '']],
               layout: {
-                'text-field': ['get', terrainHint.label],
+                'text-field': ['get', 'stage_label'],
                 'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
                 'text-size': 18,
                 'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
                 'text-radial-offset': 0.8,
                 'text-justify': 'auto',
                 'text-padding': 4,
-                'text-allow-overlap': marks.length <= 6,
+                'text-allow-overlap': false,
                 visibility: 'visible',
               },
               paint: { 'text-color': '#e9eef3', 'text-halo-color': '#0f141b', 'text-halo-width': 2.5 },
@@ -2491,7 +2510,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   // result the dashed query outline and the rank labels.
   // Dark Vessels' files carry more (their rings, halos, hairlines, hit areas: seaStage.ts).
   const geometryCompanionIds = (fillLayerId: string) =>
-    ['-outline', '-query', '-labels', '-keepout', '-hairline', ...sea.SEA_COMPANION_SUFFIXES].map(suffix => fillLayerId.replace('-fill', suffix));
+    ['-casing', '-outline', '-query', '-labels', '-keepout', '-hairline', ...sea.SEA_COMPANION_SUFFIXES].map(suffix => fillLayerId.replace('-fill', suffix));
   // Every map layer that travels with a listed one: a geometry's fill companions, a raster's light
   // (and the radar's sweep while it draws).
   const companionIds = (id: string) => (id.startsWith('cogLayer-') ? [`${id}${LIGHT_SUFFIX}`, `${id}-sweep`] : geometryCompanionIds(id));
