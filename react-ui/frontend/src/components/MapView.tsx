@@ -108,6 +108,7 @@ import { TaskingPlate } from './TaskingPlate.tsx';
 import { globeOffset, globeZoom, stagePadding } from '../utils/stageLayout.ts';
 import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
+import { whenStyleReady } from '../utils/styleReady.ts';
 import { getSectionCursor, setSectionCursor, useSectionCursor } from '../utils/sectionCursor.ts';
 import { Starfield } from './Starfield.tsx';
 import { LightPlate } from './LightPlate.tsx';
@@ -219,6 +220,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
   const draw = useRef<MapboxDraw | null>(null);
   const [allLayers, setAllLayers] = useState<LayerMetadata[]>([]); // Persistent layer tracking
   const addedRasterUrls = useRef<Set<string>>(new Set()); // Track added raster URLs to prevent duplicates
+  // Geometries waiting for the style (utils/styleReady.ts), cancelled if the map goes first.
+  const styleWaits = useRef<Set<{ cancel: () => void }>>(new Set());
   const [rasterVisibility, setRasterVisibility] = useState<Record<string, boolean>>({});
   const [isLayerControlOpen, setIsLayerControlOpen] = useState(true);
   const [drawMode, setDrawMode] = useState<'none' | 'point' | 'polygon'>('none');
@@ -1521,8 +1524,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
       setHasDrawnFeatures(true);
     });
 
+    const waits = styleWaits.current;
     return () => {
       setMapLive(false);
+      waits.forEach((w) => w.cancel());
+      waits.clear();
       map.current?.remove();
     };
   }, []);
@@ -2296,21 +2302,18 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         }
       };
 
-      if (currentMap.isStyleLoaded()) {
-        doAdd();
-      } else {
-        // isStyleLoaded() is false while basemap tiles are still streaming in, and no further
-        // `styledata` may ever fire then (the idle globe arrives a second after load). `idle` is
-        // the backstop; whichever comes first adds the geometry once.
-        let added = false;
-        const run = () => {
-          if (added) return;
-          added = true;
-          doAdd();
-        };
-        currentMap.once('styledata', run);
-        currentMap.once('idle', run);
-      }
+      // isStyleLoaded() is false while any source is loading (the basemap's tiles streaming, the
+      // source the geometry before this one just added), and the events it waited for may never
+      // come: the similarity map was lost that way (P0-3). The wait polls, and once the style's
+      // JSON is in it adds the geometry while the tiles stream (utils/styleReady.ts).
+      const wait = { cancel: () => {} };
+      let ran = false;
+      wait.cancel = whenStyleReady(currentMap, () => {
+        ran = true;
+        styleWaits.current.delete(wait);
+        if (map.current === currentMap) doAdd();
+      }, { label: `Geometry "${geometry.locationName || 'unnamed'}"` });
+      if (!ran) styleWaits.current.add(wait);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geometry]);
