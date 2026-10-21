@@ -89,3 +89,15 @@ Oct 12 when Dark Vessels was chosen for Act 3.)
   in Chat.tsx). Target: 0 on every touched surface.
 - Live runtime: `geospatial_agent_on_aws`, code tagged `deployed-2026-09-15` on `demo-stable`.
   Superseded Sep 24 by `deployed-2026-09-24` (Release 1: foundation + eyes + similarity, stable v70, CloudFront UI redeployed).
+  Superseded Oct 12 by `deployed-2026-10-12` (Release 2: Earth stable v72, Methane stable v3, CloudFront UI).
+- Oct 21 (early promotion, the user's call): `develop` promoted to `demo-stable` = `9a5c6f9`, tag
+  `deployed-2026-10-21` (pushed to `fork`). Acts 1, 2, 4 + frontend: `geospatial_agent_on_aws` v73,
+  `methane_hunter` v4, `ai_archaeologist` v1 (new), `GeospatialAgentStack` UI + backend
+  (`AGENT_RUNTIMES` gained `archaeologist`). Act 3 stays dev-only (`dark_vessels_dev` v7) until G4.
+  Gates: pytest geo_agent 124, methane 156, archaeologist 50; vitest 390; backend 75; tsc and build
+  clean; detector 0. Dev evals: earth 8/8, methane 13/13, archaeologist 8/8 (in `promote.sh` run 2;
+  run 1 stopped at its gate on archaeologist `octagon-wall-measure`, closer 306 > 280 chars, nothing
+  moved). Stable evals: earth 8/8, methane 12/13 then `watch-super-emitters` rerun 1/1 PASS (closer
+  wording flake), archaeologist 8/8. `cdk diff`: the taskings `PutObject` grant, image, header
+  rotation, archaeologist invoke grant; nothing else. Not yet seen: the signed-in switcher and
+  replay walk-through. Way back: `deployed-2026-10-12` (`f9f67c3`).

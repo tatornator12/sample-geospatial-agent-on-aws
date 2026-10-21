@@ -96,3 +96,7 @@ Commands (all exit 0, run this day, dev v24 then in-script):
 Gate condition met: Release 1 (foundation + eyes + similarity) is on the stable runtime and the CloudFront UI, both verified live. **Open:** 7.3, two timed Act 1 rehearsals on the CloudFront URL (the presenter's), and 7.4 once the timings are in.
 
 Also this week (unplanned but gate-relevant): dependency bumps + maplibre-gl 6 migration (`4b9f5c3`), Lambda input validation hardening across all modes (`57b5e7b`), `frontend-cdk/.env` gained `AGENT_RUNTIMES` so the live switcher offers both runtimes, `.venv` exec bits restored after the laptop move.
+
+### Wednesday 2026-10-21 (early promotion with Acts 2 and 4): PROMOTED
+
+`develop` promoted to `demo-stable` = `9a5c6f9`, tag `deployed-2026-10-21` (pushed to `fork`); Acts 1, 2, 4 + frontend, Act 3 dev-only until G4. Gates: pytest geo_agent 124 (methane 156, archaeologist 50); vitest 390; backend 75; detector 0. Earth eval on dev 8/8 (`geospatial_agent_dev` v30); stable runtime `geospatial_agent_on_aws` **v73** (was v72), check-env 8 keys, smoke `similar-central-park` PASS, stable eval **8/8** (no rerun). Methane stable 12/13 then 1/1 on rerun; archaeologist stable 8/8. Not yet seen: the signed-in switcher and the Palisades replay in the browser. Way back: `deployed-2026-10-12` (`f9f67c3`, stable v72).
