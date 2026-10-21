@@ -18,6 +18,7 @@ import {
   clockLines,
   countdown,
   featureBounds,
+  filedFacts,
   fleetMonth,
   fleetPlaces,
   heavyBounds,
@@ -352,6 +353,20 @@ describe('the clock plate', () => {
       .toBe('box 2 · 1 of 1 candidate · next radar look not planned yet');
     expect(clockLines('filed', { now, tasking: { box: 1, kept: 0, total: 0 } }).sub)
       .toBe('box 1 · a patrol of the box only · next radar look not planned yet');
+  });
+
+  it('reads the clock\'s filed facts from the filed tasking only: the chosen box, the kept candidates, that box\'s look', () => {
+    const look = (start: string) => ({ start });
+    const card = { candidates: [{ id: 'T01' }, { id: 'T02' }, { id: 'T03' }, { id: 'T04' }] };
+    const boxes = [{ box: 1, look: look('2026-10-24T00:17:29Z') }, { box: 2, look: null }, { box: 3, look: look('2026-10-25T11:40:00Z') }];
+    const choice = { box: 3, candidateIds: ['T01', 'T03', 'T04'] };
+    expect(filedFacts(null)).toBeUndefined();
+    expect(filedFacts({ status: 'draft', choice, card, boxes })).toBeUndefined();
+    expect(filedFacts({ status: 'filed', choice: null, card, boxes })).toBeUndefined();
+    expect(filedFacts({ status: 'filed', choice, card, boxes })).toEqual({ box: 3, kept: 3, total: 4, lookStart: '2026-10-25T11:40:00Z' });
+    // A box with no look planned, and an id the draft does not carry, counted as not kept.
+    expect(filedFacts({ status: 'filed', choice: { box: 2, candidateIds: ['T02', 'T99'] }, card, boxes }))
+      .toEqual({ box: 2, kept: 1, total: 4, lookStart: null });
   });
 
   it('keeps every changed sub at 110 characters or fewer, with the longest values', () => {

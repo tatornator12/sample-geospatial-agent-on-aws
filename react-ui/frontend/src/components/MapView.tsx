@@ -83,6 +83,7 @@ import {
   aisLook,
   beatFor,
   featureBounds,
+  filedFacts,
   growBounds,
   heavyBounds,
   isVesselLayer,
@@ -3361,11 +3362,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       // only once the stage has called one: nothing is called dark before the coverage check.
       return (
         <ul key={lg.key} className="map-legend map-legend--key" aria-label="Radar targets key">
-          <li><span className="sea-key sea-key--ring" aria-hidden="true" /><span className="map-legend__label">radar target, not yet explained</span></li>
-          <li><span className="sea-key sea-key--claimed" aria-hidden="true" /><span className="map-legend__label">a broadcast accounts for it</span></li>
+          <li><span className="sea-key sea-key--ring" aria-hidden="true" /><span className="map-legend__label">{candidatesShown ? 'set aside: reception unknown, or one detector only' : 'radar target, not yet explained'}</span></li>
+          <li><span className="sea-key sea-key--claimed" aria-hidden="true" /><span className="map-legend__label">matched to a ship's AIS</span></li>
           <li><span className="sea-key sea-key--port" aria-hidden="true" /><span className="map-legend__label">at or near a port</span></li>
           {candidatesShown && (
-            <li><span className="sea-key sea-key--candidate" aria-hidden="true" /><span className="map-legend__label">candidate, not an accusation</span></li>
+            <li><span className="sea-key sea-key--candidate" aria-hidden="true" /><span className="map-legend__label">candidate: no AIS where AIS was received</span></li>
           )}
         </ul>
       );
@@ -3373,8 +3374,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     if (lg.kind === 'coverage') {
       return (
         <ul key={lg.key} className="map-legend map-legend--key" aria-label="AIS coverage key">
-          <li><span className="sea-key sea-key--heard" aria-hidden="true" /><span className="map-legend__label">AIS heard: two vessels within 30 km</span></li>
-          <li><span className="sea-key sea-key--unproven" aria-hidden="true" /><span className="map-legend__label">unproven: no AIS is not evidence</span></li>
+          <li><span className="sea-key sea-key--heard" aria-hidden="true" /><span className="map-legend__label">AIS received: other ships came through here near the pass</span></li>
+          <li><span className="sea-key sea-key--unproven" aria-hidden="true" /><span className="map-legend__label">reception unknown: no AIS here proves nothing</span></li>
         </ul>
       );
     }
@@ -3438,7 +3439,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       {/* Top centre, Dark Vessels: what the room is looking at, dated. */}
       {seaOn && (
         <div className="sea-clock-band">
-          <SeaClock beat={seaBeat} facts={{ ...seaFacts, replayPassId: vesselRest?.pass.pass_id }} />
+          <SeaClock beat={seaBeat} facts={{ ...seaFacts, replayPassId: vesselRest?.pass.pass_id, tasking: filedFacts(taskingState) }} />
         </div>
       )}
 

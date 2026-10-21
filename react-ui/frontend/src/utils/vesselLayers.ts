@@ -788,6 +788,23 @@ export function taskingLine(box: number, kept: number, total: number): string {
   return `Patrol box ${box} · check ${kept} of ${total} ${total === 1 ? 'candidate' : 'candidates'} on the way`;
 }
 
+/**
+ * The clock's filed facts from the filed tasking: the officer's box, the candidates kept of the
+ * draft's, and that box's next radar look; undefined until it is filed.
+ */
+export function filedFacts(state: {
+  status: string;
+  choice?: { box: number; candidateIds: readonly string[] } | null;
+  card: { candidates: ReadonlyArray<{ id: string }> };
+  boxes: ReadonlyArray<{ box: number; look: { start: string } | null }>;
+} | null): SeaFacts['tasking'] {
+  if (state?.status !== 'filed' || !state.choice) return undefined;
+  const { box, candidateIds } = state.choice;
+  const kept = state.card.candidates.filter((c) => candidateIds.includes(c.id)).length;
+  const look = state.boxes.find((b) => b.box === box)?.look ?? null;
+  return { box, kept, total: state.card.candidates.length, lookStart: look?.start ?? null };
+}
+
 /** The candidates' labels on the map (the radar target's id and why it is one, in mono). */
 export const CANDIDATE_LABEL_SUFFIX = '  no AIS';
 export const LEFT_OUT_SUFFIX = '  left out';
