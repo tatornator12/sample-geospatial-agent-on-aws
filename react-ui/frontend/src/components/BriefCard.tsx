@@ -11,8 +11,11 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { approveBrief, getBrief, type BriefState } from '../services/api.ts';
+import type { ToolCall } from '../types.ts';
 import { SNAPSHOT_MAX_CHARS, mapSnapshot } from '../utils/snapshot.ts';
-import { anotherLookMessage, approvedMessage } from '../utils/brief.ts';
+import { anotherLookMessage, approvedMessage, lastLookLine, siteCue, siteTip } from '../utils/brief.ts';
+import { parseManifest, passManifestUrl, type PassFrame, type Tip } from '../utils/steps.ts';
+import { useStageFiles } from '../hooks/useStageFiles.ts';
 
 const RETRY_MS = 2000;
 const GIVE_UP_MS = 30_000;
@@ -27,6 +30,12 @@ interface BriefCardProps {
   busy: boolean;
   /** Sends the analyst's decision to the agent as the next prompt. */
   onDecision: (prompt: string) => void;
+  /** Where the session's (or the case's) methane files live: the pass manifests are read there. */
+  methaneDir?: string | null;
+  /** The session's check_recent_passes calls; the one on the card's site dates EMIT's last look. */
+  cues?: ToolCall[];
+  /** The TROPOMI tips loaded this session; the one over the card's site is the latest sign. */
+  tips?: Tip[];
 }
 
 const CONFIDENCE_WORDS: Record<string, string> = {
@@ -52,7 +61,7 @@ function WorkingDots() {
   );
 }
 
-export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: BriefCardProps) {
+export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methaneDir = null, cues = [], tips = [] }: BriefCardProps) {
   const [state, setState] = useState<BriefState | null>(null);
   const [load, setLoad] = useState<'loading' | 'waiting' | 'failed' | 'loaded'>('loading');
   const [attempt, setAttempt] = useState(0);
@@ -61,6 +70,14 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
   const [showChecks, setShowChecks] = useState(false);
   const [showGaps, setShowGaps] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
+
+  // EMIT's last look at the site and the latest sign over it (P0-2): the pass manifest of the cue
+  // on the card's site and the tip over it, the tools' own records; no line without a manifest.
+  const site = state?.card ?? null;
+  const cue = site ? siteCue(cues, site.lat, site.lon) : null;
+  const manifestUrl = cue ? passManifestUrl(methaneDir, cue) : null;
+  const manifests = useStageFiles<PassFrame[]>(manifestUrl ? [manifestUrl] : [], (raw) => (methaneDir ? parseManifest(raw, methaneDir) : null));
+  const look = site && manifestUrl ? lastLookLine(manifests[manifestUrl], siteTip(tips, site.lat, site.lon)) : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -157,6 +174,19 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision }: Brie
         <span className="brief-card__num">{card.candidates}</span> of <span className="brief-card__num">{card.passesRead}</span>{' '}
         passes read{card.passesSince ? <> since <span className="brief-card__num">{card.passesSince}</span></> : null} are candidates;
         EMIT looked <span className="brief-card__num">{card.looks}</span> times in all.
+        {/* When it last looked, so a recurring site is not read as active today. It runs on in the
+            count's paragraph, which keeps the decision on the column's first screen at 720p too. */}
+        {look && (
+          <span className="brief-card__look">
+            {' '}Last EMIT look <span className="brief-card__num">{look.lastLook}</span>.
+            {look.tropomi && (
+              <>
+                {' '}Latest sign: TROPOMI, <span className="brief-card__num">{look.tropomi.days}</span> days to{' '}
+                <span className="brief-card__num">{look.tropomi.end}</span> (about <span className="brief-card__num">4</span> km cells).
+              </>
+            )}
+          </span>
+        )}
       </p>
       {/* The two lines the room restates, at the size it reads from the back. */}
       <dl className="brief-card__verdict">

@@ -37,11 +37,12 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
   // The Methane Hunter's two beats (design.md, Act 2 run sheet); the prompts are the golden ones.
   methane: {
     prompts: [
-      // Act 2 v2: the mission (the golden prompt watch-mission); the two beats below are the fallback run sheet.
+      // Act 2 v2: the mission; the two beats below are the fallback run sheet. Not "still active"
+      // (EMIT's last look can be a year old; the card says when) and not "super-emitters" (the brief
+      // gives no rate): A2 P0-2 (c), P1-11. It keeps the mission's trigger words "brief me",
+      // "watch areas" and "how confident" (methane_config.py), word for word the golden prompt watch-mission.
       {
         label: 'Methane Watch brief',
-        // Asks for recurrence, not "super-emitters that are still active" (stage review D8): the brief
-        // reports candidate passes and when EMIT last looked, and raw passes carry no emission rate.
         prompt: 'Brief me on the watch areas where methane keeps showing up, and how confident you are.',
       },
       // The two beats work anywhere: the presenter names the region (a watch area, a basin the

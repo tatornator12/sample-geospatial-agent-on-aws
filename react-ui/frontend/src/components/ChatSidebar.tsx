@@ -648,6 +648,15 @@ export function ChatSidebar({
   useEffect(() => {
     onTipsUpdate?.(tips);
   }, [tips, onTipsUpdate]);
+  // The brief card's last look (EMIT's newest pass at the site, the TROPOMI tip over it): the cues
+  // and tips of the whole session, so the card reads the same through the analyst's decision turn.
+  // The tips are the ones already loaded (useStageFiles keeps every file it read this session).
+  const sessionTools = messages.flatMap((m) => m.tools ?? []);
+  const briefCues = sessionTools.filter((t) => t.name === 'check_recent_passes');
+  const briefTips = sessionTools
+    .map((c) => tipManifestUrl(methaneDir, c))
+    .map((u) => (u ? tipFiles[u] : undefined))
+    .filter((t): t is Tip => !!t);
   // Dark Vessels: every finished draft_tasking puts the newest draft on the map's tasking plate.
   const taskingDrafts = messages.reduce((n, m) => n + (m.tools ?? []).filter((t) => t.name === 'draft_tasking').length, 0);
   useEffect(() => {
@@ -795,6 +804,9 @@ export function ChatSidebar({
                   caseId={scenarioId}
                   busy={isProcessing}
                   onDecision={(prompt) => void sendMessage(prompt)}
+                  methaneDir={methaneDir}
+                  cues={briefCues}
+                  tips={briefTips}
                 />
               )}
               {showAnswer && (

@@ -463,6 +463,10 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+/* The last look's dates ("Aug 20 2025") never break across lines. */
+.brief-card__look .brief-card__num {
+  white-space: nowrap;
+}
 /* The verdict: the two lines the room restates, the values at the size it reads from the back. */
 .brief-card__verdict {
   display: grid;

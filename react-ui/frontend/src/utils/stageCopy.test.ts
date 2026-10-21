@@ -21,6 +21,19 @@ describe('stageCopyFor', () => {
     expect(mission).not.toMatch(/still active|super-emitter/i);
   });
 
+  it('asks for the brief without "still active" or "super-emitters", and keeps the mission words (A2 P0-2)', () => {
+    const copy = stageCopyFor('methane');
+    for (const p of copy.prompts) {
+      expect(p.prompt).not.toMatch(/still active/i);
+      expect(p.prompt).not.toMatch(/super-emitters/i);
+    }
+    const brief = copy.prompts[0];
+    expect(brief.label).toBe('Methane Watch brief');
+    expect(brief.prompt).toBe('Brief me on the watch areas where methane keeps showing up, and how confident you are.');
+    // The trigger words the agent's prompt routes the mission on (methane_config.py).
+    for (const words of ['Brief me', 'watch areas', 'how confident']) expect(brief.prompt).toContain(words);
+  });
+
   it('gives the AI Archaeologist its four plates and a placeholder that asks for a known site (Week 5)', () => {
     const copy = stageCopyFor('archaeologist');
     expect(copy.prompts.map((p) => p.label)).toEqual(['The Octagon, from space', 'Measure an Octagon wall', 'Measure the Great Circle', 'Where else, like this']);

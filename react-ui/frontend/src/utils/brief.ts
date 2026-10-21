@@ -3,7 +3,9 @@
  * markdown names it: "(draft `brief-…`, not filed)"); the card's contents come from the backend,
  * which reads the draft from S3, so nothing model-written in the answer reaches the card.
  */
-import type { Message } from '../types.ts';
+import type { Message, ToolCall } from '../types.ts';
+import { formatDate } from './layerFormatting.ts';
+import type { PassFrame, Tip } from './steps.ts';
 
 const DRAFT_ID = /draft `(brief-\d{8}T\d{6}-[0-9a-f]{6})`/g;
 const ANY_ID = /\bbrief-\d{8}T\d{6}-[0-9a-f]{6}\b/;
@@ -18,6 +20,43 @@ export function draftBriefId(text: string): string | null {
 /** The two things the analyst can say, as the agent's prompt expects them (methane_config.py). */
 export const approvedMessage = (briefId: string) => `The analyst approved and filed brief ${briefId}`;
 export const anotherLookMessage = (briefId: string) => `Request another look at brief ${briefId}`;
+
+/** The same site to 2 decimals (the step column's coordinate format). */
+function sameSite(lat: unknown, lon: unknown, cardLat: number, cardLon: number): boolean {
+  const la = typeof lat === 'number' ? lat : typeof lat === 'string' ? Number(lat) : NaN;
+  const lo = typeof lon === 'number' ? lon : typeof lon === 'string' ? Number(lon) : NaN;
+  return Number.isFinite(la) && Number.isFinite(lo) && la.toFixed(2) === cardLat.toFixed(2) && lo.toFixed(2) === cardLon.toFixed(2);
+}
+
+/** The latest check_recent_passes call on the card's site, or null. */
+export function siteCue(cues: ToolCall[], lat: number, lon: number): ToolCall | null {
+  const hits = cues.filter((c) => c.name === 'check_recent_passes' && sameSite(c.params?.lat, c.params?.lon, lat, lon));
+  return hits[hits.length - 1] ?? null;
+}
+
+/** The TROPOMI tip whose top hotspot is the card's site, or null. */
+export function siteTip(tips: Tip[], lat: number, lon: number): Tip | null {
+  return tips.find((t) => t.point && sameSite(t.point[1], t.point[0], lat, lon)) ?? null;
+}
+
+export interface LastLook {
+  /** The newest EMIT pass in the site's manifest, as the stage writes dates ("Aug 20 2025"). */
+  lastLook: string;
+  /** The TROPOMI tip over the site: its window in days and its last day ("Oct 10 2026"). */
+  tropomi: { days: number; end: string } | null;
+}
+
+/**
+ * The card's last-look line, from the tools' own records only (the pass manifest and the tip
+ * manifest, never the draft's model-written observations). Null without a pass to date.
+ */
+export function lastLookLine(frames: PassFrame[] | null | undefined, tip?: Tip | null): LastLook | null {
+  const dates = (frames ?? []).map((f) => f.date).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const newest = dates[dates.length - 1];
+  if (!newest) return null;
+  const tropomi = tip && tip.days !== null && tip.end ? { days: tip.days, end: formatDate(tip.end) } : null;
+  return { lastLook: formatDate(newest), tropomi };
+}
 
 /**
  * The brief the stage should show: the one the latest answer drafted, or, while the analyst's
