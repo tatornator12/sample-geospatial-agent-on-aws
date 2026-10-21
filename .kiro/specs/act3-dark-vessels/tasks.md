@@ -194,6 +194,10 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   - [ ] 6.1 `build_replay_case.py` (refuses forbidden phrases, identifiers, a turn without the
     coverage check); record the star turn; stage it; the gallery card; the network log
   - [ ] 6.2 Evals for all four agents on dev; record counts below
+  - [ ] 6.3 Follow-up (redesign task 9a): Re-run task 9a with s1d-20261018t1149 once GFW's AIS
+    reaches Oct 19 (about Oct 24), before the Nov 3 freeze, still on v1r. The Oct 21 run built the
+    Oct 17 pass only (`--until 2026-10-18`): GFW's AIS then reached Oct 17 and showed 0 vessels in
+    every hour of the Oct 18 pass's window, so building it would have shown a false 0% heard
   - _Requirements: 13.1, 13.2, 14.1_
 
 ## Days 10–11 (Oct 29–30): rehearsal and G4
