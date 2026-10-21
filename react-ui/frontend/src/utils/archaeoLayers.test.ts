@@ -28,6 +28,10 @@ import {
   marksBounds,
   signedMetres,
   siteWindow,
+  siteWindowShare,
+  reliefSite,
+  reliefLegendLabel,
+  FINE_RELIEF_WINDOW,
   terrainGeometryHint,
   terrainLegend,
   terrainRasterHint,
@@ -116,15 +120,38 @@ describe('isTerrainLayer and the plate', () => {
   });
   it('reads the relief in signed metres and the hillshade and record as keys', () => {
     expect(layerLegend(relief)).toMatchObject({ kind: 'relief', ramp: 'rdbu_r', lo: -1, hi: 1, units: 'm', label: 'Local relief' });
-    expect(layerLegend(fine)).toMatchObject({ kind: 'relief', lo: -0.3, hi: 0.3, key: 'relief-0.3' });
+    expect(layerLegend(fine)).toMatchObject({ kind: 'relief', lo: -0.3, hi: 0.3, key: `relief-${fine.id}` });
     expect(layerLegend(hillshade)).toEqual({ kind: 'hillshade', key: 'hillshade' });
     expect(layerLegend(record)).toEqual({ kind: 'record', key: 'record' });
     expect(layerLegend(transect)).toBeNull();
     expect(terrainLegend(undefined)).toBeNull();
   });
-  it('lists the relief ramp before the hillshade key, and one relief per stretch', () => {
-    expect(stackLegends([hillshade, relief, fine], all).map((l) => l.key)).toEqual(['relief-1', 'relief-0.3', 'hillshade']);
+  it('lists the relief ramps before the hillshade key, one per relief layer', () => {
+    expect(stackLegends([hillshade, relief, fine], all).map((l) => l.key)).toEqual([`relief-${relief.id}`, `relief-${fine.id}`, 'hillshade']);
     expect(stackLegends([relief, relief], all)).toHaveLength(1);
+  });
+  it('names each relief legend by its site, from the row title (B16, A4 P1-6)', () => {
+    const seip = { ...layer(`${S}lrm03_seip-earthworks.tif`, 'raster'), name: 'Seip Earthworks, local relief' };
+    const circle = { ...relief, name: 'Great Circle Earthworks, local relief model' };
+    expect(stackLegends([seip, circle], all).map((l) => ('label' in l ? l.label : ''))).toEqual([
+      'Seip Earthworks: blue lower, red higher',
+      'Great Circle Earthworks: blue lower, red higher',
+    ]);
+    // Only the site's own reading is shown when the earlier one is unticked.
+    expect(stackLegends([seip, circle], (id) => id !== circle.id)).toHaveLength(1);
+    expect(reliefLegendLabel('A relief map')).toBe('Local relief');
+    expect(reliefLegendLabel(undefined)).toBe('Local relief');
+  });
+  it('knows a relief file by its site, and lands closer on a ploughed one (B16, B17)', () => {
+    expect(reliefSite(`${S}lrm_newark-great-circle.tif`)).toBe('newark-great-circle');
+    expect(reliefSite(`${S}lrm03_seip-earthworks.tif`)).toBe('seip-earthworks');
+    expect(reliefSite(`${S}hillshade_newark-octagon.tif`)).toBeNull();
+    expect(siteWindowShare(`${S}lrm03_seip-earthworks.tif`)).toBe(FINE_RELIEF_WINDOW);
+    expect(siteWindowShare(`${S}lrm_newark-great-circle.tif`)).toBe(0.4);
+    expect(siteWindowShare(`${S}hillshade_newark-octagon.tif`)).toBe(0.4);
+    // About 800 m of the 3 km frame.
+    const [w, , e] = siteWindow([0, 0, 3, 3], FINE_RELIEF_WINDOW);
+    expect(Math.round((e - w) * 1000)).toBe(810);
   });
   it('prints the legend ends the way the record does', () => {
     expect(signedMetres(-1)).toBe('−1 m');

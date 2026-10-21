@@ -51,7 +51,9 @@ import {
   recordLabels,
   companionDem,
   signedMetres,
+  reliefSite,
   siteWindow,
+  siteWindowShare,
   terrainGeometryHint,
   terrainRasterHint,
   transectParts,
@@ -3145,6 +3147,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             groundOnRef.current = true;
             setGroundOn(true);
           }
+          // A second site's relief: the earlier sites' reliefs are unticked (the row's own
+          // checkbox path, not removed), so one relief legend reads at a time (A4 P1-6).
+          const site = isTerrainRaster ? reliefSite(raster.url) : null;
+          if (site) {
+            const earlier = allLayersRef.current.filter((l) =>
+              l.type === 'raster' && l.id !== layerId && reliefSite(l.url) !== null && reliefSite(l.url) !== site);
+            if (earlier.length > 0) {
+              setRasterVisibility((prev) => ({ ...prev, ...Object.fromEntries(earlier.map((l) => [l.id, false])) }));
+            }
+          }
 
           // The camera moves to the finding: the plume fills the frame; the ground scene after it
           // tightens a little further. In the methane act and the archaeologist's; other acts keep
@@ -3156,7 +3168,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             // On the ground the camera lands on the site in the middle of its 3 km frame, not on the
             // frame (a replay adds the scene after the hillshade, so this holds for any raster once
             // the ground is up); the scene "from space" before any terrain still frames the whole clip.
-            const [w, s, e, n] = groundOnRef.current ? siteWindow(rasterBounds) : rasterBounds;
+            // A ploughed site's ±0.3 m relief lands closer still (about 800 m), so its arcs read.
+            const [w, s, e, n] = groundOnRef.current ? siteWindow(rasterBounds, siteWindowShare(raster.url)) : rasterBounds;
             // A coarse raster frames below its own cap so it is still on screen when the camera lands.
             const cap = seaRadar ? 9 : coarse ? Math.max(1, hint!.max_zoom! - 0.5) : inArchaeoAct ? FRAME_MAX_ZOOM : isMethaneRaster ? 13 : 14;
             // With the 3D columns on the stage the frame keeps their tilt; on the archaeologist's

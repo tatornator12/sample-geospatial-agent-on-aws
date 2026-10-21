@@ -10,7 +10,7 @@
  */
 import { isMethaneLayer, isSimilarityLayer, type LayerMetadata } from './layerFormatting.ts';
 import { indexLegendFor, type ColormapName } from './render.ts';
-import { isTerrainLayer, terrainLegend, terrainRasterHint } from './archaeoLayers.ts';
+import { isTerrainLayer, reliefLegendLabel, terrainLegend, terrainRasterHint } from './archaeoLayers.ts';
 import { AIS, ORCHID, vesselKind } from './vesselLayers.ts';
 import { COLUMNS_NOTE, methaneRampLabel } from './methaneLayers.ts';
 
@@ -178,7 +178,8 @@ export function layerLegend(layer: LayerMetadata): StackLegend | null {
     const legend = terrainLegend(terrainRasterHint(layer.render, layer.url));
     if (!legend) return null;
     if (legend.kind === 'hillshade') return { kind: 'hillshade', key: 'hillshade' };
-    return { kind: 'relief', key: `relief-${legend.hi}`, label: legend.label, ramp: 'rdbu_r', lo: legend.lo, hi: legend.hi, units: legend.units };
+    // One legend per relief layer, named by its site (two sites' reliefs are two readings).
+    return { kind: 'relief', key: `relief-${layer.id}`, label: reliefLegendLabel(layer.name), ramp: 'rdbu_r', lo: legend.lo, hi: legend.hi, units: legend.units };
   }
   if (isMethaneLayer(layer)) {
     const hint = layer.render;

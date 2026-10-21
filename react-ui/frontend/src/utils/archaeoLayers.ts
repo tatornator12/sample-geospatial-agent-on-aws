@@ -213,6 +213,30 @@ export function isHillshadeHint(hint: RenderHint | null | undefined): boolean {
  * of the frame out towards the horizon.
  */
 export const SITE_WINDOW = 0.4;
+/**
+ * A ploughed site's ±0.3 m relief (`lrm03_<site>.tif`) lands closer, on about 800 m of the frame:
+ * at 1.2 km its faint arcs vanish into the ground (A4 P1-5).
+ */
+export const FINE_RELIEF_WINDOW = 0.27;
+
+/** The share of the frame the camera lands on for this raster: closer for a ploughed site's relief. */
+export function siteWindowShare(url: string | undefined): number {
+  return /^lrm03_.+\.tiff?$/.test(basenameOf(url)) ? FINE_RELIEF_WINDOW : SITE_WINDOW;
+}
+
+/** The site a local relief file belongs to (`lrm_<site>.tif`, `lrm03_<site>.tif`), or null. */
+export function reliefSite(url: string | undefined): string | null {
+  return basenameOf(url).match(/^lrm(?:03)?_([a-z0-9][a-z0-9_-]{0,63})\.tiff?$/)?.[1] ?? null;
+}
+
+/**
+ * The relief legend's name: the site from the layer's own row title ("Seip Earthworks, local
+ * relief" or "…, local relief model") with what the colours mean, else "Local relief" (A4 P1-6).
+ */
+export function reliefLegendLabel(title: string | undefined): string {
+  const site = (title ?? '').trim().match(/^(.{1,60}?),\s*local relief(?: model)?$/i)?.[1]?.trim();
+  return site ? `${site}: blue lower, red higher` : 'Local relief';
+}
 
 /** The central part of a frame, [west, south, east, north], for the camera to land on. */
 export function siteWindow(
