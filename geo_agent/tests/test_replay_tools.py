@@ -92,6 +92,8 @@ def test_figures_skip_identifiers_list_markers_code_and_prompt_years():
     assert ("year", "1910") in found
     assert not any(tok in ("2", "1.5", "3", "1") for _, tok in found)
     assert ("month", "2025-01") not in found  # "January 2025" is the prompt's own month
+    # A gallery label's "Jan 12" is a day some tool date must fall on.
+    assert replay_numbers.figures("High severity, Jan 12", set()) == [("monthday", "-01-12")]
 
 
 def test_a_year_and_month_in_a_result_is_a_month_the_room_may_hear():

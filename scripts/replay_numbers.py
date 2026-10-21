@@ -17,7 +17,7 @@ what the case shows the room is matched against them:
 A number matches when some source number, times a unit factor (1; m² to km² 1e-6; m² to ha 1e-4;
 m² to acres 1/4046.856; fraction to % 100; kg to t 1e-3), rounds to it at the shown decimals (a
 whole number ending in zeros, 23,700, at that many zeros). Signs are compared as magnitudes. ISO
-dates (and "20 January 2025", "January 2025", a bare year) must appear in a tool result or input. List markers,
+dates (and "20 January 2025", "January 2025", "Jan 12", a bare year) must appear in a tool result or input. List markers,
 code spans, identifiers (Sentinel-2, CH4, L2B, v1.5, 3D) and years in the prompt are not figures.
 
 Prints each figure with the tool call it came from; exit 1 when any is unmatched. --dump writes the
@@ -108,6 +108,7 @@ def numbers_in(text: str) -> list[float]:
 DAY_MONTH_RE = re.compile(rf"\b(\d{{1,2}})\s+({MONTH_RE})\.?\s+(\d{{4}})\b", re.I)
 MONTH_DAY_RE = re.compile(rf"\b({MONTH_RE})\.?\s+(\d{{1,2}}),?\s+(\d{{4}})\b", re.I)
 MONTH_YEAR_RE = re.compile(rf"\b({MONTH_RE})\.?\s+(\d{{4}})\b", re.I)
+MONTH_DAY_ONLY_RE = re.compile(rf"\b({MONTH_RE})\.?\s+(\d{{1,2}})\b(?!\d)", re.I)  # "Jan 12": a gallery label
 YEAR_RE = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
 
 
@@ -189,6 +190,9 @@ def figures(text: str, prompt_years: set[str]) -> list[tuple[str, str]]:
         if y not in prompt_years:
             out.append(("month", f"{y}-{month_number(mo):02d}"))
     text = MONTH_YEAR_RE.sub(" ", text)
+    for mo, d in MONTH_DAY_ONLY_RE.findall(text):
+        out.append(("monthday", f"-{month_number(mo):02d}-{int(d):02d}"))
+    text = MONTH_DAY_ONLY_RE.sub(" ", text)
     text = IDENT_RE.sub(" ", text)
     for m in NUM_RE.finditer(text):
         token = m.group(0).lstrip("+").replace("−", "-")
@@ -286,8 +290,10 @@ def main() -> int:
                 where = sources.dates.get(token)
             elif kind == "month":
                 where = next((w for d, w in sources.dates.items() if d.startswith(token)), None)
+            elif kind == "monthday":
+                where = next((w for d, w in sources.dates.items() if len(d) == 10 and d.endswith(token)), None)
             elif kind == "year":
-                where = next((w for d, w in sources.dates.items() if d.startswith(token)), None) or sources.years.get(token)
+                where = sources.years.get(token) or next((w for d, w in sources.dates.items() if d.startswith(token)), None)
             else:
                 where = sources.match(token)
             mark = "ok " if where else "NO "
