@@ -230,7 +230,13 @@ evidence order: pass, detect, coverage, match, then words.
   at most 120 s across eval runs.
 - N2 WHEN the question starts in a fresh session, the board and the first decision line SHALL show
   within 10 s of the click, and before the radar sweeps in.
-- N3 The design SHALL add no dependency and no backend, infrastructure or IAM change.
+- N3 The design SHALL add no dependency and no infrastructure or IAM change. Its one backend change
+  SHALL be the tasking's Slack copy (U15, amended Oct 21): the `pass` workflow variable and the
+  Block Kit "From the pass" section (`backend/src/tasking.ts:353-354`) read "AIS was received over
+  {heard}% of the reserve; this pass could check {checkable}%." with the targets and candidates
+  counts, `checkable_share` read from the draft as optional (validated 0 to 1, left out of the
+  sentence when absent), and the ten workflow variable keys unchanged. Task 1 makes it, with backend
+  tests.
 - N4 Deploys SHALL go to dev only until G4 (Fri Oct 30). After Nov 3, only fixes SHALL land, and
   the Nov 5 rerun SHALL change data only.
 
@@ -309,10 +315,10 @@ evidence order: pass, detect, coverage, match, then words.
 - The agent's narration line (summary D6).
 - A model change.
 - Any change to Acts 1, 2 and 4.
-- The off-stage record's checkable share. The backend's Slack and markdown line keeps "AIS was
-  heard over …" (`backend/src/tasking.ts:354`), which needs a backend change. Slack is not shown
-  during Act 3 (U15, approved Oct 21), and task 10's run sheet says so. There is no backend change,
-  N3 stands, and the line is post-demo work.
+- The filed markdown record's wording. Slack is shown during Act 3 (U15, amended Oct 21), so the
+  Slack copy changes (N3, task 1); the markdown record in S3 (`backend/src/tasking.ts:251-252`),
+  which the room does not see, keeps "AIS was heard over …" and "unproven water (not evidence)" and
+  is post-demo work.
 
 ## 3. Design
 
@@ -1553,7 +1559,7 @@ item (§3.11).
 | # | Task | Owner surface | Lane | Est. | Depends | Test gate | When |
 |---|---|---|---|---|---|---|---|
 | 0 | Approve this design and decisions U1 to U15 | user | | none | none | written answer | done, Wed Oct 21 |
-| 1 | Copy fixes both versions need, as the branch's first commits, holding nothing else from this design: map words (§3.8.3, except the box labels and the "outside the radar" legend row, which need the clipped areas); `NOT_EVIDENCE` → `RECEPTION_UNKNOWN`; the `ais_tools.py` strings (§3.4); the four-turn prompt's CONFIDENCE, FINAL REPORT examples and titles; the new `tasking_status` `say` ("Yes, it is on file: filed at HH:MM UTC."), the clock's filed sub and the plate's draft line, so the filed sentence shows once in both versions; the radar, coverage and candidates clock copy; the plate summary and legends; `aria-live`; matching pins. Impeccable critique first | stage, agent | B | 0.5 d | 0 | vitest (filed sentence once across clock and plate), pytest (the `say`), design:check 0, dev deploy plus the four-turn eval 7/7; then tag the verified commit `act3-four-turn-fallback` (R9.1) | Wed Oct 21 am |
+| 1 | Copy fixes both versions need, as the branch's first commits, holding nothing else from this design: map words (§3.8.3, except the box labels and the "outside the radar" legend row, which need the clipped areas); `NOT_EVIDENCE` → `RECEPTION_UNKNOWN`; the `ais_tools.py` strings (§3.4); the four-turn prompt's CONFIDENCE, FINAL REPORT examples and titles; the new `tasking_status` `say` ("Yes, it is on file: filed at HH:MM UTC."), the clock's filed sub and the plate's draft line, so the filed sentence shows once in both versions; the radar, coverage and candidates clock copy; the plate summary and legends; `aria-live`; the tasking's Slack `pass` line and "From the pass" section (U15 as amended Oct 21, N3); matching pins. Impeccable critique first | stage, agent | B | 0.5 d | 0 | vitest (filed sentence once across clock and plate), pytest (the `say`), design:check 0, dev deploy plus the four-turn eval 7/7; then tag the verified commit `act3-four-turn-fallback` (R9.1) | Wed Oct 21 am |
 | 2 | Data and scripts: imaged cells in `build_pass`; `--imaged` (from the bucket); metadata into the manifest; `--backup`, `--restore`, `--prefix`, `--seed-from`; `list_vessel_passes.py --newest --min-share --append`; `publish_vessel_rest.py --newest` and `bucket`; `warm_vessels.py --check --newest`; `VESSEL_CACHE_PREFIX` and the `deploy.sh` pass-through. Run `--backup 2026-10-21`, then `--imaged` on v1, then `publish_vessel_rest.py` on v1 with the default (the star, so the replay is unchanged), and confirm the payload carries `bucket` and otherwise matches the backup (§3.6) | build | A | 0.75 d | 0 | pytest (synthetic COG, listing, rest, prefix, backup, the `bucket` check); `--dry-run`; `warm_vessels.py --check` clear, `bucket` included | Wed Oct 21 |
 | 3 | Agent tools on branch `act3-open-question`. First hour (done Oct 21): `@tool(context=True)` confirmed in strands-agents 1.21.0, so `decision_keys` is "call" (§3.5); add the constants and tool signatures for task 4. Then: passes from the manifest; `vs.begin_turn` and the entrypoint line; `list_passes` with question state; a question open only in its turn (`vs.current_question()`), with the stale-record checks on `vs.latest_question()` (§3.5); `find_pass` newest and its budget; the gate; coverage shares and clipping; the `match_ais` floor and its two `next_steps` word for word; `decide` with question scoping, the first-read rule and the `asked` matcher, with the month-only rule after "in", "of", "end of" or "start of"; `rolling_check` with the box figures; `predict_hotspots(pass_id)` with `say_boxes`, the feature figures and box labels; the three `draft_tasking` checks; `say_else`; neutral `next_steps`; `tasking_status("")`; the tool strings | agent | A | 1.75 d | 2 | pytest green, the `decide` matrix, the gate and budget tests, the spare after a two-pass question, bare "may" and "march", no network | Wed Oct 21 pm to Fri Oct 23 am |
 | 4 | Prompt (§3.4), with the ANSWER block per ending (a draft with candidates, a draft with none, `stop`); `LOCAL_TOOLS`, the prompt and docstring pins, the answer-cap test with seven candidates | agent | B | 0.5 d | 3 (first hour) | pytest | Fri Oct 23 am |
@@ -1564,7 +1570,7 @@ item (§3.11).
 | 8 | **Gate B**: rebase onto `develop` (after `stage-fixes-1`), then headless live runs against dev, ×3 at 1920 and ×1 at 1280; beat times; screenshots | stage | B | 0.25 d | 7b | AC 5 and 6; **go/no-go 2**, by Wed Oct 28 12:00: merge to `develop`, or the four-turn version goes to G4 | Tue Oct 27 am |
 | 9a | Pre-freeze rerun rehearsal on `vessels/cache/v1r` (§3.6): data build Tue pm; then the dev deploy with the prefix and `open-question --repeat 3`. Record paths, seconds and row counts | build, agent | A | 0.5 d | 2, 8 | AC 7 | Tue Oct 27 pm, then Wed Oct 28 am after gate B's go |
 | 9 | Replay case: builder (Mon), record on the task 9a data, stage it, card available | agent, stage | A | 0.5 d | 6 (builder), 8 and 9a (record) | AC 8; pytest refusals | Mon Oct 26 pm (builder), Wed Oct 28 pm |
-| 10 | Run sheet in `design.md` (with `/?agent=vessels` after a replay until 5C is merged, and the line "Slack: not shown during Act 3", U15); the DESIGN.md Act 3 paragraph; timed rehearsal ×2 on dev, on the task 9a data (task 7.1) | docs, presenter | B | 0.25 d | 9 | Act 3 under 8:30 twice | Thu Oct 29 |
+| 10 | Run sheet in `design.md` (with `/?agent=vessels` after a replay until 5C is merged; the show order, Act 1, Act 4, Act 2, then Act 3 as the closer at 8 min, ending on the officer's approval and the Slack post on a second screen, U15 as amended Oct 21); the DESIGN.md Act 3 paragraph; timed rehearsal ×2 on dev, on the task 9a data (task 7.1) | docs, presenter | B | 0.25 d | 9 | Act 3 under 8:30 twice | Thu Oct 29 |
 | 11 | G4 (task 7.2): stable eval with `--repeat 3` on v1; then redeploy dev without `VESSEL_CACHE_PREFIX` | all | | as planned | 10 | G4 | Fri Oct 30 |
 | 12 | Fixes only, from G4 | all | | ≤ 0.5 d | 11 | the same gates | Mon Nov 2 to Tue Nov 3 |
 | 13 | Nov 5 rerun (§3.6 runbook) | build | A | 0.5 d | 11 | AC 9; R9.2 go/no-go | Thu Nov 5 |
@@ -1628,9 +1634,24 @@ it was chosen from are in revision 3 and the notes.
   draft or takes over 120 s, restore the backups and present on the pre-rerun data. If task 9a
   already shows no-draft endings, skip the rerun. It is recorded here and executed on Nov 5 and 6
   (tasks 13 and 14), not before G4.
-- **U15. Is Slack shown during Act 3?** No. Task 10's run sheet carries the line "Slack: not shown
-  during Act 3". There is no backend change, so N3 stands, and the off-stage line in
-  `backend/src/tasking.ts:354` ("AIS was heard over …") stays post-demo work (§2.4).
+- **U15. Is Slack shown during Act 3?** Yes (amended Oct 21, after this run started; it was "No").
+  The reason: Act 3 becomes the show's closer, and the Slack post landing after the officer's
+  approval is its final beat. The show order is now Act 1 Earth Analyst, Act 4 Archaeologist, Act 2
+  Methane Watch, then Act 3 Dark Vessels as the closer (8 min), ending on the officer's approval and
+  the Slack post arriving on a second screen. This takes the review's M4 "if yes" branch:
+  - N3 is amended to allow one backend change, the tasking's Slack copy: the `pass` workflow
+    variable and the Block Kit "From the pass" section read "AIS was received over {heard}% of the
+    reserve; this pass could check {checkable}%." with the targets and candidates counts, so Slack
+    never says "heard" or "unproven" beside the stage's "can check". `checkable_share` is read from
+    the draft as optional (validated 0 to 1, left out of the sentence when absent, as it is in the
+    four-turn version). Task 1 makes it, with backend tests, so the `act3-four-turn-fallback` tag
+    carries it.
+  - The ten `TASKING_WORKFLOW_VARIABLES` keys stay unchanged, so the published "Patrol taskings"
+    workflow keeps working. Its typed sentences contain no "heard" or "unproven" (the user's
+    statement, Oct 21; not read here), so nothing changes in Slack.
+  - Task 10's run sheet gives the show order and the Slack beat on a second screen.
+  - Slack stays off in every eval and browser check of this run (empty `SLACK_*` variables), and
+    this run never posts to Slack.
 
 ## 6. Responses to the design review (revision 2, Oct 20)
 
@@ -1670,7 +1691,7 @@ carry each fix into the code and tests are named in the last column.
 | M1 the question never closes, so the two-pass budget breaks the silent-vessel spare in a later turn | Addressed as given: a question is open only during the turn that opened it (`vs.current_question()` checks `turn_id`); the gate and `find_pass`'s budget apply only then, and `decide` refuses in a later turn with no `list_passes`; `draft_tasking`'s checks (a) to (c) and the stale-record checks in `match_ais` and `gather_evidence` use the session's latest question in any turn; a later turn that skips `list_passes` is ungated; pytest for the spare after a two-pass question; `gone-silent` set up with the question and run at gate A and in task 9a | R2.9 to R2.11, §3.5 (rows, question state, the gate), §3.6 task 9a, §3.10, §3.14, AC 1 and 4; tasks 3 and 5 |
 | M2 a "no candidates" line can beat the map's reveal, and `match_ais` no longer asks for the targets to be shown | Addressed as given: `match_ais`'s two `next_steps` written out word for word; the two `no_candidates` lines and the board's "no candidates" state render only once `revealedPasses` holds the `from` pass; `open-question` and `thin-pass` require a `display_visual` with `targets_{pass_id}` after each `match_ais`, through a new `expected_after` key (the review allowed this or an `expected_before` form; `expected_after` is the one that says "after"); vitest for a `no_candidates` file loaded before the reveal | R4.2, R8.1, §3.5 `match_ais`, §3.8.1, §3.10, §3.14, AC 5 and 6; tasks 3, 5, 7a and 7b |
 | M3 `rest_v1.json` never gets the `bucket` the early board depends on | Addressed as given: task 2 republishes the star's rest replay on v1 with `bucket` right after `--imaged` and confirms the payload; `warm_vessels.py --check` fails without a valid `bucket`; `loadVesselRest` with no `bucket` leaves the fallback off (vitest); the Nov 5 backup and restore therefore carry it. R9.1 now says the rest file is not republished with `--newest` under the fallback, since task 2's republish (which adds only `bucket`) stands | R7.3, R7.4, R9.1, §3.6, §3.8.1, §3.14, AC 5; tasks 2 and 7b |
-| M4 "Slack stays off stage in Act 3" was an open decision | Addressed: U15 added and approved, "No", with the run-sheet line in task 10; no backend change, so N3 stands and the review's "if yes" path is not needed | §2.4, §5 U15, §4 task 10 |
+| M4 "Slack stays off stage in Act 3" was an open decision | Addressed: U15 added and approved "No" on Oct 21, then amended the same day to "Yes" (Act 3 becomes the closer, ending on the Slack post). The review's "if yes" branch is taken: N3 amended, the Slack `pass` line and "From the pass" section reworded in task 1 with `checkable_share` optional and backend tests, the ten workflow keys unchanged, the show order in task 10's run sheet | §2.4, N3, §5 U15, §4 tasks 1 and 10 |
 | M5 the 13 px step numbers and 11 px "working" label were handed to a fix that did not exist | Addressed: the item now exists as `stage-fixes-1` item 13 (its plan's Group 4, user-approved Oct 21: step numbers 13 to 15 px and the working label 11 to 15 px in every act), owned by that run and landing before gate B. AC 6 and R6.6 cite it, and AC 6's 15 px check covers the whole column. This design does not change those sizes | R6.6, AC 6, §3.11 coordination |
 | M6 the approval day arrived with no margin before gate A's drop-dead | Addressed with option (b): gate A's first attempt Fri Oct 23 pm (`open-question` ×1 on dev), so Mon Oct 26 am is a rerun; drop-dead times unchanged | §5 U10, §4 (lane A, task 6), §3.10, §3.13 |
 | L1 the `stop` line was labelled "Decided:" | Addressed as given: both `stop` rows read "Checked: … No tasking can be drafted."; `decide(stop)` stays the tool's record; vitest pins the label. The longest template is now 89 characters | R6.2, §3.8.1, §3.14, AC 5; task 7a |
