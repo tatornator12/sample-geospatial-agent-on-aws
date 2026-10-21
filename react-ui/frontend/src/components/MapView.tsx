@@ -137,6 +137,13 @@ const STAGE_PADDING_NOW = () => {
   const consoleTop = document.querySelector('.stage-docent')?.getBoundingClientRect().top;
   return stagePadding(window.innerWidth, { viewportHeight: window.innerHeight, consoleTop });
 };
+// A ranked similarity map frames with room under its lowest dot for that match's rank label,
+// which stands below the dot (24 px type and its offset), so no rank sits on the console.
+const SIMILARITY_LABEL_ROOM = 48;
+const SIMILARITY_PADDING_NOW = () => {
+  const p = STAGE_PADDING_NOW();
+  return { ...p, bottom: p.bottom + SIMILARITY_LABEL_ROOM };
+};
 // Dark Vessels frames its sea on the fixed padding, as before (its act is its own).
 const SEA_PADDING_BASE = () => stagePadding(typeof window === 'undefined' ? 1920 : window.innerWidth);
 
@@ -2400,7 +2407,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           // Every act frames its finding clear of the plates (the step column, the caption band,
           // the layers plate), so what the camera lands on is what the room sees.
           currentMap.fitBounds(bounds, {
-            padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 15,
+            padding: isSimilarity ? SIMILARITY_PADDING_NOW() : STAGE_PADDING_NOW(), duration: 1500, maxZoom: 15,
             ...(groundOnRef.current ? { pitch: GROUND_PITCH, bearing: GROUND_BEARING } : {}),
           });
           console.log(`🎯 fitBounds called`);
@@ -2578,7 +2585,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     mapInstance.fitBounds(
       [[west, south], [east, north]],
       {
-        padding: STAGE_PADDING_NOW(),
+        padding: isSimilarityLayer(layer) ? SIMILARITY_PADDING_NOW() : STAGE_PADDING_NOW(),
         duration: 1500,
         maxZoom: typeof cap === 'number' ? Math.max(1, cap - 0.5) : groundOnRef.current ? TRANSECT_MAX_ZOOM : 15,
         // On the archaeologist's ground every flight keeps the low oblique view.
