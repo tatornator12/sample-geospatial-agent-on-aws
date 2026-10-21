@@ -372,12 +372,16 @@ export function Chat() {
   const previousAgentId = useRef<string | null>(null);
   // A replay case selects its own act; that switch keeps the case on the stage.
   const scenarioAgentSwitch = useRef<string | null>(null);
+  // The session an act switch has just let go of: nothing boots a runtime for it under the new
+  // act while the new session id is on its way (S12: one prewarm per switch, not two).
+  const staleSessionRef = useRef<string | null>(null);
   useEffect(() => {
     if (!selectedAgentId) return;
     if (previousAgentId.current && previousAgentId.current !== selectedAgentId) {
       if (scenarioAgentSwitch.current === selectedAgentId) {
         scenarioAgentSwitch.current = null;
       } else {
+        staleSessionRef.current = sessionId;
         handleSessionReset();
       }
     }
@@ -424,7 +428,7 @@ export function Chat() {
   const prewarmedSessions = useRef(new Set<string>());
   useEffect(() => {
     const key = `${selectedAgentId}:${sessionId}`;
-    if (!selectedAgentId || prewarmedSessions.current.has(key)) return;
+    if (!selectedAgentId || sessionId === staleSessionRef.current || prewarmedSessions.current.has(key)) return;
     prewarmedSessions.current.add(key);
     void prewarmSession(sessionId, selectedAgentId);
   }, [sessionId, selectedAgentId]);

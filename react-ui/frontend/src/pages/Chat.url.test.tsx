@@ -77,6 +77,7 @@ vi.mock('../services/api', () => {
 });
 
 import { Chat } from './Chat.tsx';
+import { prewarmSession } from '../services/api';
 
 const WARM = '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f';
 
@@ -140,6 +141,7 @@ beforeEach(() => {
   h.sidebar = {};
   h.map = {};
   h.sessions = [];
+  vi.mocked(prewarmSession).mockClear();
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
@@ -279,5 +281,43 @@ describe('A case that names no act (S3)', () => {
 
     await waitFor(() => expect(h.selectCalls).toEqual(['methane']));
     await waitFor(() => expect(params().get('agent')).toBe('methane'));
+  });
+});
+
+describe('Prewarm (B4, S12)', () => {
+  const calls = () => vi.mocked(prewarmSession).mock.calls.map(([sid, agent]) => `${agent}:${sid}`);
+
+  it('boots one runtime per act switch, for the new session only', async () => {
+    h.initial = 'stable';
+    renderStage('/?agent=stable');
+    await waitFor(() => expect(calls()).toHaveLength(1));
+    const first = h.sidebar.sessionId as string;
+    expect(calls()).toEqual([`stable:${first}`]);
+
+    await act(async () => {
+      h.select('methane');
+    });
+    await waitFor(() => expect(h.sidebar.sessionId).not.toBe(first));
+    const second = h.sidebar.sessionId as string;
+    await waitFor(() => expect(calls()).toHaveLength(2));
+    expect(calls()).toEqual([`stable:${first}`, `methane:${second}`]);
+
+    await act(async () => {
+      h.select('archaeologist');
+    });
+    await waitFor(() => expect(h.sidebar.sessionId).not.toBe(second));
+    const third = h.sidebar.sessionId as string;
+    await waitFor(() => expect(calls()).toHaveLength(3));
+    expect(calls()).toEqual([`stable:${first}`, `methane:${second}`, `archaeologist:${third}`]);
+  });
+
+  it("boots the case's own act on the same session when a case switches the act", async () => {
+    h.initial = 'stable';
+    renderStage('/?scenario=methane-watch-mission&agent=stable');
+    await caseLoaded('methane-watch-mission');
+    await waitFor(() => expect(h.selectCalls).toEqual(['methane']));
+    const sid = h.sidebar.sessionId as string;
+    await waitFor(() => expect(calls()).toContain(`methane:${sid}`));
+    expect(calls()).toEqual([`stable:${sid}`, `methane:${sid}`]);
   });
 });
