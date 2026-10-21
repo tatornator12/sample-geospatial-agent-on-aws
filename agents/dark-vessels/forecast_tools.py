@@ -150,6 +150,29 @@ def _km_to_box(lon: float, lat: float, bounds) -> float:
     return vs.km((lon, lat), (min(max(lon, w), e), min(max(lat, s), n)))
 
 
+HOTSPOTS_SHOW = "Show the heat and the boxes (display_visual with each render); say the check with say, word for word."
+HOTSPOTS_DRAFT = "Choose which box to draft and announce it with decide in the same response as next_look."
+HOTSPOTS_STOP = "No pass read in this question could be checked, so there is no box to draft: decide stop, then write the answer."
+
+
+def _none_checked() -> bool:
+    """While a question is open: no pass read in it could be checked (none has this question's match
+    record, or its coverage record at or over the standard), so the forecast ends on stop, not a draft.
+    With no question open the forecast runs as today."""
+    q = vs.current_question()
+    if q is None:
+        return False
+    qid = q["question_id"]
+    for p in vs.read_passes(vs.decisions(q)):
+        match, cov = vs.get_record("match", p), vs.get_record("coverage", p)
+        if match is not None and match.get("question_id") == qid:
+            return False
+        share = cov.get("checkable_share") if cov is not None and cov.get("question_id") == qid else None
+        if isinstance(share, (int, float)) and not isinstance(share, bool) and share >= vs.CHECKABLE_FLOOR:
+            return False
+    return True
+
+
 @tool
 async def predict_hotspots(pass_id: str = "") -> str:
     """Where to look next: a map of where radar targets with no AIS were seen in the reserve before
@@ -233,8 +256,8 @@ async def predict_hotspots(pass_id: str = "") -> str:
         "heat_render": {"kind": "points", "group": "maritime", "legend": "Dark targets seen before", "property": "v"},
         "boxes_render": {"kind": "vector", "group": "maritime", "legend": "Patrol boxes", "label": "label"},
         "attribution": vs.ATTRIBUTION,
-        "next_steps": "Show the heat and the boxes (display_visual with each render); say the check with say, word for "
-                      "word. Choose which box to draft and announce it with decide in the same response as next_look.",
+        # The fork this question is at: a box to draft after a checked pass, or stop after thin ones only.
+        "next_steps": f"{HOTSPOTS_SHOW} {HOTSPOTS_STOP if _none_checked() else HOTSPOTS_DRAFT}",
     })
 
 

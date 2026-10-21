@@ -607,16 +607,52 @@ def test_next_steps_name_no_call_order(vessels):
             "check_ais_coverage": run(vessels.ais.check_ais_coverage(STAR)), "match_ais": run(vessels.ais.match_ais(STAR)),
             "gather_evidence": run(vessels.ais.gather_evidence(STAR)), "predict_hotspots": run(vessels.ft.predict_hotspots(STAR)),
             "next_look": run(vessels.ft.next_look(1)), "fleet_pattern": run(vessels.ft.fleet_pattern())}
+    ask(vessels, "Same question, end of August")                           # a thin pass only: the forecast ends on stop
+    read_and_cover(vessels, AUG30, because="asked")
+    outs["predict_hotspots (thin)"] = run(vessels.ft.predict_hotspots(AUG30))
     assert outs["detect_vessels"]["next_steps"] == "Show the targets (display_visual with targets_s3_url and render); then the coverage check."
     assert outs["check_ais_coverage"]["next_steps"].endswith("judge this pass against the standard.")
     for name, out in outs.items():
         steps = out["next_steps"]
         assert not re.search(r"(detect_vessels|check_ais_coverage|match_ais|gather_evidence|fleet_pattern|draft_tasking)\(", steps), name
-        assert "fleet_pattern" not in steps and "in the same response as" not in steps.replace(
-            "announce it with decide in the same response as next_look", ""), name
+        # The forecast's two endings are its fork, decisions not investigation calls: a box with
+        # decide beside next_look, or decide stop.
+        fork = steps.replace("announce it with decide in the same response as next_look", "").replace(
+            "so there is no box to draft: decide stop, then write the answer", "")
+        assert "fleet_pattern" not in steps and "in the same response as" not in fork and "decide" not in fork, name
 
 
 # --- predict_hotspots(pass_id) ------------------------------------------------------------------------
+
+def test_predict_hotspots_next_steps_name_the_ending_this_questions_records_allow(vessels):
+    """Review B1: after thin passes only, the forecast's next steps end on stop, never on a draft (so no
+    'Decided: Drafting box k' line precedes a tasking that cannot be drafted); after a checked pass
+    they ask for the box. With no question open they read as today."""
+    show = "Show the heat and the boxes (display_visual with each render); say the check with say, word for word. "
+    draft = show + "Choose which box to draft and announce it with decide in the same response as next_look."
+    stop = show + "No pass read in this question could be checked, so there is no box to draft: decide stop, then write the answer."
+    assert run(vessels.ft.predict_hotspots())["next_steps"] == draft          # no question open
+    # A thin-only question: Aug 30 checks 6%, under the standard, so match_ais never runs on it.
+    ask(vessels, "Same question, end of August")
+    read_and_cover(vessels, AUG30, because="asked")
+    assert decide(vessels, "forecast", "coverage_thin")["status"] == "noted"
+    assert run(vessels.ft.predict_hotspots(AUG30))["next_steps"] == stop
+    assert decide(vessels, "stop", "no_checked_pass")["status"] == "noted"   # the ending it names is accepted
+    # Another question in a new turn: the first one's records count for nothing here.
+    ask(vessels)
+    assert run(vessels.ft.predict_hotspots())["next_steps"] == stop          # nothing read yet, nothing checked
+    read_and_cover(vessels, STAR)                                           # 25%: checked, before match_ais
+    assert run(vessels.ft.predict_hotspots(STAR))["next_steps"] == draft
+    run(vessels.ais.match_ais(STAR))
+    assert run(vessels.ft.predict_hotspots(STAR))["next_steps"] == draft
+    # Thin, then checked in the same question: the second pass's match record makes it a draft.
+    ask(vessels, "Same question, end of August")
+    read_and_cover(vessels, AUG30, because="asked")
+    assert run(vessels.ft.predict_hotspots(AUG30))["next_steps"] == stop
+    read_and_cover(vessels, STAR, because="coverage_thin")
+    run(vessels.ais.match_ais(STAR))
+    assert run(vessels.ft.predict_hotspots(STAR))["next_steps"] == draft
+
 
 def test_predict_hotspots_counts_this_questions_candidates_near_each_box(vessels):
     boxes = run(vessels.ft.predict_hotspots())["boxes"]
