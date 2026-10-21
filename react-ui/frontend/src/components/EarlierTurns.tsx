@@ -13,7 +13,7 @@ import { StepColumn } from './StepColumn.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
 import { withSaw } from '../utils/narration.ts';
 import { groupSteps } from '../utils/steps.ts';
-import type { PastTurn } from '../utils/turns.ts';
+import { failedTurnLine, type PastTurn } from '../utils/turns.ts';
 import type { ProfileData } from '../utils/profileSection.ts';
 
 export const EARLIER_VISIBLE = 4;
@@ -104,7 +104,7 @@ export function EarlierTurns({
                     <div className={`stage-answer earlier-turn__answer${turn.failed ? ' stage-answer--failed' : ''}`}>
                       <span className="stage-answer__who">{speaker}</span>
                       {turn.failed ? (
-                        <p className="stage-answer__text">The agent stopped before it answered.</p>
+                        <p className="stage-answer__text">{failedTurnLine(turn.answer, { record: true })}</p>
                       ) : (
                         <div className="stage-answer__text markdown-content">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.answer}</ReactMarkdown>

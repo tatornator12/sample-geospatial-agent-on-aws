@@ -23,7 +23,7 @@ import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
 import { blankDashCells } from '../utils/tables.ts';
 import { profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
-import { pastTurns, stageAnswerText } from '../utils/turns.ts';
+import { BACKEND_UNREACHABLE, failedTurnLine, isNetworkFailure, pastTurns, stageAnswerText } from '../utils/turns.ts';
 import { boundedSaw, latestNarration, sawByTool, withSaw } from '../utils/narration.ts';
 import { stepColumnMaxHeight } from '../utils/stageLayout.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
@@ -580,8 +580,11 @@ export function ChatSidebar({
       console.error('Exception while calling agent:', error);
 
       // Show user-friendly error message, unless the turn was ended or a newer one owns the stage.
+      // A request that never reached the backend says so (S8): the agent never started.
       if (!stale()) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = isNetworkFailure(error)
+          ? BACKEND_UNREACHABLE
+          : error instanceof Error ? error.message : String(error);
         setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errorMessage}` }]);
       }
     } finally {
@@ -819,9 +822,7 @@ export function ChatSidebar({
                 <div ref={answerRef} className={`stage-answer${answerFailed ? ' stage-answer--failed' : ''}`} aria-live="polite">
                   <span className="stage-answer__who">{speaker}</span>
                   {answerFailed ? (
-                    <p className="stage-answer__text">
-                      The agent stopped before it answered. Send the prompt again, or open the transcript for the error.
-                    </p>
+                    <p className="stage-answer__text">{failedTurnLine(answerText)}</p>
                   ) : (
                     <div className="stage-answer__text markdown-content">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{answerText}</ReactMarkdown>

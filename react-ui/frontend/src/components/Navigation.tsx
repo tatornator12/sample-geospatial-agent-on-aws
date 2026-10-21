@@ -1,12 +1,14 @@
 /**
  * The exhibit rail: a 56px strip across the top of the stage.
- * Title at left, sections (routes) centre, quiet sign-out at right.
- * The active section is lit amber with an underline; nothing else on the rail carries colour.
+ * Title at left, sections (routes) centre, the act picker and quiet sign-out at right.
+ * The active section is lit amber with an underline; nothing else on the rail carries colour
+ * except the error colour of the backend notice, shown only while the backend is unreachable.
  */
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { theme } from '../theme';
 import { logout } from '../utils/auth';
 import { AgentPicker } from './AgentPicker';
+import { BackendNotice } from './BackendNotice';
 
 const RAIL_HEIGHT = 56;
 
@@ -115,7 +117,9 @@ export function Navigation() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.md }}>
+        {/* The picker while the backend answers; the notice in its place while it does not. */}
         <AgentPicker />
+        <BackendNotice />
         <button
           onClick={handleLogout}
           style={{

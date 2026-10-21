@@ -30,6 +30,34 @@ export function stageAnswerText(raw: string): string {
   return stagePunctuation(twoColumnTables(blankDashCells(raw.trim())));
 }
 
+/** What the transcript records when the prompt never reached the stage backend (S8). */
+export const BACKEND_UNREACHABLE = "The stage can't reach the backend.";
+
+/**
+ * The prompt's request failed before any answer: the browser's own words for a network failure
+ * (Chrome "Failed to fetch", Firefox "NetworkError when attempting to fetch resource.", Safari
+ * "Load failed"). Matched on the message, not the TypeError class, so a bug in the stage's own
+ * code is never told as a dead connection.
+ */
+export function isNetworkFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /failed to fetch|networkerror|load failed/i.test(message);
+}
+
+/**
+ * The line a failed turn shows instead of its error: on the stage (`record` false) and in an
+ * earlier turn's record (`record` true). A prompt that never reached the backend says so, not
+ * that the agent stopped (it never started).
+ */
+export function failedTurnLine(answer: string, { record = false }: { record?: boolean } = {}): string {
+  if (answer.startsWith(`Error: ${BACKEND_UNREACHABLE}`)) {
+    return `${BACKEND_UNREACHABLE} Check the connection, then send the prompt again.`;
+  }
+  return record
+    ? 'The agent stopped before it answered.'
+    : 'The agent stopped before it answered. Send the prompt again, or open the transcript for the error.';
+}
+
 /**
  * Every turn before the one on the stage, oldest first. A turn is a presenter's prompt and the
  * agent's message after it. The turn on the stage is the last prompt and whatever followed it

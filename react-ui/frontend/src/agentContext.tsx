@@ -5,14 +5,19 @@
  * to the selected one. The list comes from the backend (`GET /api/agents`) and is offered in show
  * order with the room's names (utils/acts.ts); dev runtimes only in rehearsal. The choice is kept
  * in localStorage so a refresh between rehearsals lands on the same act, and a stored id that is
- * not offered falls back to the backend's default.
+ * not offered falls back to the backend's default. A backend that cannot be reached is asked
+ * again (2, 4, 8 and 16 s, then every 30 s) and the rail says so (components/BackendNotice.tsx).
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { listAgents } from './services/api';
 import { offeredAgents, rehearsalMode, type StageAgent } from './utils/acts';
 
 const STORAGE_KEY = 'agentic-earth.agent';
+
+// After a failed load the list is asked for again after these waits, then every 30 s.
+const RETRY_DELAYS_MS = [2000, 4000, 8000, 16000];
+const RETRY_EVERY_MS = 30000;
 
 type AgentStatus = 'loading' | 'ready' | 'error';
 
@@ -27,6 +32,10 @@ interface AgentContextValue {
   status: AgentStatus;
   /** The dev server or `?dev=1`: dev runtimes are offered too. */
   rehearsal: boolean;
+  /** While `status` is 'error': when the next attempt starts (ms since the epoch); null while one runs. */
+  retryAt: number | null;
+  /** Ask the backend again now. */
+  retry: () => void;
   selectAgent: (id: string) => void;
 }
 
@@ -64,13 +73,19 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [backendDefault, setBackendDefault] = useState<string | null>(null);
   const [status, setStatus] = useState<AgentStatus>('loading');
   const [rehearsal] = useState(readRehearsal);
+  // Each value is one attempt to load the list; a retry (timed or pressed) moves it on.
+  const [attempt, setAttempt] = useState(0);
+  const [retryAt, setRetryAt] = useState<number | null>(null);
+  const failures = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     listAgents()
       .then(({ agents: runtimes, defaultAgentId }) => {
         if (cancelled) return;
         const list = offeredAgents(runtimes, rehearsal);
+        failures.current = 0;
         setAgents(list);
         setBackendDefault(defaultAgentId);
         // `?agent=<id>` (printed by scripts/prewarm.py) wins over the remembered choice, so a
@@ -87,17 +102,31 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           null;
         if (initial) storeAgentId(initial);
         setSelectedAgentId(initial);
+        setRetryAt(null);
         setStatus('ready');
       })
       .catch((error) => {
         if (cancelled) return;
-        console.error('Could not load the agent list; prompts will use the backend default.', error);
+        const wait = RETRY_DELAYS_MS[failures.current] ?? RETRY_EVERY_MS;
+        failures.current += 1;
+        console.error(`Could not load the agent list; trying again in ${wait / 1000} s.`, error);
+        setRetryAt(Date.now() + wait);
         setStatus('error');
+        timer = setTimeout(() => {
+          setRetryAt(null);
+          setAttempt((n) => n + 1);
+        }, wait);
       });
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [rehearsal]);
+  }, [attempt, rehearsal]);
+
+  const retry = useCallback(() => {
+    setRetryAt(null);
+    setAttempt((n) => n + 1);
+  }, []);
 
   const selectAgent = useCallback(
     (id: string) => {
@@ -116,9 +145,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       defaultAgentId: backendDefault,
       status,
       rehearsal,
+      retryAt,
+      retry,
       selectAgent,
     }),
-    [agents, selectedAgentId, backendDefault, status, rehearsal, selectAgent]
+    [agents, selectedAgentId, backendDefault, status, rehearsal, retryAt, retry, selectAgent]
   );
 
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;

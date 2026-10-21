@@ -11,6 +11,8 @@ import { getApiUrl, loadArchaeologyRecord, loadMethaneBaseline, loadVesselRest, 
 import { taskingFiledMessage, type VesselRest } from '../utils/vesselLayers';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// The backend's agent id format (AGENT_ID_PATTERN in react-ui/backend/src/index.ts).
+const AGENT_ID_PATTERN = /^[a-z0-9_-]{1,64}$/;
 import { MapView } from '../components/MapView';
 import { ChatSidebar } from '../components/ChatSidebar';
 import type { GeometryData, RasterData } from '../types';
@@ -86,7 +88,13 @@ export function Chat() {
     [location.search, setSearchParams]
   );
 
-  const { agents, selectedAgentId, selectedAgent, selectAgent, defaultAgentId } = useAgents();
+  const { agents, selectedAgentId, selectedAgent, selectAgent, defaultAgentId, status } = useAgents();
+  // Until the agent list is in (loading, or the backend unreachable), the stage keeps the act its
+  // URL names, so the console's prompts and placeholder stay that act's (S8). Only a well-formed
+  // id; the backend still checks it before routing anything.
+  const urlAgent = searchParams.get('agent');
+  const stageAgentId =
+    selectedAgentId ?? (status !== 'ready' && urlAgent && AGENT_ID_PATTERN.test(urlAgent) ? urlAgent : null);
 
   // A pre-warmed session (scripts/prewarm.py prints `/?session=<uuid>`) is adopted on load so
   // the first prompt on stage skips the runtime cold start. Anything else gets a fresh id.
@@ -490,8 +498,8 @@ export function Chat() {
             rasters={currentRasters}
             // No drawing on the archaeologist's act: a shape over unrecorded ground is the one way
             // the stage could look as if it marked a new site (only the public record is shown).
-            drawRail={selectedAgentId !== 'archaeologist'}
-            onDrawnGeometry={selectedAgentId !== 'archaeologist' ? handleDrawnGeometry : undefined}
+            drawRail={stageAgentId !== 'archaeologist'}
+            onDrawnGeometry={stageAgentId !== 'archaeologist' ? handleDrawnGeometry : undefined}
             working={agentWorking}
             tips={tips}
             vesselRest={selectedAgentId === 'vessels' ? vesselRest : null}
@@ -504,7 +512,7 @@ export function Chat() {
       <div className="stage__overlay">
         <ChatSidebar
           sessionId={sessionId}
-          agentId={selectedAgentId ?? undefined}
+          agentId={stageAgentId ?? undefined}
           agentLabel={selectedAgent?.label}
           scenarioId={scenarioId || undefined}
           scenarioConfig={scenarioConfig}

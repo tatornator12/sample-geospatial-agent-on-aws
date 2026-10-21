@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Message, ToolCall } from '../types.ts';
-import { pastTurns, stageAnswerText } from './turns.ts';
+import { BACKEND_UNREACHABLE, failedTurnLine, isNetworkFailure, pastTurns, stageAnswerText } from './turns.ts';
 import { stagePunctuation } from './caption.ts';
 
 const tool = (name: string, id: string): ToolCall => ({ name, id, params: {}, status: 'completed' });
@@ -110,5 +110,43 @@ describe('stageAnswerText', () => {
     expect(text).toContain('| Wall | 1.5 m (1.7 m) |');
     expect(text).not.toContain('Documented |');
     expect(stageAnswerText('Built 2024–2025 — by hand.')).toBe('Built 2024 to 2025, by hand.');
+  });
+});
+
+describe('isNetworkFailure', () => {
+  it("is the browsers' words for a request that never reached the backend", () => {
+    expect(isNetworkFailure(new TypeError('Failed to fetch'))).toBe(true);
+    expect(isNetworkFailure(new TypeError('NetworkError when attempting to fetch resource.'))).toBe(true);
+    expect(isNetworkFailure(new TypeError('Load failed'))).toBe(true);
+  });
+  it('is not an HTTP error, a stream error or a bug in the stage', () => {
+    expect(isNetworkFailure(new Error('HTTP error! status: 502'))).toBe(false);
+    expect(isNetworkFailure(new Error('ThrottlingException: Rate exceeded'))).toBe(false);
+    expect(isNetworkFailure(new TypeError("Cannot read properties of undefined (reading 'tools')"))).toBe(false);
+    expect(isNetworkFailure(undefined)).toBe(false);
+  });
+});
+
+describe('failedTurnLine', () => {
+  const unreachable = stageAnswerText(`Error: ${BACKEND_UNREACHABLE}`);
+  it('says the stage cannot reach the backend, on the stage and in a record', () => {
+    const line = "The stage can't reach the backend. Check the connection, then send the prompt again.";
+    expect(failedTurnLine(unreachable)).toBe(line);
+    expect(failedTurnLine(unreachable, { record: true })).toBe(line);
+  });
+  it('keeps the agent-stopped lines for every other error', () => {
+    expect(failedTurnLine('Error: HTTP error! status: 502')).toBe(
+      'The agent stopped before it answered. Send the prompt again, or open the transcript for the error.'
+    );
+    expect(failedTurnLine('Error: boom', { record: true })).toBe('The agent stopped before it answered.');
+  });
+  it('marks the turn failed in the session record', () => {
+    const turns = pastTurns([
+      { role: 'user', content: 'First' },
+      { role: 'assistant', content: `Error: ${BACKEND_UNREACHABLE}` },
+      { role: 'user', content: 'Second' },
+    ]);
+    expect(turns[0].failed).toBe(true);
+    expect(failedTurnLine(turns[0].answer, { record: true })).toMatch(/^The stage can't reach the backend\./);
   });
 });
