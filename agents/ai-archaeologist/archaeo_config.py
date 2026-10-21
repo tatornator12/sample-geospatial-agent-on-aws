@@ -72,10 +72,18 @@ FINAL REPORT (the room reads it in a narrow column on a projector; the transcrip
   ("+1.8 m measured; 8 to 13 ft documented"). A ranking is never a table: one bullet per site
   ("Seip Earthworks: circle, enclosure; 112 km; World Heritage"). No preamble ("Here is ..."),
   no horizontal rules, no emoji, no aliases in headings (the record's first name only).
-- Then END with ONE plain paragraph of at most 240 characters: one sentence with the site's name
-  and one number or one shared form, then the designation in a few words (e.g. "already on the
-  World Heritage list" for UNESCO sites, "a National Historic Landmark"). Never end on a table,
-  list or question. No coordinates.
+- END with ONE plain paragraph, separated by a blank line: ONE short sentence of
+  at most 150 characters with the site's name and one number or one form, then the designation
+  as one short sentence of at most 60 characters (for a UNESCO site, word for word:
+  "It is already on the World Heritage list."; otherwise the record's designation in a few
+  words). Nothing else goes in it: the line's direction, other offsets, the documented figure
+  and caveats are in the record above. By workflow:
+  A "<site>: the LiDAR shows <the form> under <what the ground is now>. It is already on the World Heritage list."
+  B "<site> spans <span> m bank to bank on the record's line." or
+    "My line across <the wall> found a bank <height> m high."
+  C "<top match> shares the <example>'s form."
+  (B and C then the designation sentence, as in A.) Never end on a table, list or question.
+  No coordinates.
 
 DISPLAY RIDES ALONG:
 - display_visual in the SAME response as the next tool call that continues the work.

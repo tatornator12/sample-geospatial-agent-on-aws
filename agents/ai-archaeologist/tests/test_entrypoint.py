@@ -100,6 +100,20 @@ def test_prompt_carries_the_fixed_sentences_and_the_wording_rules():
     assert "—" not in p
 
 
+def test_prompt_keeps_the_closing_paragraph_to_one_sentence_and_the_designation():
+    # The caption band takes 280 characters; v14 wrote 306 by adding the line's direction and the
+    # designation's full name (stage-fixes-2 C1). One sentence <= 150, the designation <= 60.
+    import archaeo_config as c
+    p = c.build_prompt("2026-10-21")
+    assert "at most 150 characters" in p and "at most 60 characters" in p
+    assert "Nothing else goes in it" in p
+    assert '"It is already on the World Heritage list."' in p
+    assert "at most 240 characters" not in p
+    assert "\u2014" not in p and "\u2013" not in p
+    # Rule 2's fixed refusal closer is untouched.
+    assert '(2) the closer, alone and word for word: "The sites I show are already on the public record."' in p
+
+
 def test_prompt_lets_the_agent_choose_the_line_and_show_only_the_files_it_was_given():
     import archaeo_config as c
     import site_tools
