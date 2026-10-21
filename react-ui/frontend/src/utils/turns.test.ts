@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Message, ToolCall } from '../types.ts';
-import { BACKEND_UNREACHABLE, failedTurnLine, isNetworkFailure, pastTurns, stageAnswerText } from './turns.ts';
+import {
+  BACKEND_UNREACHABLE,
+  STOPPED_LINE,
+  failedTurnLine,
+  isNetworkFailure,
+  pastTurns,
+  stageAnswerText,
+  stageStatusLine,
+} from './turns.ts';
 import { stagePunctuation } from './caption.ts';
 
 const tool = (name: string, id: string): ToolCall => ({ name, id, params: {}, status: 'completed' });
@@ -168,5 +176,23 @@ describe('failedTurnLine', () => {
     ]);
     expect(turns[0].failed).toBe(true);
     expect(failedTurnLine(turns[0].answer, { record: true })).toMatch(/^The stage can't reach the backend\./);
+  });
+});
+
+describe('stageStatusLine (B3, S15)', () => {
+  const tools = [tool('find_location_boundary', 'a'), tool('find_similar_places', 'b')];
+  it('says the lit step while working, as the column numbers and names it', () => {
+    expect(stageStatusLine({ working: true, tools: [] })).toBe('The agent is working');
+    expect(stageStatusLine({ working: true, tools: tools.slice(0, 1) })).toBe('Step 1: Get the boundary');
+    expect(stageStatusLine({ working: true, tools })).toBe('Step 2: Find similar places');
+  });
+  it('then how the turn ended, and nothing before a turn', () => {
+    expect(stageStatusLine({ working: false, tools, answer: 'Six places look like the park.' })).toBe('Answer ready');
+    expect(stageStatusLine({ working: false, tools, answer: '', brief: true })).toBe('Brief drafted');
+    expect(stageStatusLine({ working: false, tools, answer: 'Error: x', failed: 'The agent stopped at step 02, Find similar places.' })).toBe(
+      'The agent stopped at step 02, Find similar places.'
+    );
+    expect(stageStatusLine({ working: false, tools: [], answer: STOPPED_LINE })).toBe(STOPPED_LINE);
+    expect(stageStatusLine({ working: false, tools: [], answer: '' })).toBe('');
   });
 });

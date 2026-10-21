@@ -1261,8 +1261,10 @@
 .map-row--settle {
   animation: map-row-settle 300ms var(--ease-out);
 }
-/* For screen readers only: the stack's instructions and its announcements. */
-.map-stack__sr {
+/* For screen readers only: the stack's instructions and its announcements, and the step
+   column's status line (the lit step, then how the turn ended). */
+.map-stack__sr,
+.stage-status {
   position: absolute;
   width: 1px;
   height: 1px;

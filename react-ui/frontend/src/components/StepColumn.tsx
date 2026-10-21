@@ -133,7 +133,6 @@ export function StepColumn({
       <ol
         className="stage-step-column"
         aria-label={live ? 'Agent steps, in progress' : 'Agent steps, completed'}
-        aria-live="polite"
         style={{ margin: 0, padding: 0, listStyle: 'none' }}
       >
         {compact && !live ? (

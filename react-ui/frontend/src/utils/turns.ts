@@ -70,6 +70,28 @@ export function failedTurnLine(
     : 'The agent stopped before it answered. Send the prompt again, or open the transcript for the error.';
 }
 
+/** What the stage records when the presenter stops a turn (Stop or Esc). */
+export const STOPPED_LINE = 'Stopped by the presenter.';
+
+/**
+ * The step column's one status line for screen readers (S15): where the agent is while it works
+ * ("Step 3: Find similar places", as the column numbers and names it; "The agent is working"
+ * before the first step), then how the turn ended. Empty before any turn. The live region is
+ * this one line, so a new step is announced once and the list itself never re-reads.
+ */
+export function stageStatusLine({
+  working, tools, answer, brief = false, failed = null,
+}: { working: boolean; tools: ToolCall[]; answer?: string | null; brief?: boolean; failed?: string | null }): string {
+  if (working) {
+    const groups = groupSteps(tools);
+    return groups.length > 0 ? `Step ${groups.length}: ${groupName(groups[groups.length - 1])}` : 'The agent is working';
+  }
+  if (failed) return failed;
+  if (brief) return 'Brief drafted';
+  if (answer === STOPPED_LINE) return STOPPED_LINE;
+  return answer ? 'Answer ready' : '';
+}
+
 /**
  * Every turn before the one on the stage, oldest first. A turn is a presenter's prompt and the
  * agent's message after it. The turn on the stage is the last prompt and whatever followed it

@@ -185,7 +185,7 @@ describe('Stop', () => {
     });
     expect(turn.signal?.aborted).toBe(true);
     expect(stopRuntimeSession).toHaveBeenCalledWith(S1, 'dev');
-    expect(screen.getByText('Stopped by the presenter.')).toBeTruthy();
+    expect(document.querySelector('.stage-answer')?.textContent).toContain('Stopped by the presenter.');
     expect(input().disabled).toBe(false);
 
     turn.push(chunk('LATE answer from the stopped turn.'));
@@ -220,7 +220,7 @@ describe('Escape', () => {
     });
 
     expect(turn.signal?.aborted).toBe(true);
-    expect(screen.getByText('Stopped by the presenter.')).toBeTruthy();
+    expect(document.querySelector('.stage-answer')?.textContent).toContain('Stopped by the presenter.');
     expect(input().disabled).toBe(false);
   });
 
@@ -244,7 +244,7 @@ describe('Escape', () => {
     slider.remove();
 
     expect(turn.signal?.aborted).toBe(false);
-    expect(screen.queryByText('Stopped by the presenter.')).toBeNull();
+    expect(document.querySelector('.stage-answer')).toBeNull();
     expect(input().disabled).toBe(true);
   });
 
@@ -254,7 +254,7 @@ describe('Escape', () => {
       fireEvent.keyDown(window, { key: 'Escape' });
     });
     expect(stopRuntimeSession).not.toHaveBeenCalled();
-    expect(screen.queryByText('Stopped by the presenter.')).toBeNull();
+    expect(document.querySelector('.stage-answer')).toBeNull();
   });
 });
 
@@ -323,6 +323,35 @@ describe('A turn that fails after some steps (B2, A1 P1-9)', () => {
     });
     expect(document.querySelector('.earlier-turn__record')?.textContent).toContain('The agent stopped at step 02, Fetch Sentinel-2.');
     expect(document.querySelectorAll('.earlier-turn__record .stage-step-column > li')).toHaveLength(2);
+  });
+});
+
+describe('The status line (B3, S15)', () => {
+  it('is mounted and empty at rest, then says each step once and how the turn ended', async () => {
+    setup();
+    const status = () => document.querySelector('.stage-status[role="status"]');
+    expect(status()).toBeTruthy();
+    expect(status()?.textContent).toBe('');
+    const turn = await sendFirstPlate();
+    const seen: string[] = [];
+    const sample = () => {
+      const t = status()?.textContent ?? '';
+      if (seen[seen.length - 1] !== t) seen.push(t);
+    };
+    await flush();
+    sample();
+    turn.push(chunk(`${toolCall('t1', 'find_location_boundary', { location: 'Central Park' })} `));
+    await flush();
+    sample();
+    turn.push(chunk('{"toolUseId": "t2", "name": "find_similar_places", "input": "'));
+    await flush();
+    sample();
+    turn.push(chunk('{}"}Six places look like the park.'));
+    turn.end();
+    await flush();
+    sample();
+    expect(seen).toEqual(['The agent is working', 'Step 1: Get the boundary', 'Step 2: Find similar places', 'Answer ready']);
+    expect(document.querySelector('.stage-answer')?.hasAttribute('aria-live')).toBe(false);
   });
 });
 

@@ -97,3 +97,12 @@ describe('the end frame (compact)', () => {
     expect(screen.queryByRole('button', { name: /earlier/ })).toBeNull();
   });
 });
+
+describe('the live region (B3, S15)', () => {
+  it('is not the list: the ol has no aria-live, while working or done', () => {
+    const { rerender } = render(<StepColumn steps={tools(NAMES.slice(0, 2))} live />);
+    expect(document.querySelector('.stage-step-column')?.hasAttribute('aria-live')).toBe(false);
+    rerender(<StepColumn steps={tools(NAMES.slice(0, 2))} live={false} />);
+    expect(document.querySelector('.stage-step-column')?.hasAttribute('aria-live')).toBe(false);
+  });
+});

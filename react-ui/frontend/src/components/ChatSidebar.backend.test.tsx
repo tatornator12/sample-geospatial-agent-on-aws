@@ -64,9 +64,9 @@ describe('A prompt with the backend unreachable', () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/agent/invoke'), expect.anything());
-    expect(
-      screen.getByText("The stage can't reach the backend. Check the connection, then send the prompt again.")
-    ).toBeTruthy();
+    expect(document.querySelector('.stage-answer')?.textContent).toContain(
+      "The stage can't reach the backend. Check the connection, then send the prompt again."
+    );
     expect(screen.queryByText(/The agent stopped before it answered/)).toBeNull();
     expect(input.disabled).toBe(false);
   });

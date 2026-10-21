@@ -23,7 +23,15 @@ import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
 import { blankDashCells } from '../utils/tables.ts';
 import { profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
-import { BACKEND_UNREACHABLE, failedTurnLine, isNetworkFailure, pastTurns, stageAnswerText } from '../utils/turns.ts';
+import {
+  BACKEND_UNREACHABLE,
+  STOPPED_LINE,
+  failedTurnLine,
+  isNetworkFailure,
+  pastTurns,
+  stageAnswerText,
+  stageStatusLine,
+} from '../utils/turns.ts';
 import { boundedSaw, latestNarration, openTool, sawByTool, withSaw } from '../utils/narration.ts';
 import { stepColumnMaxHeight } from '../utils/stageLayout.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
@@ -302,7 +310,7 @@ export function ChatSidebar({
     streamOwnerRef.current.processing = false;
     setIsStreaming(false);
     setIsProcessing(false);
-    setMessages((prev) => [...prev, { role: 'assistant', content: 'Stopped by the presenter.' }]);
+    setMessages((prev) => [...prev, { role: 'assistant', content: STOPPED_LINE }]);
     console.log('Stopped the turn; stopping session:', sessionId);
     void stopRuntimeSession(sessionId, agentId).then((stopped) => {
       if (!stopped) console.error('Could not stop the runtime session', sessionId);
@@ -709,6 +717,16 @@ export function ChatSidebar({
   const showColumn = isStreaming || stepTools.length > 0 || showAnswer || earlierTurns.length > 0;
   const columnTitle = isStreaming ? 'The agent is working' : stepTools.length > 0 ? 'What the agent did' : 'What the agent said';
   const [stepsOpen, setStepsOpen] = useState(true);
+  // One status line for screen readers (S15): the lit step while working, then how the turn ended.
+  const statusLine = lastUser
+    ? stageStatusLine({
+        working: isStreaming,
+        tools: stepTools,
+        answer: answerText,
+        brief: showBrief && draftedBrief,
+        failed: answerFailed ? failedTurnLine(answerText, { tools: stepTools }) : null,
+      })
+    : '';
   // The same count the column's "Show all N steps" uses (consecutive calls of one tool are one step).
   const stepCount = groupSteps(stepTools).length;
 
@@ -759,6 +777,8 @@ export function ChatSidebar({
 
   return (
     <>
+      {/* Always mounted, so the first step is announced too; the column's list is not a live region. */}
+      <p className="stage-status" role="status">{statusLine}</p>
       {/* Left: the step column. The question, what the agent did, and its answer or brief. */}
       {showColumn && (
         <section
@@ -835,7 +855,7 @@ export function ChatSidebar({
                 />
               )}
               {showAnswer && (
-                <div ref={answerRef} className={`stage-answer${answerFailed ? ' stage-answer--failed' : ''}`} aria-live="polite">
+                <div ref={answerRef} className={`stage-answer${answerFailed ? ' stage-answer--failed' : ''}`}>
                   <span className="stage-answer__who">{speaker}</span>
                   {answerFailed ? (
                     <p className="stage-answer__text">{failedTurnLine(answerText, { tools: stepTools })}</p>
