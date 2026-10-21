@@ -3,8 +3,9 @@
  * module-level API URL resolves to http://localhost:3001.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { listAgents, prewarmSession, streamAgentInvoke } from './api.ts';
-import type { StreamEvent } from '../types.ts';
+import { listAgents, loadVesselRest, prewarmSession, streamAgentInvoke } from './api.ts';
+import type { StreamEvent, ToolCall } from '../types.ts';
+import { vesselsDirFrom } from '../utils/vesselSteps.ts';
 
 function fetchResponding(status: number, payload: unknown) {
   return vi.fn().mockResolvedValue({
@@ -85,6 +86,45 @@ describe('prewarmSession', () => {
 
     vi.stubGlobal('fetch', fetchResponding(503, { error: 'no runtime' }));
     expect(await prewarmSession('0123456789abcdef0123456789abcdef0123')).toBe(false);
+  });
+});
+
+describe('loadVesselRest (Dark Vessels, review M3)', () => {
+  const SID = '0b6c9a0e-1111-4222-8333-444455556666';
+  const rest = (extra: Record<string, unknown> = {}) => ({
+    version: 1,
+    pass: { pass_id: 's1d-20261012t0018', satellite: 'Sentinel-1D', sensed: '2026-10-12T00:18:02Z', orbit_state: 'ASCENDING' },
+    replay: { start: '2026-10-10T00:18Z', end: '2026-10-12T00:18Z', tracks: [] },
+    reserve: { type: 'Polygon', coordinates: [] },
+    ports: [], islands: [], passes: [], attribution: 'Powered by Global Fishing Watch.',
+    ...extra,
+  });
+  // Before any s3_url has streamed, only the list_passes call is on the stage.
+  const listing: ToolCall[] = [{ id: 'tooluse_list1', name: 'list_passes', params: {}, status: 'completed' }];
+
+  it('keeps a bucket that passes the bucket rule, so the board can load before the radar', async () => {
+    vi.stubGlobal('fetch', fetchResponding(200, rest({ bucket: 'geo-agent-bucket' })));
+    const loaded = await loadVesselRest();
+    expect(loaded?.bucket).toBe('geo-agent-bucket');
+    expect(vesselsDirFrom(listing, SID, { bucket: loaded?.bucket })).toBe(`s3://geo-agent-bucket/session_data/${SID}/vessels/`);
+  });
+
+  it('leaves the fallback off with no bucket, or one that fails the rule: the column waits for a streamed s3_url', async () => {
+    for (const bad of [undefined, null, '', 'Geo_Bucket', 'a', '-bucket', 'bucket/../x', 's3://bucket', 42]) {
+      vi.stubGlobal('fetch', fetchResponding(200, bad === undefined ? rest() : rest({ bucket: bad })));
+      const loaded = await loadVesselRest();
+      // The rest itself still loads (the sea at night), only the bucket is dropped.
+      expect(loaded?.version).toBe(1);
+      expect(loaded?.bucket).toBeNull();
+      expect(vesselsDirFrom(listing, SID, { bucket: loaded?.bucket })).toBeNull();
+    }
+  });
+
+  it('is null when nothing is published', async () => {
+    vi.stubGlobal('fetch', fetchResponding(404, { error: 'No resting state published yet' }));
+    expect(await loadVesselRest()).toBeNull();
+    vi.stubGlobal('fetch', fetchResponding(200, { version: 2 }));
+    expect(await loadVesselRest()).toBeNull();
   });
 });
 

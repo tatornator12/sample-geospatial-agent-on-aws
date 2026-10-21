@@ -8,7 +8,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAgents } from '../agentContext';
 import { caseAgent } from '../utils/caseAgent';
 import { getApiUrl, loadArchaeologyRecord, loadMethaneBaseline, loadVesselRest, prewarmSession } from '../services/api';
-import { taskingFiledMessage, type VesselRest } from '../utils/vesselLayers';
+import type { VesselRest } from '../utils/vesselLayers';
+
+/** Dark Vessels: nothing revealed yet in this session. */
+const NO_REVEALS: Readonly<Record<string, number>> = {};
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // The backend's agent id format (AGENT_ID_PATTERN in react-ui/backend/src/index.ts).
@@ -114,11 +117,18 @@ export function Chat() {
   const [mapReady, setMapReady] = useState(true); // Controls MapView render delay on scenario switch
   const [agentWorking, setAgentWorking] = useState(false);
   const [tips, setTips] = useState<Tip[]>([]);
-  // Dark Vessels: the act's resting state, the session's tasking drafts, and the prompt the stage
-  // sends once the officer has filed on the map.
+  // Dark Vessels: the act's resting state and the session's tasking drafts. The officer's approval
+  // ends the act on the plate's filed line: the stage sends no follow-up turn (U4, R6.8).
   const [vesselRest, setVesselRest] = useState<VesselRest | null>(null);
   const [taskingKey, setTaskingKey] = useState(0);
-  const [autoPrompt, setAutoPrompt] = useState<string | null>(null);
+  // Dark Vessels: the passes whose candidates the map has revealed, with the count it revealed, so
+  // the step column shows no count before the map does (R4.2, review M2). Held for one session
+  // only: a new session id reads as nothing revealed.
+  const [reveals, setReveals] = useState<{ sessionId: string; passes: Record<string, number> }>({ sessionId: '', passes: {} });
+  const revealedPasses = reveals.sessionId === sessionId ? reveals.passes : NO_REVEALS;
+  const onCandidatesRevealed = useCallback((passId: string, count: number) => {
+    setReveals((r) => ({ sessionId, passes: { ...(r.sessionId === sessionId ? r.passes : {}), [passId]: count } }));
+  }, [sessionId]);
 
   // Track if this is the first run of the scenario effect
   const isFirstScenarioLoad = useRef(true);
@@ -152,7 +162,6 @@ export function Chat() {
     setIsLoadingScenario(false);
     setTips([]);
     setTaskingKey(0);
-    setAutoPrompt(null);
   }, []);
 
   // Load scenario when scenarioId is present
@@ -480,7 +489,7 @@ export function Chat() {
             tips={tips}
             vesselRest={selectedAgentId === 'vessels' ? vesselRest : null}
             tasking={{ sessionId, caseId: scenarioId || undefined, key: taskingKey }}
-            onTaskingFiled={(id) => setAutoPrompt(taskingFiledMessage(id))}
+            onCandidatesRevealed={onCandidatesRevealed}
           />
         )}
       </div>
@@ -503,8 +512,8 @@ export function Chat() {
           onWorkingChange={setAgentWorking}
           onTipsUpdate={setTips}
           onTaskingDrafted={setTaskingKey}
-          autoPrompt={autoPrompt}
-          onAutoPromptSent={() => setAutoPrompt(null)}
+          vesselBucket={selectedAgentId === 'vessels' ? vesselRest?.bucket ?? null : null}
+          revealedPasses={revealedPasses}
         />
       </div>
     </div>

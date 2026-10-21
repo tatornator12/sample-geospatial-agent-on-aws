@@ -1,5 +1,6 @@
 import type { GeometryData, StreamEvent } from '../types.ts';
 import type { VesselRest } from '../utils/vesselLayers.ts';
+import { validBucket } from '../utils/vesselSteps.ts';
 import { getIdToken } from '../utils/auth';
 
 // API URL: In production (when served from same origin), use current origin
@@ -309,14 +310,17 @@ export async function loadArchaeologyRecord(): Promise<GeometryData | null> {
 
 /**
  * Dark Vessels' resting state: the star pass's AIS replay, the reserve, its ports and the island
- * names (all already scrubbed of identity at the build). Null when it is not published.
+ * names (all already scrubbed of identity at the build). Null when it is not published. Its
+ * `bucket` is kept only when it passes the bucket rule; a missing or bad one is null, which leaves
+ * the step column's early-board fallback off (it waits for a streamed s3_url; review M3).
  */
 export async function loadVesselRest(): Promise<VesselRest | null> {
   try {
     const response = await fetch(`${API_URL}/api/vessels/rest`, { headers: getAuthHeaders() });
     if (!response.ok) return null;
     const body = (await response.json()) as VesselRest;
-    return body && body.version === 1 && Array.isArray(body.replay?.tracks) ? body : null;
+    if (!body || body.version !== 1 || !Array.isArray(body.replay?.tracks)) return null;
+    return { ...body, bucket: validBucket(body.bucket) };
   } catch {
     return null;
   }

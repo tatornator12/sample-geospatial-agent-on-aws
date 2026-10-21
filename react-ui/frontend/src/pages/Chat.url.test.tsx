@@ -77,7 +77,7 @@ vi.mock('../services/api', () => {
 });
 
 import { Chat } from './Chat.tsx';
-import { prewarmSession } from '../services/api';
+import { loadVesselRest, prewarmSession } from '../services/api';
 
 const WARM = '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f';
 
@@ -319,5 +319,54 @@ describe('Prewarm (B4, S12)', () => {
     const sid = h.sidebar.sessionId as string;
     await waitFor(() => expect(calls()).toContain(`methane:${sid}`));
     expect(calls()).toEqual([`stable:${sid}`, `methane:${sid}`]);
+  });
+});
+describe('Dark Vessels on the stage (redesign §3.8.1, §3.8.4)', () => {
+  const rest = { version: 1, pass: { pass_id: 's1d-20261012t0018' }, replay: { start: '', end: '', tracks: [] }, bucket: 'geo-bucket' };
+
+  it("passes the map's reveals to the column for this session only, and the rest file's bucket", async () => {
+    h.initial = 'vessels';
+    vi.mocked(loadVesselRest).mockResolvedValueOnce(rest as never);
+    renderStage('/?agent=vessels');
+    await waitFor(() => expect(h.sidebar.vesselBucket).toBe('geo-bucket'));
+    expect(h.sidebar.revealedPasses).toEqual({});
+
+    await act(async () => {
+      (h.map.onCandidatesRevealed as (pass: string, n: number) => void)('s1d-20261012t0018', 4);
+    });
+    expect(h.sidebar.revealedPasses).toEqual({ 's1d-20261012t0018': 4 });
+    await act(async () => {
+      (h.map.onCandidatesRevealed as (pass: string, n: number) => void)('s1d-20260830t0026', 0);
+    });
+    expect(h.sidebar.revealedPasses).toEqual({ 's1d-20261012t0018': 4, 's1d-20260830t0026': 0 });
+
+    // New session: nothing is revealed in the new one, and a late reveal from the old map is ignored.
+    const late = h.map.onCandidatesRevealed as (pass: string, n: number) => void;
+    const before = h.sidebar.sessionId;
+    await act(async () => {
+      (h.sidebar.onSessionReset as () => void)();
+    });
+    await waitFor(() => expect(h.sidebar.sessionId).not.toBe(before));
+    expect(h.sidebar.revealedPasses).toEqual({});
+    await act(async () => {
+      late('s1d-20261012t0018', 4);
+    });
+    expect(h.sidebar.revealedPasses).toEqual({});
+  });
+
+  it('sends no follow-up turn when the officer files: no auto prompt, no filed callback (U4, R6.8)', async () => {
+    h.initial = 'vessels';
+    renderStage('/?agent=vessels');
+    await waitFor(() => expect(h.sidebar.agentId).toBe('vessels'));
+    expect(h.map).not.toHaveProperty('onTaskingFiled');
+    expect(h.sidebar.autoPrompt).toBeUndefined();
+    expect(h.sidebar.onAutoPromptSent).toBeUndefined();
+  });
+
+  it('gives other acts no bucket', async () => {
+    h.initial = 'methane';
+    renderStage('/?agent=methane');
+    await waitFor(() => expect(h.sidebar.agentId).toBe('methane'));
+    expect(h.sidebar.vesselBucket).toBeNull();
   });
 });

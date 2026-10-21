@@ -14,7 +14,9 @@ import { EvidenceChip } from './EvidenceChip.tsx';
 import { PassFilmstrip } from './PassFilmstrip.tsx';
 import { ProfileSection } from './ProfileSection.tsx';
 import { TipBoard } from './TipBoard.tsx';
+import { VesselStepExtras, type VesselStage } from './VesselStepExtras.tsx';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
+import { isVesselTurn } from '../utils/vesselSteps.ts';
 import type { ProfileData } from '../utils/profileSection.ts';
 import {
   PLAN_STAGES,
@@ -50,6 +52,8 @@ interface StepColumnProps {
   compact?: boolean;
   /** The archaeologist's measured sections, by site id, drawn under the measure step that made them. */
   profiles?: Record<string, ProfileData>;
+  /** Dark Vessels: whose board and decision files to read, the turn's send time, the map's reveals. */
+  vessel?: VesselStage;
 }
 
 const MAX_VISIBLE = 9;
@@ -70,7 +74,7 @@ function sectionsFor(group: StepGroup, profiles: Record<string, ProfileData>): P
 }
 
 export function StepColumn({
-  steps, live, evidence = [], onOpenEvidence, methaneDir = null, tips = [], compact = false, profiles = {},
+  steps, live, evidence = [], onOpenEvidence, methaneDir = null, tips = [], compact = false, profiles = {}, vessel,
 }: StepColumnProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -85,6 +89,12 @@ export function StepColumn({
   };
 
   if (steps.length === 0) return null;
+
+  // Dark Vessels: the act's grammar, pass board and lines, remounted every turn by its send time so
+  // each question loads its own files (redesign §3.8.1, review L3).
+  if (isVesselTurn(steps)) {
+    return <VesselStepExtras key={vessel?.turnSentAt ?? 0} steps={steps} live={live} evidence={evidence} onOpenEvidence={onOpenEvidence} stage={vessel} />;
+  }
 
   const groups = groupSteps(steps);
   const lastCue = steps.map((s) => s.name).lastIndexOf('check_recent_passes');

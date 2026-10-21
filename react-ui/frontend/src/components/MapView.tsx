@@ -87,9 +87,14 @@ import {
   FLEET_VIEW,
   aisLook,
   beatFor,
+  boxCheckOf,
+  coverageFacts,
   featureBounds,
   filedFacts,
+  forecastPass,
   growBounds,
+  heatCheckOf,
+  heatHoldLeft,
   heavyBounds,
   isVesselLayer,
   lookStartFrom,
@@ -210,8 +215,8 @@ interface MapViewProps {
   vesselRest?: VesselRest | null;
   /** Dark Vessels' tasking: how many drafts this session (0 is none yet), for the session or the case. */
   tasking?: { sessionId: string; caseId?: string; key: number };
-  /** The officer filed the tasking on the map: the agent is told next. */
-  onTaskingFiled?: (taskingId: string) => void;
+  /** Dark Vessels: the map revealed a pass's candidates (the count it revealed); the step column's counts wait for it. */
+  onCandidatesRevealed?: (passId: string, count: number) => void;
   /** A raster is on the map (its URL): a replay's held layer waits for the scene before it. */
   onRasterLanded?: (url: string) => void;
 }
@@ -252,7 +257,7 @@ function onStyle(m: maplibregl.Map, fn: () => void) {
   m.once('idle', run);
 }
 
-export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, working = false, tips = [], vesselRest = null, tasking, onTaskingFiled, onRasterLanded }: MapViewProps) {
+export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, working = false, tips = [], vesselRest = null, tasking, onCandidatesRevealed, onRasterLanded }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
@@ -501,11 +506,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   // The pass the stage is showing (a radar, its targets, its coverage, an earlier pass's reach).
   const [stagePass, setStagePass] = useState<string | null>(null);
   const stagePassRef = useRef<string | null>(null);
-  // The first pass the session's targets came from: the forecast's beats return to it.
-  const firstPass = useRef<string | null>(null);
   const seaFiles = useRef(new Map<string, SeaFile>());
   const revealed = useRef(new Set<string>());
   const [candidatesShown, setCandidatesShown] = useState(false);
+  // The reveal is told to the stage (the step column's counts wait for it), through the latest prop.
+  const onRevealRef = useRef(onCandidatesRevealed);
+  onRevealRef.current = onCandidatesRevealed;
+  // When the heat went on (ms): its beat holds HEAT_HOLD_MS before the boxes' beat.
+  const heatShownAt = useRef<number | null>(null);
   const seaTimers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const sweeps = useRef(new Map<string, () => void>());
   const player = useRef<sea.ReplayPlayer | null>(null);
@@ -570,7 +578,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   };
 
   // The date reset: one pass on the stage at a time. A pass's layers landing hide another pass's; the
-  // forecast's (no pass) bring back the session's first pass. The AIS replay is the latest pass's, so
+  // forecast's (no pass) bring back the pass the argument ended on. The AIS replay is the rest's pass's, so
   // over another pass it steps aside (the paint effect below).
   const showPass = (pass: string | null) => {
     if (!pass) return;
@@ -589,8 +597,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     });
     if (Object.keys(changes).length) setRasterVisibility((prev) => ({ ...prev, ...changes }));
   };
-  const backToFirstPass = () => {
-    const pass = firstPass.current ?? vesselRest?.pass.pass_id ?? null;
+  // The forecast's beats return to the pass the argument ended on (the last one matched, else the
+  // last with targets), so on the thin path the set-aside pass does not come back (§3.8.4).
+  const backToForecastPass = () => {
+    const pass = forecastPass(seaFiles.current.values()) ?? vesselRest?.pass.pass_id ?? null;
     if (pass && stagePassRef.current !== pass) showPass(pass);
   };
 
@@ -615,6 +625,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         });
         setCandidatesShown(true);
         setSeaBeat('candidates');
+        // The column's candidate count (and any "no candidates" line) waits for this moment (R4.2).
+        const shown = seaFiles.current.get(id);
+        if (f.pass && shown?.data) onRevealRef.current?.(f.pass, targetCounts(shown.data.features).candidate);
       }, prefersReducedMotion() ? 0 : 1400);
     });
   };
@@ -660,7 +673,6 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     setSeaFacts((x) => ({ ...x, counts, passId: f.pass ?? x.passId }));
     if (first) {
       showPass(f.pass);
-      if (!firstPass.current) firstPass.current = f.pass;
       const b = featureBounds(f.data.features);
       if (b) seaFit(m, growBounds(b, 0.18));
     }
@@ -680,8 +692,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         landTargets(m, id, f, true);
         return;
       case 'heard': {
-        const share = Number(feats[0]?.properties?.share);
-        if (Number.isFinite(share)) setSeaFacts((x) => ({ ...x, heardShare: share }));
+        // This pass's own shares (validated), never a previous pass's: what it can check, the standard.
+        const facts = coverageFacts(feats);
+        setSeaFacts((x) => ({ ...x, heardShare: undefined, checkable: undefined, standard: undefined, ...facts }));
         showPass(f.pass);
         setSeaBeat('coverage');
         maybeReveal();
@@ -693,13 +706,29 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         maybeReveal();
         return;
       case 'heat':
-      case 'boxes':
-        backToFirstPass();
-        setSeaBeat(f.kind === 'heat' && !seaFileOf('boxes') ? 'heat' : 'boxes');
+      case 'boxes': {
+        backToForecastPass();
+        // Each figure from its own file: the top 5% from the heat, the boxes' from the boxes.
+        if (f.kind === 'heat') {
+          const heatCheck = heatCheckOf(feats);
+          setSeaFacts((x) => ({ ...x, heatCheck }));
+          heatShownAt.current = Date.now();
+          setSeaBeat('heat');
+        } else {
+          const boxCheck = boxCheckOf(feats);
+          setSeaFacts((x) => ({ ...x, boxCheck }));
+        }
+        // They land together: the heat's beat holds 5 s, then the boxes' (each figure beside its layer).
+        if (seaFileOf('boxes')) {
+          const wait = heatHoldLeft(seaFileOf('heat') ? heatShownAt.current : null, Date.now());
+          if (wait === 0) setSeaBeat('boxes');
+          else seaLater(() => { if (seaBeatRef.current === 'heat') setSeaBeat('boxes'); }, wait);
+        }
         fitForecast();
         return;
+      }
       case 'fleet': {
-        backToFirstPass();
+        backToForecastPass();
         const month = f.url.match(/fleet_(\d{4})-(\d{2})\.geojson/i);
         const words = month ? new Date(Date.UTC(Number(month[1]), Number(month[2]) - 1, 1)).toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }) : undefined;
         setSeaFacts((x) => ({ ...x, fleetMonth: words }));
@@ -708,7 +737,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         return;
       }
       case 'look': {
-        backToFirstPass();
+        backToForecastPass();
         const label = String(feats.find((x) => typeof x.properties?.label === 'string')?.properties.label ?? '');
         setSeaFacts((x) => ({ ...x, look: label || undefined, lookStart: lookStartFrom(label, Date.now()) ?? undefined, now: Date.now() }));
         setSeaBeat('look');
@@ -909,7 +938,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     setTaskExcluded(state.choice ? ids.filter((x) => !state.choice!.candidateIds.includes(x)) : []);
     setSeaBeat(state.status === 'filed' ? 'filed' : 'tasking');
     setIsLayerControlOpen(false);
-    backToFirstPass();
+    backToForecastPass();
     // Once per draft, everything the officer chooses from in the window between the plates (on a
     // 1280 screen the boxes otherwise sit under the step column). Later loads (filed) keep the view.
     const m = map.current;
@@ -2780,7 +2809,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     seaFiles.current.clear();
     revealed.current.clear();
     dateHidden.current.clear();
-    firstPass.current = null;
+    heatShownAt.current = null;
     stagePassRef.current = null;
     setStagePass(null);
     setCandidatesShown(false);
@@ -3603,7 +3632,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           onLoaded={onTaskingLoaded}
           onBox={setTaskBox}
           onToggle={(id) => setTaskExcluded((x) => toggled(x, id))}
-          onFiled={(id) => onTaskingFiled?.(id)}
+          // No onFiled: the officer's approval ends the act on the plate's filed line, and the
+          // stage sends no follow-up turn (U4, R6.8).
           onDismiss={() => {
             setTaskingDismissed(tasking.key);
             setSeaBeat('boxes');

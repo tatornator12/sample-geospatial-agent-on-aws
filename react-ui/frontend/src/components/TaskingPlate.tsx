@@ -1,12 +1,14 @@
 /**
  * Dark Vessels' tasking plate (design component 9): the officer's decision, on the map.
  *
- * The agent drafts; the officer decides. The three patrol boxes are on the map with their share and
- * next look; the officer picks one (here or by clicking it) and drops candidates (here or by
- * clicking their rings), and the plate says the choice and the countdown to the look. "Approve the
- * tasking" is executed by the BACKEND (it reads the draft from S3, checks the choice against it and
- * the session's boxes, and files it); the agent is told only afterwards and checks with
- * tasking_status. In a replay case the plate is inert: a recorded decision would be theatre.
+ * The agent drafts; the officer decides. The plate opens on the agent's box; each box option keeps
+ * its share of past dark targets (the map's box labels carry none: review L4) and its next look;
+ * the officer picks one (here or by clicking it) and drops candidates (here or by clicking their
+ * rings), and the plate says the choice and the countdown to the look. "Approve the tasking" is
+ * executed by the BACKEND (it reads the draft from S3, checks the choice against it and the
+ * session's boxes, and files it). The approval ends the act: the stage sends no follow-up turn
+ * (U4, R6.8); the filed line here is the only place that says who filed it. In a replay case the
+ * plate is inert: a recorded decision would be theatre.
  */
 import { useEffect, useId, useState } from 'react';
 import { approveTasking, getTasking, type TaskingBox, type TaskingState } from '../services/api.ts';
@@ -31,7 +33,8 @@ export interface TaskingPlateProps {
   onLoaded: (state: TaskingState) => void;
   onBox: (box: number) => void;
   onToggle: (candidateId: string) => void;
-  onFiled: (taskingId: string) => void;
+  /** Told once the backend has filed it (the stage itself sends nothing then: R6.8). */
+  onFiled?: (taskingId: string) => void;
   onDismiss: () => void;
 }
 
@@ -167,7 +170,7 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
     };
     setState(next);
     onLoaded(next);
-    onFiled(card.taskingId);
+    onFiled?.(card.taskingId);
   };
 
   const filedAt = typeof state.filedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(state.filedAt)

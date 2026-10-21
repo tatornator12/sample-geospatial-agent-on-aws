@@ -331,7 +331,7 @@ export function viewLabelPoint(geometry: Feature['geometry'], view: [number, num
   return best?.p ?? null;
 }
 
-/** The patrol boxes' labels, at each box's top edge: "1  9%" over its next look. */
+/** The patrol boxes' labels, at each box's top edge: "Box 1" over its next look (no share: review L4). */
 export function boxLabelPoints(features: readonly Feature[]): { type: 'FeatureCollection'; features: Feature[] } {
   const out: Feature[] = [];
   for (const f of features) {
@@ -417,6 +417,12 @@ export interface VesselRest {
   islands: Array<{ label: string; coordinates: [number, number] }>;
   passes: Array<{ pass_id: string; satellite: string | null; sensed: string; orbit_state: string | null; role: string | null }>;
   attribution: string;
+  /**
+   * The project bucket, so the step column can read a session's board and decisions before the
+   * first URL streams (redesign §3.8.1). loadVesselRest keeps it only when it passes the bucket
+   * rule; null otherwise, and the column then waits for a streamed s3_url (review M3).
+   */
+  bucket?: string | null;
 }
 
 export interface PreparedTrack {
@@ -707,6 +713,19 @@ function filedChoice(t: NonNullable<SeaFacts['tasking']>, now: number): string {
   return `box ${t.box} · ${which} · next radar look ${when || 'not planned yet'}`;
 }
 
+/**
+ * The heat and the boxes land together, so the heat's beat holds this long before the boxes' beat
+ * (redesign §3.8.2): each figure is on screen beside its own layer. A dwell, not motion, so it holds
+ * under reduced motion too.
+ */
+export const HEAT_HOLD_MS = 5000;
+
+/** How much of the heat's hold is left at `now` (ms): 0 once it has held, or when no heat went on. */
+export function heatHoldLeft(heatShownAt: number | null, now: number): number {
+  if (heatShownAt === null || !Number.isFinite(heatShownAt)) return 0;
+  return Math.max(0, HEAT_HOLD_MS - Math.max(0, now - heatShownAt));
+}
+
 /** The beat a newly landed layer puts on the stage (the targets' depends on whether match_ais ran). */
 export function beatFor(kind: VesselKind, counts?: TargetCounts): SeaBeat {
   switch (kind) {
@@ -905,7 +924,10 @@ export function forecastPass(files: Iterable<{ kind: VesselKind; pass: string | 
 export const CANDIDATE_LABEL_SUFFIX = '  no AIS';
 export const LEFT_OUT_SUFFIX = '  left out';
 
-/** What the stage tells the agent once the officer has filed (the prompt's turn D: "Is it filed?"). */
+/**
+ * What a presenter may ask once the officer has filed. The stage no longer sends it by itself: the
+ * officer's approval ends the act (U4, R6.8), and the filed line on the plate says it once.
+ */
 export const taskingFiledMessage = (taskingId: string) => `The officer approved ${taskingId} on the map. Is it filed?`;
 
 // --- bounds -----------------------------------------------------------------------------------------------

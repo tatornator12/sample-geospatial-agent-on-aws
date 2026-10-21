@@ -46,6 +46,13 @@ import {
 import { formatScenarioAnalysis, type ScenarioConfig } from '../utils/formatScenario';
 import { stageAgentLabel, stageCopyFor } from '../utils/stageCopy.ts';
 import type { RenderHint } from '../utils/render.ts';
+import { answerScrollBlock } from '../utils/vesselSteps.ts';
+
+/** Dark Vessels: no candidates revealed yet (a stable empty record for the column). */
+const NO_REVEALS: Readonly<Record<string, number>> = {};
+/** The answer lands under the column's sticky head (`.stage-answer` scroll-margin-top) and above its foot's fade. */
+const COLUMN_HEAD_PX = 52;
+const COLUMN_FOOT_PX = 24;
 
 /**
  * Load tool calls from scenario config
@@ -117,6 +124,10 @@ interface ChatSidebarProps {
   /** The geometry on the map right now (the stage's state, whichever loader put it there), so
    * the column can draw the archaeologist's section when its transect lands. */
   geometry?: GeometryData | null;
+  /** Dark Vessels: the project bucket from the rest file (validated), so the board loads before the radar. */
+  vesselBucket?: string | null;
+  /** Dark Vessels: the passes whose candidates the map has revealed this session, with its count. */
+  revealedPasses?: Readonly<Record<string, number>>;
 }
 
 export function ChatSidebar({
@@ -138,8 +149,13 @@ export function ChatSidebar({
   autoPrompt,
   onAutoPromptSent,
   geometry = null,
+  vesselBucket = null,
+  revealedPasses = NO_REVEALS,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  // When the presenter sent the turn on the stage (ms): Dark Vessels' column remounts on it, so each
+  // question loads its own board and decisions (redesign §3.8.1, review L3).
+  const [turnSentAt, setTurnSentAt] = useState(0);
   // The archaeologist's measured sections this session, by site id: harvested from the transect
   // GeoJSON when it lands on the map (live or replayed), kept when later geometry replaces it.
   const [profiles, setProfiles] = useState<Record<string, ProfileData>>({});
@@ -196,6 +212,7 @@ export function ChatSidebar({
     setOpenEvidence(null);
     setProfiles({});
     setMessages([]);
+    setTurnSentAt(0);
     setUserInput('');
     setStreamingText('');
     setStreamingTools([]);
@@ -364,6 +381,7 @@ export function ChatSidebar({
     streamOwnerRef.current = myOwner;
 
     setMessages((prev) => [...prev, { role: 'user', content: prompt }]);
+    setTurnSentAt(Date.now());
 
     setIsStreaming(true);
     setStreamingText('');
@@ -777,17 +795,28 @@ export function ChatSidebar({
   // When the turn ends, the answer's first line comes to the top of the column (under its head),
   // so the line to repeat is in view; a short answer cannot scroll that far and leaves the steps
   // above it (B5). The brief card scrolls itself into view.
+  // Dark Vessels: an answer taller than the column's room lands with its first line at the top
+  // (at 1280 the answer at its cap is taller than the room under the head); one that fits keeps
+  // `nearest`, so the steps above it stay in view (redesign §3.8.1, R6.10).
   const answerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const column = columnRef.current;
     const answer = answerRef.current;
     if (!showAnswer || !stepsOpen || !column || !answer) return;
     // The column scrolls, never the stage behind it (scrollIntoView would move every ancestor).
-    const head = column.querySelector<HTMLElement>('.stage-steps__head')?.offsetHeight ?? 52;
-    const top = answer.getBoundingClientRect().top - column.getBoundingClientRect().top + column.scrollTop - head - 4;
+    const head = column.querySelector<HTMLElement>('.stage-steps__head')?.offsetHeight ?? COLUMN_HEAD_PX;
+    const at = answer.getBoundingClientRect().top - column.getBoundingClientRect().top + column.scrollTop;
+    let top = at - head - 4;
+    if (agentId === 'vessels' && answerScrollBlock(answer.offsetHeight, column.clientHeight - head - COLUMN_FOOT_PX) === 'nearest') {
+      // `nearest`: an answer already in view stays; else the least scroll that brings it in view.
+      const viewTop = column.scrollTop + head;
+      const viewEnd = column.scrollTop + column.clientHeight - COLUMN_FOOT_PX;
+      if (at >= viewTop && at + answer.offsetHeight <= viewEnd) return;
+      top = at < viewTop ? at - head : at + answer.offsetHeight - column.clientHeight + COLUMN_FOOT_PX;
+    }
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     column.scrollTo?.({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
-  }, [showAnswer, stepsOpen, answerText]);
+  }, [showAnswer, stepsOpen, answerText, agentId]);
   // While the agent works, the lit step and its sentence stay in view under the earlier turns'
   // rows (unless the presenter has a record open).
   const liveEndRef = useRef<HTMLDivElement>(null);
@@ -854,6 +883,9 @@ export function ChatSidebar({
                   tips={tips}
                   compact={showBrief && draftedBrief}
                   profiles={profiles}
+                  vessel={agentId === 'vessels'
+                    ? { sessionId, bucket: vesselBucket, caseId: scenarioId ?? null, turnSentAt, revealed: revealedPasses }
+                    : undefined}
                   // One column per turn: a new turn starts with its earlier steps folded again.
                   key={`steps-${briefId ?? lastUserIndex}`}
                 />

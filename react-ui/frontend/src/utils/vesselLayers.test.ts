@@ -22,7 +22,9 @@ import {
   featureBounds,
   filedFacts,
   forecastPass,
+  HEAT_HOLD_MS,
   heatCheckOf,
+  heatHoldLeft,
   fleetMonth,
   fleetPlaces,
   heavyBounds,
@@ -467,6 +469,20 @@ describe('the clock plate', () => {
       { text: 'AIS received over ', num: false }, { text: '30%', num: true }, { text: ' of the reserve', num: false },
     ]);
     expect(numberRuns('AIS replay  2026-10-11 14:00 UTC').filter((r) => r.num).map((r) => r.text)).toEqual(['2026-10-11', '14:00 UTC']);
+  });
+
+  it('holds the heat beat 5 s before the boxes beat, so each figure is read beside its own layer', () => {
+    const on = Date.parse('2026-10-21T14:00:00Z');
+    expect(HEAT_HOLD_MS).toBe(5000);
+    // The boxes landing with the heat wait out the rest of the hold.
+    expect(heatHoldLeft(on, on)).toBe(5000);
+    expect(heatHoldLeft(on, on + 1200)).toBe(3800);
+    // Boxes later than the hold, no heat at all, or a clock that went back: no wait, or the full hold at most.
+    expect(heatHoldLeft(on, on + 5000)).toBe(0);
+    expect(heatHoldLeft(on, on + 9000)).toBe(0);
+    expect(heatHoldLeft(null, on)).toBe(0);
+    expect(heatHoldLeft(on, on - 3000)).toBe(5000);
+    expect(heatHoldLeft(Number.NaN, on)).toBe(0);
   });
 });
 

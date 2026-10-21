@@ -52,7 +52,7 @@ const MONO = ['Atkinson Hyperlegible Mono', 'monospace'];
 const SANS = ['Atkinson Hyperlegible Next', 'sans-serif'];
 const FADE = { duration: 700, delay: 0 };
 const EMPTY: FC = { type: 'FeatureCollection', features: [] };
-/** A patrol box's label: "1  9%" over its next look's time, the time a size down in label grey. */
+/** A patrol box's label: "Box 1" over its next look's time, the time a size down in label grey. */
 const BOX_LABEL_FIELD: Expr = ['format', ['get', 'label'], { 'font-scale': 1 }, '\n', {}, ['get', 'when'], { 'font-scale': 0.84, 'text-color': LABEL }];
 /** The reserve's own words (labels, notes) go below this zoom: the fleet's pull-back reads clean. */
 const NEAR = 6;
@@ -796,8 +796,9 @@ export function paintTasking(map: M, boxesFill: string | null, targetsFill: stri
     const sel: Filter = ['==', ['get', 'box'], box ?? -1];
     [cid(boxesFill, '-wash'), cid(boxesFill, '-outline')].forEach((id) => map.getLayer(id) && map.setFilter(id, sel));
     // The boxes not chosen step back, so the choice reads from the back of the room.
-    // While the plate is up it lists each box's next look, so the map's labels keep the rank and
-    // the share alone: on a small screen the candidates' labels then find room beside them.
+    // While the plate is up it lists each box's next look, so the map's labels keep the box's name
+    // alone ("Box 1"; no share on the map, review L4): on a small screen the candidates' labels then
+    // find room beside them.
     const labels = cid(boxesFill, '-labels');
     if (map.getLayer(labels)) map.setLayoutProperty(labels, 'text-field', box == null ? BOX_LABEL_FIELD : ['get', 'label']);
     // Undone only where a choice was painted: boxes still waiting to arrive stay at 0.
