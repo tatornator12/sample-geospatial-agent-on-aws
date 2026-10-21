@@ -123,6 +123,35 @@ def cells_from_runs(runs: Iterable[Iterable[int]], shape: tuple[int, int]) -> np
     return out
 
 
+def with_target_cells(imaged: np.ndarray, grid: Grid, points: Iterable[tuple[float, float]]) -> np.ndarray:
+    """The imaged cells plus every cell holding a target: a target the radar saw was imaged, even when
+    its cell's centre lies just outside the swath."""
+    out = imaged.copy()
+    for lon, lat in points:
+        rc = grid.cell(lon, lat)
+        if rc is not None:
+            out[rc] = True
+    return out
+
+
+def coverage_shares(heard: np.ndarray, imaged: np.ndarray, water: np.ndarray) -> dict:
+    """As shares of the reserve's water: what the pass imaged, where AIS was received (the whole
+    reserve, `heard_share`), and what the pass can check (imaged and received)."""
+    n = int(water.sum())
+
+    def share(mask) -> float:
+        return round(float((mask & water).sum()) / n, 3) if n else 0.0
+    return {"imaged_share": share(imaged), "heard_share": share(heard), "checkable_share": share(heard & imaged)}
+
+
+def cells_shape(cells: np.ndarray, grid: Grid) -> BaseGeometry:
+    """A grid's set cells as one shape, from their runs along each row (exact shared edges)."""
+    rects = [box(round(grid.west + a * grid.step, 6), round(grid.south + r * grid.step, 6),
+                 round(grid.west + b * grid.step, 6), round(grid.south + (r + 1) * grid.step, 6))
+             for r, a, b in cell_runs(cells)]
+    return shapely.union_all(rects) if rects else shapely.Polygon()
+
+
 def _cell_box(grid: Grid, r: int, c: int) -> BaseGeometry:
     return box(*grid.bounds(r, c))
 
