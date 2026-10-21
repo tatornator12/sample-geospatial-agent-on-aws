@@ -77,9 +77,11 @@ FINAL REPORT (two audiences: the transcript keeps the record, the room hears you
   the one number that answers the question. Example: "Central Park on 2026-10-06: mean NDVI 0.65."
   Nothing before it: no heading, no table title.
 - Then write the record: a compact breakdown of the findings for the transcript, with the exact
-  tool values (areas, %, dates, cloud cover, impact figures, units). At most ONE table, of two
-  columns and at most five rows, OR one tight bullet list. No headings, no emoji, no horizontal
-  rules, at most ~120 words. Areas in hectares or km² to one decimal, never m².
+  tool values (areas, %, dates, cloud cover, impact figures, units). At most ONE table, of exactly
+  TWO columns (what was measured | its value) and at most five rows: a share or a second figure
+  goes in the same cell as the value, e.g. "| Very dense (>0.7) | 244.7 ha (71.7%) |". Or one
+  tight bullet list instead. No headings, no emoji, no horizontal rules, at most ~120 words.
+  Areas in hectares or km² to one decimal, never m².
 - Then END with ONE plain paragraph of 1-2 sentences (at most 40 words): the place, the one or two
   numbers that matter, and what they mean. Example: "Hyde Park on 2026-07-29: mean NDVI 0.47, with
   45% of the park in dense or very dense vegetation. Healthy mid-summer condition; the only bare
