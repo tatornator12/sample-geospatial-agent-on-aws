@@ -2106,6 +2106,86 @@
   }
 }
 
+/* Earlier in this session: one row per turn before the one on the stage, above its question. A row
+   opens that turn's record (its steps, chips and sections, and its answer); the map does not change. */
+.earlier-turns {
+  margin: 0 0 10px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+.earlier-turns__label {
+  margin: 2px 0 4px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.earlier-turns__more {
+  height: 36px;
+  margin-left: -10px;
+}
+.earlier-turns__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.earlier-turn__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% + 16px);
+  min-height: 36px;
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--fog);
+  text-align: left;
+}
+.earlier-turn__row:hover,
+.earlier-turn--open .earlier-turn__row {
+  background: rgba(233, 238, 243, 0.06);
+}
+.earlier-turn__chevron {
+  flex: none;
+  color: var(--label);
+}
+.earlier-turn__question {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.earlier-turn__count {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+/* An opened turn lands with its row just under the sticky head (its focus ring clear of it), the
+   record below; the first row brings the section's label with it. */
+.earlier-turns,
+.earlier-turn {
+  scroll-margin-top: 48px;
+}
+.earlier-turn__record {
+  padding: 6px 0 8px;
+}
+.earlier-turn__note {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--label);
+}
+.earlier-turn__answer {
+  margin-top: 6px;
+}
+
 /* The agent's latest sentence while it works, under the lit step's name (the steps' 36px indent).
    It changes at most every 2.5 s, with a short fade that shows the agent moving on. */
 .stage-narration {
