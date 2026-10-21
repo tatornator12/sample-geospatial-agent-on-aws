@@ -290,6 +290,40 @@ describe('where each line goes, and when it shows', () => {
     expect(landed.lines[landed.groups[3].id]).toEqual([{ label: 'Decided:', text: 'Set Aug 30 aside: it can check only 10% of the reserve. Reading Sep 30.' }]);
   });
 
+  it('puts each read under the find called for its pass, before and after the second find streams', () => {
+    const asked = 'Reading Aug 30, as asked. It saw 31% of the reserve.';
+    const thin = 'Set Aug 30 aside: it can check only 10% of the reserve. Reading Sep 30.';
+    const under = (c: ReturnType<typeof vesselColumn>) =>
+      c.groups.filter((g) => g.name === 'find_pass').map((g) => (c.lines[g.id] ?? []).map((l) => l.text));
+    // The first decide streams after its find, the second before its find; by id, then by day.
+    for (const [aug, sep] of [[AUG30, SEP30], ['2026-08-30', '2026-09-30']]) {
+      const first = call('decide', { step: 'read_pass', because: 'asked', pass_id: AUG30 });
+      const second = call('decide', { step: 'read_pass', because: 'coverage_thin', pass_id: SEP30 });
+      const decisions = {
+        [first.id]: file(first.id, 'read_pass', 'asked', AUG30, { imaged_pct: 31 }),
+        [second.id]: file(second.id, 'read_pass', 'coverage_thin', SEP30, { imaged_pct: 53, from: AUG30, checkable_pct: 10 }),
+      };
+      const stream = [call('list_passes'), call('find_pass', { when: aug }), first, call('check_ais_coverage', { pass_id: AUG30 }), second];
+      expect(under(vesselColumn(stream, files({ decisions })))).toEqual([[asked]]);
+      expect(under(vesselColumn([...stream, call('find_pass', { when: sep })], files({ decisions })))).toEqual([[asked], [thin]]);
+    }
+    // A find called for no pass ("latest") takes the read before it, never the next pass's find.
+    const newest = call('decide', { step: 'read_pass', because: 'newest', pass_id: OCT12 });
+    const next = call('decide', { step: 'read_pass', because: 'coverage_thin', pass_id: SEP30 });
+    const decisions = {
+      [newest.id]: file(newest.id, 'read_pass', 'newest', OCT12, { imaged_pct: 53 }),
+      [next.id]: file(next.id, 'read_pass', 'coverage_thin', SEP30, { imaged_pct: 53, from: OCT12, checkable_pct: 12 }),
+    };
+    const stream = [
+      call('list_passes'), call('find_pass', { when: 'latest' }), newest, call('check_ais_coverage', { pass_id: OCT12 }), next,
+      call('find_pass', { when: SEP30 }),
+    ];
+    expect(under(vesselColumn(stream, files({ decisions })))).toEqual([
+      ['Reading Oct 12: the newest pass on file. It saw 53% of the reserve.'],
+      ['Set Oct 12 aside: it can check only 12% of the reserve. Reading Sep 30.'],
+    ]);
+  });
+
   it('puts the box under the next look (else the draft), the forecast under the prediction, and stop under the last step', () => {
     const { tools, read, draft } = cleanPath();
     const decided = {

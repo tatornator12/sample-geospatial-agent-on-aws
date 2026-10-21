@@ -503,6 +503,21 @@ const LEADS_TO: Record<Exclude<DecideStep, 'stop'>, readonly string[]> = {
   draft: ['next_look', 'draft_tasking'],
 };
 
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** What a find_pass step was called for, read as the tool reads `when`: pass ids and days ("latest" names none). */
+function findCalledFor(group: VesselGroup): string[] {
+  return group.calls
+    .map((c) => (typeof c.params?.when === 'string' ? c.params.when.trim().toLowerCase() : ''))
+    .filter((w) => PASS_ID_RE.test(w) || DAY_RE.test(w));
+}
+
+/** Whether a find_pass step was called for this pass, by its id or by its day ("2026-08-30"). */
+function findNames(group: VesselGroup, pass: string): boolean {
+  const day = `${pass.slice(4, 8)}-${pass.slice(8, 10)}-${pass.slice(10, 12)}`;
+  return findCalledFor(group).some((w) => w === pass || w === day);
+}
+
 /** A decide call's own inputs agree with its file, and the file is this board's question's. */
 function belongs(d: Decision, call: ToolCall, board: Board): boolean {
   return d.questionId === board.questionId && d.step === call.params?.step && d.because === call.params?.because
@@ -516,7 +531,9 @@ function belongs(d: Decision, call: ToolCall, board: Board): boolean {
  *   after the map's reveal when it carries a candidate count (decisionWaits).
  * - It sits under the first step of the tool its decision leads to that streamed after it, else the
  *   nearest one before it (a decide streamed after its action), never one another accepted decision
- *   of the same step already holds; until that step streams, it waits. `stop` sits under the last step.
+ *   of the same step already holds; until that step streams, it waits. A read sits under the find
+ *   called for its pass (by its id or its day) when one is; else it takes a find called for no pass
+ *   ("latest") by the same rule, never one called for another pass. `stop` sits under the last step.
  * - The coverage line renders once that pass's received area has streamed to the map and its file
  *   has loaded, under the step it folded into; the candidates line once the map has revealed that
  *   pass, under its match_ais step.
@@ -552,7 +569,13 @@ export function vesselColumn(tools: readonly ToolCall[], files: VesselColumnFile
     }
     let target: VesselGroup | null = null;
     for (const name of LEADS_TO[d.step]) {
-      const free = groups.filter((g) => g.name === name && !held.has(g.id));
+      let free = groups.filter((g) => g.name === name && !held.has(g.id));
+      if (d.step === 'read_pass') {
+        // A read goes to the find called for its pass; only when there is none, by position to a find
+        // called for no pass ("latest"), never to one called for another pass.
+        const own = free.filter((g) => findNames(g, d.subject as string));
+        free = own.length ? own : free.filter((g) => findCalledFor(g).length === 0);
+      }
       target = free.find((g) => g.first - 1 > at) ?? [...free].reverse().find((g) => g.first - 1 < at) ?? null;
       if (target) break;
     }
