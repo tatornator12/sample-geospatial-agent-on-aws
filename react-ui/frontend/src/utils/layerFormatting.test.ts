@@ -156,3 +156,15 @@ describe('boundsWithin', () => {
     expect(boundsWithin([-74.0, 40.7, -73.9, 40.8], undefined)).toBe(false);
   });
 });
+
+describe('the watch baseline row (B11, A2 P1-4)', () => {
+  it('is named by the stage, at rest and in the mission, whatever its title', () => {
+    const rest = layer({ id: 'r', type: 'geometry', name: 'EMIT Methane Watch: global repeat sites', url: 's3://methane-baseline/watch_sites_v002.geojson', render: { kind: 'points', group: 'watch', property: 'repeat_dates', label: 'repeat_dates', units: 'dates' } });
+    const mission = layer({ id: 'm', type: 'geometry', name: 'Global Methane Watch Baseline: Repeat Sites', url: 's3://b/use-cases/methane-watch-mission/watch_sites_v002.geojson' });
+    expect(layerRowLabel(rest)).toBe('NASA EMIT plume sites, 2022 to 2025');
+    expect(layerRowLabel(mission)).toBe('NASA EMIT plume sites, 2022 to 2025');
+    // A footprints layer keeps the agent's title.
+    const fp = layer({ id: 'f', type: 'geometry', name: 'Permian plumes, 2024', url: 's3://b/use-cases/methane-permian-2024/plumes_permian_2024.geojson' });
+    expect(layerRowLabel(fp)).toBe('Permian plumes, 2024');
+  });
+});

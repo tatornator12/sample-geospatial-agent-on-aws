@@ -1867,7 +1867,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
               const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }) : 'n/a');
               const html =
-                `<strong>Site seen on ${num(p[property])} dates</strong>` +
+                `<strong>Plumes on ${num(p[property])} dates</strong>` +
                 `<div class="similar-popup__row"><span>NASA plumes</span><code>${num(p.plumes)}</code></div>` +
                 `<div class="similar-popup__row"><span>First</span><code>${isoDay(p.first)}</code></div>` +
                 `<div class="similar-popup__row"><span>Last</span><code>${isoDay(p.last)}</code></div>`;
@@ -3364,16 +3364,22 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               {lg.hi.toLocaleString('en-US')}+ {lg.units}
             </span>
           </div>
+          {lg.note && <span className="map-legend__label">{lg.note}</span>}
         </div>
       );
     }
     if (lg.kind === 'sites') {
       return (
-        <div key={lg.key} className="map-legend map-legend--sites" role="img" aria-label="A dot is a site with a NASA plume; a ring marks a site seen on five or more dates">
+        <div
+          key={lg.key}
+          className="map-legend map-legend--sites"
+          role="img"
+          aria-label="A dot is a site where NASA mapped a methane plume; a ring marks plumes on five or more dates; ×N is the number of dates with a plume"
+        >
           <span className="map-legend__dot" aria-hidden="true" />
-          <span className="map-legend__label">site</span>
+          <span className="map-legend__label">NASA plume site</span>
           <span className="map-legend__ring" aria-hidden="true" />
-          <span className="map-legend__label">seen on 5+ dates</span>
+          <span className="map-legend__label">plumes on 5+ dates</span>
         </div>
       );
     }

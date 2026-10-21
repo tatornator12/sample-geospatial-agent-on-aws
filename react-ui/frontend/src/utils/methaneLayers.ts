@@ -76,7 +76,7 @@ export interface LegendRamp {
   lo: number;
   hi: number;
   units: string;
-  /** What the ramp measures, e.g. "CH4 enhancement" or "CH4 anomaly". */
+  /** What the ramp measures, e.g. "EMIT methane above background" (methaneRampLabel). */
   label: string;
 }
 
@@ -87,7 +87,29 @@ export interface MethaneLegend {
   sites: boolean;
 }
 
-const DEFAULT_LABEL: Record<string, string> = { 'ppm·m': 'CH4 enhancement', ppb: 'CH4 anomaly' };
+/** What an EMIT ramp (ppm·m: a plume, a pass window, footprints, columns) measures, in the room's words. */
+export const EMIT_RAMP_LABEL = 'EMIT methane above background';
+/** The watch baseline's row: NASA's EMIT plume product runs from 2022-08 to 2025-09-22. */
+export const WATCH_SITES_ROW = 'NASA EMIT plume sites, 2022 to 2025';
+/** The legend's line under the ramp while the 3D columns are on the stage. */
+export const COLUMNS_NOTE = 'taller column, more methane';
+
+/**
+ * A methane ramp's name, by its units, never the tools' shorthand ("CH4 enhancement", "CH4
+ * anomaly") or the model's words: ppm·m is EMIT's enhancement over its background; ppb is the
+ * TROPOMI composite's anomaly over the area's median, with its days read from the composite's own
+ * file name (`tropomi_anomaly_<area>_<end>_<N>d.tif`) when it carries them (A2 P1-4).
+ */
+export function methaneRampLabel(units: string, legend?: string, url?: string): string {
+  if (units === 'ppm·m') return EMIT_RAMP_LABEL;
+  if (units === 'ppb') {
+    const days = Number(basenameOf(url).match(/^tropomi_anomaly_.+_(\d{1,2})d\.tiff?$/)?.[1]);
+    return Number.isInteger(days) && days >= 1 && days <= 60
+      ? `TROPOMI, ${days} days, above the area median`
+      : 'TROPOMI, above the area median';
+  }
+  return legend ?? 'CH4';
+}
 
 /** The legend rows for the layers in the Methane group: plasma ppm·m and viridis ppb never share a bar. */
 export function methaneLegend(hints: Array<RenderHint | undefined>): MethaneLegend {
@@ -103,7 +125,7 @@ export function methaneLegend(hints: Array<RenderHint | undefined>): MethaneLege
     if (!ramp || !hint.rescale) continue;
     const units = hint.units ?? 'ppm·m';
     if (ramps.some((r) => r.ramp === ramp && r.units === units)) continue;
-    ramps.push({ ramp, lo: hint.rescale[0], hi: hint.rescale[1], units, label: hint.legend ?? DEFAULT_LABEL[units] ?? 'CH4' });
+    ramps.push({ ramp, lo: hint.rescale[0], hi: hint.rescale[1], units, label: methaneRampLabel(units, hint.legend) });
   }
   return { ramps, sites };
 }

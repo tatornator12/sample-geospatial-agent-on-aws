@@ -9,6 +9,7 @@ import {
   isoDay,
   methaneGeometryHint,
   methaneLegend,
+  methaneRampLabel,
   methaneRasterHint,
 } from './methaneLayers.ts';
 import { parseRenderHint } from './render.ts';
@@ -91,13 +92,13 @@ describe('methaneLegend', () => {
     const legend = methaneLegend([METHANE_SITES, tropomi, pass, METHANE_COLUMNS, undefined]);
     expect(legend.sites).toBe(true);
     expect(legend.ramps).toEqual([
-      { ramp: 'viridis', lo: 0, hi: 60, units: 'ppb', label: 'CH4 anomaly' },
-      { ramp: 'plasma', lo: 0, hi: 1500, units: 'ppm·m', label: 'CH4 enhancement' },
+      { ramp: 'viridis', lo: 0, hi: 60, units: 'ppb', label: 'TROPOMI, above the area median' },
+      { ramp: 'plasma', lo: 0, hi: 1500, units: 'ppm·m', label: 'EMIT methane above background' },
     ]);
   });
 
   it('names a ramp by its units when the hint gives no legend', () => {
-    expect(methaneLegend([METHANE_VECTOR]).ramps[0].label).toBe('CH4 enhancement');
+    expect(methaneLegend([METHANE_VECTOR]).ramps[0].label).toBe('EMIT methane above background');
   });
 });
 
@@ -126,5 +127,20 @@ describe('isoDay', () => {
     expect(isoDay('2025-08-01T06:12:00Z')).toBe('2025-08-01');
     expect(isoDay('<img src=x>')).toBe('n/a');
     expect(isoDay(20250801)).toBe('n/a');
+  });
+});
+
+describe('methaneRampLabel (B11, A2 P1-4)', () => {
+  it("says what each ramp measures in the room's words, never the tools' shorthand", () => {
+    expect(methaneRampLabel('ppm·m', 'CH4 enhancement')).toBe('EMIT methane above background');
+    expect(methaneRampLabel('ppm·m')).toBe('EMIT methane above background');
+    expect(methaneRampLabel('ppb', 'CH4 anomaly')).toBe('TROPOMI, above the area median');
+    // The composite's days, from its own file name only.
+    expect(methaneRampLabel('ppb', 'CH4 anomaly', 's3://b/use-cases/methane-watch-mission/tropomi_anomaly_south_caspian_2026-10-08_14d.tif')).toBe(
+      'TROPOMI, 14 days, above the area median'
+    );
+    expect(methaneRampLabel('ppb', undefined, 's3://b/methane/x/tropomi_anomaly_amman_2026-10-08_7d.tif')).toBe('TROPOMI, 7 days, above the area median');
+    expect(methaneRampLabel('ppb', undefined, 's3://b/methane/x/tropomi_anomaly_amman_2026-10-08_99d.tif')).toBe('TROPOMI, above the area median');
+    expect(methaneRampLabel('dates', 'something else')).toBe('something else');
   });
 });

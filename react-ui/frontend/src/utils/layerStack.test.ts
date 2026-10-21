@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LayerMetadata } from './layerFormatting.ts';
-import { METHANE_RASTER, METHANE_SITES, METHANE_TROPOMI, METHANE_VECTOR } from './methaneLayers.ts';
+import { METHANE_COLUMNS, METHANE_RASTER, METHANE_SITES, METHANE_TROPOMI, METHANE_VECTOR } from './methaneLayers.ts';
 import {
   clampDrag,
   insertInStack,
@@ -168,7 +168,9 @@ describe('legends', () => {
     expect(layerLegend(ndvi)).toMatchObject({ kind: 'index', label: 'NDVI', ramp: 'rdylgn' });
     expect(layerLegend(tci)).toBeNull();
     expect(layerLegend(plume)).toMatchObject({ kind: 'measure', ramp: 'plasma', units: 'ppm·m', lo: 0, hi: 1500 });
-    expect(layerLegend(tropomi)).toMatchObject({ kind: 'measure', ramp: 'ice', units: 'ppb', label: 'CH4 anomaly' });
+    expect(layerLegend(tropomi)).toMatchObject({ kind: 'measure', ramp: 'ice', units: 'ppb', label: 'TROPOMI, above the area median' });
+    expect(layerLegend(plume)).toMatchObject({ label: 'EMIT methane above background' });
+    expect(layerLegend(footprints)).toMatchObject({ label: 'EMIT methane above background' });
     expect(layerLegend(sites)).toEqual({ kind: 'sites', key: 'sites' });
     expect(layerLegend(similar)).toEqual({ kind: 'similar', key: 'similar' });
   });
@@ -184,6 +186,15 @@ describe('legends', () => {
     expect(stackLegends([similar, footprints], all).map((l) => l.key)).toEqual(['plasma-ppm·m', 'similar']);
   });
 
+  it("names the columns' height under the plume's ramp, whichever row is higher (B11)", () => {
+    const columns = vector('cols', 's3://b/methane/s/columns_2025.geojson', { render: METHANE_COLUMNS });
+    expect(stackLegends([plume, columns], all)).toEqual([
+      expect.objectContaining({ key: 'plasma-ppm·m', label: 'EMIT methane above background', note: 'taller column, more methane' }),
+    ]);
+    expect(stackLegends([columns, plume], all)).toHaveLength(1);
+    expect(stackLegends([columns, plume], all)[0]).toMatchObject({ note: 'taller column, more methane' });
+    expect(stackLegends([plume], all)[0]).not.toHaveProperty('note');
+  });
   it('shows no legend for a hidden or undrawable layer, and a shared ramp once', () => {
     const shown = (id: string) => id !== 'ndvi' && id !== 'tropomi';
     expect(stackLegends([ndvi, tci], shown)).toEqual([]);

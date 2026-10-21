@@ -12,6 +12,7 @@ import { isMethaneLayer, isSimilarityLayer, type LayerMetadata } from './layerFo
 import { indexLegendFor, type ColormapName } from './render.ts';
 import { isTerrainLayer, terrainLegend, terrainRasterHint } from './archaeoLayers.ts';
 import { AIS, ORCHID, vesselKind } from './vesselLayers.ts';
+import { COLUMNS_NOTE, methaneRampLabel } from './methaneLayers.ts';
 
 /** Move one entry from `from` to `to` (both indexes in the same list); a copy, never in place. */
 export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
@@ -143,7 +144,7 @@ export type StackLegend =
   /** An Earth index or the change map: ends in words. */
   | { kind: 'index'; key: string; label: string; ramp: ColormapName; low: string; high: string }
   /** A methane measure: numeric ends in the mono face, the units after the high end. */
-  | { kind: 'measure'; key: string; label: string; ramp: ColormapName; lo: number; hi: number; units: string }
+  | { kind: 'measure'; key: string; label: string; ramp: ColormapName; lo: number; hi: number; units: string; note?: string }
   /** The watch baseline's dots and rings. */
   | { kind: 'sites'; key: 'sites' }
   /** The similarity map's violet ramp. */
@@ -160,8 +161,6 @@ export type StackLegend =
   | { kind: 'coverage'; key: 'coverage' }
   /** Dark Vessels' history heat (the candidates' hue, from clear) and the fleet's (the AIS hue). */
   | { kind: 'seaheat'; key: 'heat' | 'fleet'; label: string; low: string; high: string; colour: string };
-
-const MEASURE_LABEL: Record<string, string> = { 'ppm·m': 'CH4 enhancement', ppb: 'CH4 anomaly' };
 
 /** The legend a layer reads by, or null (true colour, boundaries, drawn shapes). */
 export function layerLegend(layer: LayerMetadata): StackLegend | null {
@@ -191,11 +190,12 @@ export function layerLegend(layer: LayerMetadata): StackLegend | null {
     return {
       kind: 'measure',
       key: `${ramp}-${units}`,
-      label: hint.legend ?? MEASURE_LABEL[units] ?? 'CH4',
+      label: methaneRampLabel(units, hint.legend, layer.url),
       ramp,
       lo: hint.rescale[0],
       hi: hint.rescale[1],
       units,
+      ...(hint.kind === 'columns' ? { note: COLUMNS_NOTE } : {}),
     };
   }
   if (layer.type !== 'raster') return null;
@@ -215,7 +215,15 @@ export function stackLegends(layersTopFirst: readonly LayerMetadata[], shown: (i
   for (const layer of layersTopFirst) {
     if (!shown(layer.id)) continue;
     const legend = layerLegend(layer);
-    if (!legend || seen.has(legend.key)) continue;
+    if (!legend) continue;
+    if (seen.has(legend.key)) {
+      // The columns share the plume's ramp: its legend says what their height means too.
+      const first = out.find((l) => l.key === legend.key);
+      if (legend.kind === 'measure' && legend.note && first?.kind === 'measure' && !first.note) {
+        out[out.indexOf(first)] = { ...first, note: legend.note };
+      }
+      continue;
+    }
     seen.add(legend.key);
     out.push(legend);
   }

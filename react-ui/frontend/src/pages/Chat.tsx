@@ -385,7 +385,7 @@ export function Chat() {
       if (cancelled || !baseline) return;
       setCurrentGeometry((current) => current ?? {
         ...baseline,
-        locationName: 'EMIT Methane Watch: global repeat sites',
+        locationName: 'NASA EMIT plume sites, 2022 to 2025',
         sourceUrl: 's3://methane-baseline/watch_sites_v002.geojson',
         render: { kind: 'points', group: 'watch', property: 'repeat_dates', label: 'repeat_dates', units: 'dates' },
       });

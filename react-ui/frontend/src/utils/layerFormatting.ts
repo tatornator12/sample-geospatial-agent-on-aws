@@ -5,6 +5,7 @@
 import type { RenderHint } from './render.ts';
 import { isTerrainLayer } from './archaeoLayers.ts';
 import { isVesselLayer } from './vesselLayers.ts';
+import { WATCH_SITES_ROW, methaneGeometryHint } from './methaneLayers.ts';
 
 export interface LayerMetadata {
   id: string;
@@ -259,6 +260,12 @@ export function formatLayerDisplayText(layer: LayerMetadata, layerType: 'tci' | 
  * place and date for every other raster (true colour, indices, change maps).
  */
 export function layerRowLabel(layer: LayerMetadata): string {
+  // The watch baseline (at rest and the mission's own) is named by the stage, not by its title:
+  // what the dots are and the years they cover (A2 P1-4).
+  if (layer.type === 'geometry') {
+    const hint = methaneGeometryHint(layer.render, layer.url);
+    if (hint?.group === 'watch' && hint.kind === 'points') return WATCH_SITES_ROW;
+  }
   if (isMethaneLayer(layer)) return layer.name;
   // The archaeologist's terrain keeps the tool's title ("Great Circle, LiDAR hillshade"); the
   // scene cleaner would read "of" patterns into it.
