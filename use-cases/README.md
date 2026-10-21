@@ -72,6 +72,7 @@ when one is not found. `--dump` saves the session's tool outputs for the record.
 | `methane-permian-2024` | Permian Basin, TX/NM | Recorded: NASA EMIT CH4 plume ranking (ppm·m) + Sentinel-2 ground | Jan - Dec 2024 |
 | `methane-watch-mission` | Methane watch areas | Recorded: the Methane Watch mission and its draft brief | to Oct 2026 |
 | `archaeologist-newark` | Newark, Ohio | Recorded: Sentinel-2, then 1 m LiDAR hillshade | Oct 2026 |
+| `vessels-open-question` | Galápagos Marine Reserve | Recorded: Dark Vessels' one open question: Sentinel-1 radar targets, where AIS was received (GFW), the patrol boxes and a tasking draft, recorded by `agents/dark-vessels/build_replay_case.py` (the radar COGs are in S3 only) | the passes on file |
 
 `la-fires-2025` keeps its earlier before/after files (`before/`, `after/`, `geometry.geojson`) in
 the folder; its recorded `assets.layers` is what the stage shows.
