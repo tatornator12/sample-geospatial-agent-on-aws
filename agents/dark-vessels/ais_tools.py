@@ -181,7 +181,8 @@ async def match_ais(pass_id: str) -> str:
     than the standard.
 
     Args:
-        pass_id: From find_pass, after check_ais_coverage for the same pass.
+        pass_id: From find_pass, after check_ais_coverage for the same pass, with both of its areas
+            shown (display_visual of heard_s3_url and of unproven_s3_url).
 
     Returns: JSON with counts in the order to say them and the words to say each status in (say_as),
     checkable_share, the candidates (T01 west to east, with km to the nearest port), targets_s3_url

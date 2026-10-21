@@ -77,7 +77,7 @@ def test_the_prompt_carries_every_fixed_sentence(prompt):
 
 
 PASS_BULLET = "Read <date> (<c>% checkable); data from Global Fishing Watch."
-SET_ASIDE_BULLET = "Read <date> (<c>% checkable) after setting <date> aside (<c>%); data from Global Fishing Watch."
+SET_ASIDE_BULLET = "Read <date> (<c>% checkable) after setting <date2> aside (<c2>%); data from Global Fishing Watch."
 CANDIDATES_BULLET = "Candidates <ids>: <a> to <b> km from port."
 
 
@@ -119,6 +119,8 @@ def test_the_answer_block_has_three_endings(prompt):
     # Gate A attempt 1: the pass and candidates bullets have fixed words, so the answer cannot outgrow the cap.
     assert templates(prompt) == {"pass": PASS_BULLET, "set_aside": SET_ASIDE_BULLET, "candidates": CANDIDATES_BULLET}
     assert "the pass, in the words above;" in e["none"]["text"]
+    # Attempt 2's first run used the set-aside words for a single pass ("after setting Sep 7 aside").
+    assert "or, only if you read another pass first and set it aside," in e["candidates"]["text"]
     for kind in ("candidates", "none"):
         assert "Then the candidate sentence." in e[kind]["text"]
     assert "the forecast's say, word for word" in e["stop"]["text"] and "Global Fishing Watch" in e["stop"]["text"]
@@ -131,6 +133,8 @@ def test_the_answer_begins_with_its_first_line_and_dates_have_no_year(prompt):
     assert 'begin with the FIRST LINE itself, nothing before it, no heading and no "---";' in text
     assert "A <date> is the month's three letters and the day, with no year." in text
     assert "name the passes from it by date in one sentence, and stop" in text        # no list, so no em dash
+    # Rule 2's evidence order (R2.2 allows it) puts both coverage areas on the map before match_ais (M2).
+    assert "detect_vessels, check_ais_coverage with both of its areas on the map, match_ais, and only then" in text
 
 
 def test_the_gone_silent_spare_ends_on_the_closer(prompt):
@@ -147,7 +151,7 @@ def fill(template: str, *values: str) -> str:
     """Fill a template's placeholders in order of appearance."""
     out = template
     for v in values:
-        out = re.sub(r"<[a-z]+>", v, out, count=1)
+        out = re.sub(r"<[a-z0-9]+>", v, out, count=1)
     assert "<" not in out, out
     return out
 
