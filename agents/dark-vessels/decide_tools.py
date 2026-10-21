@@ -30,6 +30,10 @@ NOT_RECORDED = "The decision could not be recorded."
 FIRST_READ_ONLY = "That reason is for the first pass; a second read is coverage_thin, no_candidates or asked."
 NOT_NAMED = "The question did not name that pass."
 TWO_READ = "Two passes read: go to the forecast."
+# Gate B's W2: a box is drafted only after a pass read in this question was checked against AIS (its
+# match record, the record draft_tasking drafts from), so the stop path never records a draft first.
+NOT_CHECKED = "No pass read in this question could be checked, so there is no box to draft: decide stop, then write the answer."
+NOT_MATCHED = "No pass read in this question has been matched to AIS yet: match_ais on a pass at or over the standard first."
 _LOCK = threading.Lock()        # one check-and-write at a time, whatever runs a response's calls
 
 
@@ -144,6 +148,11 @@ def _forecast(q, qid, read, because):
 
 
 def _draft(q, qid, read, because, box):
+    if not any(_in_question("match", qid, p) is not None for p in read):
+        covered = [_in_question("coverage", qid, p) for p in read]
+        unmatched = any(c is not None and not _thin(c) for c in covered)
+        logger.info("decide: refused draft (no pass read in this question was checked)")
+        return None, {"error": NOT_MATCHED if unmatched else NOT_CHECKED, "facts": _context(q, read, qid)}
     hot = _in_question("hotspots", qid)
     if hot is None:
         return None, {"error": "Run predict_hotspots for this question first: the boxes come from it."}

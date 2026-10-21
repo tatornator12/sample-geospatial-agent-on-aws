@@ -750,6 +750,15 @@ fewer than two passes have been read.
 | | `only_planned_look` | `box` | exactly one box has a `next_look`, and it is this one | box |
 | `stop` | `no_checked_pass` | none | at least one pass read, and every pass read has a coverage record under the standard | each pass read with its checkable %, the standard % |
 
+**Rule common to every `draft` (gate B, W2, Oct 21):** a pass read in this question has this
+question's match record, the record `draft_tasking` drafts from. Without one, `decide(draft)` is
+refused and writes nothing. When every pass read is under the standard it says "No pass read in
+this question could be checked, so there is no box to draft: decide stop, then write the answer."
+(the forecast's own stop words). When a pass read is at or over the standard but unmatched it asks
+for `match_ais` first. So the stop path never shows a "Decided: Drafting box" line before its
+"Checked: ... No tasking can be drafted." line (pytest: the stop path tries every draft reason
+first).
+
 A second read is therefore always `coverage_thin`, `no_candidates` or a verified `asked`.
 `near_candidates` is partly true by construction, because the map is fitted on history that
 includes the read pass's day. The line therefore says only "lie in or near it".

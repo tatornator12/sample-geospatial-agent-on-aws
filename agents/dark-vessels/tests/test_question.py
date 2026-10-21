@@ -207,19 +207,29 @@ def _named_sep7(v):
 
 
 def _boxes(v):
+    _star_one(v)                                                    # a draft needs a checked pass (gate B, W2)
     put_hot(v, [bx(1, 0.4, "2026-10-24T00:17:29Z", 0), bx(2, 0.3, "2026-10-17T00:25:37Z", 2), bx(3, 0.1, None, 1)])
 
 
 def _boxes_tied(v):
+    _star_one(v)
     put_hot(v, [bx(1, 0.4, "2026-10-24T00:17:29Z", 1), bx(2, 0.4, "2026-10-17T00:25:37Z", 1), bx(3, 0.1, "2026-10-17T00:25:37Z", 0)])
 
 
 def _boxes_no_look(v):
+    _star_one(v)
     put_hot(v, [bx(1, 0.4, None, 0), bx(2, 0.3, None, 0), bx(3, 0.1, None, 0)])
 
 
 def _boxes_one_look(v):
+    _star_one(v)
     put_hot(v, [bx(1, 0.4, None, 0), bx(2, 0.3, "2026-10-17T00:25:37Z", 0), bx(3, 0.1, None, 0)])
+
+
+def _boxes_unchecked(v):
+    """The stop path's forecast: the boxes are there, but the one pass read was too thin to check."""
+    _star_thin(v)
+    put_hot(v, [bx(1, 0.4, "2026-10-24T00:17:29Z", 0), bx(2, 0.3, "2026-10-17T00:25:37Z", 2), bx(3, 0.1, None, 1)])
 
 
 MATRIX = [
@@ -255,6 +265,7 @@ MATRIX = [
     ("draft", "only_planned_look", _boxes_one_look, 2, True),
     ("draft", "only_planned_look", _boxes_one_look, 1, False),
     ("draft", "only_planned_look", _boxes, 1, False),             # two boxes have looks
+    ("draft", "most_past_targets", _boxes_unchecked, 1, False),   # no pass read was checked (W2)
     ("stop", "no_checked_pass", _star_thin, None, True),
     ("stop", "no_checked_pass", _star_checked, None, False),
     ("stop", "no_checked_pass", _fresh, None, False),             # no pass read
@@ -293,6 +304,7 @@ def test_decide_writes_the_facts_the_stage_words_its_lines_from(vessels):
     assert decide(vessels, "forecast", "coverage_thin")["facts"] == {"from": AUG30, "checkable_pct": 10}
     assert decide(vessels, "stop", "no_checked_pass")["facts"] == {
         "passes": [{"pass_id": STAR, "checkable_pct": 9}, {"pass_id": AUG30, "checkable_pct": 10}], "standard_pct": 15}
+    ask(vessels)                                                           # the draft's facts, after a checked pass
     _boxes(vessels)
     assert decide(vessels, "draft", "most_past_targets", box=1)["facts"] == {"box": 1, "share_pct": 40}
     assert decide(vessels, "draft", "soonest_look", box=2)["facts"] == {"box": 2, "look": "S1-D 10-17 UTC"}
@@ -373,9 +385,11 @@ def test_decide_refuses_unknown_pairs_and_missing_arguments(vessels):
                                     ("draft", "soonest_look", "", 4), ("draft", "soonest_look", "", True), (None, "x", "", 0)):
         out = run(vessels.dt.decide(step, because, pid, box, tool_context=ctx()))
         assert "error" in out and out["allowed"]["stop"] == ["no_checked_pass"]
+    _star_one(vessels)                                                     # a checked pass, no forecast yet
+    before = decision_files(vessels)
     assert decide(vessels, "draft", "soonest_look", box=1) == {
         "error": "Run predict_hotspots for this question first: the boxes come from it."}
-    assert decision_files(vessels) == []
+    assert decision_files(vessels) == before
 
 
 def test_in_a_later_turn_with_no_list_passes_decide_asks_for_it(vessels):
@@ -751,9 +765,45 @@ def test_draft_tasking_refuses_the_first_questions_match_record_in_a_second(vess
     _question_to_draft(vessels)
     ask(vessels, "Same question for the Oct 12 pass")
     decide(vessels, "read_pass", "asked", STAR)
+    put_match(vessels, STAR, 1)                                            # this question's match; the coverage is the first's
     run(vessels.ft.predict_hotspots(STAR))                                 # this question's hotspots
-    decide(vessels, "draft", "most_past_targets", box=1)
+    assert decide(vessels, "draft", "most_past_targets", box=1)["status"] == "noted"
     assert run(vessels.tk.draft_tasking(STAR, 1)) == {"error": "Those records are from an earlier question: read the pass again."}
+
+
+def test_the_stop_path_never_records_a_draft_first(vessels):
+    """Gate B's W2: on the spare's thin path the model tried decide(draft) after the forecast and it was
+    accepted, so the stage showed "Decided: Drafting box 1" before "No tasking can be drafted". A draft is
+    refused while no pass read in the question has been checked; nothing is written, and the refusal
+    names the ending (stop) and its facts. The first question's checked pass counts for nothing here."""
+    _question_to_draft(vessels)                                            # Oct 12 checked, in the first question
+    ask(vessels, "Same question, end of August")
+    read_and_cover(vessels, AUG30, because="asked")                        # thin: match_ais is refused
+    assert "error" in run(vessels.ais.match_ais(AUG30))
+    assert decide(vessels, "forecast", "coverage_thin")["status"] == "noted"
+    run(vessels.ft.predict_hotspots(AUG30))
+    before = decision_files(vessels)
+    for because, box in (("most_past_targets", 1), ("soonest_look", 1), ("near_candidates", 2), ("only_planned_look", 3)):
+        out = decide(vessels, "draft", because, box=box)
+        assert out["error"] == ("No pass read in this question could be checked, so there is no box to draft: decide "
+                                "stop, then write the answer.")
+        assert out["facts"]["read"] == [AUG30] and out["facts"]["last_read"]["candidates"] is None
+    assert decision_files(vessels) == before
+    assert decide(vessels, "stop", "no_checked_pass")["status"] == "noted"
+    steps = [vessels.s3.json(k)["step"] for k in decision_files(vessels) if vessels.s3.json(k)["question_id"] == qid(vessels)]
+    assert sorted(steps) == ["forecast", "read_pass", "stop"]                 # no draft line before the stop line
+    assert run(vessels.tk.draft_tasking(AUG30, 1)) == {"error": "Announce the box with decide(draft, ...) first."}
+
+
+def test_a_draft_waits_for_the_match_on_a_pass_over_the_standard(vessels):
+    """Coverage over the standard but match_ais not yet run: the refusal asks for the match, not stop."""
+    ask(vessels)
+    read_and_cover(vessels, STAR)                                          # 25%: over the standard
+    run(vessels.ft.predict_hotspots(STAR))
+    out = decide(vessels, "draft", "most_past_targets", box=1)
+    assert out["error"] == "No pass read in this question has been matched to AIS yet: match_ais on a pass at or over the standard first."
+    run(vessels.ais.match_ais(STAR))
+    assert decide(vessels, "draft", "most_past_targets", box=1)["status"] == "noted"
 
 
 def test_tasking_status_with_no_id_reads_the_newest_draft(vessels):
