@@ -4,6 +4,7 @@ target_fingerprint: "sha256:541ba5553c4a19ae19fe7670c9141d0c453f91c1aaa2d8212969
 target_path: /Users/tsteske/Documents/repos/sample-geospatial-agent-on-aws-main/.worktrees/stage-fixes-2/react-ui/frontend/src/components/MapView.tsx
 timestamp: 2026-10-21T20-01-11Z
 slug: react-ui-frontend-src-components-mapview-tsx
+closed: true
 ---
 ⚠️ DEGRADED: single-context (no sub-agent tool exposed in this workflow step; written after the Group B edits had begun, so Assessment A reads the Oct 20 review's before screenshots and today's after screenshots side by side; the detector ran after Assessment A was written)
 Target: the map and its plates (`MapView.tsx`: similarity, methane and terrain layers, the layers plate and its legends, the watch globe), headless Chrome at 1920×1080 and 1280×720. Before: `stage-review-2026-10-20/screenshots/act1/a1_live_sim_labels_crop.jpg`, `act1/a1_lake-mead-water_1920.jpg`, `act2/idle_1280.jpg`, `act2/watch_1280_t18.jpg`, `act4/08_circle_replay_1920_end.jpg`. After: `stage-fixes-2/screenshots/gb/b7-*.jpg`, `b8-*.jpg`, `b11-b14-*.jpg`, `b12-*.jpg`, `b13-*.jpg`, `b15-mission-*.jpg`, `b16-*.jpg`.
