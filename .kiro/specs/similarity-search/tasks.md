@@ -81,6 +81,12 @@ before Friday (task 1.4 records the before/after guard).
 - [x] 10. The answer opens on a sentence the room can repeat (Oct 21, stage review A1 P1-4 and the A1 P2 on m², stage-fixes-2 B18)
   - Results: `geo_agent/config.py` FINAL REPORT now opens with one sentence (the place, the date, the one number), then at most one table of two columns and five rows, areas in ha or km² to one decimal, never m²; the closing paragraph and every CRITICAL RULE unchanged. Dev only (`geospatial_agent_dev`): v31 (revision 1) eval 7/8, the miss was cloudy-scene (it kept the 2025-09-06 scene at 47.6% AOI cloud without a second fetch, as in 9.2's earlier runs); v32 (revision 2, the table's two columns) eval 8/8. Smoke `vegetation-central-park` PASS on both; it opens "Central Park on 2026-10-06: mean NDVI 0.65, with 80.2% of the park in dense or very dense vegetation." No report has m². check-env on v32: READY, required keys present. pytest 124 passed. The stable runtime is unchanged until the next promotion
 
+- [x] 11. Act 1 replays from live dev runs (Oct 21, stage-fixes-2 D9)
+  - `scripts/build_earth_replay_case.py` (presets `palisades`, `places-like`): records the Earth Analyst's dev runtime once on the stage plate, keeps the agent's file names (so two scenes of one place pair for the compare slider), lists change maps, then indices oldest first, then scenes newest first (the after index and the after scene on top), and writes each look's `saw`.
+  - `la-fires-2025` re-recorded from **v32** (take 2 of 2; take 1's table added the tools' areas and shares up itself): "46.1 km² of net new burn damage", 8,147.5 ha high severity (31.9%) on 2025-01-12 against 2024-11-08, change maps; the stage shows the after NBR on top and offers the compare slider. The gallery card's perimeter figure (96 km², 23,700 acres) is gone: the card shows the take's 46.1 km² and 8,147.5 ha (31.9%).
+  - New `earth-places-like-central-park` from v32 (take 4: takes 1 to 3 either quoted a similarity threshold the tool never gave or said what the agent saw only in the answer): 190,329 cells for July 2025, West Point rank 1 at 0.957, Lake George 0.955, a Saw line under both chips, the rank-1 popup. Gallery card with its own icon.
+  - Every figure checked against the session's tool outputs (`scripts/replay_numbers.py`, exit 0).
+
 ## Gate log
 
 ### G2 — Wednesday 2026-09-24 (early): PROMOTED, rehearsal pending
