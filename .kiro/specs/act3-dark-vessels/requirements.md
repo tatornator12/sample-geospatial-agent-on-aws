@@ -259,6 +259,13 @@ what the evidence shows.
 5. WHEN the predictions run THEN they SHALL use the newest data on file: the check holds out the
    most recent months (today Jul 1 to Oct 12, 2026), the forward map uses everything to the newest
    day, and the build SHALL be rerun on Nov 5 to add the newest pass and AIS.
+   Amended Oct 21 (`redesign-open-question.md` R9.1 and U10): the Nov 5 rerun SHALL run only IF the
+   one-question redesign passes gate A (first attempt Fri Oct 23 pm, drop-dead Mon Oct 26 12:00)
+   and gate B (Tue Oct 27, drop-dead Wed Oct 28 12:00), and THEN it SHALL follow that design's
+   runbook (§3.6), with the backups first and R9.2's go/no-go. IF either gate is not green by its
+   drop-dead, THEN G4 SHALL promote the four-turn version tagged `act3-four-turn-fallback` (task 1's
+   copy fixes and nothing else from the redesign), there SHALL be no Nov 5 rerun, the Oct 16 data
+   SHALL stand, and the rest file SHALL NOT be republished with `--newest`.
 6. WHEN the targets appear THEN, until the coverage check is on the map, a target with no match
    SHALL be a plain grey ring with no label; the candidates' colour (orchid) and their labels SHALL
    appear only after it.

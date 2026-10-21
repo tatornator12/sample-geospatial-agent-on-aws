@@ -394,6 +394,13 @@ turn, then the tasking live.
 12. **Freshness** (agreed Oct 16): the passes on file include the newest GFW-matched pass (Oct 12
     today); the build is rerun on Thursday Nov 5 (data only, after the code freeze) to add the newest
     pass and AIS and refit the prediction, and the act is rehearsed on that data Nov 6.
+    **Amended Oct 21** (`redesign-open-question.md` U10 and R9.1, approved): the Nov 5 rerun happens
+    only if the one-question redesign passes gate A (first attempt Fri Oct 23 pm, rerun Mon Oct 26
+    am, drop-dead Mon Oct 26 12:00) and gate B (Tue Oct 27, drop-dead Wed Oct 28 12:00). It then
+    follows that design's runbook (§3.6): backups first, the newest passes added by rule, and R9.2's
+    go/no-go (U14). If either gate fails, G4 promotes the four-turn version tagged
+    `act3-four-turn-fallback` (task 1's copy fixes and nothing else from the redesign), there is no
+    Nov 5 rerun, the Oct 16 data stands, and the rest file is not republished with `--newest`.
 8. **Names** (approved Oct 16): agent id `vessels`, label "Dark Vessels", directory
    `agents/dark-vessels/`, runtimes `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`,
    replay case `vessels-<pass>`.
