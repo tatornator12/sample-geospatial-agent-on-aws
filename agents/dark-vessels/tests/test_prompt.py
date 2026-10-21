@@ -76,6 +76,19 @@ def test_the_prompt_carries_every_fixed_sentence(prompt):
     assert vs.SAY_ELSE not in prompt                            # said word for word from gather_evidence
 
 
+PASS_BULLET = "Read <date> (<c>% checkable); data from Global Fishing Watch."
+SET_ASIDE_BULLET = "Read <date> (<c>% checkable) after setting <date> aside (<c>%); data from Global Fishing Watch."
+CANDIDATES_BULLET = "Candidates <ids>: <a> to <b> km from port."
+
+
+def templates(prompt) -> dict:
+    """The candidates ending's fixed bullet words, as quoted in the prompt."""
+    quoted = re.findall(r'"([^"]+)"', endings(prompt)["candidates"]["text"])
+    reads = [q for q in quoted if q.startswith("Read <date>")]
+    return {"pass": next(q for q in reads if "aside" not in q), "set_aside": next(q for q in reads if "aside" in q),
+            "candidates": next(q for q in quoted if q.startswith("Candidates <ids>"))}
+
+
 def endings(prompt) -> dict:
     """The ANSWER block's three endings: each one's FIRST LINE and its END."""
     block = flat(prompt).split("on how the question ended:", 1)[1].split("The boxes' own record", 1)[0]
@@ -102,32 +115,63 @@ def test_the_answer_block_has_three_endings(prompt):
     assert e["stop"]["end"] == c.CLOSER and "alone: no say_else and no candidate sentence" in e["stop"]["text"]
     assert "at most four bullets" in e["candidates"]["text"] and '"and <N> more"' in e["candidates"]["text"]
     assert "say_else, word for word" in e["candidates"]["text"]
-    assert '"No candidates on <date> in the <n>% it could check"' in e["none"]["text"]
+    assert '"No candidates on <date> in the <c>% it could check"' in e["none"]["text"]
+    # Gate A attempt 1: the pass and candidates bullets have fixed words, so the answer cannot outgrow the cap.
+    assert templates(prompt) == {"pass": PASS_BULLET, "set_aside": SET_ASIDE_BULLET, "candidates": CANDIDATES_BULLET}
+    assert "the pass, in the words above;" in e["none"]["text"]
     for kind in ("candidates", "none"):
         assert "Then the candidate sentence." in e[kind]["text"]
-        assert '"data from Global Fishing Watch"' in e[kind]["text"]
     assert "the forecast's say, word for word" in e["stop"]["text"] and "Global Fishing Watch" in e["stop"]["text"]
     assert vs.ANSWER_MAX_WORDS == 120
 
 
+def test_the_answer_begins_with_its_first_line_and_dates_have_no_year(prompt):
+    """Gate A attempt 1: two answers opened on "---" and one dated its pass with the year, one word each over the cap."""
+    text = flat(prompt)
+    assert 'begin with the FIRST LINE itself, nothing before it, no heading and no "---";' in text
+    assert "A <date> is the month's three letters and the day, with no year." in text
+    assert "name the passes from it by date in one sentence, and stop" in text        # no list, so no em dash
+
+
+def test_the_gone_silent_spare_ends_on_the_closer(prompt):
+    """Gate A attempt 1: the spare's answer ended on where the AIS came back on, not on the closer."""
+    import vessels_config as c
+    text = flat(prompt)
+    assert (f'"{c.CANNOT_SAY}"; where its AIS came back on comes after that, and the answer ENDS with one paragraph: '
+            f'one short sentence, then "{c.CLOSER}")') in text
+
+
 # --- the answer cap (§3.14, review L10) ------------------------------------------------------------------
 
+def fill(template: str, *values: str) -> str:
+    """Fill a template's placeholders in order of appearance."""
+    out = template
+    for v in values:
+        out = re.sub(r"<[a-z]+>", v, out, count=1)
+    assert "<" not in out, out
+    return out
+
+
 def test_the_longest_legal_answer_is_within_the_cap(prompt):
-    """Seven candidates, a set-aside pass, the longest say ("September", "100%", "14 times"): 116 words
-    split on whitespace, as report_max_words counts, with the four bullet markers. The first line and
-    the closing paragraph come from the prompt's own templates, so the prompt cannot outgrow the cap."""
+    """Seven candidates, a set-aside pass, the longest say ("September", "100%", "14 times"): 117 words
+    split on whitespace, as report_max_words counts, with the four bullet markers. Every line but the
+    tools' own sentences comes from the prompt's templates (the first line, the pass and candidates
+    bullets, the closing paragraph), so the prompt cannot outgrow the cap. Gate A attempt 1 found the
+    bullets written freely at 20 to 25 words, over the cap."""
     import forecast_tools as ft
     import vessel_store as vs
     import vessels_config as c
     e = endings(prompt)["candidates"]
+    t = templates(prompt)
     first = e["first"].replace("<n>", "7").replace("<date>", "Sep 30").replace("<k>", "3")
     assert first == "7 candidates on the Sep 30 pass; I drafted box 3 for the next look."
+    read = fill(t["set_aside"], "Sep 30", "22", "Aug 30", "10")
+    assert read == "Read Sep 30 (22% checkable) after setting Aug 30 aside (10%); data from Global Fishing Watch."
+    cands = fill(t["candidates"], "T01, T02, T03, T04 and 3 more", "12", "31")
     say = ft.rolling_say(date(2026, 9, 1), 100, "14")
-    lines = [first, "",
-             "- Read Sep 30 (22% checkable) after setting Aug 30 aside (10%); data from Global Fishing Watch.",
-             "- T01, T02, T03, T04 and 3 more, 12 to 31 km from port.",
-             f"- {vs.SAY_ELSE}", f"- {say}", "", c.CANDIDATE_SENTENCE, "", e["end"]]
-    assert [len(x.split()) for x in (lines[0], lines[2][2:], lines[3][2:], vs.SAY_ELSE, say, c.CANDIDATE_SENTENCE,
-                                     lines[-1])] == [15, 16, 13, 15, 22, 15, 16]
-    assert len("\n".join(lines).split()) == 116 <= c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 120
+    lines = [first, "", f"- {read}", f"- {cands}", f"- {vs.SAY_ELSE}", f"- {say}", "", c.CANDIDATE_SENTENCE, "", e["end"]]
+    assert [len(x.split()) for x in (first, read, cands, vs.SAY_ELSE, say, c.CANDIDATE_SENTENCE, e["end"])] == [
+        15, 16, 14, 15, 22, 15, 16]
+    assert len("\n".join(lines).split()) == 117 <= c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 120
+    assert len(fill(t["pass"], "Sep 30", "22").split()) == 10                # a single pass read is shorter still
     assert vs.CHECKABLE_FLOOR == 0.15

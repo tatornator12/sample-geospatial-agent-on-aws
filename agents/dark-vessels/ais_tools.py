@@ -161,8 +161,10 @@ async def check_ais_coverage(pass_id: str) -> str:
         "heard_render": {"kind": "vector", "group": "maritime", "legend": "AIS received"},
         "unproven_render": {"kind": "vector", "group": "maritime", "legend": "AIS reception unknown"},
         "unproven_means": vs.RECEPTION_UNKNOWN,
-        "next_steps": "Show both areas (display_visual with heard_s3_url and heard_render, and with unproven_s3_url "
-                      "and unproven_render); judge this pass against the standard.",
+        # Both areas, every time: the map shows where a missing broadcast proves nothing before any
+        # target is called a candidate (gate A attempt 1 showed one area only, once in four runs).
+        "next_steps": "Show both areas with your next call, as two display_visual calls: heard_s3_url with "
+                      "heard_render, and unproven_s3_url with unproven_render; then judge this pass against the standard.",
     })
 
 

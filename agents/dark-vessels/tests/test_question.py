@@ -599,6 +599,20 @@ def test_match_ais_next_steps_word_for_word(vessels):
         "No candidates on this pass: decide what follows.")
 
 
+def test_coverage_next_steps_ask_for_both_areas_with_the_next_call(vessels):
+    """Gate A attempt 1: one run in four showed only the received area before match_ais (M2's check)."""
+    assert run(vessels.ais.check_ais_coverage(STAR))["next_steps"] == (
+        "Show both areas with your next call, as two display_visual calls: heard_s3_url with heard_render, and "
+        "unproven_s3_url with unproven_render; then judge this pass against the standard.")
+
+
+def test_reachable_area_next_steps_get_the_radar_first_and_end_on_the_closer(vessels):
+    """Gate A attempt 1: the spare showed the reach with no find_pass and ended on where the AIS came back on."""
+    steps = run(vessels.ft.reachable_area())["next_steps"]
+    assert steps.startswith("With your next call, get that pass's radar (find_pass with pass_id);")
+    assert steps.endswith("then where the AIS came back on; end with one short paragraph that ends with the closer.")
+
+
 def test_next_steps_name_no_call_order(vessels):
     """Each tool's next steps say what to show or judge, never which investigation call comes next."""
     ask(vessels)
@@ -723,6 +737,11 @@ def test_draft_tasking_holds_to_the_decided_box_in_this_question(vessels):
     assert isinstance(draft["heard_share"], float) and draft["heard_share"] == 0.351
     assert (draft["imaged_share"], draft["checkable_share"]) == (0.527, 0.246)
     assert draft["rolling"]["total"] > 0 and draft["check"]["top_5pct"]["total"] > 0 and draft["box"]["box"] == 1
+    # Gate A attempt 1: two answers opened on "---"; the draft's next steps say where the answer begins.
+    assert out["next_steps"] == (
+        f"Write the answer now (at most {vessels.vs.ANSWER_MAX_WORDS} words), beginning with its first line: nothing "
+        "before it, no \"---\". Then stop; the map shows the tasking plate and the officer decides. Never say it is "
+        "filed: only tasking_status can say that.")
 
 
 def test_draft_tasking_refuses_the_first_questions_match_record_in_a_second(vessels):

@@ -437,7 +437,8 @@ async def reachable_area() -> str:
         "back_on": back_on, "area_s3_url": url,
         "render": {"kind": "vector", "group": "maritime", "legend": "Reach by water", "label": "label"},
         "fixed_sentence": vs.CANNOT_SAY,
-        "next_steps": "Show that pass's radar (find_pass with pass_id) and the area (display_visual with area_s3_url and "
-                      "render). Say the date plainly (an earlier pass), the speed and the hours, the targets inside, the "
-                      "fixed sentence word for word, and only then where the AIS came back on.",
+        "next_steps": "With your next call, get that pass's radar (find_pass with pass_id); then show the radar and the "
+                      "area (display_visual with area_s3_url and render) together. Say the date plainly (an earlier "
+                      "pass), the speed and the hours, the targets inside, the fixed sentence word for word, then where "
+                      "the AIS came back on; end with one short paragraph that ends with the closer.",
     })

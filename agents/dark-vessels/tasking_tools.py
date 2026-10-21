@@ -110,8 +110,9 @@ async def draft_tasking(pass_id: str, box: int, candidate_ids: list = None, look
     return json.dumps({
         "tasking_id": tid, "draft_s3_url": url, "box": box, "candidates": [c["id"] for c in draft["candidates"]],
         "look": look["text"] if look else "no look planned yet", "fixed_sentence": vs.OFFICERS_DECISION,
-        "next_steps": "Write the answer and stop; the map shows the tasking plate and the officer decides. Never say "
-                      "it is filed: only tasking_status can say that.",
+        "next_steps": f"Write the answer now (at most {vs.ANSWER_MAX_WORDS} words), beginning with its first line: "
+                      "nothing before it, no \"---\". Then stop; the map shows the tasking plate and the officer "
+                      "decides. Never say it is filed: only tasking_status can say that.",
     })
 
 
