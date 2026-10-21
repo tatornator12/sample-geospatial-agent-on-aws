@@ -11,7 +11,7 @@
 import { useEffect, useId, useState } from 'react';
 import { approveTasking, getTasking, type TaskingBox, type TaskingState } from '../services/api.ts';
 import { SNAPSHOT_MAX_CHARS, mapSnapshot } from '../utils/snapshot.ts';
-import { countdown, numberRuns, taskingLine } from '../utils/vesselLayers.ts';
+import { countdown, numberRuns, passDay, taskingLine } from '../utils/vesselLayers.ts';
 
 const RETRY_MS = 2000;
 const GIVE_UP_MS = 30_000;
@@ -140,6 +140,7 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
   const boxes = state.boxes.length ? state.boxes : [card.box];
   const chosenBox = boxes.find((b) => b.box === box) ?? card.box;
   const kept = card.candidates.filter((c) => !excluded.includes(c.id));
+  const candidatesDay = passDay(card.passId);
 
   const approve = async () => {
     setFiling(true);
@@ -185,7 +186,7 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
       {/* The choice scrolls on a short screen; the summary and the decision stay in view below it. */}
       <div className="tasking-plate__body">
       <fieldset className="tasking-plate__group" disabled={inert || busy || filing}>
-        <legend className="tasking-plate__legend">Patrol box</legend>
+        <legend className="tasking-plate__legend">Patrol box (from past dark targets)</legend>
         {boxes.map((b) => (
           <label key={b.box} className={`tasking-plate__option${b.box === chosenBox.box ? ' tasking-plate__option--on' : ''}`}>
             <input type="radio" name={`${boxesId}-box`} checked={b.box === chosenBox.box} onChange={() => onBox(b.box)} />
@@ -203,7 +204,10 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
 
       {card.candidates.length > 0 && (
         <fieldset className="tasking-plate__group" disabled={inert || busy || filing} aria-describedby={candidatesId}>
-          <legend className="tasking-plate__legend">Candidates</legend>
+          <legend className="tasking-plate__legend">
+            {/* The candidates are the pass's, the box is history's: each legend says where it comes from. */}
+            <Runs text={candidatesDay ? `Candidates (${candidatesDay} pass)` : 'Candidates'} />
+          </legend>
           <ul className="tasking-plate__candidates">
             {card.candidates.map((c) => (
               <li key={c.id}>
@@ -236,7 +240,7 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
         <p className="tasking-plate__status">Recorded case: the decision is made live, not replayed.</p>
       ) : (
         <>
-          <p className="tasking-plate__status">Decision: the officer's.</p>
+          <p className="tasking-plate__status">Nothing is filed until you approve.</p>
           <div className="tasking-plate__actions">
             <button type="button" className="stage-btn stage-btn--primary" onClick={() => void approve()} disabled={busy || filing}>
               {filing ? <>Filing<WorkingDots /></> : 'Approve the tasking'}

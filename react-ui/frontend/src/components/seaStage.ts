@@ -36,6 +36,7 @@ import {
   sweepRows,
   wakes,
   type AisLook,
+  type CoverageQuiet,
   type PreparedTrack,
   type VesselKind,
   type VesselRest,
@@ -415,7 +416,7 @@ const FLEET_RAMP: Expr = [
 ];
 
 /** The opacity each kind fades in to (its layers start at 0 and transition, so the beat arrives, not snaps). */
-export const SEA_OPACITY = { heard: 0.08, unproven: 0.6, heat: 0.75, fleet: 0.9, look: 0.035, reach: 0.07 };
+export const SEA_OPACITY = { heard: 0.08, unproven: 0.6, unprovenQuiet: 0.3, heat: 0.75, fleet: 0.9, look: 0.035, reach: 0.07 };
 
 /**
  * One tool's file on the map, by its kind. Every layer that fades starts at 0; `arrive` brings it
@@ -492,12 +493,12 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
       },
       paint: { 'text-color': ORCHID, 'text-halo-color': HALO, 'text-halo-width': 2.5, 'text-opacity': 0, 'text-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 300 } },
     });
-    // Unproven targets say so ("not evidence"); a candidate the officer left out says that.
+    // A target where reception is unknown says so; a candidate the officer left out says that.
     map.addLayer({
       id: c('-notes'), type: 'symbol', minzoom: NEAR, source, filter: notesFilter([]),
       layout: {
         ...vis,
-        'text-field': ['case', ['==', ['get', 'status'], 'unproven'], 'not evidence', ['concat', ['get', 'label'], LEFT_OUT_SUFFIX]],
+        'text-field': ['case', ['==', ['get', 'status'], 'unproven'], 'reception unknown', ['concat', ['get', 'label'], LEFT_OUT_SUFFIX]],
         'text-font': MONO, 'text-size': 15, 'text-max-width': 30,
         'text-variable-anchor': ['left', 'right', 'top', 'bottom'], 'text-radial-offset': 1.1, 'text-justify': 'auto', 'text-padding': 3, 'text-optional': true,
       },
@@ -508,7 +509,7 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
 
   if (kind === 'heard' || kind === 'unproven') {
     const geom = data.features.find((f) => f.geometry && /Polygon$/.test(f.geometry.type))?.geometry ?? null;
-    const words = kind === 'heard' ? 'heard water' : 'unproven: AIS not heard here';
+    const words = kind === 'heard' ? 'AIS received' : 'reception unknown';
     addPoints({ type: 'FeatureCollection', features: labelPoint(words, regionLabelPoint(geom as never, ctx.view, ctx.avoid)) });
     if (kind === 'heard') {
       map.addLayer({
@@ -733,15 +734,16 @@ export function arrive(map: M, kind: Exclude<VesselKind, 'radar'>, fill: string)
 }
 
 /**
- * The coverage under the forecast: once the argument has moved on to where to look next, heard and
- * unproven water step back so the history's heat and the boxes read (the key still says what they are).
+ * The coverage as the argument moves on: while the candidates are read the reception-unknown hatch
+ * halves so the orchid rings carry the frame; under the forecast both areas step back so the
+ * history's heat and the boxes read (the key still says what they are).
  */
-export function paintCoverage(map: M, kind: 'heard' | 'unproven', fill: string, quiet: boolean): void {
+export function paintCoverage(map: M, kind: 'heard' | 'unproven', fill: string, quiet: CoverageQuiet): void {
   if (kind === 'heard') {
-    setPaint(map, fill, 'fill-opacity', quiet ? 0.03 : SEA_OPACITY.heard);
-    setPaint(map, cid(fill, '-outline'), 'line-opacity', quiet ? 0.15 : 0.35);
+    setPaint(map, fill, 'fill-opacity', quiet === 'all' ? 0.03 : SEA_OPACITY.heard);
+    setPaint(map, cid(fill, '-outline'), 'line-opacity', quiet === 'all' ? 0.15 : 0.35);
   } else {
-    setPaint(map, fill, 'fill-opacity', quiet ? 0.2 : SEA_OPACITY.unproven);
+    setPaint(map, fill, 'fill-opacity', quiet === 'all' ? 0.2 : quiet === 'hatch' ? SEA_OPACITY.unprovenQuiet : SEA_OPACITY.unproven);
   }
 }
 
@@ -759,7 +761,7 @@ export function updateTargets(map: M, ids: SeaIds, data: FC): void {
 }
 
 /**
- * The candidates' reveal: the grey rings in heard water turn orchid, grow and take their labels;
+ * The candidates' reveal: the grey rings where AIS was received turn orchid, grow and take their labels;
  * the claim's hairlines step back. The grey rings under them go once the orchid has arrived.
  */
 export function revealCandidates(map: M, fill: string, excluded: readonly string[], reduced: boolean): () => void {
@@ -777,10 +779,13 @@ export function revealCandidates(map: M, fill: string, excluded: readonly string
   return () => clearTimeout(timer);
 }
 
-/** The coverage's labels step aside once the candidates carry the argument. */
+/** The coverage's labels step back once the candidates carry the argument, still readable. */
 export function quietCoverageLabels(map: M, fill: string): void {
-  setPaint(map, cid(fill, '-labels'), 'text-opacity', 0);
+  setPaint(map, cid(fill, '-labels'), 'text-opacity', COVERAGE_LABEL_QUIET);
 }
+
+/** The coverage words' opacity after the reveal: back a step, never gone (the room still reads them). */
+export const COVERAGE_LABEL_QUIET = 0.55;
 
 /** The officer's choice on the map: the selected box washed and lined; candidates in orchid, left-out ones grey. */
 export function paintTasking(map: M, boxesFill: string | null, targetsFill: string | null, box: number | null, excluded: readonly string[], revealed: boolean): void {

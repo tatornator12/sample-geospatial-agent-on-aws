@@ -25,6 +25,7 @@ import {
   lookStartFrom,
   loopTime,
   numberRuns,
+  passDay,
   passOf,
   passWords,
   poleOf,
@@ -101,13 +102,22 @@ describe('which file is which (by the tools\' own names)', () => {
     expect(passOf(`${S}boxes.geojson`)).toBeNull();
     expect(passWords('s1d-20261012t0018')).toEqual({ satellite: 'Sentinel-1D', when: '2026-10-12 00:18 UTC', day: '2026-10-12' });
     expect(passWords('nope')).toBeNull();
+    // The short date for lines and the plate: month first, no leading zero.
+    expect(passDay('s1d-20261012t0018')).toBe('Oct 12');
+    expect(passDay('s1d-20260907t1141')).toBe('Sep 7');
+    expect(passDay('s1a-20240306t0027')).toBe('Mar 6');
+    expect(passDay('s1d-20261312t0018')).toBeNull();
+    expect(passDay('nope')).toBeNull();
   });
 
   it('styles by the file\'s name whatever the hint says (the stage wins over a drifting hint)', () => {
     const drifted = { kind: 'raster' as const, group: 'methane' as const, legend: 'Plume' };
     expect(vesselGeometryHint(drifted, `${S}boxes.geojson`)).toMatchObject({ kind: 'vector', group: 'maritime', label: 'label' });
     expect(vesselGeometryHint(undefined, `${S}hotspots.geojson`)).toMatchObject({ kind: 'points', property: 'v' });
-    expect(vesselGeometryHint({ kind: 'vector', group: 'maritime', legend: 'Heard water' }, `${S}heard_s1d-20261012t0018.geojson`)?.legend).toBe('Heard water');
+    expect(vesselGeometryHint({ kind: 'vector', group: 'maritime', legend: 'AIS received' }, `${S}heard_s1d-20261012t0018.geojson`)?.legend).toBe('AIS received');
+    // With no hint, the room's words: AIS received and AIS reception unknown.
+    expect(vesselGeometryHint(undefined, `${S}heard_s1d-20261012t0018.geojson`)?.legend).toBe('AIS received');
+    expect(vesselGeometryHint(undefined, `${S}unproven_s1d-20261012t0018.geojson`)?.legend).toBe('AIS reception unknown');
     expect(vesselGeometryHint(undefined, `${S}radar_s1d-20261012t0018.tif`)).toBeNull();
     expect(vesselRasterHint(undefined, `${S}radar_s1d-20261012t0018.tif`)).toMatchObject({ kind: 'raster', group: 'maritime' });
     expect(vesselRasterHint({ kind: 'raster', bounds: [-92, -2, -88, 2] }, `${S}radar_s1d-20261012t0018.tif`)?.bounds).toEqual([-92, -2, -88, 2]);
@@ -115,8 +125,8 @@ describe('which file is which (by the tools\' own names)', () => {
   });
 
   it('keeps the agent\'s short titles in the layers plate', () => {
-    const layer: LayerMetadata = { id: 'g', sourceId: 'g', name: 'Heard water', url: `${S}heard_s1d-20261012t0018.geojson`, type: 'geometry' };
-    expect(layerRowLabel(layer)).toBe('Heard water');
+    const layer: LayerMetadata = { id: 'g', sourceId: 'g', name: 'AIS received', url: `${S}heard_s1d-20261012t0018.geojson`, type: 'geometry' };
+    expect(layerRowLabel(layer)).toBe('AIS received');
   });
 });
 
@@ -133,11 +143,12 @@ describe('colours and shapes (never red or amber, never colour alone)', () => {
     const words = Object.values(STATUS_KEY).map((s) => s.words);
     expect(new Set(shapes).size).toBe(shapes.length);
     expect(new Set(words).size).toBe(words.length);
-    // The two grey statuses differ by their label ("not evidence"), not by colour.
+    // The two grey statuses differ by their label ("reception unknown"), not by colour.
     expect(STATUS_KEY.unproven.colour).toBe(STATUS_KEY.detected.colour);
     expect(STATUS_KEY.unproven.shape).not.toBe(STATUS_KEY.detected.shape);
-    expect(STATUS_KEY.candidate.words).toMatch(/candidate/);
-    expect(STATUS_KEY.unproven.words).toMatch(/not evidence/);
+    expect(STATUS_KEY.candidate.words).toBe('candidate: no AIS where AIS was received, both detectors');
+    expect(STATUS_KEY.unproven.words).toBe('reception unknown: no AIS there proves nothing');
+    for (const { words } of Object.values(STATUS_KEY)) expect(words).not.toMatch(/heard|unproven|not evidence/i);
   });
 
   it('tints the radar from the deep sea to fog, never pure white, as 32 TiTiler intervals', () => {
@@ -295,16 +306,26 @@ describe('the clock plate', () => {
     expect(rest.sub).toContain('193 vessels broadcasting');
     expect(rest.sub).toContain(ATTRIBUTION);
     expect(clockLines('radar', { passId: 's1d-20261012t0018', vessels: 120 }).lead).toBe('Sentinel-1D radar  2026-10-12 00:18 UTC');
-    expect(clockLines('coverage', { heardShare: 0.298 }).lead).toBe('AIS heard over 30% of the reserve');
+    // The received share is of the whole reserve on this path: no checkable share is claimed.
+    expect(clockLines('coverage', { heardShare: 0.298 })).toEqual({
+      lead: 'AIS received over 30% of the reserve',
+      sub: 'other ships\' AIS was received there near the pass · hatched: reception unknown',
+    });
+    expect(clockLines('coverage', {}).lead).toBe('Where AIS was received');
     expect(clockLines('candidates', { counts: { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, matched: true } }).lead).toBe('4 candidates');
-    expect(clockLines('candidates', {}).sub).toContain('candidates, not accusations');
+    expect(clockLines('candidates', {}).sub).toBe('no AIS where AIS was being received, seen by both detectors · a reason to look, not an accusation');
     expect(clockLines('fleet', { fleetMonth: 'October 2026' }).sub).toContain(ATTRIBUTION);
   });
 
   it('sets the AIS replay aside over an earlier pass rather than mislead', () => {
     const earlier = clockLines('radar', { passId: 's1a-20240306t0027', replayPassId: 's1d-20261012t0018' });
     expect(earlier.lead).toBe('Sentinel-1A radar  2024-03-06 00:27 UTC');
-    expect(earlier.sub).toMatch(/earlier pass/);
+    expect(earlier.sub).toBe('the AIS replay is of the 2026-10-12 pass, so it steps aside');
+    // A newer pass than the replay's steps it aside the same way (the replay is one pass's, not "the latest").
+    expect(clockLines('radar', { passId: 's1d-20261024t0017', replayPassId: 's1d-20261012t0018' }).sub)
+      .toBe('the AIS replay is of the 2026-10-12 pass, so it steps aside');
+    expect(clockLines('radar', { passId: 's1d-20261012t0018', replayPassId: 's1d-20261012t0018', vessels: 120 }).sub)
+      .toBe('AIS held at the pass minute · 120 vessels broadcasting');
     expect(clockLines('reach', { passId: 's1a-20240306t0027', reach: '133 km by water at 6 kn' }).sub)
       .toBe('133 km by water at 6 kn · I cannot say which, if any, of these it is.');
   });
@@ -314,13 +335,37 @@ describe('the clock plate', () => {
     expect(clockLines('boxes', {}).sub).toMatch(/history, not today's candidates/);
   });
 
-  it('never says the agent filed anything', () => {
+  it('never says the agent filed anything, and leaves the filed sentence to the plate', () => {
     const beats: SeaBeat[] = ['rest', 'forward', 'radar', 'targets', 'coverage', 'candidates', 'heat', 'boxes', 'fleet', 'look', 'reach', 'tasking', 'filed'];
     for (const b of beats) {
       const { lead, sub } = clockLines(b, {});
       expect(`${lead} ${sub}`).not.toMatch(/agent filed|illegal|poach|suspect|culprit|—/i);
+      // The officer sentence and the retired coverage words appear on no clock line.
+      expect(`${lead} ${sub}`).not.toMatch(/Filed by the officer|did not file|officer's|heard|unproven|not evidence/i);
     }
-    expect(clockLines('filed', {}).sub).toBe('Filed by the officer. The agent did not file it.');
+    expect(clockLines('tasking', {}).sub).toBe('choose a box and the candidates, then approve');
+    expect(clockLines('filed', {}).sub).toBe('the approved box and candidates are on the tasking plate');
+    const now = Date.parse('2026-10-20T14:37:00Z');
+    expect(clockLines('filed', { now, tasking: { box: 3, kept: 3, total: 4, lookStart: '2026-10-24T00:17:00Z' } }).sub)
+      .toBe('box 3 · 3 of 4 candidates · next radar look in 3 d 9 h');
+    expect(clockLines('filed', { now, tasking: { box: 2, kept: 1, total: 1, lookStart: null } }).sub)
+      .toBe('box 2 · 1 of 1 candidate · next radar look not planned yet');
+    expect(clockLines('filed', { now, tasking: { box: 1, kept: 0, total: 0 } }).sub)
+      .toBe('box 1 · a patrol of the box only · next radar look not planned yet');
+  });
+
+  it('keeps every changed sub at 110 characters or fewer, with the longest values', () => {
+    const counts = { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, matched: true };
+    const now = Date.parse('2026-10-20T14:37:00Z');
+    const subs = [
+      clockLines('radar', { passId: 's1a-20240306t0027', replayPassId: 's1d-20261012t0018' }).sub,
+      clockLines('coverage', { heardShare: 1 }).sub,
+      clockLines('candidates', { counts }).sub,
+      clockLines('tasking', {}).sub,
+      clockLines('filed', {}).sub,
+      clockLines('filed', { now, tasking: { box: 3, kept: 12, total: 12, lookStart: '2026-11-30T23:59:00Z' } }).sub,
+    ];
+    for (const sub of subs) expect(sub.length, sub).toBeLessThanOrEqual(110);
   });
 
   it('counts down to the next look', () => {
@@ -341,8 +386,8 @@ describe('the clock plate', () => {
   });
 
   it('sets numbers apart for the mono face', () => {
-    expect(numberRuns('AIS heard over 30% of the reserve')).toEqual([
-      { text: 'AIS heard over ', num: false }, { text: '30%', num: true }, { text: ' of the reserve', num: false },
+    expect(numberRuns('AIS received over 30% of the reserve')).toEqual([
+      { text: 'AIS received over ', num: false }, { text: '30%', num: true }, { text: ' of the reserve', num: false },
     ]);
     expect(numberRuns('AIS replay  2026-10-11 14:00 UTC').filter((r) => r.num).map((r) => r.text)).toEqual(['2026-10-11', '14:00 UTC']);
   });
@@ -359,10 +404,12 @@ describe('the beats\' paint', () => {
     expect(claim.heads).toBeGreaterThan(forecast.heads);
     expect(forecast.radar).toBeLessThan(claim.radar);
     expect(aisLook('fleet').shown).toBe(false);
-    // The coverage steps back under the forecast, and is full under the argument.
-    expect(aisLook('boxes').quietCoverage).toBe(true);
-    expect(aisLook('tasking').quietCoverage).toBe(true);
-    expect(aisLook('candidates').quietCoverage).toBe(false);
+    // The coverage steps back under the forecast, is full under the argument, and only the
+    // reception-unknown hatch steps back while the candidates are read.
+    expect(aisLook('boxes').quietCoverage).toBe('all');
+    expect(aisLook('tasking').quietCoverage).toBe('all');
+    expect(aisLook('coverage').quietCoverage).toBe('none');
+    expect(aisLook('candidates').quietCoverage).toBe('hatch');
     expect(aisLook('reach').shown).toBe(false);
     expect(aisLook('radar', true).shown).toBe(false);
   });
@@ -390,9 +437,10 @@ describe('the tasking on the map', () => {
   });
 
   it('says the choice in a line', () => {
-    expect(taskingLine(1, 3, 4)).toBe('Box 1 · 3 of 4 candidates');
-    expect(taskingLine(2, 1, 1)).toBe('Box 2 · 1 of 1 candidate');
-    expect(taskingLine(3, 0, 0)).toBe('Box 3 · a patrol of the box only');
+    // The box is history's and the candidates the pass's: they are checked on the way, not in the box.
+    expect(taskingLine(1, 3, 4)).toBe('Patrol box 1 · check 3 of 4 candidates on the way');
+    expect(taskingLine(2, 1, 1)).toBe('Patrol box 2 · check 1 of 1 candidate on the way');
+    expect(taskingLine(3, 0, 0)).toBe('Patrol box 3 · a patrol of the box only');
   });
 
   it('asks the agent to check the filing (it never says so itself)', () => {

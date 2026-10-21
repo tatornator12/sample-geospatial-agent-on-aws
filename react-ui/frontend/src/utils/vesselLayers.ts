@@ -124,8 +124,8 @@ export function passOf(url: string | undefined): string | null {
 const DEFAULTS: Record<VesselKind, RenderHint> = {
   radar: { kind: 'raster', group: 'maritime', legend: 'Radar backscatter' },
   targets: { kind: 'points', group: 'maritime', legend: 'Radar targets' },
-  heard: { kind: 'vector', group: 'maritime', legend: 'Heard water' },
-  unproven: { kind: 'vector', group: 'maritime', legend: 'Unproven water' },
+  heard: { kind: 'vector', group: 'maritime', legend: 'AIS received' },
+  unproven: { kind: 'vector', group: 'maritime', legend: 'AIS reception unknown' },
   heat: { kind: 'points', group: 'maritime', legend: 'Dark targets seen before', property: 'v' },
   boxes: { kind: 'vector', group: 'maritime', legend: 'Patrol boxes', label: 'label' },
   fleet: { kind: 'points', group: 'maritime', legend: 'Squid fleet hours', property: 'v' },
@@ -162,6 +162,17 @@ export function passWords(passId: string): { satellite: string; when: string; da
   return { satellite: `Sentinel-1${m[1].toUpperCase()}`, when: `${day} ${m[5]}:${m[6]} UTC`, day };
 }
 
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** The pass's short date, "Oct 12" (month first, as the look lines give it), or null. */
+export function passDay(passId: string): string | null {
+  const m = passId.match(/^s1[a-d]-\d{4}(\d{2})(\d{2})t\d{4}$/);
+  if (!m) return null;
+  const [month, day] = [Number(m[1]), Number(m[2])];
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${MONTH_SHORT[month - 1]} ${day}`;
+}
+
 // --- the targets ---------------------------------------------------------------------------------------
 
 /** How a target reads, by what the tools said about it (detect_vessels, then match_ais). */
@@ -175,9 +186,9 @@ export const STATUS_KEY: Record<ShownStatus, { shape: string; colour: string; wo
   detected: { shape: 'grey ring', colour: LABEL, words: 'radar target, not yet explained' },
   claimed: { shape: 'fog ring tied by a hairline to its AIS dot', colour: FOG, words: 'a broadcast accounts for it' },
   port: { shape: 'fog square', colour: FOG, words: 'at or near a port' },
-  unproven: { shape: 'grey ring, labelled', colour: LABEL, words: 'no AIS, but none could be heard there: not evidence' },
+  unproven: { shape: 'grey ring, labelled', colour: LABEL, words: 'reception unknown: no AIS there proves nothing' },
   seen_once: { shape: 'small faint ring', colour: LABEL, words: 'seen by one detector only, set aside' },
-  candidate: { shape: 'orchid ring, labelled', colour: ORCHID, words: 'candidate: no AIS, in heard water, both detectors' },
+  candidate: { shape: 'orchid ring, labelled', colour: ORCHID, words: 'candidate: no AIS where AIS was received, both detectors' },
 };
 
 /** The circle layer's status as an expression: a claimed target (at detect) reads as a broadcast. */
@@ -513,6 +524,8 @@ export interface SeaFacts {
   replayPassId?: string;
   counts?: TargetCounts;
   heardShare?: number;
+  /** The officer's filed choice (the filed beat's sub); without it the sub points at the plate. */
+  tasking?: { box: number; kept: number; total: number; lookStart?: string | null };
   fleetMonth?: string;
   look?: string;
   lookStart?: string;
@@ -539,8 +552,8 @@ export function countdown(startIso: string, now: number): string {
 
 /**
  * The clock plate's two lines for a beat, from the tools' own numbers: line one what the room is
- * looking at, line two what it means. Numbers come from the files the agent wrote (the heard share
- * rides on the heard water's feature), never from the stage's own measure.
+ * looking at, line two what it means. Numbers come from the files the agent wrote (the received
+ * share rides on the received area's feature), never from the stage's own measure.
  */
 export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: string } {
   const pass = f.passId ? passWords(f.passId) : null;
@@ -556,9 +569,9 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
     case 'radar':
       return {
         lead: pass ? `${pass.satellite} radar  ${pass.when}` : 'Sentinel-1 radar',
-        // The replay is the latest pass's: over an earlier pass it steps aside rather than mislead.
+        // The replay is one pass's: over any other pass, older or newer, it steps aside rather than mislead.
         sub: f.replayPassId && f.passId && f.replayPassId !== f.passId
-          ? 'an earlier pass · the AIS replay is of the latest one, so it steps aside'
+          ? `the AIS replay is of the ${passWords(f.replayPassId)?.day ?? 'other'} pass, so it steps aside`
           : `AIS held at the pass minute · ${f.vessels ?? 0} vessels broadcasting`,
       };
     case 'targets': {
@@ -570,14 +583,15 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
       };
     }
     case 'coverage':
+      // The received share is of the whole reserve: what the pass can check needs the imaged area.
       return {
-        lead: typeof f.heardShare === 'number' ? `AIS heard over ${Math.round(f.heardShare * 100)}% of the reserve` : 'Where AIS could be heard',
-        sub: 'two or more vessels within 30 km in one hour, three either side of the pass · hatched: unproven, not evidence',
+        lead: typeof f.heardShare === 'number' ? `AIS received over ${Math.round(f.heardShare * 100)}% of the reserve` : 'Where AIS was received',
+        sub: 'other ships\' AIS was received there near the pass · hatched: reception unknown',
       };
     case 'candidates':
       return {
         lead: `${c?.candidate ?? 0} ${(c?.candidate ?? 0) === 1 ? 'candidate' : 'candidates'}`,
-        sub: 'radar targets with no AIS, in water where AIS was heard, seen by both detectors · candidates, not accusations',
+        sub: 'no AIS where AIS was being received, seen by both detectors · a reason to look, not an accusation',
       };
     case 'heat':
       return { lead: 'Where to look next', sub: 'where radar targets with no AIS match were seen before · the history, not today\'s candidates' };
@@ -599,10 +613,18 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
         sub: `${f.reach ? `${f.reach} · ` : ''}I cannot say which, if any, of these it is.`,
       };
     case 'tasking':
-      return { lead: 'Patrol tasking  draft', sub: 'the officer chooses the box and the candidates · the decision is the officer\'s' };
+      return { lead: 'Patrol tasking  draft', sub: 'choose a box and the candidates, then approve' };
     case 'filed':
-      return { lead: 'Patrol tasking  filed', sub: 'Filed by the officer. The agent did not file it.' };
+      // The filed sentence is the plate's alone (it says who filed it, and when); the clock states the choice.
+      return { lead: 'Patrol tasking  filed', sub: f.tasking ? filedChoice(f.tasking, f.now ?? Date.now()) : 'the approved box and candidates are on the tasking plate' };
   }
+}
+
+/** "box 1 · 3 of 4 candidates · next radar look in 3 d 9 h": what was filed, without saying who filed it. */
+function filedChoice(t: NonNullable<SeaFacts['tasking']>, now: number): string {
+  const which = t.total === 0 ? 'a patrol of the box only' : `${t.kept} of ${t.total} ${t.total === 1 ? 'candidate' : 'candidates'}`;
+  const when = t.lookStart ? countdown(t.lookStart, now) : '';
+  return `box ${t.box} · ${which} · next radar look ${when || 'not planned yet'}`;
 }
 
 /** The beat a newly landed layer puts on the stage (the targets' depends on whether match_ais ran). */
@@ -645,9 +667,14 @@ export interface AisLook {
   heads: number;
   headStroke: number;
   radar: number;
-  /** Heard and unproven water step back (the forecast's heat and boxes carry the beat). */
-  quietCoverage: boolean;
+  /**
+   * How far the coverage steps back: 'none' under the argument, 'hatch' while the candidates are
+   * read (the reception-unknown hatch halves), 'all' under the forecast (its heat and boxes carry it).
+   */
+  quietCoverage: CoverageQuiet;
 }
+
+export type CoverageQuiet = 'none' | 'hatch' | 'all';
 
 const CLAIM_BEATS: readonly SeaBeat[] = ['targets', 'coverage', 'candidates'];
 const FORECAST_BEATS: readonly SeaBeat[] = ['heat', 'boxes', 'look', 'tasking', 'filed'];
@@ -659,7 +686,7 @@ const FORECAST_BEATS: readonly SeaBeat[] = ['heat', 'boxes', 'look', 'tasking', 
  * mislead). The radar reads full under the argument and recedes under the forecast.
  */
 export function aisLook(beat: SeaBeat, earlierPass = false): AisLook {
-  const quietCoverage = FORECAST_BEATS.includes(beat) || beat === 'fleet';
+  const quietCoverage: CoverageQuiet = FORECAST_BEATS.includes(beat) || beat === 'fleet' ? 'all' : beat === 'candidates' ? 'hatch' : 'none';
   if (beat === 'fleet' || beat === 'reach' || earlierPass) {
     return { shown: false, wakes: 0, faintWakes: 0, trail: 0, heads: 0, headStroke: 0, radar: 0.8, quietCoverage };
   }
@@ -752,10 +779,13 @@ export function toggled(ids: readonly string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id].sort();
 }
 
-/** The plate's summary line: "Box 1 · 3 of 4 candidates". */
+/**
+ * The plate's summary line: "Patrol box 1 · check 3 of 4 candidates on the way". The box comes from
+ * past dark targets and the candidates from the pass, so they are checked on the way, not in the box.
+ */
 export function taskingLine(box: number, kept: number, total: number): string {
-  if (total === 0) return `Box ${box} · a patrol of the box only`;
-  return `Box ${box} · ${kept} of ${total} ${total === 1 ? 'candidate' : 'candidates'}`;
+  if (total === 0) return `Patrol box ${box} · a patrol of the box only`;
+  return `Patrol box ${box} · check ${kept} of ${total} ${total === 1 ? 'candidate' : 'candidates'} on the way`;
 }
 
 /** The candidates' labels on the map (the radar target's id and why it is one, in mono). */
