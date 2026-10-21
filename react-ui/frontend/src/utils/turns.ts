@@ -5,7 +5,7 @@
  */
 import type { Message, ToolCall } from '../types.ts';
 import { stagePunctuation } from './caption.ts';
-import { twoColumnTables } from './tables.ts';
+import { blankDashCells, twoColumnTables } from './tables.ts';
 
 export interface PastTurn {
   /** Stable per session: the user message's position. */
@@ -21,11 +21,13 @@ export interface PastTurn {
 }
 
 /**
- * The answer as the step column prints it: the stage's punctuation, then two columns at most per
- * table (a third column the model wrote anyway folds into the second).
+ * The answer as the step column prints it: a table cell that is only the model's dash goes empty,
+ * every table folds to two columns at most (a third column the model wrote anyway joins the
+ * second), then the stage's punctuation. In that order, so a "—" cell is never folded in as "(,)"
+ * or left as "," (A1 P1-5).
  */
 export function stageAnswerText(raw: string): string {
-  return twoColumnTables(stagePunctuation(raw.trim()));
+  return stagePunctuation(twoColumnTables(blankDashCells(raw.trim())));
 }
 
 /**

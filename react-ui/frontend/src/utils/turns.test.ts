@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Message, ToolCall } from '../types.ts';
 import { pastTurns, stageAnswerText } from './turns.ts';
 import { stagePunctuation } from './caption.ts';
-import { twoColumnTables } from './tables.ts';
 
 const tool = (name: string, id: string): ToolCall => ({ name, id, params: {}, status: 'completed' });
 
@@ -74,25 +73,42 @@ describe('pastTurns', () => {
 });
 
 describe('stageAnswerText', () => {
-  it('prints the answer exactly as the stage did before (punctuation, then two columns)', () => {
-    const raw = [
-      '  The **Octagon** is clear — the walls read as trees.',
-      '',
-      '| Feature | Measured | Documented |',
-      '|---|---|---|',
-      '| Area | 20 ha | — |',
-      '| Wall | 1.5 m | 1.7 m |',
-      '',
-      '| Check | Result |',
-      '|---|---|',
-      '| Cloud | — |',
-      '',
-    ].join('\n');
-    // The same order as before the earlier turns existed (Group 4 changes it, for the "(,)" cells).
+  const raw = [
+    '  The **Octagon** is clear — the walls read as trees.',
+    '',
+    '| Feature | Measured | Documented |',
+    '|---|---|---|',
+    '| Area | 20 ha | — |',
+    '| Wall | 1.5 m | 1.7 m |',
+    '',
+    '| Check | Result |',
+    '|---|---|',
+    '| Cloud | — |',
+    '',
+  ].join('\n');
+
+  it('prints a dash-only cell as nothing, never "(,)" or "," (A1 P1-5)', () => {
     const text = stageAnswerText(raw);
-    expect(text).toBe(twoColumnTables(stagePunctuation(raw.trim())));
+    // Punctuation first (the old order) left the two-column table's "—" cell as ",".
+    expect(stagePunctuation(raw.trim())).toContain('| Cloud |, |');
+    expect(text).not.toContain('(,)');
+    expect(text).not.toMatch(/\|\s*,\s*\|/);
+    expect(text).toContain('| Area | 20 ha |');
+    expect(text).toContain('| Cloud |  |');
+  });
+
+  it('folds the live Central Park table without "(,)"', () => {
+    const text = stageAnswerText('| Mean NDVI | 0.65 | — |\n|---|---|---|\n| a | b | — |');
+    expect(text).not.toContain('(,)');
+    expect(text.split('\n')).toEqual(['| Mean NDVI | 0.65 |', '|---|---|', '| a | b |']);
+  });
+
+  it('keeps the rest as before: an em dash in prose reads as a comma, three columns fold to two', () => {
+    const text = stageAnswerText(raw);
     expect(text.split('\n')[0]).toBe('The **Octagon** is clear, the walls read as trees.');
     expect(text).toContain('| Feature | Measured (documented) |');
+    expect(text).toContain('| Wall | 1.5 m (1.7 m) |');
     expect(text).not.toContain('Documented |');
+    expect(stageAnswerText('Built 2024–2025 — by hand.')).toBe('Built 2024 to 2025, by hand.');
   });
 });

@@ -4,10 +4,12 @@
  * more anyway, the step column (about 350 px wide) cannot show them, so the stage folds every
  * column after the second into the second: "362 m | ~366 m" becomes "362 m (~366 m)", and the
  * header "Measured | Documented" becomes "Measured (documented)". A cell that is only a dash (the
- * model's "nothing here") is dropped rather than printed as a comma.
+ * model's "nothing here") is dropped rather than printed as a comma: blankDashCells empties it
+ * before the stage's punctuation (utils/caption.ts) would turn the dash into "," and the fold
+ * into "(,)". A lone "," (a dash the punctuation already reached) counts as a dash.
  */
 
-const DASH_ONLY = /^[\s\u2013\u2014-]*$/;
+const DASH_ONLY = /^[\s\u2013\u2014,-]*$/;
 const TABLE_ROW = /^\s*\|/;
 const DELIMITER_ROW = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
 
@@ -28,6 +30,35 @@ function fold(cells: string[], isHeader: boolean): [string, string] {
   // An extra already in parentheses sits beside the value as it is; anything else is wrapped.
   const wrapped = /^\(.*\)$/.test(joined) ? joined : `(${isHeader ? joined.toLowerCase() : joined})`;
   return [first, `${second} ${wrapped}`];
+}
+
+/**
+ * Every markdown table's dash-only cells ("—", "–", "-", or a lone ",") emptied, in any number of
+ * columns; the delimiter row, the other cells and the text around the tables stay as written.
+ */
+export function blankDashCells(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const startsTable = TABLE_ROW.test(lines[i]) && i + 1 < lines.length && DELIMITER_ROW.test(lines[i + 1]);
+    if (!startsTable) {
+      out.push(lines[i]);
+      i += 1;
+      continue;
+    }
+    let row = 0;
+    while (i < lines.length && TABLE_ROW.test(lines[i])) {
+      const line = lines[i];
+      const cells = row === 1 ? [] : splitRow(line);   // row 1 is the delimiter
+      out.push(cells.some((c) => c !== '' && DASH_ONLY.test(c))
+        ? `| ${cells.map((c) => (DASH_ONLY.test(c) ? '' : c)).join(' | ')} |`
+        : line);
+      row += 1;
+      i += 1;
+    }
+  }
+  return out.join('\n');
 }
 
 /** Fold every markdown table in `text` with more than two columns down to two. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { twoColumnTables } from './tables.ts';
+import { blankDashCells, twoColumnTables } from './tables.ts';
 
 // The Great Circle answer as Sonnet 4.6 wrote it on Oct 14 (three columns, dashes for nothing).
 const THREE = [
@@ -39,6 +39,10 @@ describe('twoColumnTables', () => {
     expect(twoColumnTables('no table here\n| a lone pipe line')).toBe('no table here\n| a lone pipe line');
   });
 
+  it('drops a lone "," cell (a dash the punctuation already reached) the way it drops a dash', () => {
+    expect(twoColumnTables('| Metric | Value | Note |\n|---|---|---|\n| Mean NDVI | 0.65 | , |').split('\n')[2]).toBe('| Mean NDVI | 0.65 |');
+  });
+
   it('folds four columns and keeps an escaped pipe inside a cell', () => {
     const four = '| Site | Form | km | Designation |\n|:--|:--|--:|:--|\n| Seip | circle | 112 | World Heritage |\n| Fort Hill | a \\| b | 133 | NRHP |';
     expect(twoColumnTables(four).split('\n')).toEqual([
@@ -47,5 +51,40 @@ describe('twoColumnTables', () => {
       '| Seip | circle (112; World Heritage) |',
       '| Fort Hill | a \\| b (133; NRHP) |',
     ]);
+  });
+});
+
+describe('blankDashCells', () => {
+  it('empties an em dash, an en dash, a hyphen and a lone comma cell, in any number of columns', () => {
+    const table = [
+      '| Metric | Value | Note |',
+      '|---|---|---|',
+      '| Mean NDVI | 0.65 | — |',
+      '| Median NDVI | 0.83 | – |',
+      '| Water | - | , |',
+      '| Dense | 80% | of the park |',
+    ].join('\n');
+    expect(blankDashCells(table).split('\n')).toEqual([
+      '| Metric | Value | Note |',
+      '|---|---|---|',
+      '| Mean NDVI | 0.65 |  |',
+      '| Median NDVI | 0.83 |  |',
+      '| Water |  |  |',
+      '| Dense | 80% | of the park |',
+    ]);
+    expect(blankDashCells('| Check | Result |\n|---|---|\n| Cloud | — |')).toBe('| Check | Result |\n|---|---|\n| Cloud |  |');
+  });
+
+  it('keeps the delimiter row, a cell with words around a dash, an escaped pipe and the prose as written', () => {
+    const text = [
+      'Mostly dense — the Reservoir is water.',
+      '| a | b |',
+      '|:--|--:|',
+      '| 2024 — 2025 | a \\| b |',
+      '- a list item, not a cell',
+      '| a lone pipe line',
+      '| — |',
+    ].join('\n');
+    expect(blankDashCells(text)).toBe(text);
   });
 });

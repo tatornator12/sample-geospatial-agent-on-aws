@@ -21,6 +21,7 @@ import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { currentBriefId } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
+import { blankDashCells } from '../utils/tables.ts';
 import { profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
 import { pastTurns, stageAnswerText } from '../utils/turns.ts';
 import { boundedSaw, latestNarration, sawByTool, withSaw } from '../utils/narration.ts';
@@ -935,7 +936,8 @@ export function ChatSidebar({
                 <span className="transcript-turn__who">{msg.role === 'user' ? 'You' : 'Agent'}</span>
                 <div className="transcript-turn__body">
                   <div className="markdown-content">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{stagePunctuation(msg.content)}</ReactMarkdown>
+                    {/* A dash-only table cell is empty, not "," (A1 P1-5). */}
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{stagePunctuation(blankDashCells(msg.content))}</ReactMarkdown>
                   </div>
                   {msg.tools && msg.tools.length > 0 && (
                     <div className="transcript-turn__tools">
