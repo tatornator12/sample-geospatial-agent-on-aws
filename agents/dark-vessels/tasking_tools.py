@@ -13,6 +13,7 @@ from strands import tool
 import vessel_store as vs
 
 TASKING_ID_RE = re.compile(r"^tasking-\d{8}T\d{6}-[0-9a-f]{6}$")
+FILED_AT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T(\d{2}:\d{2})")
 MAX_NOTES = 3
 MAX_NOTE_CHARS = 220
 # Language that accuses or identifies has no place in a tasking (requirement 11).
@@ -122,5 +123,7 @@ async def tasking_status(tasking_id: str) -> str:
         except Exception:
             return json.dumps({"error": "No such tasking in this session."})
         return json.dumps({"tasking_id": tasking_id, "status": "draft", "say": "The tasking is a draft; the officer has not filed it."})
-    return json.dumps({"tasking_id": tasking_id, "status": "filed", "filed_at": filed.get("filed_at"),
-                       "say": "Filed by the officer. The agent did not file it."})
+    # The plate's filed line is the one place that says who filed it; the agent says only when.
+    at = FILED_AT_RE.match(str(filed.get("filed_at") or ""))
+    say = f"Yes, it is on file: filed at {at.group(1)} UTC." if at else "Yes, it is on file."
+    return json.dumps({"tasking_id": tasking_id, "status": "filed", "filed_at": filed.get("filed_at"), "say": say})

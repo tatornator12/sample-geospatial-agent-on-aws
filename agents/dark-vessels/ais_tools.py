@@ -1,4 +1,4 @@
-"""Dark Vessels, AIS: where AIS could be heard, which targets broadcast, and the evidence for each
+"""Dark Vessels, AIS: where AIS was being received, which targets broadcast, and the evidence for each
 candidate (design components 3 and 4). The order is the argument: check_ais_coverage before
 match_ais, and nothing is called a candidate before the coverage check is on the map."""
 from __future__ import annotations
@@ -23,12 +23,17 @@ INNOCENT = [
     {"id": "small_boat_no_ais", "says": "a small boat that need not carry AIS",
      "would_confirm": "a patrol sighting of a small boat there", "would_rule_out": "a target larger than small craft on the next look"},
     {"id": "reception_or_equipment", "says": "AIS fitted but not received at that hour",
-     "would_confirm": "the same water heard again with a vessel there within hours", "would_rule_out": "no AIS there on the next pass either"},
+     "would_confirm": "AIS received in the same water again with a vessel there within hours", "would_rule_out": "no AIS there on the next pass either"},
     {"id": "transponder_off", "says": "AIS switched off",
      "would_confirm": "an AIS-off event logged nearby", "would_rule_out": "a broadcast from that spot at the pass minute"},
     {"id": "not_a_vessel", "says": "a buoy, a rock or sea clutter",
      "would_confirm": "the same bright point in the same place on the next look", "would_rule_out": "the point moved between looks"},
 ]
+
+
+# The words the room hears for each status (the ids stay the tools' and the stage's).
+SAY_AS = {"broadcasting": "broadcasting", "port": "at or near a port", "unproven": "reception unknown",
+          "seen_once": "seen by one detector only", "candidate": "candidates"}
 
 
 _t = vs.parse_t
@@ -55,16 +60,18 @@ def _heard_for(pass_id: str) -> tuple:
 
 @tool
 async def check_ais_coverage(pass_id: str) -> str:
-    """Where AIS could be heard around the pass: the proof that silence means something. A 0.05° cell
-    of the reserve is heard when, in one hour of the three either side of the pass, two or more
-    different broadcasting vessels were heard within 30 km of it; everywhere else is unproven.
+    """Where AIS was being received around the pass: the proof that silence means something. A 0.05°
+    cell of the reserve counts as received when, in one hour of the three either side of the pass,
+    two or more different broadcasting vessels' AIS was received within 30 km of it; everywhere else
+    in the reserve is reception unknown.
 
     Args:
         pass_id: From find_pass.
 
-    Returns: JSON with heard_share (of the reserve), heard_s3_url and unproven_s3_url (the areas for
-    the map), render hints for each (pass them to display_visual unchanged), next_steps. Required
-    before match_ais.
+    Returns: JSON with heard_share (the share of the reserve where AIS was being received),
+    heard_s3_url and unproven_s3_url (the received and the reception-unknown areas for the map),
+    render hints for each (pass them to display_visual unchanged), next_steps. Required before
+    match_ais.
     """
     entry = vs.pass_entry(pass_id)
     if entry is None:
@@ -89,11 +96,12 @@ async def check_ais_coverage(pass_id: str) -> str:
                                          "cells": [[int(r), int(c)] for r, c in zip(*np.nonzero(heard))]})
     return json.dumps({
         "pass_id": pass_id, "heard_share": round(share, 3), "heard_pct": round(100 * share),
-        "rule": "heard: in one hour of the three either side of the pass, two or more different vessels heard within 30 km",
+        "rule": "received: in one hour of the three either side of the pass, two or more different vessels' AIS "
+                "received within 30 km",
         "heard_s3_url": heard_url, "unproven_s3_url": unproven_url,
-        "heard_render": {"kind": "vector", "group": "maritime", "legend": "Heard water"},
-        "unproven_render": {"kind": "vector", "group": "maritime", "legend": "Unproven water"},
-        "unproven_means": vs.NOT_EVIDENCE,
+        "heard_render": {"kind": "vector", "group": "maritime", "legend": "AIS received"},
+        "unproven_render": {"kind": "vector", "group": "maritime", "legend": "AIS reception unknown"},
+        "unproven_means": vs.RECEPTION_UNKNOWN,
         "next_steps": "display_visual(heard_s3_url, render=heard_render) and display_visual(unproven_s3_url, "
                       "render=unproven_render) in the same response as match_ais(pass_id).",
     })
@@ -108,14 +116,15 @@ def _record(pass_id: str):
 
 @tool
 async def match_ais(pass_id: str) -> str:
-    """Match every target to AIS and give it one status: broadcasting (its AIS was heard at the pass),
-    port (at or near a port), unproven (no AIS, but AIS could not be heard there: not evidence),
-    seen_once (one detector only), or candidate (no AIS, in heard water, seen by both detectors).
+    """Match every target to AIS and give it one status: broadcasting (its AIS was received at the
+    pass), port (at or near a port), unproven (reception unknown: no AIS, but reception there is
+    unknown, so it proves nothing), seen_once (one detector only), or candidate (no AIS where AIS was
+    being received, seen by both detectors).
 
     Args:
         pass_id: From find_pass, after check_ais_coverage for the same pass.
 
-    Returns: JSON with counts in the order to say them, the candidates (T01 west to east, with km
+    Returns: JSON with counts in the order to say them and the words to say each status in (say_as), the candidates (T01 west to east, with km
     to the nearest port), targets_s3_url (the same map layer, statuses changed in place), render,
     the fixed sentence, next_steps.
     """
@@ -163,11 +172,11 @@ async def match_ais(pass_id: str) -> str:
                   for t in targets if t["status"] == "candidate"]
     return json.dumps({
         "pass_id": pass_id, "counts": counts, "say_in_order": ["broadcasting", "port", "unproven", "seen_once", "candidate"],
-        "candidates": candidates, "targets_s3_url": url,
+        "say_as": SAY_AS, "candidates": candidates, "targets_s3_url": url,
         "render": {"kind": "points", "group": "maritime", "legend": "Radar targets"},
         "fixed_sentence": vs.CANDIDATE_SENTENCE,
         "next_steps": "display_visual(targets_s3_url, render=render) in the same response as gather_evidence(pass_id). "
-                      "Give the counts in that order, then the fixed sentence word for word.",
+                      "Give the counts in that order, each status in say_as's words, then the fixed sentence word for word.",
     })
 
 
@@ -182,7 +191,8 @@ async def gather_evidence(pass_id: str, candidate_ids: list = None) -> str:
         candidate_ids: OPTIONAL ["T01", "T02"]; all candidates (up to six) when omitted.
 
     Returns: JSON with evidence per candidate (chip_s3_url for inspect_image and the evidence
-    gallery), the confidence sentence, innocent explanations, next_steps.
+    gallery), the confidence sentence, innocent explanations and say_else (them in one sentence),
+    next_steps.
     """
     entry = vs.pass_entry(pass_id)
     if entry is None:
@@ -221,9 +231,9 @@ async def gather_evidence(pass_id: str, candidate_ids: list = None) -> str:
     vs.put_json(f"{vs.vessels_prefix()}evidence_{pass_id}.json", {"pass_id": pass_id, "evidence": out})
     return json.dumps({
         "pass_id": pass_id, "evidence": out,
-        "confidence": "Both detectors saw it in water where AIS was heard, and no broadcast came from it. "
+        "confidence": "Both detectors saw it in water where AIS was being received, and no broadcast came from it. "
                       "That makes it a candidate for a look, not a finding.",
-        "innocent_explanations": INNOCENT,
+        "innocent_explanations": INNOCENT, "say_else": vs.SAY_ELSE,
         "next_steps": "inspect_image(chip_s3_url) for at most two chips and say what you see; then give one line per "
                       "candidate: id, km to port, nearest broadcast (km, type). No vessel is named.",
     })
