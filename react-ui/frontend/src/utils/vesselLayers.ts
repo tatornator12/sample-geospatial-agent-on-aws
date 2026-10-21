@@ -524,6 +524,13 @@ export interface SeaFacts {
   replayPassId?: string;
   counts?: TargetCounts;
   heardShare?: number;
+  /** What the pass can check (imaged with AIS received) and the standard, from the received area's feature. */
+  checkable?: number;
+  standard?: number;
+  /** The heat's measured check, from the heat file's first feature (the top 5% figure only). */
+  heatCheck?: HeatCheck;
+  /** The boxes' measured check, from the box features (the boxes' own figure only). */
+  boxCheck?: BoxCheck;
   /** The officer's filed choice (the filed beat's sub); without it the sub points at the plate. */
   tasking?: { box: number; kept: number; total: number; lookStart?: string | null };
   fleetMonth?: string;
@@ -531,6 +538,56 @@ export interface SeaFacts {
   lookStart?: string;
   reach?: string;
   now?: number;
+}
+
+/** The rolling check's top 5% figure, refitted before each radar day since `since` (null: no check possible). */
+export interface HeatCheck {
+  since: string;
+  pct: number | null;
+}
+
+/** The boxes' own figure, refitted the same way (null: no check possible), and the radar days it was hit. */
+export interface BoxCheck {
+  pct: number | null;
+  daysHit: number;
+  days: number;
+}
+
+const isShare = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
+const isPct = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100;
+const isCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 366;
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** The received area's numbers (check_ais_coverage puts them on its first feature), each a share from 0 to 1. */
+export function coverageFacts(features: readonly Feature[]): Pick<SeaFacts, 'heardShare' | 'checkable' | 'standard'> {
+  const p = features[0]?.properties ?? {};
+  return {
+    ...(isShare(p.share) ? { heardShare: p.share } : {}),
+    ...(isShare(p.checkable) ? { checkable: p.checkable } : {}),
+    ...(isShare(p.standard) ? { standard: p.standard } : {}),
+  };
+}
+
+/** The heat's check from the heat file's first feature (predict_hotspots); undefined when it carries none. */
+export function heatCheckOf(features: readonly Feature[]): HeatCheck | undefined {
+  const p = features[0]?.properties ?? {};
+  const since = typeof p.check_since === 'string' && ISO_DAY.test(p.check_since) ? p.check_since : null;
+  if (!since || (p.check_pct !== null && !isPct(p.check_pct))) return undefined;
+  return { since, pct: p.check_pct as number | null };
+}
+
+/** The boxes' check from the box features (each carries the same figures); undefined when they carry none. */
+export function boxCheckOf(features: readonly Feature[]): BoxCheck | undefined {
+  const p = features.find((f) => f?.properties && 'boxes_pct' in f.properties)?.properties ?? null;
+  if (!p || (p.boxes_pct !== null && !isPct(p.boxes_pct)) || !isCount(p.boxes_days_hit) || !isCount(p.days) || p.boxes_days_hit > p.days) return undefined;
+  return { pct: p.boxes_pct as number | null, daysHit: p.boxes_days_hit, days: p.days };
+}
+
+/** "July" from "2026-07-01"; null for anything else. */
+function monthOf(isoDay: string): string | null {
+  const m = isoDay.match(ISO_DAY);
+  const i = m ? Number(m[2]) - 1 : -1;
+  return i >= 0 && i < 12 ? MONTHS[i] : null;
 }
 
 export function utcMinute(ms: number): string {
@@ -565,7 +622,7 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
         sub: `${f.vessels ?? 0} vessels broadcasting · the 36 hours to the radar pass · ${ATTRIBUTION}`,
       };
     case 'forward':
-      return { lead: `AIS replay  ${f.replayAt ? utcMinute(f.replayAt) : ''}`.trim(), sub: 'running on to the radar pass' };
+      return { lead: `AIS replay  ${f.replayAt ? utcMinute(f.replayAt) : ''}`.trim(), sub: 'while the agent chooses a radar pass' };
     case 'radar':
       return {
         lead: pass ? `${pass.satellite} radar  ${pass.when}` : 'Sentinel-1 radar',
@@ -583,9 +640,17 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
       };
     }
     case 'coverage':
-      // The received share is of the whole reserve: what the pass can check needs the imaged area.
+      // What the pass can check: the water it imaged where AIS was received (both areas lie inside
+      // the radar). A coverage file without the checkable share (an earlier recording) keeps the
+      // received share, which is of the whole reserve.
+      if (isShare(f.checkable)) {
+        return {
+          lead: `This pass can check ${Math.round(f.checkable * 100)}% of the reserve`,
+          sub: 'the radar imaged it and other ships\' AIS was received there near the pass · hatched: reception unknown',
+        };
+      }
       return {
-        lead: typeof f.heardShare === 'number' ? `AIS received over ${Math.round(f.heardShare * 100)}% of the reserve` : 'Where AIS was received',
+        lead: isShare(f.heardShare) ? `AIS received over ${Math.round(f.heardShare * 100)}% of the reserve` : 'Where AIS was received',
         sub: 'other ships\' AIS was received there near the pass · hatched: reception unknown',
       };
     case 'candidates':
@@ -593,10 +658,25 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
         lead: `${c?.candidate ?? 0} ${(c?.candidate ?? 0) === 1 ? 'candidate' : 'candidates'}`,
         sub: 'no AIS where AIS was being received, seen by both detectors · a reason to look, not an accusation',
       };
-    case 'heat':
-      return { lead: 'Where to look next', sub: 'where radar targets with no AIS match were seen before · the history, not today\'s candidates' };
-    case 'boxes':
-      return { lead: 'Three patrol boxes', sub: 'each box: its share of past dark targets and its next radar look · the heat is history, not today\'s candidates' };
+    case 'heat': {
+      // Each figure beside its own layer: the heat carries the top 5% figure, never the boxes'.
+      const h = f.heatCheck;
+      const month = h ? monthOf(h.since) : null;
+      if (h && month && isPct(h.pct)) {
+        return { lead: 'Where to look on the next pass', sub: `refitted before each radar day since ${month}, its top 5% of water held ${h.pct}% of the dark targets` };
+      }
+      if (h && month && h.pct === null) return { lead: 'Where to look on the next pass', sub: `no check possible: no dark targets were found since ${month}` };
+      return { lead: 'Where to look on the next pass', sub: 'where radar targets with no AIS match were seen before · the history, not today\'s candidates' };
+    }
+    case 'boxes': {
+      // The boxes carry their own figure, never the top 5%'s.
+      const b = f.boxCheck;
+      if (b && isPct(b.pct) && isCount(b.daysHit) && isCount(b.days) && b.daysHit <= b.days) {
+        return { lead: 'Three patrol boxes', sub: `the three boxes, refitted the same way, held ${b.pct}% · one or more in a box on ${b.daysHit} of ${b.days} days with dark targets` };
+      }
+      if (b && b.pct === null) return { lead: 'Three patrol boxes', sub: 'each box with its next radar look · no check possible' };
+      return { lead: 'Three patrol boxes', sub: 'each box with its next radar look · the history, not today\'s candidates' };
+    }
     case 'fleet':
       return {
         lead: `Squid fleet${f.fleetMonth ? `  ${f.fleetMonth}` : ''}`,
@@ -803,6 +883,22 @@ export function filedFacts(state: {
   const kept = state.card.candidates.filter((c) => candidateIds.includes(c.id)).length;
   const look = state.boxes.find((b) => b.box === box)?.look ?? null;
   return { box, kept, total: state.card.candidates.length, lookStart: look?.start ?? null };
+}
+
+/**
+ * The pass the forecast's camera returns to: the pass the argument ended on. That is the last pass
+ * whose targets were matched, else the last pass with targets, in the order the files landed; so
+ * on the thin path the set-aside pass does not come back. Null when no targets have landed.
+ */
+export function forecastPass(files: Iterable<{ kind: VesselKind; pass: string | null; data: { features: readonly Feature[] } | null }>): string | null {
+  let matched: string | null = null;
+  let detected: string | null = null;
+  for (const f of files) {
+    if (f.kind !== 'targets' || !f.pass) continue;
+    detected = f.pass;
+    if (f.data && targetCounts(f.data.features).matched) matched = f.pass;
+  }
+  return matched ?? detected;
 }
 
 /** The candidates' labels on the map (the radar target's id and why it is one, in mono). */

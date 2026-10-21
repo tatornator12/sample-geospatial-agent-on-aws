@@ -16,9 +16,13 @@ import {
   boxLabelPoints,
   claimParts,
   clockLines,
+  boxCheckOf,
   countdown,
+  coverageFacts,
   featureBounds,
   filedFacts,
+  forecastPass,
+  heatCheckOf,
   fleetMonth,
   fleetPlaces,
   heavyBounds,
@@ -373,14 +377,72 @@ describe('the clock plate', () => {
     const counts = { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, matched: true };
     const now = Date.parse('2026-10-20T14:37:00Z');
     const subs = [
+      clockLines('forward', {}).sub,
       clockLines('radar', { passId: 's1a-20240306t0027', replayPassId: 's1d-20261012t0018' }).sub,
       clockLines('coverage', { heardShare: 1 }).sub,
+      clockLines('coverage', { heardShare: 1, checkable: 1, standard: 0.15 }).sub,
+      clockLines('heat', { heatCheck: { since: '2026-09-01', pct: 100 } }).sub,
+      clockLines('heat', { heatCheck: { since: '2026-09-01', pct: null } }).sub,
+      clockLines('boxes', { boxCheck: { pct: 100, daysHit: 99, days: 99 } }).sub,
+      clockLines('boxes', { boxCheck: { pct: null, daysHit: 0, days: 0 } }).sub,
+      clockLines('boxes', {}).sub,
       clockLines('candidates', { counts }).sub,
       clockLines('tasking', {}).sub,
       clockLines('filed', {}).sub,
       clockLines('filed', { now, tasking: { box: 3, kept: 12, total: 12, lookStart: '2026-11-30T23:59:00Z' } }).sub,
     ];
     for (const sub of subs) expect(sub.length, sub).toBeLessThanOrEqual(110);
+  });
+
+  it('says what the pass can check, and while the agent chooses, that it is choosing', () => {
+    expect(clockLines('forward', { replayAt: Date.parse('2026-10-11T14:00:00Z') })).toEqual({
+      lead: 'AIS replay  2026-10-11 14:00 UTC', sub: 'while the agent chooses a radar pass',
+    });
+    const coverage = clockLines('coverage', { heardShare: 0.298, checkable: 0.19, standard: 0.15 });
+    expect(coverage).toEqual({
+      lead: 'This pass can check 19% of the reserve',
+      sub: 'the radar imaged it and other ships\' AIS was received there near the pass · hatched: reception unknown',
+    });
+    expect(coverage.sub).toHaveLength(102);
+    // A checkable share out of range is not a number the stage prints.
+    expect(clockLines('coverage', { heardShare: 0.298, checkable: 1.9 }).lead).toBe('AIS received over 30% of the reserve');
+  });
+
+  it('puts each measured figure beside its own layer: the top 5% with the heat, the boxes\' with the boxes', () => {
+    const facts = { heatCheck: { since: '2026-07-01', pct: 41 }, boxCheck: { pct: 9, daysHit: 4, days: 17 } };
+    const heat = clockLines('heat', facts);
+    const boxes = clockLines('boxes', facts);
+    expect(heat).toEqual({ lead: 'Where to look on the next pass', sub: 'refitted before each radar day since July, its top 5% of water held 41% of the dark targets' });
+    expect(boxes).toEqual({ lead: 'Three patrol boxes', sub: 'the three boxes, refitted the same way, held 9% · one or more in a box on 4 of 17 days with dark targets' });
+    expect(heat.sub).not.toMatch(/\b9%|\b4 of 17/);
+    expect(boxes.sub).not.toMatch(/41%|top 5%/);
+    // The longest values measure as the design says: 97 and 107.
+    expect(clockLines('heat', { heatCheck: { since: '2026-09-01', pct: 100 } }).sub).toHaveLength(97);
+    expect(clockLines('boxes', { boxCheck: { pct: 100, daysHit: 99, days: 99 } }).sub).toHaveLength(107);
+    // No radar days with dark targets: no check possible, and no figure.
+    expect(clockLines('heat', { heatCheck: { since: '2026-07-01', pct: null } }).sub).toBe('no check possible: no dark targets were found since July');
+    expect(clockLines('boxes', { boxCheck: { pct: null, daysHit: 0, days: 0 } }).sub).toBe('each box with its next radar look · no check possible');
+    // The box labels carry no share now, so the boxes' words never point at one.
+    expect(clockLines('boxes', {}).sub).not.toMatch(/share/);
+  });
+
+  it('reads the clock\'s figures from the tools\' features, each validated as a number in range', () => {
+    expect(coverageFacts([{ properties: { kind: 'heard', share: 0.3, imaged: 0.53, checkable: 0.19, standard: 0.15 } }]))
+      .toEqual({ heardShare: 0.3, checkable: 0.19, standard: 0.15 });
+    expect(coverageFacts([{ properties: { share: 0.3, checkable: '0.19', standard: 2 } }])).toEqual({ heardShare: 0.3 });
+    expect(coverageFacts([])).toEqual({});
+    const heat = [point(-90, -0.5, { v: 1, check_pct: 41, check_times: 8.2, check_since: '2026-07-01' }), point(-90.1, -0.5, { v: 0.4 })];
+    expect(heatCheckOf(heat)).toEqual({ since: '2026-07-01', pct: 41 });
+    expect(heatCheckOf([point(0, 0, { v: 1, check_pct: null, check_times: null, check_since: '2026-07-01' })])).toEqual({ since: '2026-07-01', pct: null });
+    expect(heatCheckOf([point(0, 0, { v: 1, check_pct: 141, check_since: '2026-07-01' })])).toBeUndefined();
+    expect(heatCheckOf([point(0, 0, { v: 1, check_pct: 41, check_since: 'July' })])).toBeUndefined();
+    expect(heatCheckOf([point(0, 0, { v: 1 })])).toBeUndefined();
+    const box = (props: Record<string, unknown>) => square(-91, -1, -90, 0, { box: 1, label: 'Box 1', next: 'no look planned yet', ...props });
+    expect(boxCheckOf([box({ boxes_pct: 9, boxes_times: 9.1, boxes_days_hit: 4, days: 17 })])).toEqual({ pct: 9, daysHit: 4, days: 17 });
+    expect(boxCheckOf([box({ boxes_pct: null, boxes_times: null, boxes_days_hit: 0, days: 0 })])).toEqual({ pct: null, daysHit: 0, days: 0 });
+    expect(boxCheckOf([box({ boxes_pct: 9, boxes_days_hit: 18, days: 17 })])).toBeUndefined();
+    // The box features carry no top 5% figure, and a feature without the boxes' figure gives none.
+    expect(boxCheckOf([box({ check_pct: 41 })])).toBeUndefined();
   });
 
   it('counts down to the next look', () => {
@@ -456,6 +518,22 @@ describe('the tasking on the map', () => {
     expect(taskingLine(1, 3, 4)).toBe('Patrol box 1 · check 3 of 4 candidates on the way');
     expect(taskingLine(2, 1, 1)).toBe('Patrol box 2 · check 1 of 1 candidate on the way');
     expect(taskingLine(3, 0, 0)).toBe('Patrol box 3 · a patrol of the box only');
+  });
+
+  it('returns the forecast\'s camera to the pass the argument ended on, never a set-aside one', () => {
+    const detected = [point(-90.2, -0.6, { status: 'detected' })];
+    const matched = [point(-90.2, -0.6, { status: 'candidate', label: 'T01' })];
+    const aug30 = { kind: 'targets' as const, pass: 's1d-20260830t0026', data: { features: detected } };
+    const sep30 = { kind: 'targets' as const, pass: 's1d-20260930t0018', data: { features: matched } };
+    const heat = { kind: 'heat' as const, pass: null, data: { features: [] } };
+    // The thin path: Aug 30 set aside (detected only), Sep 30 matched.
+    expect(forecastPass([aug30, sep30, heat])).toBe('s1d-20260930t0018');
+    // A matched pass wins over a later pass that was only detected.
+    expect(forecastPass([sep30, aug30])).toBe('s1d-20260930t0018');
+    // With nothing matched, the last pass with targets; with no targets, none.
+    expect(forecastPass([aug30, { ...aug30, pass: 's1d-20260907t1141' }])).toBe('s1d-20260907t1141');
+    expect(forecastPass([{ kind: 'radar', pass: 's1d-20261012t0018', data: null }, heat])).toBeNull();
+    expect(forecastPass(new Map([['a', aug30]]).values())).toBe('s1d-20260830t0026');
   });
 
   it('asks the agent to check the filing (it never says so itself)', () => {
