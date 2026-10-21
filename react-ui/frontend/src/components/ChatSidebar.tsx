@@ -903,7 +903,7 @@ export function ChatSidebar({
       )}
 
       {/* Bottom: the presenter's console and the prepared prompts. The answer is in the step column. */}
-      <div className="stage-docent" ref={docentRef}>
+      <div className={`stage-docent${agentId === 'vessels' ? ' stage-docent--sea' : ''}`} ref={docentRef}>
         <form
           className="docent-console"
           onSubmit={(e) => {

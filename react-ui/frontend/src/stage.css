@@ -902,6 +902,14 @@
   color: var(--label);
   font-variant-numeric: tabular-nums;
 }
+/* Below 1440 px the BASE plate sits over the console's right end: the session id (rehearsal
+   detail, not for the room) steps aside rather than run into it (S13). Dark Vessels' console is
+   left as its act was built. */
+@media (max-width: 1439px) {
+  .stage-docent:not(.stage-docent--sea) .docent-session {
+    display: none;
+  }
+}
 
 /* Right: the transcript drawer, a sheet that slides over the map when the presenter needs it. */
 .stage-transcript {
