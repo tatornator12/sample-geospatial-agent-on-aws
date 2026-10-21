@@ -78,6 +78,8 @@ before Friday (task 1.4 records the before/after guard).
     - full eval 2 (12:52, 56 s): inspected 2025-09-06, rejected, used 2025-07-18
   - [x] 9.3 Plate "A cloudy day, Bergen" (second Earth plate, the golden prompt word for word) and the run sheet's Judgement beat at 1:30 (design.md); the Folsom compare is now the spare
   - Results: vitest 248/248 (20 files; was 237), `npx tsc -b` 0, `npm run build` 0, detector `[]`, eslint on the four touched files 0; eval on dev 8/8 (347 s, cloudy-scene 56 s) after a 7/8 run that failed only on the first cloudy-scene expectation. No `geo_agent/` change, no deploy
+- [x] 10. The answer opens on a sentence the room can repeat (Oct 21, stage review A1 P1-4 and the A1 P2 on m², stage-fixes-2 B18)
+  - Results: `geo_agent/config.py` FINAL REPORT now opens with one sentence (the place, the date, the one number), then at most one table of two columns and five rows, areas in ha or km² to one decimal, never m²; the closing paragraph and every CRITICAL RULE unchanged. Dev only (`geospatial_agent_dev`): v31 (revision 1) eval 7/8, the miss was cloudy-scene (it kept the 2025-09-06 scene at 47.6% AOI cloud without a second fetch, as in 9.2's earlier runs); v32 (revision 2, the table's two columns) eval 8/8. Smoke `vegetation-central-park` PASS on both; it opens "Central Park on 2026-10-06: mean NDVI 0.65, with 80.2% of the park in dense or very dense vegetation." No report has m². check-env on v32: READY, required keys present. pytest 124 passed. The stable runtime is unchanged until the next promotion
 
 ## Gate log
 
