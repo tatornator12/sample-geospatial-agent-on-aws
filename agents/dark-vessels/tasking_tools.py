@@ -53,12 +53,22 @@ async def draft_tasking(pass_id: str, box: int, candidate_ids: list = None, look
     """
     if vs.pass_entry(pass_id) is None:
         return vs.refusal()
+    # Held to the session's latest question in any turn, so a later re-draft is still held to a decide.
+    q = vs.latest_question()
+    drafts = [d for d in vs.decisions(q) if d.get("step") == "draft"]
+    if not drafts:
+        return json.dumps({"error": "Announce the box with decide(draft, ...) first."})
+    decided = drafts[-1].get("subject")
+    if box != decided or isinstance(box, bool):
+        return json.dumps({"error": f"You decided box {decided}."})
     try:
         match = vs.get_json(f"{vs.vessels_prefix()}match_{pass_id}.json")
         hot = vs.get_json(f"{vs.vessels_prefix()}hotspots.json")
         coverage = vs.get_json(f"{vs.vessels_prefix()}coverage_{pass_id}.json")
     except Exception:
         return json.dumps({"error": "Run match_ais and predict_hotspots first: a tasking is drafted from the session's records."})
+    if any(r.get("question_id") != q["question_id"] for r in (match, hot, coverage)):
+        return json.dumps({"error": "Those records are from an earlier question: read the pass again."})
     chosen = next((b for b in hot["boxes"] if b["box"] == box), None)
     if chosen is None:
         return json.dumps({"error": "box must be one of predict_hotspots' boxes (1 to 3)"})
@@ -89,8 +99,9 @@ async def draft_tasking(pass_id: str, box: int, candidate_ids: list = None, look
     draft = {
         "tasking_id": tid, "status": "draft", "drafted_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "pass_id": pass_id,
         "pass_sensed": vs.pass_entry(pass_id)["sensed"], "counts": counts, "heard_share": coverage["heard_share"],
+        "imaged_share": coverage.get("imaged_share"), "checkable_share": coverage.get("checkable_share"),
         "box": {"box": box, "bounds": chosen["bounds"], "share_of_past_dark_targets": chosen["share_of_past_dark_targets"]},
-        "look": look, "check": hot["check"],
+        "look": look, "check": hot["check"], "rolling": hot.get("rolling"),
         "candidates": [{"id": t["label"], "lon": round(t["lon"], 4), "lat": round(t["lat"], 4), "port": t["port"],
                         "port_km": t["port_km"], "nearest_broadcast_km": t.get("nearest_ais_km")} for t in cands],
         "notes": notes, "sentence": vs.CANDIDATE_SENTENCE, "attribution": vs.ATTRIBUTION,
@@ -99,20 +110,31 @@ async def draft_tasking(pass_id: str, box: int, candidate_ids: list = None, look
     return json.dumps({
         "tasking_id": tid, "draft_s3_url": url, "box": box, "candidates": [c["id"] for c in draft["candidates"]],
         "look": look["text"] if look else "no look planned yet", "fixed_sentence": vs.OFFICERS_DECISION,
-        "next_steps": "Stop. Say in one sentence what the draft holds and that the officer decides; the map shows the "
-                      "tasking plate. Never say it is filed: only tasking_status can say that.",
+        "next_steps": "Write the answer and stop; the map shows the tasking plate and the officer decides. Never say "
+                      "it is filed: only tasking_status can say that.",
     })
 
 
+def newest_draft_id() -> str | None:
+    """The session's newest drafted tasking (ids sort by their UTC time)."""
+    ids = [k.rsplit("/", 1)[-1][:-len(".draft.json")] for k in vs.list_keys(tasking_prefix()) if k.endswith(".draft.json")]
+    ids = [i for i in ids if TASKING_ID_RE.fullmatch(i)]
+    return max(ids) if ids else None
+
+
 @tool
-async def tasking_status(tasking_id: str) -> str:
+async def tasking_status(tasking_id: str = "") -> str:
     """Whether the officer has filed a tasking (the only way to say a tasking is filed).
 
     Args:
-        tasking_id: From draft_tasking.
+        tasking_id: OPTIONAL from draft_tasking; the session's newest draft when omitted.
 
     Returns: JSON with status ("filed" with when, or "draft"), and the sentence to say.
     """
+    if tasking_id == "" or tasking_id is None:
+        tasking_id = newest_draft_id()
+        if tasking_id is None:
+            return json.dumps({"error": "No tasking has been drafted in this session."})
     if not isinstance(tasking_id, str) or not TASKING_ID_RE.fullmatch(tasking_id):
         return json.dumps({"error": "tasking_id is like tasking-20261016T120000-a1b2c3"})
     try:

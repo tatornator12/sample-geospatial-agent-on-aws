@@ -4,6 +4,7 @@ vessel's reach, and the tasking's validator. No network."""
 import asyncio
 import json
 import re
+import types
 from datetime import datetime, timezone
 
 import pytest
@@ -17,15 +18,21 @@ def run(coro):
     return json.loads(asyncio.run(coro))
 
 
+def ctx(tid: str):
+    return types.SimpleNamespace(tool_use={"toolUseId": tid})
+
+
 def test_the_synthetic_targets_lie_in_the_reserves_water(vessels):
     from conftest import B, D, E, P
     for name, (lon, lat) in dict(A=A, B=B, C=C, D=D, E=E, P=P).items():
         assert vessels.vs.in_reserve(lon, lat), f"{name} is not in the reserve's water"
 
 
-def test_find_pass_latest_is_the_star_and_copies_its_radar_into_the_session(vessels):
+def test_find_pass_latest_is_the_newest_pass_and_copies_its_radar_into_the_session(vessels):
     out = run(vessels.pt.find_pass("latest"))
-    assert out["pass_id"] == STAR and out["role"] == "star" and out["sensed_text"] == "Oct 12, 2026 00:18 UTC"
+    assert out["pass_id"] == STAR and out["sensed_text"] == "Oct 12, 2026 00:18 UTC"
+    # There is no star: no role, and the share is the one the pass imaged, not its footprint's.
+    assert "role" not in out and "reserve_share" not in out and out["imaged_share"] == 0.527
     assert out["render"] == {"kind": "raster", "colormap": "gray", "rescale": [1, 255], "group": "maritime",
                              "legend": "Radar backscatter", "bounds": [-91.33, -2.35, -88.38, 1.6]}
     assert out["s3_url"].endswith(f"{PRE}radar_{STAR}.tif") and (f"vessels/cache/v1/{STAR}_display.tif", f"{PRE}radar_{STAR}.tif") in vessels.s3.copies
@@ -62,13 +69,16 @@ def test_nothing_is_a_candidate_before_the_coverage_check(vessels):
 
 def test_coverage_then_match_gives_every_status_in_order(vessels):
     cov = run(vessels.ais.check_ais_coverage(STAR))
-    assert 0 < cov["heard_share"] < 0.2 and cov["unproven_means"] == "reception unknown: no AIS there proves nothing"
+    assert (cov["imaged_share"], cov["heard_share"], cov["checkable_share"]) == (0.527, 0.351, 0.246)
+    assert cov["standard"] == 0.15 and cov["checkable_pct"] == 25 and cov["unexplained"] == {"received": 3, "unknown": 1}
+    assert cov["unproven_means"] == "reception unknown: no AIS there proves nothing"
     # The room's words: AIS received and reception unknown, never heard water, unproven or not evidence.
     assert (cov["heard_render"]["legend"], cov["unproven_render"]["legend"]) == ("AIS received", "AIS reception unknown")
     assert cov["rule"].startswith("received: ")
     assert not re.search(r"heard water|unproven|not evidence|could be heard", cov["rule"] + cov["unproven_means"], re.I)
     heard_props = vessels.s3.json(f"{PRE}heard_{STAR}.geojson")["features"][0]["properties"]
-    assert heard_props == {"kind": "heard", "share": cov["heard_share"]}       # the stage quotes the tool's share
+    # The stage quotes the tool's shares, never its own measure.
+    assert heard_props == {"kind": "heard", "share": 0.351, "imaged": 0.527, "checkable": 0.246, "standard": 0.15}
     out = run(vessels.ais.match_ais(STAR))
     assert out["counts"] == {"broadcasting": 1, "port": 1, "unproven": 1, "seen_once": 2, "candidate": 1}
     assert out["say_in_order"][0] == "broadcasting" and out["fixed_sentence"] == vessels.vs.CANDIDATE_SENTENCE
@@ -111,10 +121,15 @@ def test_heads_at_interpolates_between_hourly_fixes(vessels):
 
 def test_predict_hotspots_ships_its_measured_check_and_three_boxes(vessels):
     out = run(vessels.ft.predict_hotspots())
-    chk = out["check"]
-    assert chk["checked_on"] == "2026-07-01 to 2026-10-12" and chk["dark_targets_checked"] > 0
-    assert out["say"].startswith("Fitted on everything before July 2026, the top 5% of the water held")
-    assert not re.search(r"\d\.\d{2}", out["say"] + json.dumps(chk))                 # numbers the room can hear
+    rolling = out["rolling"]
+    assert (rolling["since"], rolling["until"]) == ("2026-07-01", "2026-10-12") and rolling["dark_targets"] > 0
+    assert 0 < rolling["days_hit"] <= rolling["radar_days"]
+    assert out["say"].startswith("Refitted before each radar day since July, the map's top 5% of water held")
+    assert out["say_boxes"].startswith("Refitted the same way, the three patrol boxes held")
+    assert "check" not in out                                    # the room hears the rolling check only
+    assert not re.search(r"\d\.\d{2}", out["say"] + out["say_boxes"] + json.dumps(rolling))   # numbers the room can hear
+    record = vessels.s3.json(f"{PRE}hotspots.json")
+    assert record["check"]["top_5pct"]["total"] > 0 and record["rolling"]["total"] == rolling["dark_targets"]   # the hold-out kept
     assert len(out["boxes"]) == 3 and out["boxes"][0]["share_of_past_dark_targets"] >= out["boxes"][1]["share_of_past_dark_targets"]
     assert out["heat_render"]["legend"] == "Dark targets seen before" and out["attribution"] == "Powered by Global Fishing Watch."
     heat = vessels.s3.json(f"{PRE}hotspots.geojson")["features"]
@@ -202,14 +217,19 @@ def test_reachable_area_goes_by_water_and_keeps_the_reveal_for_last(vessels):
 
 
 def test_the_tasking_is_drafted_from_the_records_and_only_the_officer_files_it(vessels):
-    assert "match_ais and predict_hotspots first" in run(vessels.tk.draft_tasking(STAR, 1))["error"]
+    # One question: the pass and the box announced with decide, the records written in it.
+    vessels.vs.begin_turn("Is anyone in the reserve without broadcasting, and where should the patrol look next?")
+    run(vessels.pt.list_passes(tool_context=ctx("tooluse_list")))
+    assert run(vessels.dt.decide("read_pass", "newest", STAR, tool_context=ctx("tooluse_read")))["status"] == "noted"
     run(vessels.ais.check_ais_coverage(STAR))
     run(vessels.ais.match_ais(STAR))
-    run(vessels.ft.predict_hotspots())
+    run(vessels.ft.predict_hotspots(STAR))
+    assert "decide(draft" in run(vessels.tk.draft_tasking(STAR, 1))["error"]
+    assert run(vessels.dt.decide("draft", "most_past_targets", box=1, tool_context=ctx("tooluse_draft")))["status"] == "noted"
     for bad, why in ((["They are poaching."], "accuses"), (["Heard as 123456789."], "identifier"),
                      (["Look north — fast."], "em dash"), (["x" * 221], "220")):
         assert why in run(vessels.tk.draft_tasking(STAR, 1, notes=bad))["error"]
-    assert run(vessels.tk.draft_tasking(STAR, 4))["error"]
+    assert run(vessels.tk.draft_tasking(STAR, 4))["error"] == "You decided box 1."
     assert "not candidates" in run(vessels.tk.draft_tasking(STAR, 1, candidate_ids=["T09"]))["error"]
     out = run(vessels.tk.draft_tasking(STAR, 1, candidate_ids=["T01"], notes=["Two looks are planned this week."]))
     assert out["fixed_sentence"] == vessels.vs.OFFICERS_DECISION and out["candidates"] == ["T01"]

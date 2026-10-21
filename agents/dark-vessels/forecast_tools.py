@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 SPREAD = 1                   # each cell's count spread over its eight neighbours
 BOX_CELLS = 4                # patrol boxes of 4 x 4 cells (0.2 deg, about 22 km)
 N_BOXES = 3
+NEAR_KM = 5.0                # a candidate inside a box or this close to it is near it
 HOLD_OUT_MONTHS = 3          # the check holds out the latest whole months to the newest day
 PLAN_MAX_AGE = timedelta(hours=24)
 PLAN_REFRESH_S = 8
@@ -128,61 +129,112 @@ def times(lift: float) -> str:
     return text[:-2] if text.endswith(".0") else text
 
 
-@tool
-async def predict_hotspots() -> str:
-    """Where to look next: a map of where radar targets with no AIS were seen in the reserve before
-    (away from the five ports), with its measured check: fitted on everything before the latest
-    three months, how much of those months' dark targets fell in the map's top 1, 5 and 10% of the
-    water, against what that much water holds by chance. Then three patrol boxes (about 22 km) and the
-    next planned radar look over each.
+def rolling_say(since: date, pct: int, times_text: str) -> str:
+    """The check for the answer (22 words), the way it was measured."""
+    return (f"Refitted before each radar day since {since:%B}, the map's top 5% of water held {pct}% of the dark "
+            f"targets, {times_text} times chance.")
 
-    Returns: JSON with check (say it the way it was measured), boxes (rank, share of past dark
-    targets, next look), heat_s3_url and boxes_s3_url with render hints (pass them to
+
+def boxes_say(pct: int, times_text: str) -> str:
+    """The boxes' own record (17 words), said only when the presenter asks about the boxes."""
+    return f"Refitted the same way, the three patrol boxes held {pct}% of the dark targets, {times_text} times chance."
+
+
+def no_check_say(since: date) -> str:
+    return f"No dark targets were found from {since:%B} {since.day}, {since:%Y}, so the map's check cannot be measured."
+
+
+def _km_to_box(lon: float, lat: float, bounds) -> float:
+    """0 inside the box, else the km to its nearest edge."""
+    w, s, e, n = bounds
+    return vs.km((lon, lat), (min(max(lon, w), e), min(max(lat, s), n)))
+
+
+@tool
+async def predict_hotspots(pass_id: str = "") -> str:
+    """Where to look next: a map of where radar targets with no AIS were seen in the reserve before
+    (away from the five ports), with its measured check: before each radar day of the latest three
+    months the map was refitted on everything before that day, then that day's dark targets were
+    counted in its top 5% of the water and in the three patrol boxes drawn the same way, against
+    what that much water holds by chance. Then three patrol boxes (about 22 km) and the next planned
+    radar look over each.
+
+    Args:
+        pass_id: OPTIONAL the pass read for this question; each box then carries candidates_near, that
+            pass's candidates inside the box or within 5 km of it.
+
+    Returns: JSON with rolling (the check's numbers), say (the check in one sentence, word for word),
+    say_boxes (the boxes' own record, only when asked about the boxes), boxes (box, share of past dark
+    targets, next look, candidates_near), heat_s3_url and boxes_s3_url with render hints (pass them to
     display_visual unchanged), next_steps.
     """
+    if pass_id and vs.pass_entry(pass_id) is None:
+        return vs.refusal()
     history = _history()
     dets = _dark(history)
     grid, water = vs.reserve_grid()
     until = date.fromisoformat(history["until"])
     cut = _months_back(until, HOLD_OUT_MONTHS)
+    # Today's single hold-out stays in the record (and the draft); the room hears the rolling check.
     checks = R.backtest(dets, grid, cut=cut, until=until, shares=(0.01, 0.05, 0.10), spread=SPREAD, water=water)
+    rc = R.rolling_check(dets, grid, since=cut, until=until, share=0.05, spread=SPREAD, water=water,
+                         box_cells=BOX_CELLS, n_boxes=N_BOXES)
     score = R.surface(dets, grid, before=until, spread=SPREAD, water=water)
     boxes = R.patrol_boxes(score, grid, size=BOX_CELLS, k=N_BOXES)
+    stamp = vs.question_stamp()
+    cands = []
+    if pass_id:
+        match = vs.get_record("match", pass_id)
+        if match is not None and match.get("question_id") == stamp:
+            cands = [(t["lon"], t["lat"]) for t in match.get("targets", []) if t.get("status") == "candidate"]
+    measured = rc.total > 0
+    pct, bpct = round(rc.hit * 100), round(rc.boxes_hit * 100)
     mx = float(score.max()) or 1.0
     heat = [vs.point(grid.west + (c + 0.5) * grid.step, grid.south + (r + 0.5) * grid.step, v=round(float(score[r, c]) / mx, 3))
             for r, c in zip(*np.nonzero(score / mx > 0.02))]
+    if heat:
+        # The top 5% figure rides on the heat (as the received share rides on the coverage), the
+        # boxes' figure on the boxes: each beside its own layer.
+        heat[0]["properties"].update(check_pct=pct if measured else None, check_times=round(rc.lift, 1) if measured else None,
+                                     check_since=cut.isoformat())
     out_boxes, box_feats = [], []
     for k, b in enumerate(boxes, 1):
         area = shp_box(*b.bounds)
         looks = looks_over(area, limit=2)
         nxt = looks[0] if looks else None
-        out_boxes.append({"box": k, "share_of_past_dark_targets": b.share_of_history, "bounds": list(b.bounds),
-                          "next_look": {"satellite": nxt["satellite"], "start": nxt["start"], "share": nxt["share"], "text": _look_line(nxt)}
-                          if nxt else None})
-        box_feats.append({"type": "Feature", "properties": {"box": k, "label": f"{k}  {round(b.share_of_history * 100)}%",
-                                                            "next": _look_line(nxt) if nxt else "no look planned yet"},
-                          "geometry": mapping(area)})
+        row = {"box": k, "share_of_past_dark_targets": b.share_of_history, "bounds": list(b.bounds),
+               "next_look": {"satellite": nxt["satellite"], "start": nxt["start"], "share": nxt["share"], "text": _look_line(nxt)}
+               if nxt else None}
+        if pass_id:
+            row["candidates_near"] = sum(_km_to_box(lon, lat, b.bounds) <= NEAR_KM for lon, lat in cands)
+        out_boxes.append(row)
+        box_feats.append({"type": "Feature", "properties": {
+            "box": k, "label": f"Box {k}", "next": _look_line(nxt) if nxt else "no look planned yet",
+            "boxes_pct": bpct if measured else None, "boxes_times": round(rc.boxes_lift, 1) if measured else None,
+            "boxes_days_hit": rc.boxes_days_hit, "days": rc.days}, "geometry": mapping(area)})
     pre = vs.vessels_prefix()
     heat_url = vs.put_json(f"{pre}hotspots.geojson", vs.fc(heat))
     boxes_url = vs.put_json(f"{pre}boxes.geojson", vs.fc(box_feats))
     by = {c.share: c for c in checks}
+    rolling = {"since": cut.isoformat(), "until": (until - timedelta(days=1)).isoformat(), **rc.as_dict()}
     record = {"cut": cut.isoformat(), "until": until.isoformat(), "boxes": out_boxes,
-              "check": {f"top_{int(s * 100)}pct": by[s].as_dict() for s in by}}
+              "check": {f"top_{int(s * 100)}pct": by[s].as_dict() for s in by}, "rolling": rolling,
+              "pass_id": pass_id or None, "question_id": stamp}
     vs.put_json(f"{pre}hotspots.json", record)
-    c5 = by[0.05]
+    say = rolling_say(cut, pct, times(rc.lift)) if measured else no_check_say(cut)
     return json.dumps({
-        "check": {"fitted_on": f"{dets and min(d.day for d in dets).isoformat()} to {(cut - timedelta(days=1)).isoformat()}",
-                  "checked_on": f"{cut.isoformat()} to {(until - timedelta(days=1)).isoformat()}",
-                  "dark_targets_checked": c5.total,
-                  **{f"top_{int(s * 100)}pct_of_water_held": f"{round(by[s].hit * 100)}% ({times(by[s].lift)}x chance)" for s in by}},
-        "say": f"Fitted on everything before {cut:%B %Y}, the top 5% of the water held {round(c5.hit * 100)}% of the "
-               f"{c5.total} dark targets seen since, {times(c5.lift)} times what that much water holds by chance.",
+        "rolling": {"since": rolling["since"], "until": rolling["until"], "radar_days": rc.days, "days_hit": rc.days_hit,
+                    "dark_targets": rc.total,
+                    "top_5pct_of_water_held": f"{pct}% ({times(rc.lift)}x chance)" if measured else None,
+                    "boxes_held": f"{bpct}% ({times(rc.boxes_lift)}x chance)" if measured else None,
+                    "boxes_days_hit": rc.boxes_days_hit},
+        "say": say, "say_boxes": boxes_say(bpct, times(rc.boxes_lift)) if measured else say,
         "boxes": out_boxes, "heat_s3_url": heat_url, "boxes_s3_url": boxes_url,
         "heat_render": {"kind": "points", "group": "maritime", "legend": "Dark targets seen before", "property": "v"},
         "boxes_render": {"kind": "vector", "group": "maritime", "legend": "Patrol boxes", "label": "label"},
         "attribution": vs.ATTRIBUTION,
-        "next_steps": "display_visual(heat_s3_url, render=heat_render) and display_visual(boxes_s3_url, render=boxes_render) "
-                      "in the same response as fleet_pattern(). Say the check in one sentence, the way it was measured.",
+        "next_steps": "Show the heat and the boxes (display_visual with each render); say the check with say, word for "
+                      "word. Choose which box to draft and announce it with decide in the same response as next_look.",
     })
 
 
@@ -245,8 +297,8 @@ async def fleet_pattern() -> str:
         **s, "heat_s3_url": url,
         "render": {"kind": "points", "group": "maritime", "legend": "Squid fleet hours", "property": "v"},
         "say": say, "attribution": vs.ATTRIBUTION,
-        "next_steps": "display_visual(heat_s3_url, render=render); say it in one sentence. The fleet is a fleet: no vessel, "
-                      "flag or country is named.",
+        "next_steps": "Show the fleet's hours (display_visual with heat_s3_url and render); say it with say, in one "
+                      "sentence. The fleet is a fleet: no vessel, flag or country is named.",
     })
 
 
@@ -286,7 +338,7 @@ async def next_look(box: int = 0) -> str:
         "looks": [{k: lk[k] for k in ("satellite", "start", "relative_orbit", "share")} | {"text": _look_line(lk)} for lk in looks],
         "plan": source, "footprint_s3_url": url,
         "render": {"kind": "vector", "group": "maritime", "legend": "Next radar look", "label": "label"},
-        "next_steps": "display_visual(footprint_s3_url, render=render); say the first look's time in UTC.",
+        "next_steps": "Show the look (display_visual with footprint_s3_url and render); say the first look's time in UTC.",
     })
 
 
@@ -362,7 +414,7 @@ async def reachable_area() -> str:
         "back_on": back_on, "area_s3_url": url,
         "render": {"kind": "vector", "group": "maritime", "legend": "Reach by water", "label": "label"},
         "fixed_sentence": vs.CANNOT_SAY,
-        "next_steps": "find_pass(pass_id) for that pass's radar, then display_visual(area_s3_url, render=render). Say the "
-                      "date plainly (an earlier pass), the speed and the hours, the targets inside, the fixed sentence word "
-                      "for word, and only then where the AIS came back on.",
+        "next_steps": "Show that pass's radar (find_pass with pass_id) and the area (display_visual with area_s3_url and "
+                      "render). Say the date plainly (an earlier pass), the speed and the hours, the targets inside, the "
+                      "fixed sentence word for word, and only then where the AIS came back on.",
     })

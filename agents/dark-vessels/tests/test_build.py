@@ -34,6 +34,21 @@ def grid_water():
     return bvc.reserve_grid(reserve)
 
 
+def oct16_manifest(s3) -> None:
+    """The manifest as the Oct 16 build left it, before --imaged: the star's and the silent vessel's
+    records with no metadata or imaged cells (the shared fixture carries them, for the tools)."""
+    m = s3.json(f"{V1}/manifest.json")
+    m["passes"] = {pid: {k: v for k, v in m["passes"][pid].items() if k in ("pass_id", "bounds", "products", "chips")}
+                   for pid in (STAR, SILENT)}
+    s3.put_object(Bucket=BUCKET, Key=f"{V1}/manifest.json", Body=json.dumps(m))
+
+
+@pytest.fixture()
+def fake_s3(fake_s3):
+    oct16_manifest(fake_s3)
+    return fake_s3
+
+
 @pytest.fixture(autouse=True)
 def keep_prefix(monkeypatch):
     """main() moves the build's PREFIX with --prefix; every test gets the default back."""
@@ -190,6 +205,7 @@ def test_upload_writes_only_under_the_prefix_and_refuses_records_for_another(tmp
     from conftest import seed as seed_cache
     s3 = UploadS3()
     seed_cache(s3)
+    oct16_manifest(s3)
     s3.copy_object(Bucket=BUCKET, Key=f"{V1R}/manifest.json", CopySource={"Bucket": BUCKET, "Key": f"{V1}/manifest.json"})
     monkeypatch.setattr(bvc, "_s3", lambda: s3)
     out = tmp_path / "out"

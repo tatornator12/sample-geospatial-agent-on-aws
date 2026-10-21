@@ -1,9 +1,11 @@
-"""Dark Vessels, the radar: find a pass on file and the targets on the water (design component 2)."""
+"""Dark Vessels, the radar: the passes on file to choose from, find a pass and the targets on the
+water (design component 2; the open question, redesign §3.5)."""
 from __future__ import annotations
 
 import json
 import logging
 import re
+import secrets
 
 from strands import tool
 
@@ -12,13 +14,15 @@ import vessel_store as vs
 logger = logging.getLogger(__name__)
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+TWO_READ = "Two passes read: go to the forecast."
 
 
 def _resolve(when: str) -> dict | None:
-    """'latest' (the star), a pass id, or a date (YYYY-MM-DD) to a pass on file."""
+    """'latest' (the newest listed pass, by its time), a pass id, or a date (YYYY-MM-DD) to a pass on file."""
     when = (when or "latest").strip().lower()
-    if when in ("latest", "newest", "today", "star"):
-        return next(p for p in vs.passes() if p["role"] == "star")
+    if when in ("latest", "newest", "today"):
+        listed = vs.listed_passes()
+        return listed[0] if listed else None
     if vs.PASS_ID_RE.fullmatch(when):
         return vs.pass_entry(when)
     if DATE_RE.fullmatch(when):
@@ -30,26 +34,86 @@ def _built(pass_id: str) -> dict | None:
     return vs.manifest().get("passes", {}).get(pass_id)
 
 
+def _share(entry: dict) -> float | None:
+    s = entry.get("imaged_share")
+    return round(float(s), 3) if isinstance(s, (int, float)) and not isinstance(s, bool) and 0 <= s <= 1 else None
+
+
+def _row(entry: dict, now) -> dict:
+    """One pass on the board: what the choice weighs (how recent, how much of the reserve it imaged),
+    and no counts or coverage, which would hand over the answer."""
+    share = _share(entry)
+    return {"pass_id": entry["pass_id"], "sensed": entry["sensed"], "sensed_text": vs.nice_time(entry["sensed"]),
+            "days_old": (now.date() - vs.parse_t(entry["sensed"]).date()).days,
+            "satellite": entry.get("satellite", "Sentinel-1"), "orbit_state": entry.get("orbit_state"),
+            "imaged_share": share, "imaged_pct": round(100 * share) if share is not None else None}
+
+
+@tool(context=True)
+async def list_passes(tool_context=None) -> str:
+    """The Sentinel-1 radar passes on file over the Galápagos Marine Reserve, newest first: the passes
+    a question can read. Each with its time (UTC), how many days old it is, its satellite, its orbit
+    direction and the share of the reserve it imaged. It opens the question (or keeps it, called again
+    in the same turn).
+
+    Returns: JSON with passes (pass_id, sensed, sensed_text, days_old, satellite, orbit_state,
+    imaged_share, imaged_pct), next_steps. Only passes on file: the radar was read ahead of time.
+    """
+    try:
+        entries = vs.listed_passes()
+    except Exception as e:
+        logger.warning("list_passes: the passes on file could not be read (%s)", type(e).__name__)
+        return json.dumps({"error": "The passes on file could not be read."})
+    if not entries:
+        return vs.refusal()
+    now = vs.now()
+    rows = [_row(e, now) for e in entries]
+    turn = vs.current_turn() or vs.begin_turn("")
+    q = vs.latest_question()
+    if q is not None and q.get("turn_id") == turn:
+        qid, started = q["question_id"], q.get("started_at")       # same turn: the decisions stand
+    else:
+        qid, started = secrets.token_hex(6), now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    question = {"question_id": qid, "turn_id": turn, "started_at": started, "standard": vs.CHECKABLE_FLOOR,
+                "budget": {"passes": vs.PASS_BUDGET}, "decision_keys": vs.DECISION_KEYS, "passes": rows}
+    vs.put_json(vs.question_key(), question)
+    board = vs.board_key(vs.tool_use_id(tool_context))
+    if board:
+        vs.put_json(board, question)
+    else:
+        logger.warning("list_passes: no tool-use id; the board was not written")
+    return json.dumps({
+        "passes": rows,
+        "next_steps": "Choose which pass to read and announce it with decide in the same response as find_pass.",
+    })
+
+
 @tool
 async def find_pass(when: str = "latest") -> str:
     """Find a Sentinel-1 radar pass over the Galápagos Marine Reserve on file and put its image in the
     session for the map and your eyes.
 
     Args:
-        when: "latest" (the newest pass with candidates on file), a date "YYYY-MM-DD", or a pass id
-            from a previous answer (e.g. "s1d-20261012t0018").
+        when: "latest" (the newest pass on file), a date "YYYY-MM-DD", or a pass id from list_passes
+            (like "s1d-YYYYMMDDtHHMM").
 
-    Returns: JSON with pass_id, satellite, sensed (UTC), orbit, reserve_share (of the reserve the pass
-    saw), s3_url (the radar image), render (pass it to display_visual unchanged), source, next_steps.
+    Returns: JSON with pass_id, satellite, sensed (UTC), orbit, imaged_share (of the reserve the pass
+    imaged), s3_url (the radar image), render (pass it to display_visual unchanged), source, next_steps.
     Only passes on file: the radar was read ahead of time, never live.
     """
     entry = _resolve(when)
     if entry is None:
         return vs.refusal()
-    built = _built(entry["pass_id"])
-    if not built:
-        return json.dumps({"error": f"The radar for {entry['pass_id']} is not built (scripts/build_vessel_cache.py)."})
     pid = entry["pass_id"]
+    q = vs.current_question()
+    if q is not None:
+        read = vs.read_passes(vs.decisions(q))
+        if len(read) >= vs.PASS_BUDGET and pid not in read:
+            logger.info("find_pass: refused %s (budget spent)", pid)
+            return json.dumps({"error": TWO_READ, "facts": {"read": read}})
+    built = _built(pid)
+    if not built:
+        return json.dumps({"error": f"The radar for {pid} is not built (scripts/build_vessel_cache.py)."})
     key = f"{vs.vessels_prefix()}radar_{pid}.tif"
     try:
         url = vs.copy_into_session(built["products"]["display"]["key"], key)
@@ -57,15 +121,15 @@ async def find_pass(when: str = "latest") -> str:
         logger.warning("find_pass copy failed for %s: %s", pid, type(e).__name__)
         return json.dumps({"error": f"The radar image for {pid} is missing from the cache (scripts/build_vessel_cache.py)."})
     return json.dumps({
-        "pass_id": pid, "role": entry["role"], "satellite": entry.get("satellite", "Sentinel-1"),
+        "pass_id": pid, "satellite": entry.get("satellite", "Sentinel-1"),
         "sensed": entry["sensed"], "sensed_text": vs.nice_time(entry["sensed"]),
         "orbit": f"{entry.get('orbit_state', '')} orbit {entry.get('relative_orbit')}".strip(),
-        "reserve_share": entry.get("reserve_share"), "s3_url": url,
+        "imaged_share": _share(entry), "s3_url": url,
         "render": {"kind": "raster", "colormap": "gray", "rescale": [1, 255], "group": "maritime",
                    "legend": "Radar backscatter", "bounds": built["bounds"]},
         "source": "Copernicus Sentinel-1 (ESA), VV, read ahead of time from Microsoft Planetary Computer",
-        "next_steps": "inspect_image(s3_url) and say what you see in one sentence; then display_visual(s3_url, "
-                      "render=render) in the same response as detect_vessels(pass_id).",
+        "next_steps": "Look at the radar once (inspect_image with s3_url) and say what you see in one sentence; "
+                      "show it with display_visual(s3_url, render=render).",
     })
 
 
@@ -145,6 +209,9 @@ async def detect_vessels(pass_id: str) -> str:
     entry = vs.pass_entry(pass_id)
     if entry is None:
         return vs.refusal()
+    refused = vs.require_read(pass_id)
+    if refused:
+        return json.dumps(refused)
     if not _built(pass_id):
         return json.dumps({"error": f"The targets for {pass_id} are not built (scripts/build_vessel_cache.py)."})
     targets = targets_for(pass_id)
@@ -162,6 +229,5 @@ async def detect_vessels(pass_id: str) -> str:
         "detectors": "ours: a two-parameter CA-CFAR on the VV radar at 20 m; GFW: its public SAR vessel detections "
                      "(larger vessels); a pair is one of each within 1 km",
         "attribution": vs.ATTRIBUTION,
-        "next_steps": "display_visual(targets_s3_url, render=render) in the same response as check_ais_coverage(pass_id). "
-                      "Say the counts in one sentence; say 'data from Global Fishing Watch' once.",
+        "next_steps": "Show the targets (display_visual with targets_s3_url and render); then the coverage check.",
     })

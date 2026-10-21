@@ -12,7 +12,8 @@ AGENT_DIR = Path(__file__).resolve().parents[1]
 GEO_AGENT_DIR = AGENT_DIR.parents[1] / "geo_agent"
 STAGE = GEO_AGENT_DIR / "stage_shared.sh"
 AGENT_MODULES = ["_paths.py", "vessels_config.py", "dark_vessels.py", "vessel_store.py", "pass_tools.py", "ais_tools.py",
-                 "forecast_tools.py", "tasking_tools.py", "ais_coverage.py", "cfar.py", "plan.py", "predict.py", "reach.py"]
+                 "forecast_tools.py", "tasking_tools.py", "decide_tools.py", "ais_coverage.py", "cfar.py", "plan.py",
+                 "predict.py", "reach.py"]
 
 
 def _allowlist():
