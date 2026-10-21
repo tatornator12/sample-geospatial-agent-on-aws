@@ -1702,10 +1702,16 @@
   }
   .map-frame--sea .map-legend--key {
     gap: 2px;
-    margin-top: 6px;
+    margin-top: 4px;
   }
   .map-frame--sea .map-legend--key .map-legend__label {
     line-height: 1.15;
+  }
+  /* Act 3 asks one question, so its console holds a single row of plates: the layers plate may run
+     to 16 px above it, which keeps the coverage key's third row ("outside the radar") and the
+     candidate row in view at the candidates beat (review B2, L6). */
+  .map-frame--sea .map-layers {
+    max-height: calc(100% - 176px);
   }
 }
 .map-basemap__fixed {

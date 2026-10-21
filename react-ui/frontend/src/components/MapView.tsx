@@ -907,6 +907,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
 
   // The replay's mode: loop at rest, run on to the pass while the agent works, hold once the pass is on.
   useEffect(() => {
+    // The clock's choose beat (§3.2, §3.8.2): "while the agent chooses a radar pass", from the click
+    // until the first file of the argument lands; back to the rest if the turn ends with none.
+    if (working && !vesselOnStage && seaBeatRef.current === 'rest') {
+      seaBeatRef.current = 'forward';
+      setSeaBeatState('forward');
+    } else if (!working && seaBeatRef.current === 'forward') {
+      seaBeatRef.current = 'rest';
+      setSeaBeatState('rest');
+    }
     const p = player.current;
     if (!p) return;
     p.setMode(prefersReducedMotion() || vesselOnStage ? 'hold' : working ? 'forward' : 'loop');

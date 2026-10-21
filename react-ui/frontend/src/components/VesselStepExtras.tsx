@@ -19,7 +19,7 @@ import type { ToolCall } from '../types.ts';
 import { theme } from '../theme';
 import type { EvidenceItem } from '../utils/evidence.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
-import { numberRuns, passOf, vesselKind } from '../utils/vesselLayers.ts';
+import { passOf, vesselKind } from '../utils/vesselLayers.ts';
 import {
   DECISION_KEYS,
   boardAccepted,
@@ -68,6 +68,24 @@ const NOTHING_REVEALED: Readonly<Record<string, number>> = {};
 
 const urlOf = (call: ToolCall): string | undefined => (typeof call.params?.s3_url === 'string' ? call.params.s3_url : undefined);
 
+/**
+ * A line's numbers for the mono face, without the sentence's own punctuation: "Oct 12:" sets "12" in
+ * mono and the colon in the body face ("box 1:" otherwise reads "box 1 :" from the mono cell).
+ */
+function lineRuns(text: string): Array<{ text: string; num: boolean }> {
+  const out: Array<{ text: string; num: boolean }> = [];
+  // Not a digit inside a name ("S1-D"): figures, dates and times only.
+  const re = /(?<![A-Za-z])\d+(?:[:.,]\d+)*%?(?:\s?UTC)?/g;
+  let last = 0;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (m.index > last) out.push({ text: text.slice(last, m.index), num: false });
+    out.push({ text: m[0], num: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last), num: false });
+  return out;
+}
+
 /** One line under a step: "Decided:" in fog, "Checked:" in label grey, 15 px, numbers in mono. */
 function LineText({ line }: { line: StepLine }) {
   const decided = line.label === 'Decided:';
@@ -75,7 +93,7 @@ function LineText({ line }: { line: StepLine }) {
     <span className={`step-detail step-line step-line--${decided ? 'decided' : 'checked'}`} style={{ color: decided ? 'var(--fog)' : 'var(--label)' }}>
       <span>
         <span style={{ fontWeight: 600 }}>{line.label}</span>{' '}
-        {numberRuns(line.text).map((r, i) => (
+        {lineRuns(line.text).map((r, i) => (
           r.num
             ? <span key={i} style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>{r.text}</span>
             : <span key={i}>{r.text}</span>

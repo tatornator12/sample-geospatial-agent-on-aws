@@ -99,6 +99,10 @@ describe('the board and the lines, from the files', () => {
       'Decided: Reading Oct 12: the newest pass that saw over half the reserve (53%).',
       'Checked: This pass can check 19% of the reserve, over the 15% standard.',
     ]);
+    // Figures in the mono face, the sentence's own punctuation in the body face ("Oct 12:", "53%).").
+    const mono = Array.from(document.querySelectorAll<HTMLElement>('.step-line span'))
+      .filter((el) => el.style.fontFamily.includes('mono')).map((el) => el.textContent);
+    expect(mono).toEqual(['12', '53%', '19%', '15%']);
     // The refused decide's file was asked for and never came: it shows no line.
     expect(vi.mocked(loadGeometry).mock.calls.map(([u]) => u)).toContain(`${DIR}decision_${Q1}_refused1.json`);
   });
