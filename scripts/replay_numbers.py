@@ -12,7 +12,8 @@ only restates the model's observations). Then every number in
 what the case shows the room is matched against them:
 
     narrative.md, the config's `description`, each recorded call's `saw`, each display_visual
-    `title` and `description`, and each --extra text (a gallery card's metrics)
+    `title` and `description`, each inspect_image `title` (the chip), and each --extra text (a
+    gallery card's metrics)
 
 A number matches when some source number, times a unit factor (1; m² to km² 1e-6; m² to ha 1e-4;
 m² to acres 1/4046.856; fraction to % 100; kg to t 1e-3), rounds to it at the shown decimals (a
@@ -250,11 +251,11 @@ def shown_texts(case: Path, extras: list[str]) -> list[tuple[str, str]]:
     for i, call in enumerate(config.get("tool_calls") or []):
         if isinstance(call.get("saw"), str):
             texts.append((f"tool_calls[{i}] {call['name']} saw", call["saw"]))
-        if call.get("name") == "display_visual":
-            for k in ("title", "description"):
-                v = (call.get("params") or {}).get(k)
-                if isinstance(v, str):
-                    texts.append((f"tool_calls[{i}] display_visual {k}", v))
+        # A layer's row and legend, and a look's chip title, are on the stage too.
+        for k in {"display_visual": ("title", "description"), "inspect_image": ("title",)}.get(call.get("name"), ()):
+            v = (call.get("params") or {}).get(k)
+            if isinstance(v, str):
+                texts.append((f"tool_calls[{i}] {call['name']} {k}", v))
     texts += [(f"extra {i + 1}", e) for i, e in enumerate(extras)]
     return texts
 
