@@ -16,12 +16,15 @@ interface PassFilmstripProps {
   toolId: string;
   frames: PassFrame[];
   onOpen?: (item: EvidenceItem, imageUrl: string) => void;
+  /** Only the line in words (the end frame keeps the site the agent did not follow this way): no frames, no chip loads. */
+  summaryOnly?: boolean;
 }
 
-export function PassFilmstrip({ toolId, frames, onOpen }: PassFilmstripProps) {
+export function PassFilmstrip({ toolId, frames, onOpen, summaryOnly = false }: PassFilmstripProps) {
   const [images, setImages] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    if (summaryOnly) return;
     let cancelled = false;
     const missing = frames.filter((f) => f.chipUrl && !images[f.chipUrl]);
     if (missing.length === 0) return;
@@ -36,9 +39,16 @@ export function PassFilmstrip({ toolId, frames, onOpen }: PassFilmstripProps) {
     return () => { cancelled = true; };
     // `frames` is the identity to watch; `images` is only read to skip work already done.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frames]);
+  }, [frames, summaryOnly]);
 
   if (frames.length === 0) return null;
+  if (summaryOnly) {
+    return (
+      <div className="pass-film">
+        <p className="pass-film__summary">{filmstripSummary(frames)}</p>
+      </div>
+    );
+  }
 
   const open = (frame: PassFrame) => {
     const imageUrl = frame.chipUrl ? images[frame.chipUrl] : undefined;

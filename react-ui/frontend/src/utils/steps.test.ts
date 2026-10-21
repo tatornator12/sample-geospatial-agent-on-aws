@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ToolCall } from '../types.ts';
 import {
   chosenCue,
+  cueTally,
+  cueTallyText,
+  endFrameFilms,
   filmstripSummary,
   groupDetail,
   groupName,
@@ -267,5 +270,50 @@ describe('parseManifest and filmstripSummary', () => {
   it('is null for something that is not a manifest', () => {
     expect(parseManifest({ type: 'FeatureCollection', features: [] }, dir)).toBeNull();
     expect(parseManifest(null, dir)).toBeNull();
+  });
+});
+
+describe('cueTally, cueTallyText and endFrameFilms', () => {
+  const dir = 's3://b/use-cases/methane-watch-mission/';
+  // The Krasnovodsk manifest of the recorded mission: two candidates, then a cloud gap and a noisy pass.
+  const krasnovodsk = parseManifest(
+    {
+      passes: [
+        { date: '2025-08-01', verdict: 'candidate', short: 'candidate', peak_ppm_m: 2309.7 },
+        { date: '2025-08-20', verdict: 'candidate', short: 'candidate', peak_ppm_m: 2828.3 },
+        { date: '2025-06-17', verdict: 'rejected', short: 'cloud or gap', peak_ppm_m: null },
+        { date: '2025-06-13', verdict: 'rejected', short: 'within noise', peak_ppm_m: 1231.6 },
+      ],
+    },
+    dir
+  )!;
+
+  it('counts candidates out of the passes read and takes the newest candidate, whatever the order', () => {
+    expect(cueTally(krasnovodsk)).toEqual({ candidates: 2, read: 4, latest: '2025-08-20' });
+    const rejected = krasnovodsk.filter((f) => f.verdict === 'rejected');
+    expect(cueTally(rejected)).toEqual({ candidates: 0, read: 2, latest: null });
+    // A date that passes the manifest's pattern but is not a real day never prints.
+    const odd: PassFrame[] = [{ date: '2025-02-30', verdict: 'candidate', short: 'candidate', reason: null, peak: 1, chipUrl: null }];
+    expect(cueTally(odd)).toEqual({ candidates: 1, read: 1, latest: null });
+  });
+
+  it('says the tally in the stage\'s words', () => {
+    expect(cueTallyText({ candidates: 2, read: 4, latest: '2026-04-25' })).toBe('2 of 4 candidate passes · latest 2026-04-25');
+    expect(cueTallyText({ candidates: 0, read: 4, latest: null })).toBe('0 of 4 candidate passes');
+    expect(cueTallyText({ candidates: 1, read: 1, latest: null })).toBe('1 of 1 candidate pass');
+    expect(cueTallyText(cueTally(krasnovodsk))).toBe('2 of 4 candidate passes · latest 2025-08-20');
+  });
+
+  it('keeps every cued site in the end frame, the followed one whole and the others as their summary', () => {
+    const a = call('check_recent_passes', { lat: 39.4379, lon: 53.573 });
+    const b = call('check_recent_passes', { lat: 35.5528, lon: 112.6889 });
+    const films = [{ call: a, frames: krasnovodsk }, { call: b, frames: krasnovodsk }];
+    // The end frame, the agent followed b.
+    expect(endFrameFilms(films, b, true).map((f) => [f.call.id, f.summaryOnly])).toEqual([[a.id, true], [b.id, false]]);
+    // Working (or the full list): every strip whole.
+    expect(endFrameFilms(films, b, false).every((f) => !f.summaryOnly)).toBe(true);
+    // No choice yet: nothing is cut down.
+    expect(endFrameFilms(films, null, true).every((f) => !f.summaryOnly)).toBe(true);
+    expect(endFrameFilms([], a, true)).toEqual([]);
   });
 });

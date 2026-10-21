@@ -88,6 +88,28 @@ def test_prompt_carries_the_confidence_sentence_and_render_rule():
     assert "ppm·m" in p
 
 
+def test_the_watch_reads_its_dates_from_the_tools_and_says_when_emit_last_looked():
+    """Stage review D5 and D8 (Oct 20): the plume product's date is read from watch_baseline, not
+    recited; a tie goes to the more recent candidate; the closer gives the last look, never "still
+    active"; a rate is given when "super-emitter" is asked, and only NASA's own."""
+    import methane_config
+    p = " ".join(methane_config.build_prompt("2026-10-20").split())   # line breaks are layout
+    assert "nearly empty after 2024, so I'm" not in p and "post-2024" not in p
+    assert "plume_product_latest in watch_baseline's summary" in p and "latest date could not be read" in p
+    assert "more recent" in p and "2 of 4 and Shanxi coal basin (China) 2 of 6, tied: following the Shanxi site" in p
+    assert "EMIT last looked here on" in p and "last_look" in p
+    assert 'never says "still active", "recent" or "active"' in p
+    assert "NASA's highest published emission rate at this site" in p and "Never estimate a rate yourself" in p
+    assert 'never write "only oil and gas"' in p and "one plain sentence with a verb" in p
+    # The checks' own lines reach the record once, as the tool's "- Check:" lines (dev v42 eval run 1:
+    # a model that copied them into observations dropped the "Check:" lines from the pasted record).
+    assert "never copy a check's line" in p and "the \"- Check:\" lines included" in p
+    assert 'ONLY when the user\'s own words include "super-emitter"' in p
+    # The mission still starts on the old plate's words (a replay case and old notes use them).
+    assert '"super-emitters", "still active"' in p
+    assert "\u2014" not in p
+
+
 # --- replay cases (scenario_id) -------------------------------------------------------------------
 
 _CASE = {

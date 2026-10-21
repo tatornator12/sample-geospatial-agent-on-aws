@@ -129,6 +129,27 @@ def test_infra_reads_the_watch_area_extract_and_counts_types_only(ground, fake_s
     assert rec["mapped"] == 6
 
 
+def _groups(**counts):
+    import overture as ov
+    g = {k: 0 for k in ov.GROUPS}
+    g.update({k.replace("_", " "): v for k, v in counts.items()})
+    return {"mapped": sum(g.values()), "groups": g, "types": []}
+
+
+def test_infra_hint_says_only_oil_and_gas_only_when_nothing_else_is_mapped(ground):
+    """Stage review act2 P1-10: an industrial area beside the tanks is other industry, and the hint
+    said "only oil and gas" over it; with farmland it said "possible" and "less likely" at once."""
+    only = ground.infra_hint(_groups(oil_and_gas=3))
+    assert "non_oil_gas_source: 'less likely' (only oil and gas infrastructure is mapped)" in only
+    other = ground.infra_hint(_groups(oil_and_gas=3, other_industry=1))
+    assert "'less likely' (oil and gas infrastructure is mapped, and no landfill, mine, wetland or farmland)" in other
+    assert "never 'only oil and gas'" in other and "(only oil and gas infrastructure is mapped)" not in other
+    farm = ground.infra_hint(_groups(oil_and_gas=3, agriculture=2))
+    assert "non_oil_gas_source (wetland or agriculture): 'possible'" in farm and "less likely" not in farm
+    # A record missing a group (an older extract) reads as zero, not a KeyError.
+    assert "only oil and gas" in ground.infra_hint({"mapped": 2, "groups": {"oil and gas": 2}, "types": []})
+
+
 def test_infra_outside_the_watch_areas_reads_overture_live(ground, monkeypatch):
     import overture as ov
     calls = []

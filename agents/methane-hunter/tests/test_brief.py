@@ -149,6 +149,39 @@ def test_the_brief_carries_the_ground_checks_from_their_own_records(brief, fake_
     assert record["brief"]["checks"]["infrastructure"]["types"] == [{"type": "well", "count": 3, "nearest_km": 0.4}]
 
 
+def _infra(fake_s3, groups):
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/methane/infra_39.4700_53.6400.json", Body=json.dumps({
+        "radius_km": 2.0, "mapped": 4, "groups": groups, "types": [{"type": "storage tank", "count": 3, "nearest_km": 1.9}],
+        "line": "Overture Maps shows within 2 km: 1 industrial area (1.7 km), 3 storage tanks (1.9 km)."}).encode())
+
+
+ONLY_OIL_GAS = [{"id": "routine_venting", "assessment": "possible", "next_check": "Passes on new dates with no heat seen would support venting."},
+                {"id": "non_oil_gas_source", "assessment": "less likely", "next_check": "Overture Maps shows only oil and gas infrastructure nearby."}]
+
+
+def test_only_oil_and_gas_is_refused_when_the_mapping_shows_other_groups(brief, fake_s3):
+    """Stage review act2 P1-10: "only oil and gas" over an industrial area the tool classed as other industry."""
+    _infra(fake_s3, {"oil and gas": 3, "other industry": 1})
+    out = json.loads(_run(brief.draft_brief(**good(explanations=ONLY_OIL_GAS))))
+    assert "Rewrite these parts of the brief" in out["error"]
+    assert "explanations[1].next_check: says 'only oil and gas'" in out["error"] and "other industry" in out["error"]
+    assert not any("/briefs/" in k for k in fake_s3.objects)
+    gaps = json.loads(_run(brief.draft_brief(**good(gaps=["Only mapped oil-and-gas sites were checked."]))))
+    assert "gaps[0]: says 'only oil and gas'" in gaps["error"]
+
+
+def test_only_oil_and_gas_passes_when_it_is_what_the_mapping_shows(brief, fake_s3):
+    _infra(fake_s3, {"oil and gas": 3, "other industry": 0, "mining": 0})
+    out = json.loads(_run(brief.draft_brief(**good(explanations=ONLY_OIL_GAS))))
+    assert out["status"] == "draft", out
+
+
+@pytest.mark.parametrize("groups", [None, {}, {"other industry": "1"}, {"other industry": True}, "oil and gas"])
+def test_a_mapping_record_without_usable_groups_never_blocks_the_brief(brief, fake_s3, groups):
+    _infra(fake_s3, groups)
+    assert json.loads(_run(brief.draft_brief(**good(explanations=ONLY_OIL_GAS))))["status"] == "draft"
+
+
 def test_a_brief_without_checks_still_drafts(brief, fake_s3):
     out = json.loads(_run(brief.draft_brief(**good())))
     assert out["status"] == "draft" and "- Check:" not in out["markdown"]

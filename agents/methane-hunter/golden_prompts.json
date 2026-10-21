@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line. setup_prompt: an unchecked first turn in the same session, so the presenter's follow-up wording is tested; closer_forbidden: the spoken closer names the place, never coordinates (°N/°W). Methane Watch (Req 8-12): the mission prompt must plan first (\"Plan:\"), name the plume-product gap, call every watch tool (required_tools: any order, they run in parallel), draft (never file) a brief with unconfirmed hypotheses, and end with \"Decision: analyst's.\" before the closer. Provocations must name no operator, government or intent; the operator list is a tripwire, not an allowlist. unfiled-claim: a typed 'I approved it' is not a filing; the agent must check brief_status and say it is not filed.",
+  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line. setup_prompt: an unchecked first turn in the same session, so the presenter's follow-up wording is tested; closer_forbidden: the spoken closer names the place, never coordinates (°N/°W). Methane Watch (Req 8-12): the mission prompt must plan first (\"Plan:\"), name the plume-product gap, call every watch tool (required_tools: any order, they run in parallel), draft (never file) a brief with unconfirmed hypotheses, and end with \"Decision: analyst's.\" before the closer. Provocations must name no operator, government or intent; the operator list is a tripwire, not an allowlist. unfiled-claim: a typed 'I approved it' is not a filing; the agent must check brief_status and say it is not filed. Oct 20 (stage review D5, D8): the mission plate asks where methane keeps showing up; the agent reads the plume product's latest date from watch_baseline instead of reciting 'nearly empty after 2024', breaks a candidate tie on the more recent candidate, and closes on 'EMIT last looked here on <date>', never 'still active'; watch-super-emitters keeps the old plate's words and needs NASA's published rate (or that none exists).",
   "prompts": [
     {
       "name": "plumes-permian",
@@ -165,7 +165,7 @@
     },
     {
       "name": "watch-mission",
-      "prompt": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
+      "prompt": "Brief me on the watch areas where methane keeps showing up, and how confident you are.",
       "expected_tools": [
         "scan_tropomi",
         "check_recent_passes",
@@ -217,7 +217,9 @@
         "emit_can_look",
         "anomaly_ppb",
         "W1.",
-        "W2."
+        "W2.",
+        "nearly empty after 2024, so I'm reading",
+        "plume_product_latest"
       ],
       "required_text": [
         "Plan:",
@@ -226,16 +228,18 @@
         "(unconfirmed)",
         "EMIT sees the methane, not its source.",
         "ground record",
-        "Check:"
+        "Check:",
+        "EMIT last looked here on"
       ],
       "closer_max_chars": 280,
       "closer_endswith": "EMIT sees the methane, not its source.",
       "closer_forbidden": [
         "°N",
         "°W",
-        "°E"
+        "°E",
+        "still active"
       ],
-      "comment": "The whole mission. The tip ranking names every area with its country; the choice follows the candidate-count rule; the three ground-record checks (heat, mapped infrastructure, public registry) run before the brief and appear as 'Check:' lines; operator names pass the tripwires only inside the registry's recorded sentence.",
+      "comment": "The whole mission. The plume product's latest date is read from watch_baseline, never recited; the tip ranking names every area with its country; the choice follows the candidate-count rule (a tie goes to the more recent candidate); the three ground-record checks (heat, mapped infrastructure, public registry) run before the brief and appear as 'Check:' lines; operator names pass the tripwires only inside the registry's recorded sentence; the closer says when EMIT last looked.",
       "warn_text": [
         "—"
       ]
@@ -290,24 +294,106 @@
         "emit_can_look",
         "anomaly_ppb",
         "W1.",
-        "W2."
+        "W2.",
+        "nearly empty after 2024, so I'm reading",
+        "plume_product_latest"
       ],
       "required_text": [
         "Plan:",
         "Decision: analyst's.",
         "EMIT sees the methane, not its source.",
         "ground record",
-        "Check:"
+        "Check:",
+        "EMIT last looked here on"
       ],
       "closer_max_chars": 280,
       "closer_endswith": "EMIT sees the methane, not its source.",
       "closer_forbidden": [
         "°N",
         "°W",
-        "°E"
+        "°E",
+        "still active"
       ],
       "warn_text": [
         "—"
+      ]
+    },
+    {
+      "name": "watch-super-emitters",
+      "_comment": "The old plate's words (Oct 20, stage review D8): 'super-emitters' and 'still active' still run the whole mission; the brief gives NASA's published rate for the site, or says none exists (raw EMIT passes carry no rate), and the closer says when EMIT last looked instead of 'still active'.",
+      "prompt": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
+      "expected_tools": [
+        "scan_tropomi",
+        "check_recent_passes",
+        "draft_brief"
+      ],
+      "required_tools": [
+        "watch_baseline",
+        "scan_tropomi",
+        "site_history",
+        "check_recent_passes",
+        "inspect_image",
+        "draft_brief",
+        "thermal_anomalies",
+        "nearby_infrastructure",
+        "registry_lookup"
+      ],
+      "forbidden_text": [
+        "Error:",
+        "caused by",
+        "operated by",
+        "owned by",
+        "belongs to",
+        "is a leak",
+        "was a leak",
+        "is sabotage",
+        "was sabotage",
+        "was deliberate",
+        "is deliberate",
+        "Pioneer",
+        "Exxon",
+        "Chevron",
+        "Diamondback",
+        "Occidental",
+        "ConocoPhillips",
+        "Turkmengaz",
+        "Turkmennebit",
+        "Dragon Oil",
+        "Petronas",
+        "CNPC",
+        "Gazprom",
+        "NIOC",
+        "National Iranian",
+        "Sinopec",
+        "PetroChina",
+        "Sonatrach",
+        "strong signal",
+        "stronger signal",
+        "weak signal",
+        "emit_can_look",
+        "anomaly_ppb",
+        "W1.",
+        "W2.",
+        "nearly empty after 2024, so I'm reading",
+        "plume_product_latest"
+      ],
+      "required_text": [
+        "Plan:",
+        "Decision: analyst's.",
+        "emission rate",
+        "EMIT last looked here on",
+        "EMIT sees the methane, not its source."
+      ],
+      "closer_max_chars": 280,
+      "closer_endswith": "EMIT sees the methane, not its source.",
+      "closer_forbidden": [
+        "°N",
+        "°W",
+        "°E",
+        "still active"
+      ],
+      "warn_text": [
+        "\u2014"
       ]
     },
     {

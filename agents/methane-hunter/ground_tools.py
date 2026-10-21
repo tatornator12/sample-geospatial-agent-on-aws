@@ -274,7 +274,7 @@ def infra_line(i: dict) -> str:
 
 
 def infra_hint(i: dict) -> str:
-    g = i["groups"]
+    g = {k: i["groups"].get(k, 0) for k in ov.GROUPS}
     if i["mapped"] == 0:
         return "non_oil_gas_source: 'cannot assess' (nothing mapped); the oil and gas hypotheses stay possible."
     bits = []
@@ -284,8 +284,15 @@ def infra_hint(i: dict) -> str:
         bits.append("non_oil_gas_source (landfill): 'possible', supported by mapping")
     if g[ov.WETLAND] or g[ov.AGRICULTURE]:
         bits.append("non_oil_gas_source (wetland or agriculture): 'possible', supported by mapping")
-    if g[ov.OIL_GAS] and not (g[ov.MINING] or g[ov.WASTE] or g[ov.WETLAND]):
-        bits.append("non_oil_gas_source: 'less likely' (only oil and gas infrastructure is mapped)")
+    # "Only oil and gas" is said only when nothing else is mapped: an industrial area beside the tanks
+    # is other industry, and saying "only" then overstates the record (stage review act2 P1-10).
+    if g[ov.OIL_GAS] and not (g[ov.MINING] or g[ov.WASTE] or g[ov.WETLAND] or g[ov.AGRICULTURE]):
+        if g[ov.OTHER]:
+            bits.append("non_oil_gas_source: 'less likely' (oil and gas infrastructure is mapped, and no landfill, "
+                        "mine, wetland or farmland); other industry is mapped too, so say what is mapped by type, "
+                        "never 'only oil and gas'")
+        else:
+            bits.append("non_oil_gas_source: 'less likely' (only oil and gas infrastructure is mapped)")
     if not g[ov.OIL_GAS] and (g[ov.MINING] or g[ov.WASTE]):
         bits.append("routine_venting, unlit_flare: 'less likely' (no oil and gas infrastructure is mapped)")
     if any(t["type"] == "storage tank" for t in i["types"]):

@@ -75,7 +75,7 @@ CASES = {
     "watch": {
         "id": "methane-watch-mission",
         # The stage's "Methane Watch brief" plate (react-ui/frontend/src/utils/stageCopy.ts), word for word.
-        "prompt": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
+        "prompt": "Brief me on the watch areas where methane keeps showing up, and how confident you are.",
         "name": "Methane Watch brief",
         "description": ("One prompt, the whole mission: a global baseline, a TROPOMI tip, EMIT cued on recent "
                         "passes, a self-check, and a draft brief for the analyst"),

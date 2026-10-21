@@ -14,6 +14,13 @@ describe('stageCopyFor', () => {
     expect(copy.placeholder).toBe('Ask for a Methane Watch brief, or name a region and a year');
   });
 
+  it('asks the mission plate for recurrence, never "still active" or "super-emitters" (stage review D8)', () => {
+    // The golden prompt watch-mission and build_replay_case.py's watch preset, word for word.
+    const mission = stageCopyFor('methane').prompts[0].prompt;
+    expect(mission).toBe('Brief me on the watch areas where methane keeps showing up, and how confident you are.');
+    expect(mission).not.toMatch(/still active|super-emitter/i);
+  });
+
   it('gives the AI Archaeologist its three beats and a placeholder that asks for a known site (Week 5)', () => {
     const copy = stageCopyFor('archaeologist');
     expect(copy.prompts.map((p) => p.label)).toEqual(['The Octagon, from space', 'Measure the Great Circle', 'Where else, like this']);

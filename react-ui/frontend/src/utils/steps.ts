@@ -402,6 +402,51 @@ export function parseManifest(raw: unknown, dir: string): PassFrame[] | null {
   return frames;
 }
 
+/**
+ * The reason for the choice, per cued site: candidate passes out of the passes read, and the newest
+ * candidate's date (the tie-break: methane_config.py W4). Counted from the manifest's validated
+ * frames, so it matches the filmstrip; the date prints only as a real ISO day.
+ */
+export interface CueTally {
+  candidates: number;
+  read: number;
+  /** The newest candidate pass, YYYY-MM-DD; null when there is none. */
+  latest: string | null;
+}
+
+export function cueTally(frames: PassFrame[]): CueTally {
+  const days = frames
+    .filter((f) => f.verdict === 'candidate')
+    .map((f) => isoDay(f.date))
+    .filter((d): d is string => d !== null)
+    .sort();
+  return {
+    candidates: frames.filter((f) => f.verdict === 'candidate').length,
+    read: frames.length,
+    latest: days.length > 0 ? days[days.length - 1] : null,
+  };
+}
+
+/** "2 of 4 candidate passes · latest 2026-04-25", "0 of 4 candidate passes", "1 of 1 candidate pass". */
+export function cueTallyText(t: CueTally): string {
+  const noun = t.read === 1 ? 'candidate pass' : 'candidate passes';
+  return `${t.candidates} of ${t.read} ${noun}${t.latest ? ` · latest ${t.latest}` : ''}`;
+}
+
+/**
+ * The cue step's filmstrips in the mission's end frame: every cued site stays, the one the agent
+ * followed with its frames and the others as their summary line only (the end frame is already
+ * taller than the column, act2 review P1-2). While working, in the full list, or before the agent
+ * commits, every strip is whole.
+ */
+export function endFrameFilms<T extends { call: ToolCall }>(
+  films: T[],
+  chosenCall: ToolCall | null,
+  collapsed: boolean
+): Array<T & { summaryOnly: boolean }> {
+  return films.map((f) => ({ ...f, summaryOnly: collapsed && chosenCall !== null && f.call !== chosenCall }));
+}
+
 /** "2 candidates · 1 too weak · 1 cloud or gap": the filmstrip in words, candidates first. */
 export function filmstripSummary(frames: PassFrame[]): string {
   const counts = new Map<PassShort, number>();

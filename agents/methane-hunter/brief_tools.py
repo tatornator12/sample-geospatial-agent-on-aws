@@ -346,6 +346,28 @@ def check_record_names(brief: dict, names: list[str]) -> list[str]:
     return problems
 
 
+_ONLY_OIL_GAS = re.compile(r"\bonly (mapped )?oil[ -]and[ -]gas\b", re.IGNORECASE)
+
+
+def check_only_oil_gas(brief: dict, checks: dict) -> list[str]:
+    """Which of the model's text fields say "only oil and gas" when the session's mapping record
+    shows other groups too (empty list: none). The Oct 12 replay said "Overture Maps shows only oil
+    and gas infrastructure (3 storage tanks, 1 industrial area)" over an industrial area the tool
+    had classed as other industry (stage review act2 P1-10)."""
+    groups = ((checks or {}).get("infrastructure") or {}).get("groups")
+    if not isinstance(groups, dict):
+        return []
+    others = [g for g, n in groups.items()
+              if g != "oil and gas" and isinstance(n, (int, float)) and not isinstance(n, bool) and n > 0]
+    if not others:
+        return []
+    fields = [("next_collection", brief.get("next_collection") or "")]
+    fields += [(f"{k}[{i}]", t) for k in ("observations", "gaps") for i, t in enumerate(brief.get(k) or [])]
+    fields += [(f"explanations[{i}].next_check", r.get("next_check") or "") for i, r in enumerate(brief.get("explanations") or [])]
+    return [f"{field}: says 'only oil and gas', but Overture Maps also maps {', '.join(sorted(others))} here; "
+            "say what is mapped by type" for field, text in fields if _ONLY_OIL_GAS.search(text)]
+
+
 def render_markdown(brief: dict, brief_id: str) -> str:
     area = f"; tipped by the {brief['watch_area']} watch area" if brief["watch_area"] else ""
     since = f" since {brief['passes_since']}" if brief.get("passes_since") else ""
@@ -409,7 +431,8 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
             infrastructure_damage; assessment one of "possible", "less likely", "cannot assess";
             next_check: the evidence that would confirm or rule it out.
         confidence: "low" | "moderate" | "high": confidence that methane RECURS at this site.
-        gaps: 1-4 things the data cannot show (coverage, the post-2024 plume product gap, ...).
+        gaps: 1-4 things the data cannot show (coverage, the plume product's gap after its latest
+            plume date, ...).
         next_collection: The recommended next look (another EMIT pass, aircraft, ground inspection).
         watch_area: The watch area whose scan tipped this site (its key, e.g. "shanxi coal basin").
 
@@ -428,7 +451,7 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
         brief.update(candidates=passes["candidates"], passes_read=passes["read"], passes_since=passes["since"])
         brief["title"] = compose_title(brief["place"], brief["confidence"], brief["candidates"])
     brief["checks"] = find_checks(brief["lat"], brief["lon"])
-    named = check_record_names(brief, record_names(brief["checks"]))
+    named = check_record_names(brief, record_names(brief["checks"])) + check_only_oil_gas(brief, brief["checks"])
     if named:   # nothing is written: the model rewrites its fields and calls again
         return json.dumps({"error": "Rewrite these parts of the brief: " + "; ".join(named[:8])})
     markdown = render_markdown(brief, brief_id)

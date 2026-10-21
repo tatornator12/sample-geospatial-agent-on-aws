@@ -313,6 +313,23 @@
   line-height: 1;
   color: var(--fog);
 }
+/* A cued row's third line: the reason for the choice ("2 of 4 candidate passes · latest 2025-08-20"). */
+.tip-row__cue {
+  grid-column: 2 / -1;
+  grid-row: 3;
+  font-size: 15px;
+  color: var(--label);
+}
+.tip-row--chosen .tip-row__cue {
+  color: var(--fog);
+}
+.tip-row__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tip-row__latest {
+  white-space: nowrap;
+}
 .tip-row__bar {
   grid-row: 2;
   grid-column: 2;

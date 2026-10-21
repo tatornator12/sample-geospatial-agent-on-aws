@@ -19,6 +19,8 @@ import type { ProfileData } from '../utils/profileSection.ts';
 import {
   PLAN_STAGES,
   chosenCue,
+  cueTally,
+  endFrameFilms,
   groupDetail,
   groupName,
   groupSteps,
@@ -27,6 +29,7 @@ import {
   planStage,
   rankTips,
   tipCued,
+  type CueTally,
   type PassFrame,
   type StepGroup,
   type Tip,
@@ -88,6 +91,13 @@ export function StepColumn({
   const chosen = chosenCue(cues, cues.map(framesFor), steps.slice(lastCue + 1));
   const cuedAreas = tips.filter((t) => tipCued(t, cues)).map((t) => t.area.name);
   const chosenArea = chosen !== null ? tips.find((t) => tipCued(t, [cues[chosen]]))?.area.name ?? null : null;
+  // The reason for the choice on the board: each cued site's candidate passes and newest candidate.
+  const tallies: Record<string, CueTally> = {};
+  tips.forEach((t) => {
+    const cue = cues.find((c) => tipCued(t, [c]));
+    const frames = cue ? framesFor(cue) : null;
+    if (frames && frames.length > 0) tallies[t.area.name] = cueTally(frames);
+  });
 
   const hasFilm = (g: StepGroup) => g.name === 'check_recent_passes' && manifestUrls.length > 0;
   const hasBoard = (g: StepGroup) => g.name === 'scan_tropomi' && tips.length > 0;
@@ -151,14 +161,12 @@ export function StepColumn({
           const n = at + 1;
           const detail = groupDetail(group, groups.slice(0, at));
           const items = group.calls.map((c) => evidenceByTool.get(c.id)).filter((x): x is EvidenceItem => !!x);
-          // The filmstrips under a cue step: every cued site while working and in the full list;
-          // only the site the agent followed in the end frame.
+          // The filmstrips under a cue step: every cued site while working and in the full list; in
+          // the end frame the site the agent followed with its frames, the others as their summary line.
           const allFilms = group.name === 'check_recent_passes'
             ? group.calls.map((call) => ({ call, frames: framesFor(call) })).filter((f) => f.frames !== null)
             : [];
-          const films = collapsed && chosen !== null
-            ? allFilms.filter((f) => f.call === cues[chosen])
-            : allFilms;
+          const films = endFrameFilms(allFilms, chosen !== null ? cues[chosen] : null, collapsed);
           const board = hasBoard(group);
           return (
             <li
@@ -230,10 +238,10 @@ export function StepColumn({
               )}
               {board && (
                 <div style={{ gridColumn: '2 / -1' }}>
-                  <TipBoard tips={rankTips(tips)} cued={cuedAreas} chosen={chosenArea} expected={group.calls.length} />
+                  <TipBoard tips={rankTips(tips)} cued={cuedAreas} chosen={chosenArea} expected={group.calls.length} tallies={tallies} />
                 </div>
               )}
-              {films.map(({ call, frames }) => {
+              {films.map(({ call, frames, summaryOnly }) => {
                 const j = group.calls.indexOf(call);
                 const site = tips.find((t) => tipCued(t, [call]));
                 return (
@@ -243,7 +251,7 @@ export function StepColumn({
                         {site ? site.area.label : detail?.points?.[j] ?? ''}
                       </span>
                     )}
-                    <PassFilmstrip toolId={call.id} frames={frames!} onOpen={onOpenEvidence} />
+                    <PassFilmstrip toolId={call.id} frames={frames!} onOpen={onOpenEvidence} summaryOnly={summaryOnly} />
                   </div>
                 );
               })}

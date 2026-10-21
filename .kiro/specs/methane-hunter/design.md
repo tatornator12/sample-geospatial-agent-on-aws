@@ -381,20 +381,41 @@ Found while building tasks 1–3 against live data; each keeps the approved inte
 
 ### The mission (one prompt, 7 minutes)
 
-Prepared prompt: "Brief me on methane super-emitters in the watch areas that are still active,
-and how confident you are." A second plate names one watch area for a predictable dive.
+Prepared prompt (Oct 20, stage review D8): "Brief me on the watch areas where methane keeps
+showing up, and how confident you are." The old wording ("…super-emitters in the watch areas that
+are still active…") still runs the mission (golden `watch-super-emitters`). A second plate names
+one watch area for a predictable dive.
 
 | t | What the agent does | What the room sees |
 |---|---|---|
 | 0:00 | States a 4-step plan: baseline, tip, cue, brief | Plan in the step column; globe, dimmed |
 | 0:30 | Baseline: global NASA detections, clustered by site | 1,686 plasma points; rings `×10`, `×9` on repeat sites; slow rotation |
 | 1:30 | Tip: `scan_tropomi` over the watch areas, last 14 days | TROPOMI anomaly composite; hotspots numbered |
-| 2:30 | Notices NASA's plume product ends in 2024; says so | One sentence in the caption |
-| 3:00 | Cue: `check_recent_passes` on the top hotspot EMIT can see | Filmstrip: 8 passes arrive in parallel; weak ones dimmed "rejected: inside uncertainty" |
+| 2:30 | Reads the plume product's latest plume date from `watch_baseline` and says, in its own words, what it means: after that date it reads EMIT's raw passes itself, over the two strongest tips EMIT can see | One sentence in the transcript |
+| 3:00 | Cue: `check_recent_passes` on the top two hotspots EMIT can see | Filmstrips: passes arrive in parallel; rejected ones dimmed with their short reason. Each cued row on the tip board gains "2 of 4 candidate passes · latest 2025-08-20" |
+| 3:45 | Chooses: more candidate passes; a tie goes to the more recent latest candidate, then the higher peak | The chosen row reads "following"; both rows keep their tallies, so the reason is on the board |
 | 4:15 | `site_history`: looked N times, methane on M | Numbers in the record |
 | 4:45 | Looks closer: strongest candidate, Sentinel-2 ground | Camera tilts; methane columns rise over the ground |
-| 5:45 | `draft_brief`: explanations, confidence, gaps, next collection | Brief in the stream; "Approve and file" / "Request another look" |
+| 5:45 | `draft_brief`: explanations, confidence, gaps, next collection | Brief card; the end frame keeps the tip board, the followed site's filmstrip and the other site's summary line; "Approve and file" / "Request another look" |
+| 6:15 | Closer: place, candidate count, "EMIT last looked here on <date>" (never "still active") | The answer's last line |
 | 6:30 | Presenter approves; backend files it; agent confirms | "Filed: briefs/<id>.md" |
+
+Recorded case vs the new tie rule (Oct 20): the replay `methane-watch-mission` was a 2-vs-2 tie
+won by Krasnovodsk on peak (2,828.3 vs 2,600.0 ppm·m). Under the most-recent rule it would follow
+the Shanxi site (latest candidate 2026-04-25 vs 2025-08-20). It needs a re-record in a later run;
+until then the replay, its `user_question` and its narrative keep the old rule and wording, and
+its hypothesis text ("only oil and gas") stays as recorded (the tool now refuses it).
+
+Live on dev, Oct 20 (`methane_hunter_dev` v42, eval 12/13): the new plate ran the mission in
+135 s and the old wording (`watch-super-emitters`) in 76 s. Both followed the Shanxi site near
+Yangquan City on 4 of 8 candidate passes against 1 of 8 (no tie that day) and closed on "EMIT
+last looked here on 2026-08-17". The super-emitters brief merged both rate sentences ("NASA's
+highest published emission rate at this site is not available; NASA has published no emission
+rate for this site; EMIT's raw passes carry none."), and the new plate's brief carried the
+no-rate sentence it was not asked for. `watch-named-area` failed once because the record dropped
+the "Check:" lines. v43 fixes the last two (the rate line ONLY for "super-emitter"; every line of
+the brief pasted) and ran 13/13 on Oct 21; the super-emitters brief still merges the two rate
+sentences (task 24).
 
 Fallbacks: over 7:30 in rehearsal → start from the globe replay case at 1:30; any live source
 down → the mission replay case.

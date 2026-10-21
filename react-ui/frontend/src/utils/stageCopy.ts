@@ -40,7 +40,9 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
       // Act 2 v2: the mission (the golden prompt watch-mission); the two beats below are the fallback run sheet.
       {
         label: 'Methane Watch brief',
-        prompt: 'Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.',
+        // Asks for recurrence, not "super-emitters that are still active" (stage review D8): the brief
+        // reports candidate passes and when EMIT last looked, and raw passes carry no emission rate.
+        prompt: 'Brief me on the watch areas where methane keeps showing up, and how confident you are.',
       },
       // The two beats work anywhere: the presenter names the region (a watch area, a basin the
       // search tool knows, or any place the geocoder finds) and presses Enter.
