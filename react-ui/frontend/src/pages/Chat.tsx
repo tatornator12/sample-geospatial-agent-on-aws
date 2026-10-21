@@ -243,9 +243,11 @@ export function Chat() {
           setCurrentGeometry(geometry);
         }
 
-        // Pre-load key rasters with explicit zIndex for stacking (higher = on top): the after
-        // scene on top, the before scene under it (A1 P1-10), so the map shows the case's finding
-        // and the compare slider pairs the two (one case, two dates); each index the same way.
+        // The after layer above the before one, for the scenes and for the index (A1 P1-10), so
+        // the map shows the case's finding and the compare slider pairs the two (one case, two
+        // dates). zIndex orders the adds (higher first); the map puts each scene at the bottom
+        // of the imagery and each index on top of it, so the after scene is added before its
+        // before scene and the after index after its before index.
         const rasters: RasterData[] = [];
         const when = (date: string | undefined, side: 'before' | 'after') =>
           date ? `${formatDate(date)} (${side})` : `(${side})`;
@@ -273,8 +275,8 @@ export function Chat() {
         const label = indexType.toUpperCase();
         const after = config.assets.after?.[indexType];
         const before = config.assets.before?.[indexType];
-        if (after) rasters.push({ url: after, name: `${label}, ${when(config.dates.after, 'after')}`, date: config.dates.after, zIndex: 2 });
-        if (before) rasters.push({ url: before, name: `${label}, ${when(config.dates.before, 'before')}`, date: config.dates.before, zIndex: 1 });
+        if (before) rasters.push({ url: before, name: `${label}, ${when(config.dates.before, 'before')}`, date: config.dates.before, zIndex: 2 });
+        if (after) rasters.push({ url: after, name: `${label}, ${when(config.dates.after, 'after')}`, date: config.dates.after, zIndex: 1 });
 
         console.log('✅ Pre-loading rasters:', rasters.map(r => `${r.name} (z:${r.zIndex})`));
         setCurrentRasters(rasters);
