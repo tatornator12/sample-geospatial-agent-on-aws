@@ -309,8 +309,12 @@ evidence order: pass, detect, coverage, match, then words.
    them, and with item 13 merged the 15 px check covers the whole column.
 7. Task 9a's rehearsal records 3 runs of `open-question` on data whose newest pass is thin, with
    their paths and seconds.
-8. The replay case `vessels-open-question` loads with a network log of only the basemap, TiTiler
-   and the bucket. Its gallery card is marked available.
+8. The replay case `vessels-open-question` loads from the basemap, TiTiler and the bucket: loading
+   the case makes no agent invocation and waits on no live data call; background prewarm and the
+   app shell's fonts are allowed. Its gallery card is marked available. (Amended Oct 21, task 9:
+   the stage prewarms a runtime for every new session, a replay's too, so the return to live or a
+   follow-up question skips the cold start; the shell's fonts load on every page. The case
+   renders in full with both blocked.)
 9. After the Nov 5 rerun, `warm_vessels.py --check --newest` is clear, the stable eval passes, and
    R9.2's go/no-go is recorded.
 10. pytest in `scripts/tests` passes, and `eval.py --dry-run --agent X` succeeds for each of

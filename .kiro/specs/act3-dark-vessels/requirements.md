@@ -277,7 +277,9 @@ what the evidence shows.
 1. WHEN `build_replay_case.py` records the star turn THEN it SHALL copy every layer the room saw into
    `use-cases/vessels-<pass>/` and refuse a recording with a forbidden phrase, an identifier, or no
    coverage check.
-2. WHEN the case plays THEN the network log SHALL show only the basemap, TiTiler and the bucket.
+2. WHEN the case plays THEN it SHALL load from the basemap, TiTiler and the bucket, make no agent
+   invocation and wait on no live data call; background prewarm and the app shell's fonts are
+   allowed (amended Oct 21, redesign AC 8).
 
 ### Requirement 14: Tests, gate and run sheet
 
