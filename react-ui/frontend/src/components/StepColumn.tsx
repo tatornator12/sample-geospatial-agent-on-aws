@@ -155,7 +155,9 @@ export function StepColumn({
           const done = !lit;
           const at = groups.indexOf(group);
           const n = at + 1;
-          const detail = groupDetail(group, groups.slice(0, at));
+          // A call still streaming has no inputs yet: its line waits for them rather than guess.
+          const settled = group.calls.filter((c) => c.status !== 'executing');
+          const detail = settled.length > 0 ? groupDetail({ ...group, calls: settled }, groups.slice(0, at)) : null;
           const items = group.calls.map((c) => evidenceByTool.get(c.id)).filter((x): x is EvidenceItem => !!x);
           // The filmstrips under a cue step: every cued site while working and in the full list; in
           // the end frame the site the agent followed with its frames, the others as their summary line.

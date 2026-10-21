@@ -258,6 +258,43 @@ describe('Escape', () => {
   });
 });
 
+describe('The lit step while a tool runs (B1, A1 P1-2)', () => {
+  const rows = () => [...document.querySelectorAll('.stage-step-column > li')];
+  const lit = () => document.querySelector('.stage-step-column > li[aria-current="step"]');
+
+  it('lights the call the agent has started, before it finishes, and keeps it out of the layers', async () => {
+    const { onRastersUpdate } = setup();
+    const turn = await sendFirstPlate();
+    turn.push(chunk(`Finding the park. ${toolCall('t1', 'find_location_boundary', { location: 'Central Park' })} Searching now. `));
+    turn.push(chunk('{"toolUseId": "t2", "name": "find_similar_places", "input": "{\\"s3_url\\": \\"'));
+    await flush();
+    expect(rows()).toHaveLength(2);
+    expect(lit()?.textContent).toContain('Find similar places');
+    expect(lit()?.textContent).toContain('working');
+    expect(rows()[0].getAttribute('aria-current')).toBeNull();
+    expect(rows()[0].textContent).toContain('Get the boundary');
+    expect(onRastersUpdate).not.toHaveBeenCalled();
+
+    // The call closes once the tool has run: the same row, now with its inputs.
+    turn.push(chunk(`${RASTER}\\"}"}The matches are on the map.`));
+    turn.end();
+    await flush();
+    expect(rows()).toHaveLength(2);
+    expect(lit()).toBeNull();
+    expect(screen.getByText('The matches are on the map.')).toBeTruthy();
+  });
+
+  it('is left as it was on Dark Vessels (its act is its own)', async () => {
+    const props = { agentId: 'vessels', agentLabel: 'Dark Vessels', onSessionReset: vi.fn(), onGeometryUpdate: vi.fn(), onRastersUpdate: vi.fn() };
+    render(<ChatSidebar sessionId={S1} {...props} />);
+    const turn = await sendFirstPlate();
+    turn.push(chunk(`${toolCall('t1', 'find_pass', { date: '2026-10-12' })}{"toolUseId": "t2", "name": "detect_vessels", "input": "`));
+    await flush();
+    expect(rows()).toHaveLength(1);
+    expect(lit()?.textContent).toContain('Find the radar pass');
+  });
+});
+
 describe('Runtime crash', () => {
   it('resets the session and shows the recovery notice on the new one', async () => {
     const { rerender, onSessionReset } = setup();

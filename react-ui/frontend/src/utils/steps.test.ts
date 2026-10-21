@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolCall } from '../types.ts';
+import { extractEvidence } from './evidence.ts';
 import {
   BEARING_LABELS,
   VERIFIED_TRANSECT_SITES,
@@ -49,6 +50,27 @@ describe('groupSteps and groupName', () => {
 
   it('names an unknown repeated tool with a count', () => {
     expect(groupName(groupSteps([call('calculator'), call('calculator')])[0])).toBe('Calculate ×2');
+  });
+});
+
+describe('a call that has started and has no inputs yet (B1: params {})', () => {
+  // Every tool family's paths with an empty input, as the lit step carries one while its tool runs.
+  const families = [
+    'scan_tropomi', 'check_recent_passes', 'thermal_anomalies', 'nearby_infrastructure', 'registry_lookup',
+    'get_rasters', 'get_rasters_for_dates', 'scan_region_change', 'run_change_detection', 'measure_profile',
+    'find_similar_places', 'display_visual', 'inspect_image', 'draft_brief', 'find_pass', 'show_terrain',
+  ];
+  it('never throws, and gives no pass manifest, tip manifest or cue', () => {
+    for (const name of families) {
+      const started = call(name, {}, 'executing');
+      expect(() => groupDetail(groupSteps([started])[0])).not.toThrow();
+      expect(groupName(groupSteps([started])[0])).toBeTruthy();
+      expect(passManifestUrl('s3://b/use-cases/methane-watch-mission/', started)).toBeNull();
+      expect(tipManifestUrl('s3://b/use-cases/methane-watch-mission/', started)).toBeNull();
+      expect(methaneDirFrom([started], 'sid')).toBeNull();
+      expect(extractEvidence([started], 'sid')).toEqual([]);
+    }
+    expect(planStage([call('watch_baseline'), call('scan_tropomi', {}, 'executing')])).toBe(1);
   });
 });
 

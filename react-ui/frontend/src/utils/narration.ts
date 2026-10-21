@@ -80,6 +80,21 @@ export function toolSpans(raw: string): { spans: ToolSpan[]; openFrom: number | 
   return { spans, openFrom: null };
 }
 
+const OPEN_TOOL = /^\{"toolUseId":\s*"([A-Za-z0-9_-]{1,128})",\s*"name":\s*"([a-z_][a-z0-9_]{0,63})"/;
+
+/**
+ * The tool the agent has started and not yet finished: every runtime streams a call's opening
+ * `{"toolUseId": "…", "name": "…", "input": "` when the model starts it and closes it only once
+ * the tool has run and the next text or call begins. So the step lights while the tool works,
+ * not after (A1 P1-2). Only an id and a tool name of the expected shape; null when none is open.
+ */
+export function openTool(raw: string): { id: string; name: string } | null {
+  const { openFrom } = toolSpans(raw);
+  if (openFrom === null) return null;
+  const m = raw.slice(openFrom, openFrom + 260).match(OPEN_TOOL);
+  return m ? { id: m[1], name: m[2] } : null;
+}
+
 interface Segment {
   text: string;
   /** Still streaming: nothing after it yet, so its last sentence may be half-written. */

@@ -24,7 +24,7 @@ import { stagePunctuation } from '../utils/caption.ts';
 import { blankDashCells } from '../utils/tables.ts';
 import { profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
 import { BACKEND_UNREACHABLE, failedTurnLine, isNetworkFailure, pastTurns, stageAnswerText } from '../utils/turns.ts';
-import { boundedSaw, latestNarration, sawByTool, withSaw } from '../utils/narration.ts';
+import { boundedSaw, latestNarration, openTool, sawByTool, withSaw } from '../utils/narration.ts';
 import { stepColumnMaxHeight } from '../utils/stageLayout.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
@@ -450,7 +450,14 @@ export function ChatSidebar({
             const existingIds = new Set(accumulatedTools.map((t) => t.id));
             const newTools = tools.filter((t) => !existingIds.has(t.id));
             accumulatedTools = [...accumulatedTools, ...newTools];
-            setStreamingTools(accumulatedTools);
+            // The call the agent has started lights its step while the tool runs (A1 P1-2); the
+            // layers, evidence and the turn's record keep only finished calls. Not on Dark Vessels.
+            const started = agentId !== 'vessels' ? openTool(fullResponse) : null;
+            setStreamingTools(
+              started && !accumulatedTools.some((t) => t.id === started.id)
+                ? [...accumulatedTools, { id: started.id, name: started.name, params: {}, status: 'executing' }]
+                : accumulatedTools
+            );
 
             const { rasters: allRasterData, geometries: allGeometryData } =
               extractAllVisualizationData(accumulatedTools);

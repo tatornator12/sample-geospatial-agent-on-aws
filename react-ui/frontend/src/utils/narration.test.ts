@@ -5,6 +5,7 @@ import {
   boundedSaw,
   capWords,
   latestNarration,
+  openTool,
   sawByTool,
   stageSentences,
   toolSpans,
@@ -101,6 +102,25 @@ describe('toolSpans', () => {
     const { spans, openFrom } = toolSpans(raw);
     expect(spans.map((s) => [s.id, s.name])).toEqual([['t1', 'get_rasters']]);
     expect(openFrom).toBe(raw.indexOf('{"toolUseId": "t2"'));
+  });
+});
+
+describe('openTool (B1, A1 P1-2: the step lights while its tool runs)', () => {
+  it('names the call the agent has opened and not closed, as every runtime streams it', () => {
+    // geospatial_agent_on_aws.py: the opener with a space after each colon, then the input.
+    const raw = `Done. ${tool('t1', 'find_location_boundary', { location: 'Central Park' })} Now the search. {"toolUseId": "tooluse_AbC-9", "name": "find_similar_places", "input": "{\\"bbox\\": [-79.8, 40.4`;
+    expect(openTool(raw)).toEqual({ id: 'tooluse_AbC-9', name: 'find_similar_places' });
+    // No space after the colons (the scratch harness and JSON.stringify).
+    expect(openTool(`{"toolUseId":"t2","name":"get_rasters","input":"`)).toEqual({ id: 't2', name: 'get_rasters' });
+  });
+
+  it('is null when every call is closed, while the name is still streaming, or when the shape is wrong', () => {
+    expect(openTool(`Words. ${tool('t1', 'get_rasters')} More words.`)).toBeNull();
+    expect(openTool('No tools at all.')).toBeNull();
+    expect(openTool('{"toolUseId": "t2", "name": "inspect_im')).toBeNull();
+    expect(openTool('{"toolUseId": "t2", "name": "Not A Tool", "input": "')).toBeNull();
+    expect(openTool('{"toolUseId": "bad id!", "name": "get_rasters", "input": "')).toBeNull();
+    expect(openTool('{"toolUseId": "t2", "name": "get_rasters<script>", "input": "')).toBeNull();
   });
 });
 
