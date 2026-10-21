@@ -5,7 +5,7 @@
  */
 import type { Message, ToolCall } from '../types.ts';
 import { formatDate } from './layerFormatting.ts';
-import type { PassFrame, Tip } from './steps.ts';
+import { cueTally, type PassFrame, type Tip } from './steps.ts';
 
 const DRAFT_ID = /draft `(brief-\d{8}T\d{6}-[0-9a-f]{6})`/g;
 const ANY_ID = /\bbrief-\d{8}T\d{6}-[0-9a-f]{6}\b/;
@@ -56,6 +56,39 @@ export function lastLookLine(frames: PassFrame[] | null | undefined, tip?: Tip |
   if (!newest) return null;
   const tropomi = tip && tip.days !== null && tip.end ? { days: tip.days, end: formatDate(tip.end) } : null;
   return { lastLook: formatDate(newest), tropomi };
+}
+
+/** The ground checks a mission can run before it drafts (the plan's Check stage). */
+export const GROUND_CHECKS = ['thermal_anomalies', 'nearby_infrastructure', 'registry_lookup'] as const;
+
+/** How many of the ground checks the session ran (each counted once). */
+export function groundChecks(tools: ToolCall[]): number {
+  return new Set(tools.map((t) => t.name).filter((n) => (GROUND_CHECKS as readonly string[]).includes(n))).size;
+}
+
+export interface MissionChain {
+  /** The TROPOMI tip over the card's site: the area's label (the stage's table) and its anomaly. */
+  tip: { label: string; ppb: number } | null;
+  /** EMIT's cue on the site: candidate passes of those read (the pass manifest). */
+  cue: { candidates: number; read: number } | null;
+  /** How many ground checks the session ran. */
+  checks: number | null;
+}
+
+/**
+ * The card's first line, tip to brief (A2 P1-2): "Tip <area> +<ppb> ppb → Cue <n> of <m> passes →
+ * Check <k> records → Brief", from the tools' records only (the tip manifest, the pass manifest,
+ * the session's calls). A part with no record is left out; the brief always ends it.
+ */
+export function missionChain({
+  tip, frames, checks,
+}: { tip?: Tip | null; frames?: PassFrame[] | null; checks?: number }): MissionChain {
+  const tally = frames && frames.length > 0 ? cueTally(frames) : null;
+  return {
+    tip: tip && tip.anomalyPpb !== null ? { label: tip.area.label, ppb: tip.anomalyPpb } : null,
+    cue: tally ? { candidates: tally.candidates, read: tally.read } : null,
+    checks: typeof checks === 'number' && checks > 0 ? checks : null,
+  };
 }
 
 /**

@@ -19,7 +19,7 @@ import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
 import { groupSteps, methaneDirFrom, parseTip, tipManifestUrl, type Tip } from '../utils/steps.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { useReplayReveal } from '../hooks/useReplayReveal.ts';
-import { currentBriefId } from '../utils/brief.ts';
+import { currentBriefId, groundChecks } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
 import { blankDashCells } from '../utils/tables.ts';
@@ -873,6 +873,7 @@ export function ChatSidebar({
                   methaneDir={methaneDir}
                   cues={briefCues}
                   tips={briefTips}
+                  checks={groundChecks(sessionTools)}
                 />
               )}
               {showAnswer && (

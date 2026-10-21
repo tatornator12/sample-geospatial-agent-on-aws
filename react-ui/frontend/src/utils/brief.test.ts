@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Message, ToolCall } from '../types.ts';
-import { anotherLookMessage, approvedMessage, currentBriefId, draftBriefId, lastLookLine, siteCue, siteTip } from './brief.ts';
+import { anotherLookMessage, approvedMessage, currentBriefId, draftBriefId, groundChecks, lastLookLine, missionChain, siteCue, siteTip } from './brief.ts';
 import { parseManifest, parseTip } from './steps.ts';
 
 const ID = 'brief-20260925T201500-a1b2c3';
@@ -78,5 +78,22 @@ describe('siteCue and siteTip', () => {
     const tip = parseTip(TIP, 'south caspian')!;
     expect(siteTip([tip], 39.4379, 53.573)).toBe(tip);
     expect(siteTip([tip], 35.5528, 112.6889)).toBeNull();
+  });
+});
+
+describe('missionChain and groundChecks (B15, A2 P1-2)', () => {
+  it('counts each ground check once', () => {
+    const t = (name: string, id: string) => ({ name, id, params: {}, status: 'completed' as const });
+    expect(groundChecks([t('thermal_anomalies', 'a'), t('thermal_anomalies', 'b'), t('registry_lookup', 'c'), t('draft_brief', 'd')])).toBe(2);
+    expect(groundChecks([])).toBe(0);
+  });
+  it('builds each part from its record, and leaves out a part with none', () => {
+    const tip = parseTip({ area: 'amman', emit_can_look: true, top: { lat: 31.9, lon: 36.1, anomaly_ppb: 12.5 } }, 'amman')!;
+    const frames = [
+      { date: '2025-08-20', verdict: 'candidate' as const, short: 'candidate' as const, reason: null, peak: 1, chipUrl: null },
+      { date: '2025-08-01', verdict: 'rejected' as const, short: 'too weak' as const, reason: null, peak: 1, chipUrl: null },
+    ];
+    expect(missionChain({ tip, frames, checks: 3 })).toEqual({ tip: { label: 'Amman, Jordan', ppb: 12.5 }, cue: { candidates: 1, read: 2 }, checks: 3 });
+    expect(missionChain({})).toEqual({ tip: null, cue: null, checks: null });
   });
 });

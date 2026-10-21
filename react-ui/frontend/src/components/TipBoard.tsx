@@ -25,6 +25,11 @@ interface TipBoardProps {
    * its newest candidate (from the cue manifests' numbers), printed under its row.
    */
   tallies?: Record<string, CueTally>;
+  /**
+   * The mission's end frame: the strongest `limit` rows and any cued one, then "+N more areas"
+   * (A2 P1-2); the full list is one press away ("Show all N steps").
+   */
+  limit?: number;
 }
 
 /** "2 of 4 candidate passes · latest 2026-04-25", the numbers in mono (the same words as cueTallyText). */
@@ -46,13 +51,15 @@ function CueLine({ tally }: { tally: CueTally }) {
   );
 }
 
-export function TipBoard({ tips, cued, chosen = null, expected, tallies = {} }: TipBoardProps) {
+export function TipBoard({ tips, cued, chosen = null, expected, tallies = {}, limit }: TipBoardProps) {
   if (tips.length === 0) return null;
   const gradient = rampGradient(TROPOMI_RAMP) ?? undefined;
   const pending = Math.max(0, expected - tips.length);
+  const shown = limit === undefined ? tips : tips.filter((tip, i) => i < limit || cued.includes(tip.area.name));
+  const more = tips.length - shown.length;
   return (
     <div className="tip-board" role="table" aria-label="TROPOMI tips by watch area, strongest first">
-      {tips.map((tip) => {
+      {shown.map((tip) => {
         const isCued = cued.includes(tip.area.name);
         const isChosen = chosen === tip.area.name;
         const tally = isCued && Object.prototype.hasOwnProperty.call(tallies, tip.area.name) ? tallies[tip.area.name] : undefined;
@@ -81,6 +88,12 @@ export function TipBoard({ tips, cued, chosen = null, expected, tallies = {} }: 
           </div>
         );
       })}
+      {more > 0 && (
+        <div role="row" className="tip-row tip-row--more">
+          <span className="tip-row__mark" aria-hidden="true" />
+          <span role="cell" className="tip-row__label">+{more} more {more === 1 ? 'area' : 'areas'}</span>
+        </div>
+      )}
       {pending > 0 && (
         <div role="row" className="tip-row tip-row--pending">
           <span className="tip-row__mark" aria-hidden="true" />

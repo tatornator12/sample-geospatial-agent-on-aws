@@ -53,7 +53,7 @@ const TIP: Tip = parseTip(
 const cue = (id: string, lat: number, lon: number): ToolCall => ({ id, name: 'check_recent_passes', params: { lat, lon }, status: 'completed' });
 const CUES = [cue('c1', 39.4379, 53.573), cue('c2', 35.5528, 112.6889)];
 
-function card(props: { cues?: ToolCall[]; tips?: Tip[]; methaneDir?: string | null } = {}) {
+function card(props: { cues?: ToolCall[]; tips?: Tip[]; methaneDir?: string | null; checks?: number } = {}) {
   return render(
     <BriefCard briefId={ID} sessionId="s" caseId="methane-watch-mission" busy={false} onDecision={() => {}} methaneDir={DIR} cues={CUES} tips={[TIP]} {...props} />
   );
@@ -107,5 +107,24 @@ describe('BriefCard last look', () => {
     await screen.findByText(/Recurring methane near Krasnovodsk/);
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByText(/Last EMIT look/)).toBeNull();
+  });
+});
+
+describe('BriefCard chain (B15, A2 P1-2)', () => {
+  const chainText = () => document.querySelector('.brief-card__chain')?.textContent?.replace(/\s+/g, ' ').trim();
+
+  it('opens the card with tip, cue, check and brief, from the records', async () => {
+    card({ checks: 3 });
+    await screen.findByText(/Last EMIT look/);
+    const section = document.querySelector('.brief-card')!;
+    expect(section.firstElementChild?.className).toBe('brief-card__chain');
+    expect(chainText()).toBe('Tip South Caspian, Turkmenistan +108.8 ppb → Cue 2 of 4 passes → Check 3 records → Brief');
+    expect([...document.querySelectorAll('.brief-card__chain .brief-card__num')].map((n) => n.textContent)).toEqual(['+108.8', '2', '4', '3']);
+  });
+
+  it('leaves out a part with no record', async () => {
+    render(<BriefCard briefId={ID} sessionId="s" caseId="methane-watch-mission" busy={false} onDecision={() => {}} methaneDir={DIR} cues={CUES} tips={[]} />);
+    await screen.findByText(/Last EMIT look/);
+    expect(chainText()).toBe('Cue 2 of 4 passes → Brief');
   });
 });

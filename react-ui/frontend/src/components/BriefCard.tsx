@@ -9,11 +9,11 @@
  * "Request another look" asks the agent to read more passes. In a replay case the card is inert: a
  * recorded decision would be theatre.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { approveBrief, getBrief, type BriefState } from '../services/api.ts';
 import type { ToolCall } from '../types.ts';
 import { SNAPSHOT_MAX_CHARS, mapSnapshot } from '../utils/snapshot.ts';
-import { anotherLookMessage, approvedMessage, lastLookLine, siteCue, siteTip } from '../utils/brief.ts';
+import { anotherLookMessage, approvedMessage, lastLookLine, missionChain, siteCue, siteTip, type MissionChain } from '../utils/brief.ts';
 import { parseManifest, passManifestUrl, type PassFrame, type Tip } from '../utils/steps.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 
@@ -36,6 +36,8 @@ interface BriefCardProps {
   cues?: ToolCall[];
   /** The TROPOMI tips loaded this session; the one over the card's site is the latest sign. */
   tips?: Tip[];
+  /** How many ground checks the session ran (the chain's Check). */
+  checks?: number;
 }
 
 const CONFIDENCE_WORDS: Record<string, string> = {
@@ -51,6 +53,51 @@ function causeWords(singleExplanation: string): string {
     : singleExplanation;
 }
 
+/** "Tip … → Cue … → Check … → Brief": the mission in one line, numbers in mono, no part without a record. */
+function ChainLine({ chain }: { chain: MissionChain }) {
+  const parts: ReactElement[] = [];
+  if (chain.tip) {
+    const ppb = chain.tip.ppb;
+    parts.push(
+      <span key="tip">
+        <span className="brief-card__stage">Tip</span> {chain.tip.label}{' '}
+        <span className="brief-card__num">{`${ppb >= 0 ? '+' : ''}${ppb.toFixed(1)}`}</span> ppb
+      </span>
+    );
+  }
+  if (chain.cue) {
+    parts.push(
+      <span key="cue">
+        <span className="brief-card__stage">Cue</span> <span className="brief-card__num">{chain.cue.candidates}</span> of{' '}
+        <span className="brief-card__num">{chain.cue.read}</span> {chain.cue.read === 1 ? 'pass' : 'passes'}
+      </span>
+    );
+  }
+  if (chain.checks) {
+    parts.push(
+      <span key="check">
+        <span className="brief-card__stage">Check</span> <span className="brief-card__num">{chain.checks}</span>{' '}
+        {chain.checks === 1 ? 'record' : 'records'}
+      </span>
+    );
+  }
+  parts.push(
+    <span key="brief">
+      <span className="brief-card__stage">Brief</span>
+    </span>
+  );
+  return (
+    <p className="brief-card__chain">
+      {parts.map((part, i) => (
+        <span key={part.key ?? i}>
+          {i > 0 && <span className="brief-card__arrow" aria-label="then"> → </span>}
+          {part}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 function WorkingDots() {
   return (
     <span className="docent-working" aria-hidden="true">
@@ -61,7 +108,7 @@ function WorkingDots() {
   );
 }
 
-export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methaneDir = null, cues = [], tips = [] }: BriefCardProps) {
+export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methaneDir = null, cues = [], tips = [], checks = 0 }: BriefCardProps) {
   const [state, setState] = useState<BriefState | null>(null);
   const [load, setLoad] = useState<'loading' | 'waiting' | 'failed' | 'loaded'>('loading');
   const [attempt, setAttempt] = useState(0);
@@ -78,6 +125,10 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
   const manifestUrl = cue ? passManifestUrl(methaneDir, cue) : null;
   const manifests = useStageFiles<PassFrame[]>(manifestUrl ? [manifestUrl] : [], (raw) => (methaneDir ? parseManifest(raw, methaneDir) : null));
   const look = site && manifestUrl ? lastLookLine(manifests[manifestUrl], siteTip(tips, site.lat, site.lon)) : null;
+  // The chain tip, cue, check, brief (A2 P1-2), from the same records.
+  const chain = site
+    ? missionChain({ tip: siteTip(tips, site.lat, site.lon), frames: manifestUrl ? manifests[manifestUrl] : null, checks })
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +211,8 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
 
   return (
     <section ref={cardRef} className="brief-card" aria-label={filed ? 'Filed brief' : 'Draft brief'}>
+      {/* First, how the mission got here: the tip, the cue, the checks, the brief. */}
+      {chain && <ChainLine chain={chain} />}
       {/* The title is the tool's: what the evidence supports, then the geocoded place. */}
       <h3 className="brief-card__title">
         <span className="brief-card__state">{filed ? 'Filed brief' : 'Draft brief'}</span> {card.title}

@@ -245,7 +245,14 @@ export function StepColumn({
               )}
               {board && (
                 <div style={{ gridColumn: '2 / -1' }}>
-                  <TipBoard tips={rankTips(tips)} cued={cuedAreas} chosen={chosenArea} expected={group.calls.length} tallies={tallies} />
+                  <TipBoard
+                    tips={rankTips(tips)}
+                    cued={cuedAreas}
+                    chosen={chosenArea}
+                    expected={group.calls.length}
+                    tallies={tallies}
+                    limit={collapsed ? 3 : undefined}
+                  />
                 </div>
               )}
               {films.map(({ call, frames, summaryOnly }) => {

@@ -437,6 +437,28 @@
   font-weight: 400;
   color: var(--label);
 }
+/* The card's first line: how the mission got here (tip, cue, check, brief), the stages in label
+   grey as the plan strip names them, the records in fog with their numbers in mono. A figure and
+   its unit never part. No amber: the decision owns it. */
+.brief-card__chain {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--fog);
+}
+.brief-card__chain .brief-card__num {
+  white-space: nowrap;
+}
+.brief-card__stage,
+.brief-card__arrow {
+  color: var(--label);
+}
+.tip-row--more {
+  grid-template-rows: auto;
+}
+.tip-row--more .tip-row__label {
+  color: var(--label);
+}
 .brief-card__title {
   margin: 0 0 4px;
   font-family: var(--font-display);

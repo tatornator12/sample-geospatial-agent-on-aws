@@ -49,3 +49,22 @@ describe('TipBoard', () => {
     expect(container.querySelectorAll('.tip-row--cued')).toHaveLength(2);
   });
 });
+
+describe('TipBoard in the end frame (B15, A2 P1-2)', () => {
+  const nine: Tip[] = [
+    ...tips,
+    ...['orenburg and lower volga', 'amu darya basin', 'hassi messaoud', 'amman', 'west siberia and yamal', 'permian basin'].map(
+      (area, i) => parseTip({ area, emit_can_look: true, top: { lat: 30 + i, lon: 40 + i, anomaly_ppb: 30 - i } }, area)!
+    ),
+  ];
+  it('shows the top three and any cued row, then "+N more areas"', () => {
+    const { container } = render(<TipBoard tips={nine} cued={['south caspian', 'amman']} expected={9} limit={3} />);
+    const labels = [...container.querySelectorAll('.tip-row__label')].map((el) => el.textContent?.trim());
+    expect(labels).toEqual(['South Caspian, Turkmenistan', 'Shanxi and Ordos coal basins, China', 'Zagros foreland, Iran', 'Amman, Jordan', '+5 more areas']);
+  });
+  it('shows every row without a limit', () => {
+    const { container } = render(<TipBoard tips={nine} cued={['south caspian']} expected={9} />);
+    expect(container.querySelectorAll('.tip-row')).toHaveLength(9);
+    expect(container.querySelector('.tip-row--more')).toBeNull();
+  });
+});
