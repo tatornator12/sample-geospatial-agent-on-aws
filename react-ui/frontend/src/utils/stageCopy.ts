@@ -18,19 +18,21 @@ export interface AgentStageCopy {
 // Keyed by agent id (AGENT_RUNTIMES); `default` is the Earth Analyst (the `dev` and `stable`
 // runtimes, and a backend with a single runtime).
 const STAGE_COPY: Record<string, AgentStageCopy> = {
+  // In the order the presenter clicks them on stage (Act 1 is built around Clay): the judgement
+  // beat, then the similarity search; the rest are spares. Prompts are the golden ones, word for word.
   default: {
     prompts: [
-      { label: 'Vegetation, Central Park', prompt: 'Show vegetation health for Central Park, New York' },
       // The judgement beat (the golden prompt cloudy-scene, word for word): the first scene is cloudy
       // over the city, so the agent turns it down and fetches the next one.
       { label: 'A cloudy day, Bergen', prompt: 'Show vegetation health for Bergen, Norway as of 2025-09-15' },
+      { label: 'Places like Central Park', prompt: 'Find places across New York State that look like Central Park' },
+      { label: 'Vegetation, Central Park', prompt: 'Show vegetation health for Central Park, New York' },
+      { label: 'Water, Folsom Lake', prompt: 'Compare water levels for Folsom Lake, California 2021 vs 2022' },
+      { label: 'Scan Colorado', prompt: 'Scan Colorado for land change between 2019 and 2024' },
       {
         label: 'Wildfire, Pacific Palisades',
         prompt: 'Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025',
       },
-      { label: 'Water, Folsom Lake', prompt: 'Compare water levels for Folsom Lake, California 2021 vs 2022' },
-      { label: 'Scan Colorado', prompt: 'Scan Colorado for land change between 2019 and 2024' },
-      { label: 'Places like Central Park', prompt: 'Find places across New York State that look like Central Park' },
     ],
     placeholder: 'Ask about any place on Earth',
   },

@@ -70,12 +70,24 @@ describe('stageCopyFor', () => {
 });
 
 describe('the Earth Analyst plates', () => {
-  it('puts the cloudy day second, sent as the golden prompt cloudy-scene', () => {
+  it('lists the plates in the order clicked on stage: Bergen, then Places like Central Park, then the spares (B0)', () => {
     const earth = stageCopyFor('dev');
     expect(earth.prompts.map((p) => p.label)).toEqual([
-      'Vegetation, Central Park', 'A cloudy day, Bergen', 'Wildfire, Pacific Palisades', 'Water, Folsom Lake', 'Scan Colorado', 'Places like Central Park',
+      'A cloudy day, Bergen', 'Places like Central Park', 'Vegetation, Central Park', 'Water, Folsom Lake', 'Scan Colorado', 'Wildfire, Pacific Palisades',
     ]);
-    expect(earth.prompts[1]).toEqual({ label: 'A cloudy day, Bergen', prompt: 'Show vegetation health for Bergen, Norway as of 2025-09-15' });
+  });
+
+  it('keeps every prompt word for word (the golden prompts and the notes quote them)', () => {
+    const byLabel = Object.fromEntries(stageCopyFor('dev').prompts.map((p) => [p.label, p.prompt]));
+    expect(byLabel).toEqual({
+      'A cloudy day, Bergen': 'Show vegetation health for Bergen, Norway as of 2025-09-15',
+      'Places like Central Park': 'Find places across New York State that look like Central Park',
+      'Vegetation, Central Park': 'Show vegetation health for Central Park, New York',
+      'Water, Folsom Lake': 'Compare water levels for Folsom Lake, California 2021 vs 2022',
+      'Scan Colorado': 'Scan Colorado for land change between 2019 and 2024',
+      'Wildfire, Pacific Palisades': 'Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025',
+    });
+    expect(stageCopyFor('dev').prompts.every((p) => !p.fill)).toBe(true);
   });
 });
 
