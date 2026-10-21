@@ -1289,6 +1289,13 @@
   padding-top: 2px;
   border-top: 1px solid var(--hairline);
 }
+/* At the plate's foot (every act but Dark Vessels): only the rows above scroll, so a ramp and its
+   ends are never clipped on a short screen. */
+.map-layers__legends--foot {
+  flex: none;
+  margin: 0 10px;
+  padding-bottom: 12px;
+}
 /* Similar places: the one legend on the stage. Evidence colour (violet ramp), not the accent. */
 .map-legend {
   display: flex;

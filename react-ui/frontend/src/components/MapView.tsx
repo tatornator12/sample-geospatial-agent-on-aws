@@ -3488,6 +3488,39 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     setCompareMode({ left: comparePair.left, right: comparePair.right, center: [center.lng, center.lat], zoom });
   };
 
+  // The legends: at the plate's foot, outside the scrolling rows, so a short screen never clips a
+  // ramp or its ends (A2 P1-8). Dark Vessels keeps them under its rows, as its act was built.
+  const legendsAtFoot = !vesselOnStage;
+  const legendsBlock = (atFoot: boolean) =>
+    legends.length > 0 || groundOn || restOn || vesselOnStage ? (
+      <div className={`map-layers__legends${atFoot ? ' map-layers__legends--foot' : ''}`}>
+        {legends.map(renderLegend)}
+        {vesselOnStage && (
+          // Global Fishing Watch's data (the detections, the AIS, the fleet) is on the map.
+          <div className="map-legend map-legend--ground">
+            <span className="map-legend__label">{SEA_ATTRIBUTION}</span>
+          </div>
+        )}
+        {restOn && (
+          // The rest view says what it is: the continent's relief stood up, lit at dusk.
+          <div className="map-legend map-legend--ground">
+            <span className="map-legend__label">
+              relief <span className="map-legend__num">×{REST_EXAGGERATION}</span>, a low sun from the west
+            </span>
+          </div>
+        )}
+        {groundOn && (
+          // The archaeologist's ground is a stated viewing aid: the 3D relief is exaggerated,
+          // the hillshade and relief draped on it are not.
+          <div className="map-legend map-legend--ground">
+            <span className="map-legend__label">
+              ground relief <span className="map-legend__num">×{RELIEF_EXAGGERATION}</span>, read from the south-west
+            </span>
+          </div>
+        )}
+      </div>
+    ) : null;
+
   return (
     <div className={`map-frame${lightCount > 0 ? ' map-frame--light' : ''}${restOn ? ' map-frame--dusk' : ''}${seaOn ? ' map-frame--sea' : ''}${taskingOn ? ' map-frame--tasking' : ''}`}>
       {/* Compare overlay */}
@@ -3580,35 +3613,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
                 </div>
               )}
 
-              {(legends.length > 0 || groundOn || restOn || vesselOnStage) && (
-                <div className="map-layers__legends">
-                  {legends.map(renderLegend)}
-                  {vesselOnStage && (
-                    // Global Fishing Watch's data (the detections, the AIS, the fleet) is on the map.
-                    <div className="map-legend map-legend--ground">
-                      <span className="map-legend__label">{SEA_ATTRIBUTION}</span>
-                    </div>
-                  )}
-                  {restOn && (
-                    // The rest view says what it is: the continent's relief stood up, lit at dusk.
-                    <div className="map-legend map-legend--ground">
-                      <span className="map-legend__label">
-                        relief <span className="map-legend__num">×{REST_EXAGGERATION}</span>, a low sun from the west
-                      </span>
-                    </div>
-                  )}
-                  {groundOn && (
-                    // The archaeologist's ground is a stated viewing aid: the 3D relief is exaggerated,
-                    // the hillshade and relief draped on it are not.
-                    <div className="map-legend map-legend--ground">
-                      <span className="map-legend__label">
-                        ground relief <span className="map-legend__num">×{RELIEF_EXAGGERATION}</span>, read from the south-west
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
+              {!legendsAtFoot && legendsBlock(false)}
               {comparePair && (
                 <button type="button" className="stage-btn map-group__action" onClick={openCompare}>
                   <Icon name="compare" size={16} />
@@ -3617,6 +3622,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               )}
             </div>
           )}
+          {isLayerControlOpen && legendsAtFoot && legendsBlock(true)}
         </section>
       )}
 
