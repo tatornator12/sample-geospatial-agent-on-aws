@@ -14,6 +14,8 @@ export interface EvidenceItem {
   toolId: string;
   title: string;
   question?: string;
+  /** What the agent said it saw, in its own words, sanitised for the stage (utils/narration.ts). */
+  saw?: string;
   sourceUrl: string;
   /** Candidate locations of the saved rendering, most likely first. */
   evidenceUrls: string[];

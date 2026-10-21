@@ -6,6 +6,8 @@ export interface Message {
   tools?: ToolCall[];
   /** What the agent said after its last tool call: the answer the stage shows (utils/parsing.ts finalAnswer). */
   answer?: string;
+  /** What the agent said it saw after each inspect_image call, by tool id (utils/narration.ts sawByTool). */
+  saw?: Record<string, string>;
 }
 
 export interface ToolCall {

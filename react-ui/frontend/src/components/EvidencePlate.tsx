@@ -69,7 +69,20 @@ export function EvidencePlate({ item, imageUrl, onClose }: EvidencePlateProps) {
           </button>
         </div>
         <img className="evidence-plate__image" src={imageUrl} alt={item.title} />
-        {item.question && <p className="evidence-plate__question">{item.question}</p>}
+        {/* With what the agent saw, the question it asked is labelled apart from it; without, it
+            stands alone as before (replays, a filmstrip frame's reason, Dark Vessels). */}
+        {item.question && (
+          <p className="evidence-plate__question">
+            {item.saw && <span className="evidence-plate__prefix">Asked:</span>}
+            {item.saw && ' '}
+            {item.question}
+          </p>
+        )}
+        {item.saw && (
+          <p className="evidence-plate__saw">
+            <span className="evidence-plate__prefix">Saw:</span> {item.saw}
+          </p>
+        )}
       </figure>
     </div>
   );

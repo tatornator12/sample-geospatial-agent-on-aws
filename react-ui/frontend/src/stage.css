@@ -2105,3 +2105,60 @@
     transition: none;
   }
 }
+
+/* The agent's latest sentence while it works, under the lit step's name (the steps' 36px indent).
+   It changes at most every 2.5 s, with a short fade that shows the agent moving on. */
+.stage-narration {
+  margin: 2px 0 10px 36px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--fog) 90%, transparent);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.stage-narration:empty {
+  margin: 0;
+}
+.stage-narration__text {
+  display: block;
+  animation: stage-narration-in 240ms var(--ease-out) both;
+}
+@keyframes stage-narration-in {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* The live end of the column: kept in view clear of the column's 24px foot. */
+.stage-steps__live-end {
+  scroll-margin-bottom: 24px;
+}
+
+/* What the agent said it saw, in its words, under the chip (and as the evidence plate's caption). */
+.evidence-chip__saw {
+  width: calc(100% - 36px);
+  margin: -4px 0 10px 36px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--fog);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.evidence-chip__saw-label,
+.evidence-plate__prefix {
+  color: var(--label);
+}
+.evidence-plate__saw {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--fog);
+  text-wrap: pretty;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-narration__text {
+    animation: none;
+  }
+}

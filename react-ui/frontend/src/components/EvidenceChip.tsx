@@ -72,38 +72,46 @@ export function EvidenceChip({ item, onOpen }: EvidenceChipProps) {
   };
 
   return (
-    <button
-      type="button"
-      className={`evidence-chip evidence-chip--${state}`}
-      onClick={open}
-      disabled={state !== 'ready'}
-      aria-label={
-        state === 'ready'
-          ? `Open evidence: ${item.title}`
-          : state === 'looking'
-            ? `${item.title}: the agent is looking`
-            : `${item.title}: image not saved`
-      }
-      title={item.question || item.title}
-    >
-      <span className="evidence-chip__frame">
-        {state === 'ready' && imageUrl ? (
-          <img className="evidence-chip__image" src={imageUrl} alt="" />
-        ) : (
-          <span className="evidence-chip__placeholder" aria-hidden="true">
-            {state === 'looking' ? (
-              <span className="docent-working">
-                <i />
-                <i />
-                <i />
-              </span>
-            ) : (
-              'not saved'
-            )}
-          </span>
-        )}
-      </span>
-      <span className="evidence-chip__title">{item.title}</span>
-    </button>
+    <>
+      <button
+        type="button"
+        className={`evidence-chip evidence-chip--${state}`}
+        onClick={open}
+        disabled={state !== 'ready'}
+        aria-label={
+          state === 'ready'
+            ? `Open evidence: ${item.title}`
+            : state === 'looking'
+              ? `${item.title}: the agent is looking`
+              : `${item.title}: image not saved`
+        }
+        title={item.question || item.title}
+      >
+        <span className="evidence-chip__frame">
+          {state === 'ready' && imageUrl ? (
+            <img className="evidence-chip__image" src={imageUrl} alt="" />
+          ) : (
+            <span className="evidence-chip__placeholder" aria-hidden="true">
+              {state === 'looking' ? (
+                <span className="docent-working">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              ) : (
+                'not saved'
+              )}
+            </span>
+          )}
+        </span>
+        <span className="evidence-chip__title">{item.title}</span>
+      </button>
+      {/* What the agent said it saw, in its words: beside the button, not part of its name. */}
+      {item.saw && (
+        <p className="evidence-chip__saw">
+          <span className="evidence-chip__saw-label">Saw:</span> {item.saw}
+        </p>
+      )}
+    </>
   );
 }
