@@ -2,7 +2,7 @@
   "name": "Methane Watch brief",
   "description": "One prompt, the whole mission: a global baseline, a TROPOMI tip, EMIT cued on recent passes, a self-check, and a draft brief for the analyst",
   "location": "Methane watch areas",
-  "user_question": "Brief me on methane super-emitters in the watch areas that are still active, and how confident you are.",
+  "user_question": "Brief me on the watch areas where methane keeps showing up, and how confident you are.",
   "agent": "methane",
   "dates": {},
   "scenario_version": "1.1",
@@ -17,8 +17,8 @@
       "name": "display_visual",
       "params": {
         "s3_url": "s3://bucket/use-cases/methane-watch-mission/watch_sites_v002.geojson",
-        "title": "Global Methane Watch Baseline: Repeat Sites",
-        "description": "24 sites seen on 5 or more dates, 1,104 total sites, 1,686 detections (EMIT plume product 2022-08-10 to 2025-09-22)",
+        "title": "Global EMIT Repeat Methane Sites",
+        "description": "24 sites seen on 5 or more separate dates, 1104 total sites, 1686 detections",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -104,56 +104,56 @@
     {
       "name": "check_recent_passes",
       "params": {
-        "lat": 39.4379,
-        "lon": 53.573
+        "lat": 37.8927,
+        "lon": 113.5628
       },
       "result": "Recent EMIT passes judged"
     },
     {
       "name": "check_recent_passes",
       "params": {
-        "lat": 35.5528,
-        "lon": 112.6889
+        "lat": 39.0173,
+        "lon": 53.8207
       },
       "result": "Recent EMIT passes judged"
     },
     {
       "name": "site_history",
       "params": {
-        "lat": 39.4379,
-        "lon": 53.573
+        "lat": 37.8927,
+        "lon": 113.5628
       },
       "result": "Site history read"
     },
     {
       "name": "site_history",
       "params": {
-        "lat": 35.5528,
-        "lon": 112.6889
+        "lat": 39.0173,
+        "lon": 53.8207
       },
       "result": "Site history read"
     },
     {
       "name": "reverse_geocode",
       "params": {
-        "x": 53.573,
-        "y": 39.4379
+        "x": 113.5628,
+        "y": 37.8927
       },
       "result": "Place named"
     },
     {
       "name": "reverse_geocode",
       "params": {
-        "x": 112.6889,
-        "y": 35.5528
+        "x": 53.8207,
+        "y": 39.0173
       },
       "result": "Place named"
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_south_caspian_turkmenistan_2026-10-10_14d.tif",
-        "title": "TROPOMI CH4 Anomaly: south Caspian (Turkmenistan), 14 days to 2026-10-10",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-19_14d.tif",
+        "title": "TROPOMI CH4 Anomaly: Shanxi and Ordos Coal Basins (China), 14-day composite",
         "render": {
           "kind": "raster",
           "colormap": "ice",
@@ -166,10 +166,10 @@
           "max_zoom": 8,
           "legend": "CH4 anomaly",
           "bounds": [
-            52.0,
-            36.5,
-            62.5,
-            41.5
+            108.0,
+            34.5,
+            114.6,
+            40.8
           ]
         }
       },
@@ -178,21 +178,22 @@
     {
       "name": "inspect_image",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250820T070851_2523205_009.tif",
-        "title": "EMIT pass 2025-08-20, south Caspian site near Krasnovodsk, Turkmenistan",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.tif",
+        "title": "EMIT strongest candidate pass, Yangquan City, Shanxi, 2025-09-25",
         "question": "What is the shape, direction and extent of the methane enhancement?"
       },
-      "result": "Looked at the image"
+      "result": "Looked at the image",
+      "saw": "The 2025-09-25 pass shows a scattered, diffuse field of enhancement pixels across the 6 km window, with no single tight plume axis, peaking at 5,121.5 ppm·m. Now displaying that pass and cueing the ground record checks in parallel."
     },
     {
       "name": "display_visual",
       "params": {
         "render": {
           "bounds": [
-            53.53811,
-            39.41077,
-            53.60789,
-            39.46503
+            113.52865,
+            37.86557,
+            113.59695,
+            37.91983
           ],
           "colormap": "plasma",
           "group": "methane",
@@ -200,12 +201,12 @@
           "legend": "CH4 enhancement",
           "rescale": [
             500,
-            2500
+            4500
           ],
           "units": "ppm·m"
         },
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250820T070851_2523205_009.tif",
-        "title": "EMIT CH4 Enhancement: Krasnovodsk, Turkmenistan, 2025-08-20, peak 2828.3 ppm·m"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/pass_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.tif",
+        "title": "EMIT CH4 Enhancement, Yangquan City, Shanxi, 2025-09-25"
       },
       "result": "Shown on the map"
     },
@@ -220,20 +221,20 @@
           "ramp": "plasma",
           "rescale": [
             500,
-            2500
+            4500
           ],
           "units": "ppm·m"
         },
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20250820T070851_2523205_009.geojson",
-        "title": "EMIT CH4 Columns: Krasnovodsk, Turkmenistan, 2025-08-20"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/columns_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.geojson",
+        "title": "EMIT CH4 Enhancement Columns, Yangquan City, Shanxi, 2025-09-25"
       },
       "result": "Shown on the map"
     },
     {
       "name": "create_bbox_from_coordinates",
       "params": {
-        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[53.573,39.4379]}",
-        "location": "Krasnovodsk watch site",
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[113.5628,37.8927]}",
+        "location": "Yangquan City Shanxi watch site",
         "radius_meters": 3000
       },
       "result": "3 km frame around the site"
@@ -241,102 +242,108 @@
     {
       "name": "thermal_anomalies",
       "params": {
-        "lat": 39.4379,
-        "lon": 53.573
+        "lat": 37.8927,
+        "lon": 113.5628
       },
       "result": "VIIRS heat checked"
     },
     {
       "name": "nearby_infrastructure",
       "params": {
-        "lat": 39.4379,
-        "lon": 53.573
+        "lat": 37.8927,
+        "lon": 113.5628
       },
       "result": "Overture Maps checked, by type"
     },
     {
       "name": "registry_lookup",
       "params": {
-        "lat": 39.4379,
-        "lon": 53.573
+        "lat": 37.8927,
+        "lon": 113.5628
       },
       "result": "Public registry checked"
     },
     {
       "name": "get_rasters",
       "params": {
-        "location": "Krasnovodsk watch site",
+        "location": "Yangquan City Shanxi watch site",
         "geometry_s3_url": "s3://bucket/use-cases/methane-watch-mission/plumes_detected.geojson",
-        "current_date_str": "2025-08-20"
+        "current_date_str": "2025-09-25"
       },
       "result": "Sentinel-2 scene fetched"
     },
     {
       "name": "inspect_image",
       "params": {
-        "question": "What land cover and structures are visible? Look for industrial facilities, tanks, pipelines, pads.",
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_krasnovodsk_watch_site_2025-08-19.tif",
-        "title": "Sentinel-2 true colour, Krasnovodsk watch site, 2025-08-19"
+        "question": "What land cover and structures are visible? Look for industrial features, mine workings, roads, pipelines.",
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_yangquan_city_shanxi_watch_site_2025-09-08.tif",
+        "title": "Sentinel-2 true colour, Yangquan City, Shanxi, 2025-09-08"
       },
-      "result": "Looked at the image"
+      "result": "Looked at the image",
+      "saw": "The image shows a dense urban and industrial landscape with terraced hillsides, bare-earth excavations consistent with mine workings in the northwest, warehouse-scale industrial buildings, road networks, and residential blocks across the frame.\n\nNow drafting the brief."
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_krasnovodsk_watch_site_2025-08-19.tif",
-        "title": "Sentinel-2 true colour, Krasnovodsk watch site, 2025-08-19",
-        "description": "Arid terrain with industrial compound, storage structures, access roads and a linear cleared corridor to the southwest"
+        "s3_url": "s3://bucket/use-cases/methane-watch-mission/tci_clipped_yangquan_city_shanxi_watch_site_2025-09-08.tif",
+        "title": "Sentinel-2 true colour, Yangquan City, Shanxi, 2025-09-08",
+        "description": "Urban and industrial landscape with terraced hillsides, bare-earth excavations, industrial buildings and residential blocks"
       },
       "result": "Shown on the map"
     },
     {
       "name": "draft_brief",
       "params": {
-        "place": "Krasnovodsk, Turkmenistan",
-        "lat": 39.4379,
-        "lon": 53.573,
-        "watch_area": "south caspian",
+        "place": "Yangquan City, Shanxi Province, China",
+        "lat": 37.8927,
+        "lon": 113.5628,
+        "watch_area": "shanxi coal basin",
         "observations": [
-          "TROPOMI recorded a top hotspot anomaly of +108.8 ppb above background over south Caspian (Turkmenistan) in the 14 days to 2026-10-10.",
-          "EMIT read 4 passes at this site since 2025-01-01; 2 were candidates peaking at 2828.3 ppm·m on 2025-08-20 and 2309.7 ppm·m on 2025-08-01.",
-          "Two passes were rejected: one within noise (2025-06-13, only 4 pixels above 3x uncertainty) and one cloud or gap (2025-06-17).",
-          "EMIT looked at this site 23 times from 2022-08-15 to 2025-08-20; NASA outlined no plumes here in the plume product.",
-          "Sentinel-2 on 2025-08-19 shows an industrial compound with storage structures, access roads and a linear cleared corridor in an arid setting.",
-          "VIIRS saw no heat source within 1 km over the last 30 nights."
+          "TROPOMI recorded a 14-day CH4 anomaly of +125.4 ppb above background at this site (2026-10-05 to 2026-10-19).",
+          "EMIT read 8 passes since 2025-01-01 and found 4 candidates, with peaks of 5121.5, 3647.5, 3214.2 and 2795.1 ppm·m on 2025-09-25, 2025-09-29, 2025-08-18 and 2025-11-30.",
+          "EMIT looked at this site 27 times (2024-01-30 to 2026-08-17); NASA outlined no plumes here in the plume product.",
+          "VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed.",
+          "Overture Maps shows within 2 km: 1 pipeline at the site and 1 industrial area 1.8 km away; nothing mapped for mining, waste or wetland.",
+          "The nearest coal mine on Global Energy Monitor's record is 4.3 km away, with 6 other mines within 10 km."
         ],
-        "looks": 23,
-        "candidates": 2,
-        "passes_read": 4,
+        "looks": 27,
+        "candidates": 4,
+        "passes_read": 8,
         "explanations": [
           {
             "id": "routine_venting",
             "assessment": "possible",
-            "next_check": "Repeated candidates on separate dates without heat support venting; additional EMIT passes on different dates would confirm recurrence."
+            "next_check": "Repeated EMIT passes on new dates with consistent enhancement would support persistent venting."
           },
           {
             "id": "equipment_failure_or_leak",
             "assessment": "possible",
-            "next_check": "A third candidate pass or aircraft survey over this site would help distinguish a persistent leak from an intermittent one."
+            "next_check": "A single pass with no enhancement after prior candidates would suggest an intermittent rather than continuous source."
+          },
+          {
+            "id": "maintenance_blowdown",
+            "assessment": "possible",
+            "next_check": "Enhancement on only one or two dates with long gaps would be consistent with periodic blowdown events."
           },
           {
             "id": "unlit_flare",
             "assessment": "cannot assess",
-            "next_check": "No flare stack is mapped within 1 km in Overture Maps; VIIRS saw no heat, so this cannot be assessed without ground inspection."
+            "next_check": "VIIRS saw no heat; a mapped flare stack nearby would be needed to assess this hypothesis."
           },
           {
             "id": "non_oil_gas_source",
-            "assessment": "less likely",
-            "next_check": "Overture Maps shows only oil and gas infrastructure (3 storage tanks, 1 industrial area) within 2 km; no waste, wetland or mining mapped."
+            "assessment": "possible",
+            "next_check": "Ground inspection or aircraft survey near the mapped coal mines within 10 km would help distinguish coal mine methane from pipeline sources."
           }
         ],
         "confidence": "moderate",
         "gaps": [
-          "NASA's plume product is nearly empty after 2024, so passes since late 2024 have not been independently outlined.",
-          "EMIT only sees this site on its passes; gaps between passes leave intervals unobserved.",
-          "The public registry (OGIM v3.0) lists no facility within 2 km; a registry gap is not evidence of an empty site.",
-          "VIIRS at 375 m resolution can miss small or brief flares."
+          "NASA's plume product is nearly empty after 2025-09-22; passes after that date have not been checked for outlined plumes.",
+          "EMIT only sees this site on its passes; gaps between passes leave the record incomplete.",
+          "The public registry lists no oil and gas facility within 2 km, which may reflect a registry gap rather than an empty site.",
+          "TROPOMI at ~4 km resolution cannot pinpoint a source within the site."
         ],
-        "next_collection": "A targeted EMIT pass or airborne survey over this site would clarify whether enhancement recurs and at what rate."
+        "next_collection": "A new EMIT pass over this site with clear skies would confirm whether enhancement persists into late 2026."
       },
       "result": "Brief drafted (not filed)"
     }
@@ -344,8 +351,8 @@
   "assets": {
     "layers": [
       {
-        "file": "tropomi_anomaly_south_caspian_turkmenistan_2026-10-10_14d.tif",
-        "title": "TROPOMI CH4 Anomaly: south Caspian (Turkmenistan), 14 days to 2026-10-10",
+        "file": "tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-19_14d.tif",
+        "title": "TROPOMI CH4 Anomaly: Shanxi and Ordos Coal Basins (China), 14-day composite",
         "render": {
           "kind": "raster",
           "colormap": "ice",
@@ -358,22 +365,22 @@
           "max_zoom": 8,
           "legend": "CH4 anomaly",
           "bounds": [
-            52.0,
-            36.5,
-            62.5,
-            41.5
+            108.0,
+            34.5,
+            114.6,
+            40.8
           ]
         }
       },
       {
-        "file": "pass_EMIT_L2B_CH4ENH_002_20250820T070851_2523205_009.tif",
-        "title": "EMIT CH4 Enhancement: Krasnovodsk, Turkmenistan, 2025-08-20, peak 2828.3 ppm·m",
+        "file": "pass_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.tif",
+        "title": "EMIT CH4 Enhancement, Yangquan City, Shanxi, 2025-09-25",
         "render": {
           "bounds": [
-            53.53811,
-            39.41077,
-            53.60789,
-            39.46503
+            113.52865,
+            37.86557,
+            113.59695,
+            37.91983
           ],
           "colormap": "plasma",
           "group": "methane",
@@ -381,14 +388,14 @@
           "legend": "CH4 enhancement",
           "rescale": [
             500,
-            2500
+            4500
           ],
           "units": "ppm·m"
         }
       },
       {
         "file": "watch_sites_v002.geojson",
-        "title": "Global Methane Watch Baseline: Repeat Sites",
+        "title": "Global EMIT Repeat Methane Sites",
         "render": {
           "kind": "points",
           "group": "watch",
@@ -398,8 +405,8 @@
         }
       },
       {
-        "file": "columns_EMIT_L2B_CH4ENH_002_20250820T070851_2523205_009.geojson",
-        "title": "EMIT CH4 Columns: Krasnovodsk, Turkmenistan, 2025-08-20",
+        "file": "columns_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.geojson",
+        "title": "EMIT CH4 Enhancement Columns, Yangquan City, Shanxi, 2025-09-25",
         "render": {
           "group": "methane",
           "kind": "columns",
@@ -408,14 +415,14 @@
           "ramp": "plasma",
           "rescale": [
             500,
-            2500
+            4500
           ],
           "units": "ppm·m"
         }
       },
       {
-        "file": "tci_clipped_krasnovodsk_watch_site_2025-08-19.tif",
-        "title": "Sentinel-2 true colour, Krasnovodsk watch site, 2025-08-19"
+        "file": "tci_clipped_yangquan_city_shanxi_watch_site_2025-09-08.tif",
+        "title": "Sentinel-2 true colour, Yangquan City, Shanxi, 2025-09-08"
       }
     ]
   }
