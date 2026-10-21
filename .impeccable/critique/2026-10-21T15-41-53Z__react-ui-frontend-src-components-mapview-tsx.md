@@ -10,6 +10,7 @@ target_fingerprint: "sha256:2093e85b6cfe253f889f9e45ad0c4569b8ba51d225c3b9176484
 target_path: /Users/tsteske/Documents/repos/sample-geospatial-agent-on-aws-main/.worktrees/act3-open-question/react-ui/frontend/src/components/MapView.tsx
 timestamp: 2026-10-21T15-41-53Z
 slug: react-ui-frontend-src-components-mapview-tsx
+closed: true
 ---
 ⚠️ DEGRADED: single-context (no sub-agent tool exposed in this workflow step; Assessment A was written before the detector ran)
 
