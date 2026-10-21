@@ -20,10 +20,11 @@ function Runs({ text }: { text: string }) {
 export function SeaClock({ beat, facts }: { beat: SeaBeat; facts: SeaFacts }) {
   const { lead, sub } = clockLines(beat, facts);
   // The replay's clock ticks several times a second: announced, it would talk over everything.
-  // Each beat of the argument is announced once as it lands.
-  const ticking = beat === 'rest' || beat === 'forward';
+  // The tasking plate announces its own draft and filing, so the clock stays quiet for those.
+  // Every other beat of the argument is announced once as it lands.
+  const quiet = beat === 'rest' || beat === 'forward' || beat === 'tasking' || beat === 'filed';
   return (
-    <section className="map-plate sea-clock" aria-label="What the map shows" aria-live={ticking ? 'off' : 'polite'} aria-atomic="true">
+    <section className="map-plate sea-clock" aria-label="What the map shows" aria-live={quiet ? 'off' : 'polite'} aria-atomic="true">
       <p className="sea-clock__lead">
         <Runs text={lead} />
       </p>
