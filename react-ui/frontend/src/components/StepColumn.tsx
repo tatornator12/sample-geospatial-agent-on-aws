@@ -105,11 +105,11 @@ export function StepColumn({
   // the full list of steps is one click away. While working, the last steps, with the board and the
   // cue pinned so they never scroll away under "+N earlier".
   const collapsed = compact && !live && !expanded;
-  const showAll = compact && !live && expanded;   // "Show all N steps": every step, 01 included
+  const showAll = expanded;   // "Show all N steps" or "Show N earlier steps": every step, 01 included
   const tail = groups.slice(-MAX_VISIBLE);
   const pinned = groups.slice(0, groups.length - tail.length).filter((g) => hasFilm(g) || hasBoard(g));
   const visible = collapsed ? groups.filter((g) => hasFilm(g) || hasBoard(g)) : showAll ? groups : [...pinned, ...tail];
-  const hidden = groups.length - visible.length;
+  const earlier = groups.length - pinned.length - tail.length;
   const litIndex = live ? visible.length - 1 : -1;
   const evidenceByTool = new Map(evidence.map((item) => [item.toolId, item]));
   const stage = planStage(steps);
@@ -142,16 +142,12 @@ export function StepColumn({
               {expanded ? 'Show the summary' : groups.length === 1 ? 'Show the step' : `Show all ${groups.length} steps`}
             </button>
           </li>
-        ) : hidden > 0 && (
-          <li
-            style={{
-              ...theme.typography.mono,
-              fontSize: '15px',
-              color: theme.colors.secondary,
-              padding: '2px 0 6px 36px',
-            }}
-          >
-            +{hidden} earlier
+        ) : earlier > 0 && (
+          // The steps above the last nine, one press away (while working too; the lit step stays last).
+          <li className="step-toggle">
+            <button type="button" className="stage-btn stage-btn--quiet" onClick={() => setExpanded((e) => !e)} aria-expanded={expanded}>
+              {expanded ? 'Hide the earlier steps' : earlier === 1 ? 'Show 1 earlier step' : `Show ${earlier} earlier steps`}
+            </button>
           </li>
         )}
         {visible.map((group, i) => {
