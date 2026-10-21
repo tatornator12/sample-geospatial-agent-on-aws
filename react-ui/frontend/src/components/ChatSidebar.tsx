@@ -762,10 +762,19 @@ export function ChatSidebar({
     return () => observer.disconnect();
   }, [showColumn]);
 
-  // The answer lands in view when the turn ends (the brief card scrolls itself into view).
+  // When the turn ends, the answer's first line comes to the top of the column (under its head),
+  // so the line to repeat is in view; a short answer cannot scroll that far and leaves the steps
+  // above it (B5). The brief card scrolls itself into view.
   const answerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (showAnswer && stepsOpen) answerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const column = columnRef.current;
+    const answer = answerRef.current;
+    if (!showAnswer || !stepsOpen || !column || !answer) return;
+    // The column scrolls, never the stage behind it (scrollIntoView would move every ancestor).
+    const head = column.querySelector<HTMLElement>('.stage-steps__head')?.offsetHeight ?? 52;
+    const top = answer.getBoundingClientRect().top - column.getBoundingClientRect().top + column.scrollTop - head - 4;
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    column.scrollTo?.({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
   }, [showAnswer, stepsOpen, answerText]);
   // While the agent works, the lit step and its sentence stay in view under the earlier turns'
   // rows (unless the presenter has a record open).

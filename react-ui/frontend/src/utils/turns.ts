@@ -5,7 +5,7 @@
  */
 import type { Message, ToolCall } from '../types.ts';
 import { stagePunctuation } from './caption.ts';
-import { blankDashCells, twoColumnTables } from './tables.ts';
+import { blankDashCells, capTableRows, twoColumnTables } from './tables.ts';
 import { groupName, groupSteps } from './steps.ts';
 
 export interface PastTurn {
@@ -21,14 +21,17 @@ export interface PastTurn {
   failed: boolean;
 }
 
+/** The rows of any one table the step column shows; the transcript keeps them all. */
+export const STAGE_TABLE_ROWS = 5;
+
 /**
  * The answer as the step column prints it: a table cell that is only the model's dash goes empty,
  * every table folds to two columns at most (a third column the model wrote anyway joins the
- * second), then the stage's punctuation. In that order, so a "—" cell is never folded in as "(,)"
- * or left as "," (A1 P1-5).
+ * second), keeps its first five rows, then the stage's punctuation. In that order, so a "—" cell
+ * is never folded in as "(,)" or left as "," (A1 P1-5).
  */
 export function stageAnswerText(raw: string): string {
-  return stagePunctuation(twoColumnTables(blankDashCells(raw.trim())));
+  return stagePunctuation(capTableRows(twoColumnTables(blankDashCells(raw.trim())), STAGE_TABLE_ROWS));
 }
 
 /** What the transcript records when the prompt never reached the stage backend (S8). */

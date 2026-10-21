@@ -197,6 +197,13 @@
   color: var(--label);
   font-weight: 600;
 }
+/* "+N more rows in the transcript" under a table cut to five rows (utils/tables.ts capTableRows):
+   a note about the record, not part of the answer, so label grey and upright. */
+.stage-answer__text table + p > em:only-child {
+  font-size: 15px;
+  font-style: normal;
+  color: var(--label);
+}
 .stage-answer--failed .stage-answer__text {
   color: var(--error);
 }
