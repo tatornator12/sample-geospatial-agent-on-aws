@@ -25,18 +25,19 @@
     {
       "name": "inspect_image",
       "params": {
-        "s3_url": "s3://bucket/use-cases/archaeologist-newark/tci_clipped_newark_octagon_2026-10-05.tif",
-        "title": "Newark Octagon, Sentinel-2 true colour",
-        "question": "What is visible from space? Can you see the earthwork walls, golf course fairways, or other features?"
+        "s3_url": "s3://bucket/use-cases/archaeologist-newark/tci_clipped_newark_octagon_2026-10-20.tif",
+        "title": "Newark Octagon, Sentinel-2 true colour, 2026-10-20",
+        "question": "What is visible on the ground? Can you see the earthwork walls, golf course fairways, or other features?"
       },
-      "result": "Looked at the image"
+      "result": "Looked at the image",
+      "saw": "From space, the site reads as a large open green area embedded in suburban Newark, Ohio, with the old golf course fairways still visible as lighter grass patches amid the tree cover. Now loading the LiDAR hillshade."
     },
     {
       "name": "display_visual",
       "params": {
-        "s3_url": "s3://bucket/use-cases/archaeologist-newark/tci_clipped_newark_octagon_2026-10-05.tif",
+        "s3_url": "s3://bucket/use-cases/archaeologist-newark/tci_clipped_newark_octagon_2026-10-20.tif",
         "title": "Octagon Earthworks, Sentinel-2 true colour",
-        "description": "Sentinel-2, 2026-10-05. Former golf course fairways still visible as lighter grass strips. Suburban Newark, Ohio surrounds the site."
+        "description": "Sentinel-2, 2026-10-20"
       },
       "result": "Shown on the map"
     },
@@ -51,18 +52,19 @@
     {
       "name": "inspect_image",
       "params": {
+        "question": "What earthwork shapes are visible? Can you see the octagon walls, the circle, and the connecting avenue?",
         "s3_url": "s3://bucket/use-cases/archaeologist-newark/hillshade_newark-octagon.tif",
-        "title": "Octagon Earthworks, LiDAR hillshade",
-        "question": "What earthwork shapes are visible? Can you see the octagon walls, the circle, and the connecting avenue?"
+        "title": "Octagon Earthworks, LiDAR hillshade"
       },
-      "result": "Looked at the image"
+      "result": "Looked at the image",
+      "saw": "The LiDAR cuts straight through the suburban cover and draws the full form with striking clarity: the large octagonal enclosure with its eight walls and corner bastions sits to the right, the circle with Observatory Mound is to its left, and the connecting avenue runs between them, all invisible in true colour but unmistakable in the 1 m bare-earth model."
     },
     {
       "name": "display_visual",
       "params": {
         "s3_url": "s3://bucket/use-cases/archaeologist-newark/hillshade_newark-octagon.tif",
         "title": "Octagon Earthworks, LiDAR hillshade",
-        "description": "USGS 3DEP 1 m bare-earth DEM, Ohio Statewide Phase 2 (2020, published 2023). The octagon walls, attached circle, Observatory Mound, and connecting avenue are all visible.",
+        "description": "USGS 3DEP 1 m bare-earth DEM, OH Statewide Phase 2 2020, published 2023-11-02",
         "render": {
           "kind": "raster",
           "colormap": "gray",
@@ -105,10 +107,11 @@
             40.067382
           ],
           "dem": "s3://bucket/use-cases/archaeologist-newark/dem_newark-octagon.tif"
-        }
+        },
+        "delay_ms": 8000
       },
       {
-        "file": "tci_clipped_newark_octagon_2026-10-05.tif",
+        "file": "tci_clipped_newark_octagon_2026-10-20.tif",
         "title": "Octagon Earthworks, Sentinel-2 true colour"
       }
     ]
