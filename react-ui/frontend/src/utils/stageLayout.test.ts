@@ -16,6 +16,19 @@ describe('stagePadding and globeOffset', () => {
     expect(stagePadding(1280).left).toBe(340);
     expect(globeOffset(stagePadding(1920))).toEqual([19.5, -40]);
   });
+  it('clears the console as measured, never less than the usual 170 px (B7, B14)', () => {
+    // 1280x720: two rows of plates put the console's top at 500 px.
+    expect(stagePadding(1280, { viewportHeight: 720, consoleTop: 500 }).bottom).toBe(244);
+    // 1920x1080: one row, the console's top at 960 px: the usual 170 px still wins.
+    expect(stagePadding(1920, { viewportHeight: 1080, consoleTop: 960 }).bottom).toBe(170);
+    // Not measured, or a measurement that makes no sense: the usual padding.
+    expect(stagePadding(1280, { viewportHeight: 720 }).bottom).toBe(170);
+    expect(stagePadding(1280, { viewportHeight: 720, consoleTop: 0 }).bottom).toBe(170);
+    expect(stagePadding(1280, { viewportHeight: 720, consoleTop: 900 }).bottom).toBe(170);
+    expect(stagePadding(1280, { viewportHeight: Number.NaN, consoleTop: 500 }).bottom).toBe(170);
+    // The rest of the padding does not move.
+    expect(stagePadding(1280, { viewportHeight: 720, consoleTop: 500 })).toMatchObject({ top: 90, left: 340, right: 370 });
+  });
   it('fits the whole globe into the free area, up to zoom 2.5', () => {
     const pad = { ...stagePadding(1920), top: 24 };
     const z = globeZoom(1920, 1024, pad);

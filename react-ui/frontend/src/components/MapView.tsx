@@ -126,7 +126,15 @@ const BASEMAP_IDS = ['dark-base', 'google-roads-base', 'google-satellite-base', 
 // The finding's frame: clear of the step column (left), the console (bottom) and the layers
 // plate (right), so what the camera lands on is what the room sees. Read at each frame: the step
 // column widens with the screen (utils/stageLayout.ts).
-const STAGE_PADDING_NOW = () => stagePadding(typeof window === 'undefined' ? 1920 : window.innerWidth);
+// Clear of the plates as they are now: the console measured, so a frame never lands under prompts
+// that wrap to two rows (A1 P1-7, A2 P1-8).
+const STAGE_PADDING_NOW = () => {
+  if (typeof window === 'undefined') return stagePadding(1920);
+  const consoleTop = document.querySelector('.stage-docent')?.getBoundingClientRect().top;
+  return stagePadding(window.innerWidth, { viewportHeight: window.innerHeight, consoleTop });
+};
+// Dark Vessels frames its sea on the fixed padding, as before (its act is its own).
+const SEA_PADDING_BASE = () => stagePadding(typeof window === 'undefined' ? 1920 : window.innerWidth);
 
 // Ranks at or above this are lit and labelled; every other footprint is a hairline. 39 is the count; 3 is the story.
 const LIT_RANKS = 3;
@@ -501,7 +509,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     [...seaFiles.current.entries()].find(([, f]) => f.kind === kind && (pass === undefined || f.pass === pass)) ?? null;
   // The view the room sees, inside the plates (labels land there).
   const seaView = (m: maplibregl.Map): [number, number, number, number] => {
-    const p = seaPadding(STAGE_PADDING_NOW());
+    const p = seaPadding(SEA_PADDING_BASE());
     const box = m.getContainer();
     const sw = m.unproject([p.left, box.clientHeight - p.bottom]);
     const ne = m.unproject([box.clientWidth - p.right, p.top]);
@@ -516,7 +524,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     b: [number, number, number, number],
     opts: { maxZoom?: number; duration?: number; extra?: { left?: number; right?: number } } = {},
   ) => {
-    const pad = seaPadding(STAGE_PADDING_NOW());
+    const pad = seaPadding(SEA_PADDING_BASE());
     m.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
       padding: { ...pad, left: pad.left + (opts.extra?.left ?? 0), right: pad.right + (opts.extra?.right ?? 0) },
       duration: prefersReducedMotion() ? 0 : opts.duration ?? 1800,
@@ -530,7 +538,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     if (!vesselRest) return;
     const b = featureBounds([{ type: 'Feature', properties: {}, geometry: vesselRest.reserve as never }]);
     if (!b) return;
-    const stage = STAGE_PADDING_NOW();
+    const stage = SEA_PADDING_BASE();
     const columnUp = typeof document !== 'undefined' && !!document.querySelector('.stage-steps');
     m.fitBounds([[b[0], b[1]], [b[2], b[3]]], {
       padding: { top: 140, bottom: stage.bottom, left: columnUp ? stage.left : 90, right: allLayersRef.current.length ? stage.right : 90 },
@@ -893,7 +901,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   // The box the camera last framed for the tasking (a narrow window frames one box at a time).
   const taskingFramedBox = useRef<number | null>(null);
   const taskingNarrow = (m: maplibregl.Map) => {
-    const pad = seaPadding(STAGE_PADDING_NOW());
+    const pad = seaPadding(SEA_PADDING_BASE());
     // A 1280 screen leaves about 570 px between the step column and the plate.
     return m.getContainer().clientWidth - pad.left - pad.right < 800;
   };
@@ -2028,20 +2036,64 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               paint: { 'line-color': '#0FF', 'line-width': 2, 'line-dasharray': [2, 1.5] },
               layout: { visibility: 'visible' },
             });
-            // Rank labels at the cell centres (Back Row rule: 24 px, mono, halo). The style has
-            // no glyphs server; maplibre >= 5.11 renders text-font with local fonts.
+            // Each match as a dot at its centre (the tool's center_lat/lon, else its box's middle),
+            // so the matches read at state zoom where a 1 km cell is a speck; gone from zoom 9,
+            // where the cells themselves are big enough.
+            const matchCentres = geometry.features.flatMap((f) => {
+              const p = f?.properties ?? {};
+              if (p.tier !== 'match') return [];
+              let lon = Number(p.center_lon);
+              let lat = Number(p.center_lat);
+              if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+                const b = featureBounds([f as Parameters<typeof featureBounds>[0][number]]);
+                if (!b) return [];
+                lon = (b[0] + b[2]) / 2;
+                lat = (b[1] + b[3]) / 2;
+              }
+              return [{ type: 'Feature' as const, properties: p, geometry: { type: 'Point' as const, coordinates: [lon, lat] } }];
+            });
+            currentMap.addSource(`${geometryId}-points`, {
+              type: 'geojson',
+              data: { type: 'FeatureCollection', features: matchCentres },
+            });
+            currentMap.addLayer({
+              id: `${geometryId}-dots`,
+              type: 'circle',
+              source: `${geometryId}-points`,
+              maxzoom: 9,
+              paint: {
+                'circle-radius': 6,
+                'circle-color': [
+                  'interpolate', ['linear'], ['get', 'similarity'],
+                  rampLo, '#e8dcf5',
+                  (rampLo + hi) / 2, '#a678d6',
+                  hi, '#5b2a86',
+                ],
+                'circle-stroke-color': '#0f141b',
+                'circle-stroke-width': 1.5,
+              },
+              layout: { visibility: 'visible' },
+            });
+            // Rank labels beside the dots (Back Row rule: 24 px, mono, halo), ranks 1 to 5 only (the
+            // answer's table stops at five), placed by rank with collision checks so no two numerals
+            // print over each other. The style has no glyphs server; maplibre >= 5.11 renders
+            // text-font with local fonts.
             currentMap.addLayer({
               id: `${geometryId}-labels`,
               type: 'symbol',
-              source: geometryId,
-              filter: ['==', ['get', 'tier'], 'match'],
+              source: `${geometryId}-points`,
+              filter: ['<=', ['to-number', ['get', 'rank'], 99], 5],
               layout: {
                 'symbol-placement': 'point',
+                'symbol-sort-key': ['to-number', ['get', 'rank'], 99],
                 'text-field': ['to-string', ['get', 'rank']],
                 'text-font': ['Atkinson Hyperlegible Mono', 'monospace'],
                 'text-size': 24,
-                'text-allow-overlap': true,
-                'text-ignore-placement': true,
+                'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+                'text-radial-offset': 0.9,
+                'text-allow-overlap': false,
+                'text-ignore-placement': false,
+                'text-padding': 4,
                 visibility: 'visible',
               },
               paint: {
@@ -2051,8 +2103,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               },
             });
             // Popup with the numbers only (rank, similarity, centre) so nothing model-written
-            // is ever injected into setHTML.
-            currentMap.on('click', fillLayerId, (e: maplibregl.MapLayerMouseEvent) => {
+            // is ever injected into setHTML. A match opens from its cell, its dot or its rank.
+            const openMatch = (e: maplibregl.MapLayerMouseEvent) => {
               const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
               const rank = Number.isFinite(Number(p.rank)) ? Number(p.rank) : null;
               const sim = Number.isFinite(Number(p.similarity)) ? Number(p.similarity).toFixed(4) : null;
@@ -2065,13 +2117,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
                 `<div class="similar-popup__row"><span>Centre</span><code>${lat ?? '—'}, ${lon ?? '—'}</code></div>` +
                 (km !== null ? `<div class="similar-popup__row"><span>From example</span><code>${km} km</code></div>` : '');
               new maplibregl.Popup({ className: 'similar-popup' }).setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
-            });
-            currentMap.on('mouseenter', fillLayerId, () => {
-              currentMap.getCanvas().style.cursor = 'pointer';
-            });
-            currentMap.on('mouseleave', fillLayerId, () => {
-              currentMap.getCanvas().style.cursor = '';
-            });
+            };
+            for (const id of [fillLayerId, `${geometryId}-dots`, `${geometryId}-labels`]) {
+              currentMap.on('click', id, openMatch);
+              currentMap.on('mouseenter', id, () => {
+                currentMap.getCanvas().style.cursor = 'pointer';
+              });
+              currentMap.on('mouseleave', id, () => {
+                currentMap.getCanvas().style.cursor = '';
+              });
+            }
           } else if (isChangeScan) {
             currentMap.addLayer({
               id: fillLayerId,
@@ -2525,7 +2580,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   // result the dashed query outline and the rank labels.
   // Dark Vessels' files carry more (their rings, halos, hairlines, hit areas: seaStage.ts).
   const geometryCompanionIds = (fillLayerId: string) =>
-    ['-casing', '-outline', '-query', '-labels', '-keepout', '-hairline', ...sea.SEA_COMPANION_SUFFIXES].map(suffix => fillLayerId.replace('-fill', suffix));
+    ['-casing', '-outline', '-query', '-dots', '-labels', '-keepout', '-hairline', ...sea.SEA_COMPANION_SUFFIXES].map(suffix => fillLayerId.replace('-fill', suffix));
   // Every map layer that travels with a listed one: a geometry's fill companions, a raster's light
   // (and the radar's sweep while it draws).
   const companionIds = (id: string) => (id.startsWith('cogLayer-') ? [`${id}${LIGHT_SUFFIX}`, `${id}-sweep`] : geometryCompanionIds(id));
@@ -3099,7 +3154,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             // ground it takes the low oblique view; otherwise it is flat.
             const columnsOnStage = allLayersRef.current.some((l) => methaneGeometryHint(l.render, l.url)?.kind === 'columns');
             mapInstance.fitBounds([[w, s], [e, n]], {
-              padding: seaRadar ? seaPadding(STAGE_PADDING_NOW()) : STAGE_PADDING_NOW(),
+              padding: seaRadar ? seaPadding(SEA_PADDING_BASE()) : STAGE_PADDING_NOW(),
               duration: 1800,
               maxZoom: cap,
               pitch: groundOnRef.current ? GROUND_PITCH : columnsOnStage ? COLUMNS_PITCH : 0,

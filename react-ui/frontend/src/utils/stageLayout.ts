@@ -23,9 +23,23 @@ export interface StagePadding {
   right: number;
 }
 
-/** The camera's padding: the step column and its 16 px inset plus a 28 px breath, the console, the layers plate. */
-export function stagePadding(viewportWidth: number): StagePadding {
-  return { top: 90, bottom: 170, left: 16 + stepColumnWidth(viewportWidth) + 28, right: 370 };
+/** The camera's bottom padding when the console is not measured (its usual height plus a breath). */
+export const CONSOLE_PADDING_MIN = 170;
+/**
+ * The camera's padding: the step column and its 16 px inset plus a 28 px breath, the console, the
+ * layers plate. With the console measured (`consoleTop`, its top edge from the viewport's top, in
+ * a viewport `viewportHeight` tall), the bottom clears it by 24 px however tall its prompts wrap
+ * (two rows of plates at 1280), so nothing the map frames lands under it (A1 P1-7, A2 P1-8).
+ */
+export function stagePadding(
+  viewportWidth: number,
+  { viewportHeight, consoleTop }: { viewportHeight?: number; consoleTop?: number } = {}
+): StagePadding {
+  const measured =
+    Number.isFinite(viewportHeight) && Number.isFinite(consoleTop) && (consoleTop as number) > 0 && (consoleTop as number) < (viewportHeight as number)
+      ? (viewportHeight as number) - (consoleTop as number) + 24
+      : 0;
+  return { top: 90, bottom: Math.max(CONSOLE_PADDING_MIN, Math.round(measured)), left: 16 + stepColumnWidth(viewportWidth) + 28, right: 370 };
 }
 
 /** Where the watch globe's centre sits: the middle of the area the plates leave free. */
