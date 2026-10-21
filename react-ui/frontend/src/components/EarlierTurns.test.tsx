@@ -91,12 +91,22 @@ describe('EarlierTurns', () => {
     expect(screen.queryByText(/A bright target/)).toBeNull();
   });
 
-  it('says a failed turn stopped before it answered', async () => {
-    render(<EarlierTurns turns={[turn(1, { answer: 'Error: boom', failed: true })]} sessionId="s" speaker="Earth Analyst" />);
+  it('says a failed turn with no steps stopped before it answered', async () => {
+    render(<EarlierTurns turns={[turn(1, { answer: 'Error: boom', failed: true, tools: [] })]} sessionId="s" speaker="Earth Analyst" />);
     await act(async () => {
       fireEvent.click(row(/Question 1/));
     });
     expect(screen.getByText('The agent stopped before it answered.')).toBeTruthy();
+    expect(screen.queryByText(/boom/)).toBeNull();
+  });
+
+  it('keeps a failed turn\'s steps and names the last one it reached (B2)', async () => {
+    render(<EarlierTurns turns={[turn(1, { answer: 'Error: boom', failed: true })]} sessionId="s" speaker="Earth Analyst" />);
+    await act(async () => {
+      fireEvent.click(row(/Question 1/));
+    });
+    expect(screen.getByText('The agent stopped at step 02, Fetch Sentinel-2.')).toBeTruthy();
+    expect(document.querySelectorAll('.earlier-turn__record .stage-step-column > li')).toHaveLength(2);
     expect(screen.queryByText(/boom/)).toBeNull();
   });
 

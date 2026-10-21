@@ -140,6 +140,26 @@ describe('failedTurnLine', () => {
     );
     expect(failedTurnLine('Error: boom', { record: true })).toBe('The agent stopped before it answered.');
   });
+  it('names the last step a turn reached before it failed, numbered as the column numbers it (B2)', () => {
+    const tools = [tool('find_location_boundary', 'a'), tool('get_rasters', 'b')];
+    expect(failedTurnLine('Error: ThrottlingException: Rate exceeded', { tools })).toBe(
+      'The agent stopped at step 02, Fetch Sentinel-2. Send the prompt again; the steps it finished are above.'
+    );
+    expect(failedTurnLine('Error: boom', { record: true, tools })).toBe('The agent stopped at step 02, Fetch Sentinel-2.');
+    // The backend line still wins: the agent never started.
+    expect(failedTurnLine(unreachable, { tools })).toMatch(/^The stage can't reach the backend\./);
+    // No steps: today's line.
+    expect(failedTurnLine('Error: boom', { tools: [] })).toMatch(/^The agent stopped before it answered\./);
+  });
+  it('keeps a failed turn\'s steps in its record', () => {
+    const turns = pastTurns([
+      { role: 'user', content: 'First' },
+      { role: 'assistant', content: 'Error: Rate exceeded', tools: [tool('find_location_boundary', 'a')] },
+      { role: 'user', content: 'Second' },
+    ]);
+    expect(turns[0].failed).toBe(true);
+    expect(turns[0].tools.map((t) => t.id)).toEqual(['a']);
+  });
   it('marks the turn failed in the session record', () => {
     const turns = pastTurns([
       { role: 'user', content: 'First' },

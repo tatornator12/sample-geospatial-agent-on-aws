@@ -104,7 +104,7 @@ export function EarlierTurns({
                     <div className={`stage-answer earlier-turn__answer${turn.failed ? ' stage-answer--failed' : ''}`}>
                       <span className="stage-answer__who">{speaker}</span>
                       {turn.failed ? (
-                        <p className="stage-answer__text">{failedTurnLine(turn.answer, { record: true })}</p>
+                        <p className="stage-answer__text">{failedTurnLine(turn.answer, { record: true, tools: turn.tools })}</p>
                       ) : (
                         <div className="stage-answer__text markdown-content">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.answer}</ReactMarkdown>

@@ -6,6 +6,7 @@
 import type { Message, ToolCall } from '../types.ts';
 import { stagePunctuation } from './caption.ts';
 import { blankDashCells, twoColumnTables } from './tables.ts';
+import { groupName, groupSteps } from './steps.ts';
 
 export interface PastTurn {
   /** Stable per session: the user message's position. */
@@ -47,11 +48,22 @@ export function isNetworkFailure(error: unknown): boolean {
 /**
  * The line a failed turn shows instead of its error: on the stage (`record` false) and in an
  * earlier turn's record (`record` true). A prompt that never reached the backend says so, not
- * that the agent stopped (it never started).
+ * that the agent stopped (it never started). A turn that failed after some steps names the last
+ * one it reached, as the column numbers and names it; its steps stay above the line (A1 P1-9).
  */
-export function failedTurnLine(answer: string, { record = false }: { record?: boolean } = {}): string {
+export function failedTurnLine(
+  answer: string,
+  { record = false, tools = [] }: { record?: boolean; tools?: ToolCall[] } = {}
+): string {
   if (answer.startsWith(`Error: ${BACKEND_UNREACHABLE}`)) {
     return `${BACKEND_UNREACHABLE} Check the connection, then send the prompt again.`;
+  }
+  const groups = groupSteps(tools);
+  if (groups.length > 0) {
+    const at = `step ${String(groups.length).padStart(2, '0')}, ${groupName(groups[groups.length - 1])}`;
+    return record
+      ? `The agent stopped at ${at}.`
+      : `The agent stopped at ${at}. Send the prompt again; the steps it finished are above.`;
   }
   return record
     ? 'The agent stopped before it answered.'

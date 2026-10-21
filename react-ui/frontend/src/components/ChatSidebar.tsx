@@ -511,7 +511,12 @@ export function ChatSidebar({
             return; // session reset; useEffect will seed a recovery notice
           }
 
-          setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${event.message}` }]);
+          // The steps the agent finished stay on the stage above the failed line (A1 P1-9).
+          const done = accumulatedTools;
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: `Error: ${event.message}`, ...(done.length > 0 ? { tools: done } : {}) },
+          ]);
           return; // Exit early on error
         }
       }
@@ -592,7 +597,11 @@ export function ChatSidebar({
         const errorMessage = isNetworkFailure(error)
           ? BACKEND_UNREACHABLE
           : error instanceof Error ? error.message : String(error);
-        setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${errorMessage}` }]);
+        const done = accumulatedTools;
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: `Error: ${errorMessage}`, ...(done.length > 0 ? { tools: done } : {}) },
+        ]);
       }
     } finally {
       // Only the turn that still owns the stage may clear the working state; an ended turn
@@ -829,7 +838,7 @@ export function ChatSidebar({
                 <div ref={answerRef} className={`stage-answer${answerFailed ? ' stage-answer--failed' : ''}`} aria-live="polite">
                   <span className="stage-answer__who">{speaker}</span>
                   {answerFailed ? (
-                    <p className="stage-answer__text">{failedTurnLine(answerText)}</p>
+                    <p className="stage-answer__text">{failedTurnLine(answerText, { tools: stepTools })}</p>
                   ) : (
                     <div className="stage-answer__text markdown-content">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{answerText}</ReactMarkdown>

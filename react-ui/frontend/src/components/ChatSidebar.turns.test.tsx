@@ -295,6 +295,37 @@ describe('The lit step while a tool runs (B1, A1 P1-2)', () => {
   });
 });
 
+describe('A turn that fails after some steps (B2, A1 P1-9)', () => {
+  it('keeps its steps, names the last one, and keeps them in its record when the next turn starts', async () => {
+    setup();
+    const turn = await sendFirstPlate();
+    turn.push(chunk(`${toolCall('t1', 'find_location_boundary', { location: 'Bergen' })} ${toolCall('t2', 'get_rasters', { current_date_str: '2025-09-15' })}`));
+    await flush();
+    turn.push({ type: 'error', message: 'ThrottlingException: Rate exceeded' });
+    await flush();
+
+    const rows = () => [...document.querySelectorAll('.stage-steps > .stage-step-column > li, .stage-steps .stage-step-column > li')];
+    expect(rows()).toHaveLength(2);
+    expect(document.querySelector('.stage-steps__title')?.textContent).toBe('What the agent did');
+    expect(document.querySelector('.stage-answer--failed')?.textContent).toContain(
+      'The agent stopped at step 02, Fetch Sentinel-2. Send the prompt again; the steps it finished are above.'
+    );
+    expect(input().disabled).toBe(false);
+
+    const next = await sendFirstPlate();
+    next.push(chunk('Quick answer.'));
+    next.end();
+    await flush();
+    const row = screen.getByRole('button', { name: /Show vegetation health for Bergen/ });
+    expect(row.textContent).toContain('2 steps');
+    await act(async () => {
+      fireEvent.click(row);
+    });
+    expect(document.querySelector('.earlier-turn__record')?.textContent).toContain('The agent stopped at step 02, Fetch Sentinel-2.');
+    expect(document.querySelectorAll('.earlier-turn__record .stage-step-column > li')).toHaveLength(2);
+  });
+});
+
 describe('Runtime crash', () => {
   it('resets the session and shows the recovery notice on the new one', async () => {
     const { rerender, onSessionReset } = setup();
