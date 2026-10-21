@@ -62,7 +62,8 @@ CASES = {
     },
     "great-circle": {
         "id": "archaeologist-great-circle",
-        "prompt": "How big is the Great Circle, and how was it built?",
+        # The stage's "Measure the Great Circle" plate, word for word (stage review D10: not "how was it built?").
+        "prompt": "Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?",
         "name": "The Great Circle, measured",
         "description": "The Great Circle Earthworks measured across on 1 m LiDAR: 362 m bank to bank, the bank and the interior ditch in metres, beside the record",
         "location": "Newark, Ohio",

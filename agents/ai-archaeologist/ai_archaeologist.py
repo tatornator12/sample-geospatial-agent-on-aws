@@ -33,12 +33,13 @@ from strands.session.s3_session_manager import S3SessionManager  # noqa: E402
 
 from utils.mcp_http import charset_safe_httpx_client_factory  # noqa: E402
 from utils.tools import (  # noqa: E402
-    display_visual,
     get_rasters,
     inspect_image,
 )
 
 import archaeo_config  # noqa: E402
+# The platform's display_visual plus a check that the file is one this session wrote (act4 P0-2).
+from display_tools import display_visual  # noqa: E402
 from site_tools import find_known_site, find_similar_sites, measure_profile, show_terrain  # noqa: E402
 
 app = BedrockAgentCoreApp()

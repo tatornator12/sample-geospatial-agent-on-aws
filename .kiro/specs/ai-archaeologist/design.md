@@ -1,6 +1,7 @@
 # Design: ai-archaeologist
 
 Status: **APPROVED Oct 12** (the user approved all eight decisions at the end; work starts early).
+Decision 9 (the agent picks the line it measures) added Oct 20 from the stage review (D5, D10).
 
 ## Overview
 
@@ -100,13 +101,21 @@ public record.", "known_sites": [names…]}` with no coordinates.
 keeps the backend's presign allowlist and the evidence chip path unchanged). Returns bounds from
 the manifest and the render hint. Missing cache object: error naming `build_site_catalogue.py`.
 
-### 4. `measure_profile(site_id, transect=None)`
+### 4. `measure_profile(site_id, bearing=None)`
 
-Reads the cached DEM COG along the transect (bilinear, 1 m step), baseline = median, local
-extrema with a 0.5 m prominence floor, labels crests (> +0.5 m) and ditches (< −0.5 m), span =
-outermost crest to outermost crest. A given transect must lie inside the site frame. Writes a
-LineString with crest/ditch points as GeoJSON. Returns the documented dimension beside the
-measured one.
+Reads the cached DEM COG along a line (bilinear, 1 m step), baseline = median, local extrema
+with a 0.5 m prominence floor, labels crests (> +0.5 m) and ditches (< −0.5 m), span =
+outermost crest to outermost crest. Which line (decision 9): no bearing → the record's verified
+transect when the site has one (the Great Circle), else east-west through the centre; a bearing
+from the enum `n-s`, `ne-sw`, `e-w`, `nw-se` (lower-cased and trimmed) → a 600 m line
+(`DEFAULT_TRANSECT_M`) through the catalogue centre at that azimuth, from its western end (N–S
+from its north). The model never writes coordinates: there is no `transect` argument, and a
+bearing outside the enum is an error that writes nothing. The frame guard (inside the site's
+frame) and the length guard (50 to 3000 m) stay in `_measure_line`. Writes a LineString with
+crest/ditch points as GeoJSON. Returns the documented dimension beside the measured one, the
+line in words, `bearing` (the code or null) and `line_source` ("verified", "bearing" or
+"default"); with no bank on the line its `next_steps` asks for "I cannot confirm a bank on this
+line." `find_known_site` says `has_verified_transect`, so the agent knows which flow to take.
 
 ### 5. `find_similar_sites(site_id, top_k=3)` (method per decision 4)
 
@@ -124,8 +133,14 @@ measured one.
 - `react-ui/frontend/src/utils/render.ts`: `COLORMAPS` += `gray`, `rdbu_r` with `RAMP_ANCHORS`
   from TiTiler's own entries; `RENDER_GROUPS` += `terrain`. Legend words for the LRM.
 - An `archaeoLayers.ts` (transect line style, LRM legend) following `methaneLayers.ts`.
-- `stageCopy.ts`: three prepared prompts, placeholder "Name a known site, or ask how they built
-  it"; step names for the four tools.
+- `stageCopy.ts`: four prepared prompts (decision 9 added "Measure an Octagon wall"; D10 reworded
+  the Great Circle's), placeholder "Name a known site, or ask how they built it"; step names for
+  the four tools.
+- `steps.ts`: the measure step's line, from tool inputs only: `BEARING_LABELS` ("NW–SE, the
+  agent's line") and `VERIFIED_TRANSECT_SITES` ("The record's verified line"), both pinned to
+  the tool and the catalogue by `tests/test_stage_mirror.py`; anything else prints nothing.
+- `display_tools.py`: the agent's own `display_visual`, the platform's plus a check that a
+  session URL exists (a HEAD), ported from Dark Vessels (stage review P0-2).
 - `UseCaseGallery.tsx`: "Newark Earthworks" card, `agent: 'archaeologist'`.
 
 ## Security and the known-sites rule
@@ -148,7 +163,12 @@ measured one.
 - Unknown site: the fixed refusal with the catalogue's names. Malformed site id: error.
 - Cache object missing or a manifest mismatch: error naming the build script; the turn goes on
   with true colour only.
-- Transect outside the frame or too short (< 50 m): error.
+- Transect outside the frame or too short (< 50 m): error. A bearing outside the four: error, nothing written.
+- `display_visual` given a session URL that does not exist (run 1 of the Oct 20 review: `lrm_` for
+  show_terrain's `lrm03_`): "That file is not in this session. Show the s3_url a tool returned,
+  unchanged." plus `did_you_mean` when one file in the same folder matches by name without
+  punctuation or case, or by product family (`lrm` and `lrm03` are one) and site id. URLs outside
+  the session (replay cases) pass; a failing list call still refuses, without a guess.
 - Similarity Lambda failure (option A): error; the agent falls back to the catalogue's `form`
   field and says the similarity search was unavailable.
 - Frontend: an invalid hint is dropped and the layer falls back, as today.
@@ -172,15 +192,26 @@ measured one.
 
 | t | Beat | Prompt / action | What the room sees |
 |---|---|---|---|
-| 0:00 | Switch | Agent switcher → AI Archaeologist (pre-warmed) | Its three prepared plates |
+| 0:00 | Switch | Agent switcher → AI Archaeologist (pre-warmed) | Its four prepared plates |
 | 0:10 | From space | "Show me the Newark Octagon the way an archaeologist sees it" | Sentinel-2 true colour (the Octagon has long sat under a country club's golf course; day 1 checks what current imagery shows); chip; one sentence on what is visible from space |
 | 0:50 | Under the grass | (same turn) | Hillshade lands: the Octagon and its circle appear under the fairways; chip; one sentence |
-| 1:40 | Measure | "How big is the Great Circle, and how was it built?" | LRM (red bank, blue ditch), transect line; "363 m across (366 m documented), bank +2.7 m, ditch −2.6 m" |
-| 2:40 | Like this | "Where else did they build like this?" | Sites of the same form from the catalogue (option B); the top match's LiDAR. Candidate after the Oct 13 sheets: Hopeton Earthworks, a circle and a square ploughed down to tens of centimetres, still drawn by the LiDAR at ±0.3 m (High Bank Works' circle and octagon not yet convincing) |
-| 3:30 | Close | | "Both are already on the World Heritage list. I only work with sites on the public record." Hand-off to the close |
+| 1:20 | The agent's line | "Measure across a wall of the Newark Octagon, on a line you choose from the local relief." | The local relief lands and the agent looks at it, says which wall it will cross and which way, then measures: the step reads "NW–SE, the agent's line" (or the bearing it chose), the section draws under it. If the line crosses no bank it says "I cannot confirm a bank on this line." and what the LiDAR does show: a designed outcome, not a failure. About 30 s on dev |
+| 2:00 | Measure | "Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?" | LRM (red bank, blue ditch), transect line, the step reads "The record's verified line"; "362 m measured, about 366 m documented, bank +2.6 m, ditch −2.7 m". About 25 to 45 s on dev |
+| 2:50 | Like this | "Where else did they build like this?" | Sites of the same form from the catalogue (option B); the answer opens on the top match's name ("Fort Hill Earthworks & Nature Preserve, 133 km away, shares the Great Circle's form: a circle, a ditch, and an enclosure."); the top match's LiDAR. About 25 s on dev |
+| 3:40 | Close | | "Both are already on the World Heritage list. I only work with sites on the public record." Hand-off to the close |
 
-Fallback if over 4:30 on rehearsal two: drop the measure beat. Cut-list fallback (90-second
+Fallback if over 4:30 on rehearsal two: drop the Great Circle measure; "Where else, like this"
+then follows the Octagon, whose top form match is Hopeton Earthworks (87 km; avenue, circle,
+enclosure) by the catalogue's own ranking, not yet run on dev. Cut-list fallback (90-second
 teaser in the close): the replay's "under the grass" beat only.
+
+Beat note, the agent's line on dev v14 (Oct 21): three Octagon runs, each find_known_site →
+show_terrain(lrm) → inspect_image → measure_profile with a bearing. Eval run 1 chose north-south
+("I will cross the northern wall of the octagon"): banks +1.43 m (23 m along) to +2.15 m (305 m),
+489 m outer bank to outer bank. Eval run 2 chose north-west to south-east ("the north-western
+wall of the octagon"): tallest bank +2.06 m at 300 m, 420 m bank to bank. The stage run chose
+north-south again (the step read "N–S, the agent's line"). No run said "I cannot confirm";
+which walls a line crossed is the agent's reading of the relief, not checked against the record.
 
 ## Decisions to approve
 
@@ -211,3 +242,11 @@ teaser in the close): the replay's "under the grass" beat only.
    the Week 5 gate; the Week 5 gate is dev-only.
 8. Agent id `archaeologist`, label "AI Archaeologist", directory `agents/ai-archaeologist/`
    (named by the similarity-search spec), runtimes `ai_archaeologist` / `ai_archaeologist_dev`.
+9. The agent picks the line it measures (Oct 20, stage review D5; dev gate Friday Oct 23). At a
+   site without a verified transect it inspects the local relief first, names the wall or ring
+   it will cross and the direction in words, then calls `measure_profile(site_id, bearing=...)`
+   with one of four bearings through the centre. The bearing is an enum, so the model never
+   writes coordinates and decision 2 holds. The stored verified line stays for the Great Circle
+   (no bearing). A line that crosses no bank is a designed outcome: "I cannot confirm a bank on
+   this line." (PRODUCT.md principle 2). The stage names the line from tool inputs only: "NW–SE,
+   the agent's line" against "The record's verified line".

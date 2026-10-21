@@ -63,6 +63,12 @@ def test_a_known_site_returns_its_record_and_writes_its_frame(tools, fake_s3):
     assert "public_note" not in json.loads(_run(tools.find_known_site("Serpent Mound")))
 
 
+def test_the_record_says_which_sites_have_a_verified_line(tools):
+    # The Great Circle is measured on the record's line; at the Octagon the agent chooses a bearing.
+    assert json.loads(_run(tools.find_known_site("Great Circle Earthworks")))["has_verified_transect"] is True
+    assert json.loads(_run(tools.find_known_site("Newark Octagon")))["has_verified_transect"] is False
+
+
 def test_an_ambiguous_name_offers_the_sites_by_name_only(tools):
     out = _run(tools.find_known_site("Newark Earthworks"))
     body = json.loads(out)

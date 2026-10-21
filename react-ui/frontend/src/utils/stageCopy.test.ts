@@ -21,12 +21,20 @@ describe('stageCopyFor', () => {
     expect(mission).not.toMatch(/still active|super-emitter/i);
   });
 
-  it('gives the AI Archaeologist its three beats and a placeholder that asks for a known site (Week 5)', () => {
+  it('gives the AI Archaeologist its four plates and a placeholder that asks for a known site (Week 5)', () => {
     const copy = stageCopyFor('archaeologist');
-    expect(copy.prompts.map((p) => p.label)).toEqual(['The Octagon, from space', 'Measure the Great Circle', 'Where else, like this']);
+    expect(copy.prompts.map((p) => p.label)).toEqual(['The Octagon, from space', 'Measure an Octagon wall', 'Measure the Great Circle', 'Where else, like this']);
     expect(copy.prompts.every((p) => !p.fill)).toBe(true);
     expect(copy.placeholder).toBe('Name a known site, or ask how they built it');
     expect(copy.placeholder).not.toMatch(/any place/i);
+  });
+
+  it('asks the measure plates what the LiDAR can answer, never how it was built (stage review D10)', () => {
+    // The golden prompts octagon-wall-measure and great-circle-measure, word for word.
+    const [, octagon, circle] = stageCopyFor('archaeologist').prompts;
+    expect(octagon.prompt).toBe('Measure across a wall of the Newark Octagon, on a line you choose from the local relief.');
+    expect(circle.prompt).toBe('Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?');
+    for (const p of [octagon, circle]) expect(p.prompt).not.toMatch(/built|build/i);
   });
 
   it('gives Dark Vessels its four turns (the golden prompts) and a placeholder about passes on file', () => {

@@ -2,9 +2,10 @@
 profile across an earthwork, and the sites on the record that share its form.
 
 Design decision 2 (known sites only, enforced in tools): every coordinate any of these tools
-returns or writes is a catalogue site's centre, frame or transect (`data/sites_v1.json`, sites
-whose locations UNESCO, the NPS or a state or tribal steward already publish). A name that is not
-in the catalogue gets the fixed refusal and no numbers. Decision 3: terrain is never computed or
+returns or writes is a catalogue site's centre, frame or transect, or a line through its centre on
+one of four bearings (`data/sites_v1.json`, sites whose locations UNESCO, the NPS or a state or
+tribal steward already publish). A name that is not in the catalogue gets the fixed refusal and no
+numbers. Decision 3: terrain is never computed or
 read from 3DEP here; `scripts/build_site_catalogue.py` built it into the bucket, and these tools
 copy it into the session. Decision 4 (outcome Oct 13): similar sites are ranked by the published
 form, not by embeddings (Clay's 1.28 km cells read the landscape, not the earthwork).
@@ -41,7 +42,13 @@ MANIFEST_TTL_S = 300
 REFUSAL = "I only work with sites already on the public record."
 PRODUCTS = ("hillshade", "lrm")
 SITE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
-DEFAULT_TRANSECT_M = 600          # east-west through the centre when a site has no verified transect
+DEFAULT_TRANSECT_M = 600          # a line through the centre: the agent's bearing, or east-west by default
+# The lines the agent may choose (decision 9): a bearing through the site's centre, never coordinates.
+# Azimuths in degrees clockwise from north. The stage mirrors the keys (steps.ts BEARING_LABELS).
+BEARINGS = {"n-s": 0, "ne-sw": 45, "e-w": 90, "nw-se": 135}
+BEARING_WORDS = {"n-s": "north-south", "ne-sw": "north-east to south-west", "e-w": "east-west",
+                 "nw-se": "north-west to south-east"}
+NO_BANK = "I cannot confirm a bank on this line."
 MAX_TRANSECT_M = 3000
 MIN_TRANSECT_M = 50
 SAME_COMPLEX_KM = 10.0            # sites closer than this are parts of the same complex, not "elsewhere"
@@ -179,8 +186,10 @@ async def find_known_site(name: str) -> str:
     Returns: JSON with site_id, name, culture, period, designation, steward, source_url, centre
     (lat, lon; centre_verified says whether it was checked on the LiDAR), frame_bounds [w, s, e, n],
     frame_geometry_s3_url (for get_rasters), form (the record's description), documented
-    dimensions, terrain (the products built), next_steps. For a name not in the catalogue: an
-    error with the fixed sentence and the catalogue's names, and no coordinates.
+    dimensions, terrain (the products built), has_verified_transect (whether the record has a
+    verified line for measure_profile; when false, you choose a bearing), next_steps. For a name
+    not in the catalogue: an error with the fixed sentence and the catalogue's names, and no
+    coordinates.
     """
     ids, how = resolve(name)
     if not ids:
@@ -208,7 +217,7 @@ async def find_known_site(name: str) -> str:
         "frame_bounds": bounds, "frame_geometry_s3_url": geom_url,
         "form": site["form"], "documented": _documented(site),
         **({"public_note": site["public_note"]} if site.get("public_note") else {}),
-        "terrain": list(PRODUCTS), "matched_on": how,
+        "terrain": list(PRODUCTS), "has_verified_transect": bool(site.get("transect")), "matched_on": how,
         "next_steps": ("get_rasters(location=<name>, geometry_s3_url=frame_geometry_s3_url) for true colour, "
                        "inspect it, then show_terrain(site_id, 'hillshade') and inspect that."),
     })
@@ -294,63 +303,81 @@ def _dem_path(site_id: str) -> str:
     return _presigned_vsicurl(f"s3://{config.S3_BUCKET_NAME}/{CACHE_PREFIX}/{site_id}_dem.tif")
 
 
-def _transect_lonlat(site: dict, transect) -> tuple[list[list[float]], str, bool]:
-    if transect is None:
+def _metres_per_degree(lat: float) -> tuple[float, float]:
+    """Metres in a degree of latitude and of longitude at a latitude (WGS 84; centimetres over a site)."""
+    p = math.radians(lat)
+    return (111132.954 - 559.822 * math.cos(2 * p) + 1.175 * math.cos(4 * p),
+            111412.84 * math.cos(p) - 93.5 * math.cos(3 * p) + 0.118 * math.cos(5 * p))
+
+
+def _centre_line(site: dict, azimuth: float) -> list[list[float]]:
+    """A DEFAULT_TRANSECT_M line through the site's centre at an azimuth (degrees from north), from
+    its western end; a north-south line, which has none, from its northern end."""
+    lat, lon = site["centre"]["lat"], site["centre"]["lon"]
+    m_lat, m_lon = _metres_per_degree(lat)
+    half = DEFAULT_TRANSECT_M / 2
+    east, north = half * math.sin(math.radians(azimuth)), half * math.cos(math.radians(azimuth))
+    a = [lon + east / m_lon, lat + north / m_lat]
+    b = [lon - east / m_lon, lat - north / m_lat]
+    start, end = (b, a) if east > 1e-6 else (a, b)
+    return [[round(v, 7) for v in start], [round(v, 7) for v in end]]
+
+
+def _bearing(value) -> str | None:
+    """The bearing code (lower-cased and trimmed) when it is one of BEARINGS; None when none was
+    given. Anything else is a ValueError: the model chooses from the four, it never writes a line."""
+    if value is None:
+        return None
+    code = value.strip().lower() if isinstance(value, str) else None
+    if code not in BEARINGS:
+        raise ValueError(f"bearing must be one of {', '.join(BEARINGS)}, or left out for the site's own line")
+    return code
+
+
+def _line_for(site: dict, bearing: str | None) -> tuple[list[list[float]], str, bool, str]:
+    """(coords, label, verified, line_source) of the line measure_profile reads. No bearing: the
+    record's verified transect when the site has one (the Great Circle), else east-west through the
+    centre. A bearing (a BEARINGS code): a DEFAULT_TRANSECT_M line through the centre that way."""
+    if bearing is None:
         stored = site.get("transect")
         if stored and stored.get("coords"):
-            return stored["coords"], stored.get("label", "the site's verified transect"), True
-        lat, lon = site["centre"]["lat"], site["centre"]["lon"]
-        half = DEFAULT_TRANSECT_M / 2
-        dlon = half / (111320.0 * math.cos(math.radians(lat)))
-        return [[lon - dlon, lat], [lon + dlon, lat]], f"east-west through the centre ({DEFAULT_TRANSECT_M} m)", False
-    if isinstance(transect, str):
-        try:
-            transect = json.loads(transect)
-        except json.JSONDecodeError:
-            raise ValueError("transect must be [[lon, lat], [lon, lat]]")
-    ok = (isinstance(transect, list) and len(transect) == 2
-          and all(isinstance(p, (list, tuple)) and len(p) == 2 and all(isinstance(v, (int, float)) and math.isfinite(v) for v in p)
-                  for p in transect))
-    if not ok:
-        raise ValueError("transect must be [[lon, lat], [lon, lat]]")
-    return [list(map(float, p)) for p in transect], "the given transect", False
+            return stored["coords"], stored.get("label", "the site's verified transect"), True, "verified"
+        return (_centre_line(site, BEARINGS["e-w"]), f"east-west through the centre ({DEFAULT_TRANSECT_M} m)",
+                False, "default")
+    return (_centre_line(site, BEARINGS[bearing]),
+            f"{BEARING_WORDS[bearing]} through the centre ({DEFAULT_TRANSECT_M} m)", False, "bearing")
 
 
-@tool
-async def measure_profile(site_id: str, transect: list = None) -> str:
-    """Measure an earthwork: the ground's height along a line across it, from the 1 m LiDAR DEM.
+def _next_steps(result: dict, label: str, line_source: str) -> str:
+    banks = [f for f in result["features"] if f["kind"] == "bank"]
+    if not banks:
+        return (f'No bank on this line, {label}: say "{NO_BANK}" and what the LiDAR does show; do not '
+                "measure a second line. Then display_visual(transect_s3_url, render=render).")
+    line = {"verified": f"This is the record's verified line, {label}: say so.",
+            "bearing": f"Your line runs {label}: say the direction in words, never the code, and what it crossed.",
+            "default": f"The line runs {label}: say so."}[line_source]
+    span = ("Say the span and" if result["outer_banks_span_m"] is not None
+            else "It crosses one bank, so there is no span: say")
+    return (f"{line} {span} the bank and ditch offsets in metres, with the documented value beside your "
+            "measurement; then display_visual(transect_s3_url, render=render).")
 
-    Args:
-        site_id: From find_known_site.
-        transect: OPTIONAL [[lon, lat], [lon, lat]] inside the site's frame. Omit it to use the
-            site's verified transect (or an east-west line through its centre when none is verified).
 
-    Returns: JSON with baseline_m (the line's median height), features (each bank and ditch: where
-    along the line, height, offset from the baseline in metres), outer_banks_span_m (bank to bank),
-    documented (the record's dimensions, with metres beside feet), transect_s3_url (the line and
-    its banks and ditches for the map), transect_verified, next_steps.
-    """
-    site = _site(site_id)
-    if site is None:
-        return _refusal()
-    built = manifest().get("sites", {}).get(site_id)
-    if not built:
-        return json.dumps({"error": f"No terrain is built for {site['names'][0]}."})
-    try:
-        coords, label, verified = _transect_lonlat(site, transect)
-    except ValueError as e:
-        return json.dumps({"error": str(e)})
+def _measure_line(site: dict, built: dict, coords, label: str, verified: bool, *,
+                  bearing: str | None = None, line_source: str = "verified") -> dict:
+    """Read the cached DEM along a line inside the site's frame, find its banks and ditches, write
+    the line and its marks for the map. The result body, or {"error": ...}."""
+    site_id = site["id"]
     w, s, e, n = built["bounds"]
     if not all(w <= lon <= e and s <= lat <= n for lon, lat in coords):
-        return json.dumps({"error": "The transect must lie inside the site's frame (frame_bounds from find_known_site)."})
+        return {"error": "The transect must lie inside the site's frame (frame_bounds from find_known_site)."}
     try:
         with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", CPL_VSIL_CURL_USE_HEAD="NO",
                           CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif"), rasterio.open(_dem_path(site_id)) as ds:
             xs, ys = warp_transform("EPSG:4326", ds.crs, [c[0] for c in coords], [c[1] for c in coords])
             length = math.hypot(xs[1] - xs[0], ys[1] - ys[0])
             if not MIN_TRANSECT_M <= length <= MAX_TRANSECT_M:
-                return json.dumps({"error": f"The transect must be {MIN_TRANSECT_M} to {MAX_TRANSECT_M} m long "
-                                            f"(this one is {length:.0f} m)."})
+                return {"error": f"The transect must be {MIN_TRANSECT_M} to {MAX_TRANSECT_M} m long "
+                                 f"(this one is {length:.0f} m)."}
             pad = 3
             win = from_bounds(min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad, transform=ds.transform)
             win = win.round_offsets().round_lengths()
@@ -368,10 +395,10 @@ async def measure_profile(site_id: str, transect: list = None) -> str:
                 lon, lat = warp_transform(ds.crs, "EPSG:4326", [fx], [fy])
                 pts.append((f, lon[0], lat[0]))
     except ValueError as e:
-        return json.dumps({"error": str(e)})
+        return {"error": str(e)}
     except Exception as e:
         logger.warning("measure_profile failed for %s: %s", site_id, type(e).__name__)
-        return json.dumps({"error": f"The DEM for {site['names'][0]} could not be read ({type(e).__name__})."})
+        return {"error": f"The DEM for {site['names'][0]} could not be read ({type(e).__name__})."}
 
     # The line carries the section itself (distance along it, height above the baseline, every
     # metre or so), so the stage can draw the cross-section the room reads the numbers on.
@@ -388,15 +415,49 @@ async def measure_profile(site_id: str, transect: list = None) -> str:
                          "geometry": {"type": "Point", "coordinates": [round(lon, 6), round(lat, 6)]}})
     url = _put_json(f"{session_prefix()}terrain/profile_{site_id}.geojson",
                     {"type": "FeatureCollection", "features": features})
-    return json.dumps({
-        "site_id": site_id, "transect": label, "transect_verified": verified, "length_m": result["length_m"],
+    return {
+        "site_id": site_id, "transect": label, "transect_verified": verified,
+        "bearing": bearing, "line_source": line_source, "length_m": result["length_m"],
         "baseline_m": result["baseline_m"], "features": result["features"],
         "outer_banks_span_m": result["outer_banks_span_m"], "max_relief_m": result["max_relief_m"],
         "documented": _documented(site), "transect_s3_url": url,
         "render": {"kind": "vector", "group": "terrain", "label": "label"},
-        "next_steps": ("Say the span and the bank and ditch offsets in metres, with the documented value beside "
-                       "your measurement; then display_visual(transect_s3_url, render=render)."),
-    })
+        "next_steps": _next_steps(result, label, line_source),
+    }
+
+
+@tool
+async def measure_profile(site_id: str, bearing: str = None) -> str:
+    """Measure an earthwork: the ground's height along a line across it, from the 1 m LiDAR DEM.
+
+    Args:
+        site_id: From find_known_site.
+        bearing: OPTIONAL the line you choose, one of "n-s", "ne-sw", "e-w", "nw-se": a 600 m line
+            through the site's centre in that direction. Choose it after looking at the local
+            relief, to cross the wall or ring you named. Omit it to measure the record's verified
+            line (find_known_site's has_verified_transect), or east-west through the centre when
+            the site has none. There is no other way to give a line: never coordinates.
+
+    Returns: JSON with transect (the line in words), bearing (the code, or null), line_source
+    ("verified": the record's line; "bearing": your line; "default": east-west through the centre),
+    transect_verified, baseline_m (the line's median height), features (each bank and ditch: where
+    along the line, height, offset from the baseline in metres), outer_banks_span_m (bank to bank;
+    null with fewer than two banks), documented (the record's dimensions, with metres beside feet),
+    transect_s3_url (the line and its banks and ditches for the map), next_steps. A bearing that is
+    not one of the four is an error and nothing is measured.
+    """
+    site = _site(site_id)
+    if site is None:
+        return _refusal()
+    built = manifest().get("sites", {}).get(site_id)
+    if not built:
+        return json.dumps({"error": f"No terrain is built for {site['names'][0]}."})
+    try:
+        code = _bearing(bearing)
+    except ValueError as e:
+        return json.dumps({"error": str(e)})
+    coords, label, verified, source = _line_for(site, code)
+    return json.dumps(_measure_line(site, built, coords, label, verified, bearing=code, line_source=source))
 
 
 def form_terms(text: str) -> set[str]:

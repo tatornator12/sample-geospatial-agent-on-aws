@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolCall } from '../types.ts';
 import {
+  BEARING_LABELS,
+  VERIFIED_TRANSECT_SITES,
   chosenCue,
   cueTally,
   cueTallyText,
@@ -153,6 +155,48 @@ describe('groupDetail: Earth Analyst', () => {
     expect(one('nearby_infrastructure', {})).toEqual({ text: 'Overture Maps, by type, within 2 km' });
     expect(one('registry_lookup', { radius_km: 3 })).toEqual({ text: 'OGIM public registry, operators of record, within 3 km' });
     expect(one('inspect_image', { s3_url: 's3://b/x.tif' })).toBeNull();
+  });
+});
+
+describe('groupDetail: AI Archaeologist', () => {
+  const measure = (params: Record<string, unknown>) => groupDetail(groupSteps([call('measure_profile', params)])[0]);
+
+  it("names the agent's own line from the four bearings, in the stage's words", () => {
+    expect(measure({ site_id: 'newark-octagon', bearing: 'n-s' })).toEqual({ text: "N–S, the agent's line" });
+    expect(measure({ site_id: 'newark-octagon', bearing: 'ne-sw' })).toEqual({ text: "NE–SW, the agent's line" });
+    expect(measure({ site_id: 'newark-octagon', bearing: 'e-w' })).toEqual({ text: "E–W, the agent's line" });
+    expect(measure({ site_id: 'newark-octagon', bearing: 'nw-se' })).toEqual({ text: "NW–SE, the agent's line" });
+    // The tool lower-cases and trims, so the stage does too.
+    expect(measure({ site_id: 'newark-octagon', bearing: ' NW-SE ' })).toEqual({ text: "NW–SE, the agent's line" });
+    // A bearing on the Great Circle is the agent's line, not the record's.
+    expect(measure({ site_id: 'newark-great-circle', bearing: 'e-w' })).toEqual({ text: "E–W, the agent's line" });
+  });
+
+  it("says the record's verified line, or the default line, when no bearing was given", () => {
+    expect(measure({ site_id: 'newark-great-circle' })).toEqual({ text: "The record's verified line" });
+    expect(measure({ site_id: 'newark-great-circle', bearing: null })).toEqual({ text: "The record's verified line" });
+    expect(measure({ site_id: 'newark-octagon' })).toEqual({ text: 'E–W through the centre, the default line' });
+    // A site id outside the list (or not a string) is never the record's line, and is never printed.
+    expect(measure({ site_id: 'Great Circle' })).toEqual({ text: 'E–W through the centre, the default line' });
+    expect(measure({ site_id: ['newark-great-circle'] })).toEqual({ text: 'E–W through the centre, the default line' });
+    expect(measure({})).toEqual({ text: 'E–W through the centre, the default line' });
+  });
+
+  it('prints nothing for a bearing outside the four', () => {
+    for (const bearing of ['<b>nw</b>', 'north-west', 'nw–se', '', 135, ['nw-se'], { nw: 'se' }, 'constructor', '__proto__']) {
+      expect(measure({ site_id: 'newark-octagon', bearing })).toBeNull();
+    }
+  });
+
+  it('reads the last call when the agent measured again after an error', () => {
+    const [g] = groupSteps([call('measure_profile', { site_id: 'newark-octagon', bearing: 'NW to SE' }), call('measure_profile', { site_id: 'newark-octagon', bearing: 'nw-se' })]);
+    expect(groupDetail(g)).toEqual({ text: "NW–SE, the agent's line" });
+  });
+
+  it('mirrors the tool: four bearings with en dashes, one verified site', () => {
+    expect(Object.keys(BEARING_LABELS)).toEqual(['n-s', 'ne-sw', 'e-w', 'nw-se']);
+    expect(Object.values(BEARING_LABELS).every((l) => /^[NSEW]{1,2}–[NSEW]{1,2}$/.test(l))).toBe(true);
+    expect(VERIFIED_TRANSECT_SITES).toEqual(['newark-great-circle']);
   });
 });
 

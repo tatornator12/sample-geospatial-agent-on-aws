@@ -109,6 +109,7 @@ class FakeS3:
         self.objects: dict[str, bytes] = {}
         self.copies: list[tuple[str, str]] = []
         self.fail_copy = False
+        self.fail_list = False
 
     def put_object(self, Bucket, Key, Body, ContentType=None):
         assert Bucket == BUCKET
@@ -126,6 +127,19 @@ class FakeS3:
             raise _NoSuchKey(CopySource["Key"])
         self.objects[Key] = self.objects[CopySource["Key"]]
         self.copies.append((CopySource["Key"], Key))
+
+    def head_object(self, Bucket, Key):
+        assert Bucket == BUCKET
+        if Key not in self.objects:
+            raise _NoSuchKey(Key)
+        return {"ContentLength": len(self.objects[Key])}
+
+    def list_objects_v2(self, Bucket, Prefix, MaxKeys=1000):
+        assert Bucket == BUCKET
+        if self.fail_list:
+            raise RuntimeError("AccessDenied")
+        keys = sorted(k for k in self.objects if k.startswith(Prefix))[:MaxKeys]
+        return {"Contents": [{"Key": k} for k in keys]} if keys else {}
 
 
 def manifest_for(sites) -> dict:

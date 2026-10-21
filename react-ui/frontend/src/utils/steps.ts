@@ -229,6 +229,27 @@ function listed(items: string[]): string {
   return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
+// The AI Archaeologist's line (agents/ai-archaeologist/site_tools.py BEARINGS, same keys; pinned by
+// tests/test_stage_mirror.py): the agent picks one of four bearings through the site's centre, and
+// the stage prints its own label for it, never the model's string.
+export const BEARING_LABELS: Readonly<Record<string, string>> = { 'n-s': 'N–S', 'ne-sw': 'NE–SW', 'e-w': 'E–W', 'nw-se': 'NW–SE' };
+// The catalogue's sites with a stored verified transect (agents/ai-archaeologist/data/sites_v1.json):
+// measured with no bearing, they are read on the record's line.
+export const VERIFIED_TRANSECT_SITES: readonly string[] = ['newark-great-circle'];
+
+/** Which line measure_profile read, from its last call's inputs: the agent's bearing, the record's line, or the default. */
+function measureLine(group: StepGroup): { text: string } | null {
+  const params = group.calls[group.calls.length - 1]?.params ?? {};
+  const bearing = params.bearing;
+  if (bearing === undefined || bearing === null) {
+    return typeof params.site_id === 'string' && VERIFIED_TRANSECT_SITES.includes(params.site_id)
+      ? { text: "The record's verified line" }
+      : { text: 'E–W through the centre, the default line' };
+  }
+  const code = typeof bearing === 'string' ? bearing.trim().toLowerCase() : '';
+  return Object.prototype.hasOwnProperty.call(BEARING_LABELS, code) ? { text: `${BEARING_LABELS[code]}, the agent's line` } : null;
+}
+
 /** The "skipping …" line: the scenes the agent inspected and turned down, across the group's calls. */
 function skipping(group: StepGroup): { mono?: string } {
   const days = excludedDays(group.calls.flatMap((c) => excludedDays(c.params?.exclude_dates)));
@@ -238,7 +259,8 @@ function skipping(group: StepGroup): { mono?: string } {
 /**
  * The line under a step: the watch areas a scan covered, or the point EMIT was cued on (with the
  * adapt line when a TROPOMI tip came first); for the Earth Analyst, the scene window and the scenes
- * it skipped, or the area that chose the embedding grid. Null when there is nothing safe to say.
+ * it skipped, or the area that chose the embedding grid; for the AI Archaeologist, the line it
+ * measured. Null when there is nothing safe to say.
  */
 export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text: string; mono?: string; points?: string[] } | null {
   if (group.name === 'scan_tropomi') {
@@ -311,6 +333,8 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
       ...(dates ? { mono: `${dates[0]} · ${dates[1]}` } : {}),
     };
   }
+  // The AI Archaeologist: the line it measured, its own bearing or the record's line.
+  if (group.name === 'measure_profile') return measureLine(group);
   return null;
 }
 

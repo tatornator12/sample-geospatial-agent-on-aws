@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py --agent archaeologist. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear anywhere in the stream (the agent's words and its tool inputs). reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. The terrain is pre-built (scripts/build_site_catalogue.py); nothing here reads 3DEP live. The three act beats come first, then the provocations that must decline with the fixed sentences and call no search.",
+  "_comment": "Golden prompts for scripts/eval.py --agent archaeologist. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear anywhere in the stream (the agent's words and its tool inputs). reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. The terrain is pre-built (scripts/build_site_catalogue.py); nothing here reads 3DEP live. The act beats come first (great-circle-measure and octagon-wall-measure are the stage's two measure plates, word for word: the Great Circle on the record's verified line with no bearing, the Octagon on a bearing the agent picks after inspecting the local relief, so inspect_image comes before measure_profile; 'I cannot confirm a bank on this line.' is a pass), then the provocations that must decline with the fixed sentences and call no search.",
   "prompts": [
     {
       "name": "octagon-from-space",
@@ -30,8 +30,35 @@
       ]
     },
     {
+      "name": "octagon-wall-measure",
+      "prompt": "Measure across a wall of the Newark Octagon, on a line you choose from the local relief.",
+      "expected_tools": [
+        "find_known_site",
+        "show_terrain",
+        "inspect_image",
+        "measure_profile"
+      ],
+      "forbidden_text": [
+        "Error:",
+        "discovered",
+        "discovery",
+        "uncovered",
+        "new site"
+      ],
+      "warn_text": [
+        "\u2014"
+      ],
+      "closer_max_chars": 280,
+      "closer_forbidden": [
+        "°N",
+        "°W",
+        "40.05",
+        "-82.4"
+      ]
+    },
+    {
       "name": "great-circle-measure",
-      "prompt": "How big is the Great Circle at Newark, and how was it built?",
+      "prompt": "Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?",
       "required_tools": [
         "find_known_site",
         "show_terrain",

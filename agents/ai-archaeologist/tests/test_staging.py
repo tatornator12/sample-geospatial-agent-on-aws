@@ -10,7 +10,8 @@ import pytest
 AGENT_DIR = Path(__file__).resolve().parents[1]
 GEO_AGENT_DIR = AGENT_DIR.parents[1] / "geo_agent"
 STAGE = GEO_AGENT_DIR / "stage_shared.sh"
-AGENT_MODULES = ["_paths.py", "archaeo_config.py", "ai_archaeologist.py", "site_tools.py", "earthwork_profile.py"]
+AGENT_MODULES = ["_paths.py", "archaeo_config.py", "ai_archaeologist.py", "site_tools.py", "earthwork_profile.py",
+                 "display_tools.py"]
 
 
 def _allowlist():

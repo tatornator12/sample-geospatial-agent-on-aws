@@ -81,6 +81,8 @@ def test_no_tool_can_place_a_point_outside_the_catalogue(entry):
     names = [t.__name__ for t in entry.LOCAL_TOOLS]
     assert names[:4] == ["find_known_site", "show_terrain", "measure_profile", "find_similar_sites"]
     assert {"display_visual", "inspect_image", "get_rasters"} <= set(names)
+    # display_visual is the agent's own, with the session-file check (act4 P0-2).
+    assert next(t for t in entry.LOCAL_TOOLS if t.__name__ == "display_visual").__module__ == "display_tools"
     for open_search in ("create_bbox_from_coordinates", "find_similar_places", "scan_region_change",
                         "find_location_boundary", "bbox_around_point"):
         assert open_search not in names
@@ -96,6 +98,23 @@ def test_prompt_carries_the_fixed_sentences_and_the_wording_rules():
         assert sentence in p
     assert '"discovered"' in p and '"new site"' in p and "No em dashes" in p
     assert "—" not in p
+
+
+def test_prompt_lets_the_agent_choose_the_line_and_show_only_the_files_it_was_given():
+    import archaeo_config as c
+    import site_tools
+    p = c.build_prompt("2026-10-20")
+    # The display check's retry, and the URL passed unchanged (act4 P0-2).
+    assert "did_you_mean" in p and "exactly as the tool returned it" in p
+    # Workflow B: the record's line when there is one, else the agent's own bearing after a look.
+    assert "has_verified_transect" in p and "line_source" in p
+    for code in site_tools.BEARINGS:
+        assert f'"{code}"' in p
+    # No bank on the line is a designed outcome (PRODUCT.md principle 2), in the tool's own words.
+    assert site_tools.NO_BANK == "I cannot confirm a bank on this line." and site_tools.NO_BANK in p
+    # Workflow C opens on the top match's name, never on "The LiDAR" (act4 P1-5).
+    assert "FIRST LINE starts with the top match's name" in p and 'Never open with "The LiDAR"' in p
+    assert "\u2014" not in p and "\u2013" not in p
 
 
 _CASE = {

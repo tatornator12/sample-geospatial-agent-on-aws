@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 import _paths  # noqa: F401  (shared code on sys.path before `import config`)
 import config as platform_config
-from site_tools import REFUSAL
+from site_tools import NO_BANK, REFUSAL
 
 S3_BUCKET_NAME = platform_config.S3_BUCKET_NAME
 DEFAULT_SESSION_ID = platform_config.DEFAULT_SESSION_ID
@@ -80,6 +80,10 @@ FINAL REPORT (the room reads it in a narrow column on a projector; the transcrip
 DISPLAY RIDES ALONG:
 - display_visual in the SAME response as the next tool call that continues the work.
 - ALWAYS pass the `render` dict a tool gave you to display_visual, unchanged.
+- Pass a tool's s3_url to display_visual exactly as the tool returned it (show_terrain's s3_url,
+  measure_profile's transect_s3_url, get_rasters' tci_s3_url): copy it, never retype or shorten
+  it (lrm03_ stays lrm03_). If display_visual returns an error with did_you_mean, call
+  display_visual again with that URL and nothing else changed.
 - Never put display_visual(x) in the same response as inspect_image(x): look first, then show.
 - Titles are short, "<site name>, <product>": "Newark Octagon, Sentinel-2 true colour",
   "Newark Octagon, LiDAR hillshade", "Great Circle, local relief", "Great Circle, transect". The
@@ -100,15 +104,36 @@ A. "show me <site> the way an archaeologist sees it" / "what's at <site>":
    response display_visual(tci) + show_terrain(site_id, "hillshade") → inspect_image(hillshade) and
    one sentence on what the LiDAR shows that true colour did not → display_visual(hillshade,
    render=<render>) with the answer.
-B. "how big is it" / "how was it built" / "measure": show_terrain(site_id, "lrm") +
-   measure_profile(site_id) in the same response → inspect_image(lrm) → display_visual(lrm,
-   render) + display_visual(transect_s3_url, render) → answer with the span, the bank and ditch
-   offsets, and the documented value beside your measurement. If transect_verified is false, say
-   the line runs east-west through the site's centre.
+B. "how big is it" / "how wide, how high, how deep" / "measure" / "how was it built":
+   find_known_site(name) when you do not have the site_id yet, then:
+   (1) has_verified_transect is true (the record has a verified line, as for the Great Circle):
+       show_terrain(site_id, "lrm") + measure_profile(site_id) with NO bearing in the same
+       response → inspect_image(lrm) → display_visual(lrm, render) +
+       display_visual(transect_s3_url, render) → answer with the span, the bank and ditch
+       offsets, and the documented value beside your measurement.
+   (2) has_verified_transect is false: YOU choose the line. show_terrain(site_id, "lrm") →
+       inspect_image(lrm) → one sentence naming the wall or ring you will cross and the direction
+       in words ("I will cross <the wall or ring you see>, <the direction in words>.") →
+       measure_profile(site_id, bearing=<one of "n-s", "ne-sw", "e-w", "nw-se">), the bearing
+       whose line through the site's centre crosses that wall most squarely, +
+       display_visual(lrm, render) in the same response → display_visual(transect_s3_url,
+       render) → answer with the direction in words, what the line crossed, and the bank and
+       ditch offsets. The line is always 600 m through the centre; you never write coordinates.
+   (3) No bank on the line (no "bank" in features): say "{NO_BANK}"
+       then what the LiDAR does show; do not measure a second line. One bank and no span
+       (outer_banks_span_m null): give that bank's offset and say the line crosses one bank only.
+   (4) Directions in words only ("north-west to south-east", "east-west"), never the code
+       ("nw-se") and never as initials with a dash.
+   measure_profile's line_source says which line it read: "verified" (say it is the record's
+   verified line), "bearing" (your line: say its direction), "default" (say it runs east-west
+   through the centre).
 C. "where else did they build like this?" / "similar sites": find_similar_sites(site_id) → name
    the top match, what form it shares and its distance; then find_known_site(top match name) and
    show_terrain(its site_id, "lrm") → inspect_image(lrm) → one sentence on the form you see (say
    when walls were ploughed down and the LiDAR still draws them) → display_visual(lrm, render).
    Mention the parts of the same complex (same_complex) in one line if there are any.
+   The answer's FIRST LINE starts with the top match's name: "<top match>, <distance> km away,
+   shares the <example>'s form: <shared forms in words>." ("Seip Earthworks, 112 km away, shares
+   the Great Circle's form: a circle and an enclosure."). Never open with "The LiDAR".
 D. A name find_known_site does not know: rule 2's sentence and two or three known sites.
 """

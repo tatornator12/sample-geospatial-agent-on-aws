@@ -1,12 +1,18 @@
 """Measure what it sees (requirement 4): banks, ditches and the span on a synthetic earthwork with
 known dimensions, through the pure profile module and through the tool."""
 import asyncio
+import inspect
 import json
+import math
 
 import numpy as np
+import pytest
+from rasterio.warp import transform as warp_transform
 
 import earthwork_profile as ep
 from conftest import (BANK_H, BANK_R, CENTRE_UTM, DITCH_D, GROUND_M, SESSION, lonlat, make_dem)
+
+PROFILE_KEY = f"session_data/{SESSION}/terrain/profile_newark-great-circle.geojson"
 
 
 def _run(coro):
@@ -108,16 +114,83 @@ def test_without_a_verified_transect_it_crosses_the_centre_east_west(tools, monk
     body = json.loads(_run(tools.measure_profile("newark-great-circle")))
     assert body["transect_verified"] is False and body["transect"].startswith("east-west through the centre")
     assert abs(body["outer_banks_span_m"] - 2 * BANK_R) <= 3
+    assert body["line_source"] == "default" and body["bearing"] is None
 
 
-def test_a_given_transect_must_be_inside_the_frame_and_a_sane_length(tools, monkeypatch, tmp_path):
+def test_no_bearing_keeps_the_record_s_verified_line(tools, monkeypatch, tmp_path):
+    _synthetic_site(tools, monkeypatch, tmp_path)
+    body = json.loads(_run(tools.measure_profile("newark-great-circle")))
+    assert body["line_source"] == "verified" and body["bearing"] is None and body["transect"] == "east-west (430 m)"
+    assert "record's verified line" in body["next_steps"]
+
+
+def _utm(coords):
+    xs, ys = warp_transform("EPSG:4326", "EPSG:32617", [c[0] for c in coords], [c[1] for c in coords])
+    return list(zip(xs, ys))
+
+
+# The agent's line (decision 9): one of four bearings through the centre, 600 m, never coordinates.
+# The azimuth runs from the line's first point to its last (the western end first; N-S from the north).
+@pytest.mark.parametrize("code, words, azimuth", [
+    ("n-s", "north-south", 180), ("ne-sw", "north-east to south-west", 45),
+    ("e-w", "east-west", 90), ("nw-se", "north-west to south-east", 135),
+])
+def test_each_bearing_crosses_the_ring_through_the_centre(tools, fake_s3, monkeypatch, tmp_path, code, words, azimuth):
+    _synthetic_site(tools, monkeypatch, tmp_path)
+    body = json.loads(_run(tools.measure_profile("newark-great-circle", code)))
+    assert abs(body["length_m"] - tools.DEFAULT_TRANSECT_M) <= 2
+    assert abs(body["outer_banks_span_m"] - 2 * BANK_R) <= 3
+    assert body["line_source"] == "bearing" and body["bearing"] == code and body["transect_verified"] is False
+    assert body["transect"] == f"{words} through the centre (600 m)"
+    assert words in body["next_steps"] and "never the code" in body["next_steps"]
+    line = json.loads(fake_s3.objects[PROFILE_KEY])["features"][0]
+    assert line["properties"]["label"] == body["transect"]
+    (x0, y0), (x1, y1) = _utm(line["geometry"]["coordinates"])
+    # UTM grid north is within about a degree of true north this far from the zone's meridian.
+    got = math.degrees(math.atan2(x1 - x0, y1 - y0)) % 360
+    assert abs(got - azimuth) < 1.5
+    assert math.hypot((x0 + x1) / 2 - CENTRE_UTM[0], (y0 + y1) / 2 - CENTRE_UTM[1]) < 2
+
+
+def test_the_nw_se_line_runs_from_its_north_west_end(tools, fake_s3, monkeypatch, tmp_path):
+    _synthetic_site(tools, monkeypatch, tmp_path)
+    json.loads(_run(tools.measure_profile("newark-great-circle", " NW-SE ")))
+    (lon0, lat0), (lon1, lat1) = json.loads(fake_s3.objects[PROFILE_KEY])["features"][0]["geometry"]["coordinates"]
+    assert lon0 < lon1 and lat0 > lat1
+
+
+def test_a_bearing_outside_the_four_is_an_error_and_writes_nothing(tools, fake_s3, monkeypatch, tmp_path):
+    _synthetic_site(tools, monkeypatch, tmp_path)
+    for bad in ("north-west", "nw\u2013se", "NW SE", "", "<b>nw</b>", 135, [[0, 0], [1, 1]]):
+        body = json.loads(_run(tools.measure_profile("newark-great-circle", bad)))
+        assert body["error"].startswith("bearing must be one of n-s, ne-sw, e-w, nw-se"), bad
+    assert PROFILE_KEY not in fake_s3.objects
+    assert json.loads(_run(tools.measure_profile("somewhere-else", "e-w")))["error"] == tools.REFUSAL
+
+
+def test_a_line_with_no_bank_says_it_cannot_confirm_one(tools, monkeypatch, tmp_path):
     site = _synthetic_site(tools, monkeypatch, tmp_path)
+    built = tools.manifest()["sites"]["newark-great-circle"]
+    inside = [list(lonlat(*CENTRE_UTM)), list(lonlat(CENTRE_UTM[0] + 150, CENTRE_UTM[1]))]
+    body = tools._measure_line(site, built, inside, "inside the ring", False, line_source="bearing")
+    assert body["features"] == [] and body["outer_banks_span_m"] is None
+    assert tools.NO_BANK == "I cannot confirm a bank on this line." and tools.NO_BANK in body["next_steps"]
+    one = [list(lonlat(*CENTRE_UTM)), list(lonlat(CENTRE_UTM[0] + 250, CENTRE_UTM[1]))]
+    body = tools._measure_line(site, built, one, "to the east bank", False, line_source="bearing")
+    assert [f["kind"] for f in body["features"]] == ["ditch", "bank"] and body["outer_banks_span_m"] is None
+    assert "one bank" in body["next_steps"] and tools.NO_BANK not in body["next_steps"]
+
+
+def test_a_line_must_be_inside_the_frame_and_a_sane_length(tools, monkeypatch, tmp_path):
+    site = _synthetic_site(tools, monkeypatch, tmp_path)
+    built = tools.manifest()["sites"]["newark-great-circle"]
     a, b = site["transect"]["coords"]
-    ok = json.loads(_run(tools.measure_profile("newark-great-circle", json.dumps([a, b]))))
-    assert "error" not in ok and ok["transect"] == "the given transect"
+    ok = tools._measure_line(site, built, [a, b], "a test line", False, line_source="default")
+    assert "error" not in ok and ok["transect"] == "a test line"
     far = [[a[0] + 1.0, a[1]], [b[0] + 1.0, b[1]]]
-    assert "inside the site's frame" in json.loads(_run(tools.measure_profile("newark-great-circle", far)))["error"]
+    assert "inside the site's frame" in tools._measure_line(site, built, far, "far", False)["error"]
     short = [a, [a[0] + 0.0001, a[1]]]
-    assert "50 to 3000 m" in json.loads(_run(tools.measure_profile("newark-great-circle", short)))["error"]
-    assert "must be [[lon, lat]" in json.loads(_run(tools.measure_profile("newark-great-circle", [[1, 2]])))["error"]
+    assert "50 to 3000 m" in tools._measure_line(site, built, short, "short", False)["error"]
     assert json.loads(_run(tools.measure_profile("somewhere-else")))["error"] == tools.REFUSAL
+    # The model can no longer write a line: the tool takes a site and, at most, one of four bearings.
+    assert list(inspect.signature(tools.measure_profile).parameters) == ["site_id", "bearing"]

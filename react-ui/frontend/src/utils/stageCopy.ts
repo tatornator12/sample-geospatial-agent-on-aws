@@ -55,12 +55,15 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
     ],
     placeholder: 'Ask for a Methane Watch brief, or name a region and a year',
   },
-  // The AI Archaeologist's three beats (design.md, Act 4 run sheet); known sites only, so the
-  // placeholder asks for a name on the record, never for "any place".
+  // The AI Archaeologist's beats (design.md, Act 4 run sheet); known sites only, so the
+  // placeholder asks for a name on the record, never for "any place". The prompts are the golden ones.
   archaeologist: {
     prompts: [
       { label: 'The Octagon, from space', prompt: 'Show me the Newark Octagon the way an archaeologist sees it' },
-      { label: 'Measure the Great Circle', prompt: 'How big is the Great Circle, and how was it built?' },
+      // The agent picks the line from the local relief (decision 9; golden octagon-wall-measure).
+      { label: 'Measure an Octagon wall', prompt: 'Measure across a wall of the Newark Octagon, on a line you choose from the local relief.' },
+      // What the LiDAR can answer, not "how was it built?", which prompt rule 4 limits (stage review D10, act4 P1-10).
+      { label: 'Measure the Great Circle', prompt: 'Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?' },
       { label: 'Where else, like this', prompt: 'Where else did they build like this?' },
     ],
     placeholder: 'Name a known site, or ask how they built it',
