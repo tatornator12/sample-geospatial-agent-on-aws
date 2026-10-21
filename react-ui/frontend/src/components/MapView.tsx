@@ -178,6 +178,8 @@ interface MapViewProps {
   geometry: GeometryData | null;
   rasters: RasterData[];
   onDrawnGeometry?: (geojson: any) => void;
+  /** The draw rail (drop a point, draw a polygon). Off on the archaeologist's act: nothing is marked there that is not on the record. */
+  drawRail?: boolean;
   /** The agent is working this turn: the watch globe turns until the first finding lands. */
   working?: boolean;
   /** The TROPOMI tips by watch area, drawn on the globe as they load. */
@@ -226,7 +228,7 @@ function onStyle(m: maplibregl.Map, fn: () => void) {
   m.once('idle', run);
 }
 
-export function MapView({ geometry, rasters, onDrawnGeometry, working = false, tips = [], vesselRest = null, tasking, onTaskingFiled }: MapViewProps) {
+export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, working = false, tips = [], vesselRest = null, tasking, onTaskingFiled }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
@@ -2378,6 +2380,19 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
     setDrawMode('none');
   };
 
+  // The rail leaves (the archaeologist's act): no drawing mode or drawn shape stays behind it.
+  useEffect(() => {
+    if (drawRail) return;
+    try {
+      draw.current?.deleteAll();
+      draw.current?.changeMode('simple_select');
+    } catch {
+      // The draw control is not connected yet (the map is still loading): nothing is drawn.
+    }
+    setDrawMode('none');
+    setHasDrawnFeatures(false);
+  }, [drawRail]);
+
   // Send drawn geometry to chat
   const sendDrawnGeometryToChat = () => {
     if (!draw.current || !onDrawnGeometry) return;
@@ -3547,7 +3562,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
         />
       )}
 
-      {/* Bottom left: the draw rail */}
+      {/* Bottom left: the draw rail (not on the archaeologist's act) */}
+      {drawRail && (
       <nav className="map-plate map-rail" aria-label="Draw an area">
         <button
           type="button"
@@ -3605,6 +3621,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, working = false, t
           </>
         )}
       </nav>
+      )}
 
       {/* Bottom right: the basemap plate (the sea's ground is the seabed, not a choice) */}
       {seaOn ? (

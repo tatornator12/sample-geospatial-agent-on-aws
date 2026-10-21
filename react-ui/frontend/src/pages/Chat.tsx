@@ -488,7 +488,10 @@ export function Chat() {
             key={sessionId}
             geometry={currentGeometry}
             rasters={currentRasters}
-            onDrawnGeometry={handleDrawnGeometry}
+            // No drawing on the archaeologist's act: a shape over unrecorded ground is the one way
+            // the stage could look as if it marked a new site (only the public record is shown).
+            drawRail={selectedAgentId !== 'archaeologist'}
+            onDrawnGeometry={selectedAgentId !== 'archaeologist' ? handleDrawnGeometry : undefined}
             working={agentWorking}
             tips={tips}
             vesselRest={selectedAgentId === 'vessels' ? vesselRest : null}
