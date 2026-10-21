@@ -89,6 +89,9 @@ describe('the board and the lines, from the files', () => {
     render(<StepColumn steps={tools} live={false} vessel={stage()} />);
 
     await waitFor(() => expect(lines()).toContain('Checked: This pass can check 19% of the reserve, over the 15% standard.'));
+    // The decision file is asked for only once the board names the question, so it can land after the
+    // heard file (gate B: under a parallel run it did).
+    await waitFor(() => expect(lines()).toContain('Decided: Reading Oct 12: the newest pass that saw over half the reserve (53%).'));
     expect(text()).toContain('Weigh the passes on file');
     expect(text()).toContain('Look at the radar');
     expect(text()).not.toMatch(/Put it on the map|could be heard/);
@@ -159,6 +162,8 @@ describe('two questions in one session (review L3)', () => {
     view.rerender(<StepColumn steps={second} live={false} vessel={stage({ turnSentAt: 2000 })} />);
 
     await waitFor(() => expect(lines()).toContain('Checked: This pass can check 22% of the reserve, over the 15% standard.'));
+    // The second decision waits for the second board, so it can land after the rewritten heard file.
+    await waitFor(() => expect(lines()).toContain('Decided: Reading Oct 12, as asked. It saw 53% of the reserve.'));
     expect(lines()).toEqual([
       'Decided: Reading Oct 12, as asked. It saw 53% of the reserve.',
       'Checked: This pass can check 22% of the reserve, over the 15% standard.',
