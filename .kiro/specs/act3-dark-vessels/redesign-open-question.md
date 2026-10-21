@@ -491,7 +491,7 @@ Every block, kept, replaced or deleted:
 | Block | Lines | What happens to it |
 |---|---|---|
 | Intro | 31-35 | Kept, with "check where AIS was being received at that hour" |
-| HARD RULES 1 to 7 | 37-58 | Kept, with two changes. Rule 1 reads "Every pass comes from list_passes, find_pass or reachable_area … name the passes from list_passes". In rule 2, "Unproven water is …" becomes "Where AIS reception is unknown, no AIS proves nothing: a target there is never a candidate." |
+| HARD RULES 1 to 7 | 37-58 | Kept, with two changes. Rule 1 reads "Every pass comes from list_passes, find_pass or reachable_area … name the passes from list_passes". In rule 2, "Unproven water is …" becomes "Where AIS reception is unknown, no AIS proves nothing: a target there is never a candidate." (Gate A attempt 2 adds "with both of its areas on the map" after check_ais_coverage in rule 2's order.) |
 | RESPONSE STYLE | 60-63 | Kept |
 | FINAL REPORT | 65-80 | Deleted (replaced by ANSWER) |
 | CONFIDENCE | 82-83 | Deleted (it says "heard water") |
@@ -543,8 +543,9 @@ it, no heading and no "---"; no tables, no coordinates). A <date> is the month's
 the day, with no year. It depends on how the question ended:
 - A draft, with candidates. FIRST LINE "<n> candidates on the <date> pass; I drafted box <k> for
   the next look." Then at most four bullets, one line each, in these words: the pass, "Read <date>
-  (<c>% checkable); data from Global Fishing Watch." or, with a pass set aside, "Read <date> (<c>%
-  checkable) after setting <date> aside (<c>%); data from Global Fishing Watch."; the candidates,
+  (<c>% checkable); data from Global Fishing Watch." or, only if you read another pass first and
+  set it aside, "Read <date> (<c>% checkable) after setting <date2> aside (<c2>%); data from Global
+  Fishing Watch."; the candidates,
   "Candidates <ids>: <a> to <b> km from port." (at most four ids, then "and <N> more");
   gather_evidence's say_else, word for word; the forecast's say, word for word. Then the candidate
   sentence. END with one paragraph: "{OFFICERS_DECISION} {CLOSER}".
@@ -571,7 +572,10 @@ passes in one sentence, and the gone-silent spare ends on the closer its golden 
 tool strings say the same: `check_ais_coverage` asks for both areas "with your next call, as two
 display_visual calls"; `reachable_area` asks for `find_pass` "with your next call" and ends "end with
 one short paragraph that ends with the closer"; `draft_tasking` says "Write the answer now (at most
-120 words), beginning with its first line". No tool order is added to the prompt (R2.2).
+120 words), beginning with its first line". Hard rule 2's evidence order reads "check_ais_coverage
+with both of its areas on the map, match_ais", and `match_ais`'s `pass_id` argument says the same,
+because two of five checked reads in attempt 2's first run still showed one area. No other tool
+order is added to the prompt (R2.2).
 
 **Tool strings the model reads**, reworded so the retired words cannot come back through it:
 
