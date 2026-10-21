@@ -11,6 +11,8 @@ import remarkGfm from 'remark-gfm';
 import type { Message, ToolCall, GeometryData, RasterData } from '../types.ts';
 import { ToolCallDisplay } from './ToolCallDisplay.tsx';
 import { StepColumn } from './StepColumn.tsx';
+import { EarlierTurns } from './EarlierTurns.tsx';
+import { NarrationLine } from './NarrationLine.tsx';
 import { EvidencePlate } from './EvidencePlate.tsx';
 import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
@@ -20,7 +22,8 @@ import { currentBriefId } from '../utils/brief.ts';
 import { BriefCard } from './BriefCard.tsx';
 import { stagePunctuation } from '../utils/caption.ts';
 import { profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
-import { twoColumnTables } from '../utils/tables.ts';
+import { pastTurns, stageAnswerText } from '../utils/turns.ts';
+import { boundedSaw, latestNarration, sawByTool, withSaw } from '../utils/narration.ts';
 import { stepColumnMaxHeight } from '../utils/stageLayout.ts';
 import { streamAgentInvoke, loadGeometry, stopRuntimeSession } from '../services/api.ts';
 import {
@@ -55,6 +58,24 @@ function loadToolCallsFromConfig(config: ScenarioConfig): ToolCall[] {
     result: tool.result || `Completed ${tool.name}`,
   }));
 }
+
+/** A recorded call's `saw` (what the agent said it saw), by the replayed call's id; none recorded today. */
+function recordedSaw(config: ScenarioConfig, tools: ToolCall[]): Record<string, string> | undefined {
+  const calls: unknown = (config as { tool_calls?: unknown }).tool_calls;
+  if (!Array.isArray(calls)) return undefined;
+  const saw: Record<string, string> = {};
+  calls.forEach((call: unknown, i: number) => {
+    const text = boundedSaw(call && typeof call === 'object' ? (call as { saw?: unknown }).saw : undefined);
+    if (text && tools[i]) saw[tools[i].id] = text;
+  });
+  return Object.keys(saw).length > 0 ? saw : undefined;
+}
+
+interface StreamNarration {
+  latest: string | null;
+  saw: Record<string, string>;
+}
+const NO_NARRATION: StreamNarration = { latest: null, saw: {} };
 
 
 
@@ -120,6 +141,9 @@ export function ChatSidebar({
   const [userInput, setUserInput] = useState('');
   const [streamingText, setStreamingText] = useState('');
   const [streamingTools, setStreamingTools] = useState<ToolCall[]>([]);
+  // The agent's own words while it works: its latest finished sentence (under the lit step) and
+  // what it said it saw after each inspect_image (under the chip), as utils/narration.ts reads them.
+  const [streamNarration, setStreamNarration] = useState<StreamNarration>(NO_NARRATION);
   const [isStreaming, setIsStreaming] = useState(false);
   useEffect(() => {
     onWorkingChange?.(isStreaming);
@@ -162,6 +186,7 @@ export function ChatSidebar({
     setUserInput('');
     setStreamingText('');
     setStreamingTools([]);
+    setStreamNarration(NO_NARRATION);
     setIsStreaming(false);
     setIsProcessing(false);
     scenarioDisplayedRef.current = false;
@@ -243,9 +268,10 @@ export function ChatSidebar({
 
       // Set initial messages with scenario-specific user question
       const userQuestion = (scenarioConfig as any).user_question || 'Analyze this area';
+      const saw = recordedSaw(scenarioConfig, simulatedTools);
       setMessages([
         { role: 'user', content: userQuestion },
-        { role: 'assistant', content: analysisText, tools: simulatedTools },
+        { role: 'assistant', content: analysisText, tools: simulatedTools, ...(saw ? { saw } : {}) },
       ]);
 
       scenarioDisplayedRef.current = true;
@@ -327,6 +353,9 @@ export function ChatSidebar({
     setIsStreaming(true);
     setStreamingText('');
     setStreamingTools([]);
+    setStreamNarration(NO_NARRATION);
+    // The words last put on the stage this turn, so a chunk that changes nothing re-renders nothing.
+    let narrationKey = '';
 
     const locationChanged = extractLocationChanged('', []);
 
@@ -402,6 +431,13 @@ export function ChatSidebar({
             }
 
             setStreamingText(cleanText);
+
+            const narration = { latest: latestNarration(fullResponse), saw: sawByTool(fullResponse) };
+            const key = JSON.stringify(narration);
+            if (key !== narrationKey) {
+              narrationKey = key;
+              setStreamNarration(narration);
+            }
 
             // Update accumulated tools (merge with existing to avoid duplicates)
             const existingIds = new Set(accumulatedTools.map((t) => t.id));
@@ -522,6 +558,7 @@ export function ChatSidebar({
       }));
 
       if (stale()) return;
+      const saw = sawByTool(fullResponse, { finished: true });
       setMessages((prev) => [
         ...prev,
         {
@@ -529,6 +566,7 @@ export function ChatSidebar({
           content: cleanText,
           answer: finalAnswer(fullResponse),
           tools: completedTools.length > 0 ? completedTools : undefined,
+          ...(Object.keys(saw).length > 0 ? { saw } : {}),
         },
       ]);
     } catch (error) {
@@ -573,15 +611,21 @@ export function ChatSidebar({
   // narrative, or a stopped or failed turn's one line, has no answer field and stands as is).
   // Two columns at most in the column (tables.ts): a third column the model wrote anyway folds
   // into the second, so the room never reads a value with its documented figure cut off.
-  const answerText = !isStreaming && lastAssistant
-    ? twoColumnTables(stagePunctuation((lastAssistant.answer ?? lastAssistant.content).trim()))
-    : '';
+  const answerText = !isStreaming && lastAssistant ? stageAnswerText(lastAssistant.answer ?? lastAssistant.content) : '';
   const answerFailed = /^Error:/.test(answerText);
+  // The turns before the one on the stage, as records the presenter can reopen above its question.
+  const lastUserIndex = messages.map((m) => m.role).lastIndexOf('user');
+  const earlierTurns = useMemo(() => pastTurns(messages), [messages]);
 
   // Where the agent is: this turn's tools while working, the last turn's when finished.
   const stepTools = isStreaming ? streamingTools : lastAssistant?.tools || [];
-  // What the agent looked at: the inspect_image steps of the same turn.
-  const evidence = extractEvidence(stepTools, sessionId);
+  // What the agent looked at: the inspect_image steps of the same turn, each with what the agent
+  // said it saw (Dark Vessels' chips keep their titles alone: its copy is its own act's).
+  const showSaw = agentId !== 'vessels';
+  const evidence = withSaw(
+    extractEvidence(stepTools, sessionId),
+    showSaw ? (isStreaming ? streamNarration.saw : lastAssistant?.saw) : undefined
+  );
   // Where this session's methane files live (the pass filmstrip reads its manifest there): from
   // any s3_url a tool was given in this session, this turn first.
   const methaneDir = methaneDirFrom([...stepTools, ...messages.flatMap((m) => m.tools ?? [])], sessionId);
@@ -627,7 +671,7 @@ export function ChatSidebar({
   const draftedBrief = stepTools.some((t) => t.name === 'draft_brief');
   const showBrief = !!briefId && !isStreaming;
   const showAnswer = !isStreaming && !!answerText && !(showBrief && draftedBrief);
-  const showColumn = isStreaming || stepTools.length > 0 || showAnswer;
+  const showColumn = isStreaming || stepTools.length > 0 || showAnswer || earlierTurns.length > 0;
   const columnTitle = isStreaming ? 'The agent is working' : stepTools.length > 0 ? 'What the agent did' : 'What the agent said';
   const [stepsOpen, setStepsOpen] = useState(true);
   // The same count the column's "Show all N steps" uses (consecutive calls of one tool are one step).
@@ -670,6 +714,13 @@ export function ChatSidebar({
   useEffect(() => {
     if (showAnswer && stepsOpen) answerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [showAnswer, stepsOpen, answerText]);
+  // While the agent works, the lit step and its sentence stay in view under the earlier turns'
+  // rows (unless the presenter has a record open).
+  const liveEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isStreaming || !stepsOpen || columnRef.current?.querySelector('.earlier-turn__record')) return;
+    liveEndRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [isStreaming, stepsOpen, streamingTools.length, streamNarration.latest]);
 
   return (
     <>
@@ -703,6 +754,19 @@ export function ChatSidebar({
           </div>
           {stepsOpen && (
             <>
+              {earlierTurns.length > 0 && (
+                <EarlierTurns
+                  // A new turn closes any record the presenter had open, so the live steps lead.
+                  key={`earlier-${lastUserIndex}`}
+                  turns={earlierTurns}
+                  sessionId={sessionId}
+                  speaker={speaker}
+                  showSaw={showSaw}
+                  onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
+                  methaneDir={methaneDir}
+                  profiles={profiles}
+                />
+              )}
               {lastUser && <p className="stage-steps__ask" title={lastUser.content}>{lastUser.content}</p>}
               {stepTools.length > 0 && (
                 <StepColumn
@@ -714,10 +778,14 @@ export function ChatSidebar({
                   tips={tips}
                   compact={showBrief && draftedBrief}
                   profiles={profiles}
-                  key={`steps-${briefId ?? 'live'}`}
+                  // One column per turn: a new turn starts with its earlier steps folded again.
+                  key={`steps-${briefId ?? lastUserIndex}`}
                 />
               )}
               {isStreaming && stepTools.length === 0 && <p className="stage-steps__reading">Reading the request</p>}
+              {/* The agent's latest sentence, under the lit step (always the last row) while it works. */}
+              {isStreaming && <NarrationLine key={`narration-${lastUserIndex}`} text={streamNarration.latest} />}
+              {isStreaming && <div ref={liveEndRef} className="stage-steps__live-end" />}
               {showBrief && (
                 <BriefCard
                   key={briefId}
