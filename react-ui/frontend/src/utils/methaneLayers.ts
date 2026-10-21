@@ -159,6 +159,81 @@ export function globeCentre(features: Feature[]): [number, number] | null {
   return [Math.round(lon * 100) / 100, Math.round(Math.max(-60, Math.min(60, lat)) * 100) / 100];
 }
 
+/** [west, south, east, north] of every finite position in a geometry's coordinates, or null. */
+function coordsBox(coordinates: unknown): [number, number, number, number] | null {
+  let w = Infinity;
+  let s = Infinity;
+  let e = -Infinity;
+  let n = -Infinity;
+  const walk = (c: unknown) => {
+    if (!Array.isArray(c)) return;
+    if (c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number') {
+      if (Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+        w = Math.min(w, c[0]);
+        e = Math.max(e, c[0]);
+        s = Math.min(s, c[1]);
+        n = Math.max(n, c[1]);
+      }
+      return;
+    }
+    c.forEach(walk);
+  };
+  walk(coordinates);
+  return Number.isFinite(w) ? [w, s, e, n] : null;
+}
+
+function finiteProp(f: Feature, key: string): number | null {
+  const v = Number(f?.properties?.[key]);
+  return f?.properties?.[key] !== undefined && f?.properties?.[key] !== null && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Where a footprint's rank label stands: on its east edge at its centre's latitude, so "#1 8,130.7
+ * ppm·m" sits beside the plume, not across it (A2 P1-6). Null without a usable outline.
+ */
+export function labelPointOutside(feature: Feature): [number, number] | null {
+  const box = coordsBox(feature?.geometry?.coordinates);
+  if (!box) return null;
+  const lat = finiteProp(feature, 'center_lat');
+  return [box[2], lat !== null && lat >= box[1] && lat <= box[3] ? lat : (box[1] + box[3]) / 2];
+}
+
+/** The widest a frame of ranked footprints may span, degrees of longitude, before it frames fewer. */
+export const FOOTPRINT_FRAME_MAX_LON = 90;
+
+/**
+ * Where the camera goes for a ranked set of footprints (A2 P1-7): the whole set when it spans at
+ * most 90° of longitude (a basin, a region); else ranks 1 to 3 when they do; else rank 1's centre
+ * at zoom 5. "The strongest plume ever, anywhere" runs from Utah to New South Wales, whose box is
+ * centred on Africa; the room should land on rank 1, not the Sahara. Null without footprints.
+ */
+export function footprintFrame(
+  features: Feature[]
+): { bounds: [number, number, number, number] } | { center: [number, number]; zoom: number } | null {
+  const boxes = features
+    .map((f) => ({ f, box: coordsBox(f?.geometry?.coordinates), rank: finiteProp(f, 'rank') }))
+    .filter((x): x is { f: Feature; box: [number, number, number, number]; rank: number | null } => x.box !== null);
+  if (boxes.length === 0) return null;
+  const union = (list: typeof boxes): [number, number, number, number] => [
+    Math.min(...list.map((x) => x.box[0])),
+    Math.min(...list.map((x) => x.box[1])),
+    Math.max(...list.map((x) => x.box[2])),
+    Math.max(...list.map((x) => x.box[3])),
+  ];
+  const all = union(boxes);
+  if (all[2] - all[0] <= FOOTPRINT_FRAME_MAX_LON) return { bounds: all };
+  const ranked = [...boxes].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity));
+  const top = union(ranked.slice(0, 3));
+  if (top[2] - top[0] <= FOOTPRINT_FRAME_MAX_LON) return { bounds: top };
+  const first = ranked[0];
+  const lon = finiteProp(first.f, 'center_lon');
+  const lat = finiteProp(first.f, 'center_lat');
+  return {
+    center: lon !== null && lat !== null ? [lon, lat] : [(first.box[0] + first.box[2]) / 2, (first.box[1] + first.box[3]) / 2],
+    zoom: 5,
+  };
+}
+
 /** An ISO date (YYYY-MM-DD) from a feature property, or "n/a"; popups print nothing else. */
 export function isoDay(value: unknown): string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : 'n/a';

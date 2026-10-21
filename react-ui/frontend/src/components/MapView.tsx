@@ -21,7 +21,9 @@ import { indexLegendFor, rampExpression, rampGradient, tileParamsFor, type Rende
 import {
   COLUMN_METRES_PER_PPM_M,
   METHANE_RASTER,
+  footprintFrame,
   globeCentre,
+  labelPointOutside,
   isoDay,
   methaneGeometryHint,
   methaneRasterHint,
@@ -1937,14 +1939,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               paint: { 'line-color': ramp, 'line-width': 3 },
               layout: { visibility: 'visible' },
             });
-            // Labels sit at each plume's centre (the tool's center_lat/lon), not on a polygon vertex,
-            // and are placed by rank with collision checks so #2 and #3 never print over each other.
+            // Labels stand on each footprint's east edge at its centre's latitude, beside the plume
+            // and never across it (A2 P1-6), placed by rank with collision checks so #2 and #3
+            // never print over each other.
             const centres = geometry.features.flatMap((f) => {
-              const p = f?.properties ?? {};
-              const lon = Number(p.center_lon);
-              const lat = Number(p.center_lat);
-              if (!Number.isFinite(lon) || !Number.isFinite(lat)) return [];
-              return [{ type: 'Feature' as const, properties: p, geometry: { type: 'Point' as const, coordinates: [lon, lat] } }];
+              const at = labelPointOutside(f as Parameters<typeof labelPointOutside>[0]);
+              if (!at) return [];
+              return [{ type: 'Feature' as const, properties: f?.properties ?? {}, geometry: { type: 'Point' as const, coordinates: at } }];
             });
             currentMap.addSource(`${geometryId}-points`, {
               type: 'geojson',
@@ -1958,8 +1959,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               layout: {
                 'symbol-placement': 'point',
                 'symbol-sort-key': ['to-number', ['get', 'rank'], 9999],
-                'text-variable-anchor': ['left', 'right', 'top', 'bottom'],
-                'text-radial-offset': 0.9,
+                'text-variable-anchor': ['left', 'top', 'bottom', 'right'],
+                'text-radial-offset': 0.6,
                 'text-field': [
                   'format',
                   ['concat', '#', ['to-string', ['get', 'rank']]], { 'font-scale': 1 },
@@ -2369,8 +2370,16 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             });
           } else if (!rasterOnStage) {
             // The frame rule, methane edition: once a plume raster is on the stage it owns the frame
-            // (a replay case lands the footprints and the plume together; the plume wins).
-            currentMap.fitBounds(bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 11 });
+            // (a replay case lands the footprints and the plume together; the plume wins). A set
+            // that spans the world frames its top ranks, or rank 1 (A2 P1-7), never the box's
+            // middle (Utah to New South Wales is centred on Africa).
+            const frame = footprintFrame(geometry.features as Parameters<typeof footprintFrame>[0]);
+            if (frame && 'center' in frame) {
+              currentMap.easeTo({ center: frame.center, zoom: frame.zoom, padding: STAGE_PADDING_NOW(), pitch: 0, bearing: 0, duration: 1800 });
+            } else {
+              const b = frame?.bounds;
+              currentMap.fitBounds(b ? [[b[0], b[1]], [b[2], b[3]]] : bounds, { padding: STAGE_PADDING_NOW(), duration: 1500, maxZoom: 11 });
+            }
           }
           return;
         }

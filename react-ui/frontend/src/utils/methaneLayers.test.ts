@@ -5,8 +5,10 @@ import {
   METHANE_SITES,
   METHANE_TROPOMI,
   METHANE_VECTOR,
+  footprintFrame,
   globeCentre,
   isoDay,
+  labelPointOutside,
   methaneGeometryHint,
   methaneLegend,
   methaneRampLabel,
@@ -142,5 +144,44 @@ describe('methaneRampLabel (B11, A2 P1-4)', () => {
     expect(methaneRampLabel('ppb', undefined, 's3://b/methane/x/tropomi_anomaly_amman_2026-10-08_7d.tif')).toBe('TROPOMI, 7 days, above the area median');
     expect(methaneRampLabel('ppb', undefined, 's3://b/methane/x/tropomi_anomaly_amman_2026-10-08_99d.tif')).toBe('TROPOMI, above the area median');
     expect(methaneRampLabel('dates', 'something else')).toBe('something else');
+  });
+});
+
+const square = (w: number, s: number, e: number, n: number, properties: Record<string, unknown> = {}) => ({
+  properties,
+  geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] },
+});
+
+describe('labelPointOutside (B12, A2 P1-6)', () => {
+  it("stands on the footprint's east edge at its centre's latitude", () => {
+    expect(labelPointOutside(square(-102.0, 31.8, -101.9, 31.9, { center_lat: 31.86, center_lon: -101.95 }))).toEqual([-101.9, 31.86]);
+    // No centre (or one outside the footprint): the box's middle latitude.
+    expect(labelPointOutside(square(-102.0, 31.8, -101.9, 32.0))).toEqual([-101.9, 31.9]);
+    expect(labelPointOutside(square(-102.0, 31.8, -101.9, 32.0, { center_lat: 40 }))).toEqual([-101.9, 31.9]);
+    expect(labelPointOutside({ properties: {}, geometry: null })).toBeNull();
+  });
+});
+
+describe('footprintFrame (B13, A2 P1-7)', () => {
+  it('frames a regional set whole', () => {
+    const permian = [square(-102.2, 31.6, -102.1, 31.7, { rank: 1 }), square(-103.5, 32.2, -103.4, 32.3, { rank: 2 })];
+    expect(footprintFrame(permian)).toEqual({ bounds: [-103.5, 31.6, -102.1, 32.3] });
+  });
+
+  it('frames the top three when the whole set spans the world, and rank 1 when they do too', () => {
+    const utah = square(-111.2, 41.4, -111.1, 41.5, { rank: 1, center_lon: -111.15, center_lat: 41.45 });
+    const nsw = square(150.0, -32.5, 150.1, -32.4, { rank: 2 });
+    const turkmen = square(53.6, 39.4, 53.7, 39.5, { rank: 3 });
+    const texas = square(-102.0, 31.8, -101.9, 31.9, { rank: 2 });
+    const nm = square(-104.0, 32.0, -103.9, 32.1, { rank: 3 });
+    // Ranks 1 to 3 in the Americas, a fourth in Australia: the Americas.
+    expect(footprintFrame([utah, texas, nm, square(150.0, -32.5, 150.1, -32.4, { rank: 4 })])).toEqual({ bounds: [-111.2, 31.8, -101.9, 41.5] });
+    // Ranks 1 to 3 across the world: rank 1's centre, at zoom 5, never the box's middle over Africa.
+    const frame = footprintFrame([nsw, turkmen, utah]);
+    expect(frame).toEqual({ center: [-111.15, 41.45], zoom: 5 });
+  });
+
+  it('is null without footprints', () => {
+    expect(footprintFrame([])).toBeNull();
   });
 });
