@@ -64,7 +64,7 @@ CASES = {
         # The stage's "Wildfire, Pacific Palisades" plate (react-ui/frontend/src/utils/stageCopy.ts), word for word.
         "prompt": "Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025",
         "name": "LA Palisades Fire",
-        "description": "The January 2025 Palisades Fire seen from Sentinel-2: the burn scar in the Normalized Burn Ratio, before and after",
+        "description": "The January 2025 Palisades Fire seen from Sentinel-2: the burn scar in the Normalised Burn Ratio, before and after",
         "location": "Pacific Palisades, Los Angeles",
         "required": ["get_rasters_for_dates", "inspect_image", "run_bandmath", "display_visual"],
     },

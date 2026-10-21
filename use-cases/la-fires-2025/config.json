@@ -1,6 +1,6 @@
 {
   "name": "LA Palisades Fire",
-  "description": "The January 2025 Palisades Fire seen from Sentinel-2: the burn scar in the Normalized Burn Ratio, before and after",
+  "description": "The January 2025 Palisades Fire seen from Sentinel-2: the burn scar in the Normalised Burn Ratio, before and after",
   "location": "Pacific Palisades, Los Angeles",
   "user_question": "Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025",
   "agent": "stable",
