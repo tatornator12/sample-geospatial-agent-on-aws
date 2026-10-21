@@ -7,7 +7,7 @@ import _paths  # noqa: F401  (shared platform code on sys.path first)
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-for name in ("utils", "pass_tools", "ais_tools", "forecast_tools", "tasking_tools", "vessel_store"):
+for name in ("utils", "pass_tools", "ais_tools", "forecast_tools", "tasking_tools", "decide_tools", "vessel_store"):
     logging.getLogger(name).setLevel(logging.INFO)
 
 from strands.telemetry import StrandsTelemetry  # noqa: E402
@@ -20,11 +20,13 @@ from strands.session.s3_session_manager import S3SessionManager  # noqa: E402
 
 from utils.tools import inspect_image  # noqa: E402
 
+import vessel_store as vs  # noqa: E402
 import vessels_config  # noqa: E402
 from display_tools import display_visual  # noqa: E402
 from ais_tools import check_ais_coverage, gather_evidence, match_ais  # noqa: E402
+from decide_tools import decide  # noqa: E402
 from forecast_tools import fleet_pattern, next_look, predict_hotspots, reachable_area  # noqa: E402
-from pass_tools import detect_vessels, find_pass  # noqa: E402
+from pass_tools import detect_vessels, find_pass, list_passes  # noqa: E402
 from tasking_tools import draft_tasking, tasking_status  # noqa: E402
 
 app = BedrockAgentCoreApp()
@@ -34,6 +36,8 @@ logger.info(f"Model: {vessels_config.model_kwargs()}")
 
 # No MCP and no open search: every place is the reserve, its ports and its islands, on file.
 LOCAL_TOOLS = [
+    list_passes,
+    decide,
     find_pass,
     detect_vessels,
     check_ais_coverage,
@@ -125,6 +129,10 @@ async def dark_vessels_agent(payload, context=None):
 
         sent_tool_uses = {}
         open_tools = set()
+
+        # A new turn with the presenter's words: decide's `asked` checks them, and a question opened by
+        # list_passes stays open only in this turn. A replay case's follow-up reaches this line too.
+        vs.begin_turn(payload["prompt"])
 
         # Same wire format as the other agents: text chunks as-is; each tool use as
         # {"toolUseId": "...", "name": "...", "input": "<escaped json, streamed>"}.

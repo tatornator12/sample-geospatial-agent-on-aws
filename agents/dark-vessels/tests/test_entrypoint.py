@@ -65,9 +65,39 @@ def test_prewarm_yields_warm_and_builds_nothing(entry):
     assert _collect(entry.dark_vessels_agent({"prewarm": True}, types.SimpleNamespace(session_id="s" * 33))) == ["warm"]
 
 
+def test_prewarm_begins_no_turn(entry, monkeypatch):
+    monkeypatch.setattr(entry.vs, "_turn", {"turn_id": None, "prompt": ""})
+    _collect(entry.dark_vessels_agent({"prewarm": True}, types.SimpleNamespace(session_id="s" * 33)))
+    assert entry.vs.current_turn() is None
+
+
+def test_the_turn_begins_with_the_presenters_words_before_the_model_streams(entry, monkeypatch):
+    """vs.begin_turn runs before stream_async, so decide's `asked` sees this turn's words and a
+    question opened in an earlier turn is closed."""
+    monkeypatch.setattr(entry.vs, "_turn", {"turn_id": "0123456789ab", "prompt": "an earlier turn"})
+    seen = {}
+
+    class Agent:
+        def __init__(self, *a, **k):
+            pass
+
+        async def stream_async(self, prompt):
+            seen.update(turn=entry.vs.current_turn(), prompt=entry.vs.turn_prompt(), asked=prompt)
+            yield {"data": "ok"}
+
+    monkeypatch.setattr(entry, "Agent", Agent)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    words = "Same question, end of August"
+    out = _collect(entry.dark_vessels_agent({"prompt": words}, types.SimpleNamespace(session_id="s" * 33)))
+    assert out == ["ok"]
+    assert seen["prompt"] == seen["asked"] == words
+    assert re.fullmatch(r"[0-9a-f]{12}", seen["turn"]) and seen["turn"] != "0123456789ab"
+
+
 def test_the_tool_surface_is_the_act_and_the_platforms_eyes(entry):
     names = [t.__name__ for t in entry.LOCAL_TOOLS]
-    assert names[:5] == ["find_pass", "detect_vessels", "check_ais_coverage", "match_ais", "gather_evidence"]
+    assert names[:7] == ["list_passes", "decide", "find_pass", "detect_vessels", "check_ais_coverage", "match_ais",
+                         "gather_evidence"]
     assert {"reachable_area", "predict_hotspots", "fleet_pattern", "next_look", "draft_tasking", "tasking_status",
             "display_visual", "inspect_image"} <= set(names)
     for open_search in ("get_rasters", "create_bbox_from_coordinates", "find_similar_places", "scan_region_change",
