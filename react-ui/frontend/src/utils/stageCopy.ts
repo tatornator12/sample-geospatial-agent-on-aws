@@ -71,16 +71,22 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
     ],
     placeholder: 'Name a known site, or ask how they built it',
   },
-  // Dark Vessels' four turns (design.md, Act 3 run sheet); the prompts are the golden ones. Passes on
-  // file only, so the placeholder asks about a radar pass, never about live traffic.
+  // Dark Vessels' one open question (redesign §3.8.5, U1) and the sceptic's spare (U7), the golden
+  // prompts open-question and thin-pass word for word. The gone-silent and fleet spares are asked
+  // only (U5, U6). Passes on file only, so the placeholder asks about the reserve or a pass on file,
+  // never about live traffic.
   vessels: {
     prompts: [
-      { label: 'Who is in the reserve unseen?', prompt: 'Who is in the reserve unseen?' },
-      { label: 'Has a vessel gone silent?', prompt: 'Has a vessel gone silent near here?' },
-      { label: 'Where should we look next?', prompt: 'Where should we look next?' },
-      { label: 'Draft the patrol tasking', prompt: 'Draft the patrol tasking' },
+      {
+        label: 'Who is there without broadcasting, and where next?',
+        prompt: 'Is anyone in the reserve without broadcasting, and where should the patrol look next?',
+      },
+      {
+        label: 'Same question, end of August',
+        prompt: 'Is anyone in the reserve without broadcasting at the end of August, and where should the patrol look next?',
+      },
     ],
-    placeholder: 'Ask about a radar pass over the reserve',
+    placeholder: 'Ask about the reserve, or a radar pass on file',
   },
 };
 
@@ -129,10 +135,11 @@ const STEP_NAMES: Record<string, string> = {
   show_terrain: 'Show the 1 m LiDAR',
   measure_profile: 'Measure across the earthwork',
   find_similar_sites: 'Find sites of the same form',
-  // Dark Vessels' tools.
+  // Dark Vessels' tools (decide is no step: its line sits under the step it leads to).
+  list_passes: 'Weigh the passes on file',
   find_pass: 'Find the radar pass',
   detect_vessels: 'Find targets on the water',
-  check_ais_coverage: 'Check where AIS could be heard',
+  check_ais_coverage: 'Check where AIS was received',
   match_ais: 'Match targets to broadcasts',
   gather_evidence: 'Gather the evidence',
   predict_hotspots: 'Predict where to look',

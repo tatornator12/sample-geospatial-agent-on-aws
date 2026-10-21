@@ -133,15 +133,15 @@ const scenarios: Scenario[] = [
     agent: 'archaeologist',
   },
   {
-    id: 'vessels-s1d-20261012t0018',
-    name: 'Dark Vessels, Galápagos',
-    description: 'One Sentinel-1 pass over the Galápagos Marine Reserve: every radar target, the ones AIS accounts for set aside, coverage checked, and the rest shown as candidates for a patrol look, never accusations',
+    // The one open question (redesign §3.8.5, U11: the id stays across re-records). The metrics are
+    // worded to stay true on any take. Coming soon until task 9 records the case on dev.
+    id: 'vessels-open-question',
+    name: 'Dark Vessels, Galápagos: one open question',
+    description: 'One question about the Galápagos Marine Reserve: the agent weighs the radar passes on file, checks whether AIS reception there is good enough, chooses what to check next, and drafts a patrol tasking for the officer. Candidates, never accusations.',
     icon: '/dark_vessels.png',
-    // The dev take (Oct 19, v5): 22 targets on the Oct 12 2026 pass, 4 candidates. Coming soon until
-    // the replay case is recorded (tasks.md 6.1).
     metrics: [
-      { label: 'Radar Targets', value: '22 on the Oct 12 pass' },
-      { label: 'Candidates', value: '4, in heard water' },
+      { label: 'Agent decisions', value: 'the pass, what follows a thin pass, the box' },
+      { label: 'Passes weighed', value: 'every pass on file' },
     ],
     status: 'coming-soon',
     agent: 'vessels',

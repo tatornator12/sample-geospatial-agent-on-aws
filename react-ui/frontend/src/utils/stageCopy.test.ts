@@ -50,13 +50,18 @@ describe('stageCopyFor', () => {
     for (const p of [octagon, circle]) expect(p.prompt).not.toMatch(/built|build/i);
   });
 
-  it('gives Dark Vessels its four turns (the golden prompts) and a placeholder about passes on file', () => {
+  it('gives Dark Vessels one question and the spare plate (the golden prompts) and a placeholder about passes on file', () => {
     const copy = stageCopyFor('vessels');
+    // open-question and thin-pass (agents/dark-vessels/golden_prompts.json), word for word.
     expect(copy.prompts.map((p) => p.prompt)).toEqual([
-      'Who is in the reserve unseen?', 'Has a vessel gone silent near here?', 'Where should we look next?', 'Draft the patrol tasking',
+      'Is anyone in the reserve without broadcasting, and where should the patrol look next?',
+      'Is anyone in the reserve without broadcasting at the end of August, and where should the patrol look next?',
     ]);
+    expect(copy.prompts.map((p) => p.label)).toEqual(['Who is there without broadcasting, and where next?', 'Same question, end of August']);
     expect(copy.prompts.every((p) => !p.fill)).toBe(true);
-    expect(copy.placeholder).toBe('Ask about a radar pass over the reserve');
+    // No "fishing" (it presumes an activity the evidence cannot show), no em dash.
+    for (const p of copy.prompts) expect(`${p.label} ${p.prompt}`).not.toMatch(/fishing|\u2014/i);
+    expect(copy.placeholder).toBe('Ask about the reserve, or a radar pass on file');
     expect(copy.placeholder).not.toMatch(/live/i);
   });
 
@@ -108,7 +113,8 @@ describe('stepName', () => {
     expect(stepName('show_terrain')).toBe('Show the 1 m LiDAR');
     expect(stepName('measure_profile')).toBe('Measure across the earthwork');
     expect(stepName('find_similar_sites')).toBe('Find sites of the same form');
-    expect(stepName('check_ais_coverage')).toBe('Check where AIS could be heard');
+    expect(stepName('check_ais_coverage')).toBe('Check where AIS was received');
+    expect(stepName('list_passes')).toBe('Weigh the passes on file');
     expect(stepName('match_ais')).toBe('Match targets to broadcasts');
     expect(stepName('draft_tasking')).toBe('Draft the tasking');
     expect(stepName('tasking_status')).toBe('Check the tasking');
