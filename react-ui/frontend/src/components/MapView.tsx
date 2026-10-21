@@ -3511,15 +3511,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
                 </div>
               )}
 
-              {(legends.length > 0 || groundOn || restOn || vesselOnStage) && (
+              {(legends.length > 0 || groundOn || restOn) && (
                 <div className="map-layers__legends">
                   {legends.map(renderLegend)}
-                  {vesselOnStage && (
-                    // Global Fishing Watch's data (the detections, the AIS, the fleet) is on the map.
-                    <div className="map-legend map-legend--ground">
-                      <span className="map-legend__label">{SEA_ATTRIBUTION}</span>
-                    </div>
-                  )}
                   {restOn && (
                     // The rest view says what it is: the continent's relief stood up, lit at dusk.
                     <div className="map-legend map-legend--ground">
@@ -3546,6 +3540,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
                   Compare before and after
                 </button>
               )}
+            </div>
+          )}
+
+          {isLayerControlOpen && vesselOnStage && (
+            // Global Fishing Watch's data (the detections, the AIS, the fleet) is on the map. Its
+            // attribution is the plate's foot, outside the scroll, so it stays in view at 720p too.
+            <div className="map-layers__foot">
+              <span className="map-legend__label">{SEA_ATTRIBUTION}</span>
             </div>
           )}
         </section>
