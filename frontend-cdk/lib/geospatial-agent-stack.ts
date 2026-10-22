@@ -531,6 +531,19 @@ export class GeospatialAgentStack extends cdk.Stack {
     // WAF with CLOUDFRONT scope can only be created in us-east-1
     const isUsEast1 = this.region === 'us-east-1';
 
+    // The two routes whose POST body carries a base64 PNG map snapshot (up to 2 MB), far over the
+    // Common Rule Set's 8 KB SizeRestrictions_BODY limit. Keep these in step with BRIEF_APPROVE_PATH
+    // and TASKING_APPROVE_PATH in react-ui/backend/src/index.ts.
+    const approvePaths = ['/api/brief/approve', '/api/tasking/approve'];
+    const exactMatch = (fieldToMatch: wafv2.CfnWebACL.FieldToMatchProperty, searchString: string) => ({
+      byteMatchStatement: {
+        fieldToMatch,
+        positionalConstraint: 'EXACTLY',
+        searchString,
+        textTransformations: [{ priority: 0, type: 'NONE' }],
+      },
+    });
+
     let webAclArn: string | undefined;
     if (isUsEast1) {
       const webAcl = new wafv2.CfnWebACL(this, 'WebACL', {
@@ -549,6 +562,12 @@ export class GeospatialAgentStack extends cdk.Stack {
               managedRuleGroupStatement: {
                 vendorName: 'AWS',
                 name: 'AWSManagedRulesCommonRuleSet',
+                // SizeRestrictions_BODY only counts (and labels) here; BlockLargeBodyExceptApprove
+                // below blocks on that label, so the 8 KB limit holds everywhere except the two
+                // approve routes. Every other rule in the group keeps its own action.
+                ruleActionOverrides: [
+                  { name: 'SizeRestrictions_BODY', actionToUse: { count: {} } },
+                ],
               },
             },
             overrideAction: { none: {} },
@@ -588,6 +607,52 @@ export class GeospatialAgentStack extends cdk.Stack {
               sampledRequestsEnabled: true,
               cloudWatchMetricsEnabled: true,
               metricName: 'IpReputationMetric',
+            },
+          },
+          {
+            // The Common Rule Set's body-size block, re-applied with one exception (AWS's
+            // label-match pattern for allowing larger bodies on chosen routes). A request whose
+            // body is over 8 KB is blocked unless it is a POST to exactly one of the approve
+            // routes. Those two are exempt from the size rule only (the group's other rules and
+            // the two managed groups above still inspect them), and they stay protected
+            // otherwise: Cognito sign-in is checked before the body is parsed, the backend caps the
+            // snapshot at 2 MB and checks the PNG magic number (react-ui/backend/src/filing.ts),
+            // and the record being filed is the agent's draft read from S3, not the request.
+            name: 'BlockLargeBodyExceptApprove',
+            priority: 4,
+            statement: {
+              andStatement: {
+                statements: [
+                  {
+                    labelMatchStatement: {
+                      scope: 'LABEL',
+                      key: 'awswaf:managed:aws:core-rule-set:SizeRestrictions_Body',
+                    },
+                  },
+                  {
+                    notStatement: {
+                      statement: {
+                        andStatement: {
+                          statements: [
+                            exactMatch({ method: {} }, 'POST'),
+                            {
+                              orStatement: {
+                                statements: approvePaths.map((p) => exactMatch({ uriPath: {} }, p)),
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            action: { block: {} },
+            visibilityConfig: {
+              sampledRequestsEnabled: true,
+              cloudWatchMetricsEnabled: true,
+              metricName: 'LargeBodyBlockMetric',
             },
           },
         ],
