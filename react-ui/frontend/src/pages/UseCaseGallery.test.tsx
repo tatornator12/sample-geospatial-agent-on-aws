@@ -2,7 +2,8 @@
  * The replay gallery (S10). Every available replay case opens on its own act (S3): the Earth
  * Analyst cases name Act 1, so a rehearsal that ended on another act does not play them under
  * that act's speaker. The page is titled "Replay cases", groups the cases by act in show order,
- * opens each case from a real button, and leaves the Act 3 card as the Act 3 run wrote it.
+ * opens each case from a real button, and shows the Act 3 card as the Act 3 run wrote it (the one
+ * open question, available since task 9).
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
@@ -72,19 +73,20 @@ describe('UseCaseGallery', () => {
   it('opens the Dark Vessels case on Act 3, available, in the words that stay true across re-records (task 9, §3.8.5)', () => {
     expect(open('Dark Vessels, Galápagos: one open question')).toBe('/?scenario=vessels-open-question&agent=vessels');
     cleanup();
-    render(
-      <MemoryRouter initialEntries={['/use-cases']}>
-        <UseCaseGallery />
-      </MemoryRouter>
+    renderGallery();
+    const vessels = card('Dark Vessels, Galápagos: one open question');
+    expect(within(vessels).getByRole('button').textContent).toBe('Open the replay');
+    expect(within(vessels).queryByText('Coming soon')).toBeNull();
+    const text = vessels.textContent ?? '';
+    expect(text).toContain(
+      'One question about the Galápagos Marine Reserve: the agent weighs the radar passes on file, checks whether AIS reception there is good enough, chooses what to check next, and drafts a patrol tasking for the officer.'
     );
-    const card = screen.getByRole('heading', { name: 'Dark Vessels, Galápagos: one open question' }).parentElement!.textContent ?? '';
-    expect(card).toContain('View Analysis');
-    expect(card).not.toContain('Coming Soon');
-    expect(card).toContain('Agent decisions');
-    expect(card).toContain('the pass, what follows a thin pass, the box');
-    expect(card).toContain('Passes weighed');
-    expect(card).toContain('every pass on file');
-    expect(card).toContain('Candidates, never accusations.');
+    expect(text).not.toMatch(/22 on the Oct 12 pass|heard water/);
+    expect(text).toContain('Agent decisions');
+    expect(text).toContain('the pass, what follows a thin pass, the box');
+    expect(text).toContain('Passes weighed');
+    expect(text).toContain('every pass on file');
+    expect(text).toContain('Candidates, never accusations.');
   });
 
   it('still opens the other acts\u2019 cases on their own act', () => {
@@ -109,7 +111,7 @@ describe('UseCaseGallery', () => {
     expect(cases('Earth Analyst')).toEqual(['LA Palisades Fire', 'Places like Central Park', 'Amazon Deforestation', 'Lake Mead Drought']);
     expect(cases('AI Archaeologist')).toEqual(['Newark Earthworks', 'The Great Circle, measured']);
     expect(cases('Methane Watch')).toEqual(['Permian Basin Methane', 'Methane Watch brief']);
-    expect(cases('Dark Vessels')).toEqual(['Dark Vessels, Galápagos']);
+    expect(cases('Dark Vessels')).toEqual(['Dark Vessels, Galápagos: one open question']);
     const page = document.body.textContent ?? '';
     expect(page).not.toMatch(/Featured|View Analysis|Act \d/);
   });
@@ -117,7 +119,7 @@ describe('UseCaseGallery', () => {
   it('opens every available case from one native button (Tab, Enter and Space are the browser’s own)', () => {
     renderGallery();
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(8);
+    expect(buttons).toHaveLength(9);
     for (const button of buttons) {
       expect(button.tagName).toBe('BUTTON');
       expect(button.getAttribute('type')).toBe('button');
@@ -126,20 +128,6 @@ describe('UseCaseGallery', () => {
       expect(button.hasAttribute('disabled')).toBe(false);
       expect(button.getAttribute('tabindex')).toBeNull();
     }
-  });
-
-  it('leaves the Dark Vessels card as it was, coming soon with no button', () => {
-    renderGallery();
-    const vessels = card('Dark Vessels, Galápagos');
-    expect(vessels.textContent).toContain(
-      'One Sentinel-1 pass over the Galápagos Marine Reserve: every radar target, the ones AIS accounts for set aside, coverage checked, and the rest shown as candidates for a patrol look, never accusations'
-    );
-    expect(vessels.textContent).toContain('Radar Targets');
-    expect(vessels.textContent).toContain('22 on the Oct 12 pass');
-    expect(vessels.textContent).toContain('Candidates');
-    expect(vessels.textContent).toContain('4, in heard water');
-    expect(within(vessels).queryByRole('button')).toBeNull();
-    expect(within(vessels).getByText('Coming soon')).toBeTruthy();
   });
 
   it('treats the case images as decoration next to their headings', () => {

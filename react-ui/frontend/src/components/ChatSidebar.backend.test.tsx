@@ -54,7 +54,7 @@ describe('A prompt with the backend unreachable', () => {
       />
     );
     const input = document.querySelector('.docent-input') as HTMLTextAreaElement;
-    expect(input.placeholder).toBe('Ask about a radar pass over the reserve');
+    expect(input.placeholder).toBe('Ask about the reserve, or a radar pass on file');
 
     await act(async () => {
       fireEvent.click(document.querySelector('.docent-plate') as HTMLButtonElement);

@@ -1,8 +1,9 @@
 /**
  * Dark Vessels in the docent (redesign §3.8.1, R6.10, N2): the step column gets this session, the
  * rest file's bucket and the turn's send time, so the board is asked for before any URL streams;
- * and when the turn ends, an answer taller than the column's room lands with its first line in
- * view (`block: 'start'`), one that fits keeps `nearest`, and other acts keep `nearest`.
+ * and when the turn ends the column (never the stage behind it) scrolls: an answer taller than the
+ * column's room lands with its first line under the head, one that fits keeps `nearest`, and other
+ * acts bring the first line to the top (B5).
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
@@ -45,10 +46,14 @@ const toolCall = (id: string, name: string, input: Record<string, unknown>) =>
 const chunk = (content: string): StreamEvent => ({ type: 'chunk', content });
 const flush = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
 
-// jsdom lays nothing out: the answer's and the column's heights are set per test.
+// jsdom lays nothing out: the answer's height and place, the head's and the column's heights are set here.
 let answerHeight = 0;
+let answerTop = 700;
 const COLUMN_HEIGHT = 500;
+const HEAD_HEIGHT = 52;
 let scrolls: Array<{ el: Element; arg: unknown }> = [];
+let columnScrolls: Array<{ el: Element; arg: unknown }> = [];
+let rectSpy: { mockRestore: () => void } | undefined;
 const saved = {
   offsetHeight: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight'),
   clientHeight: Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight'),
@@ -56,7 +61,11 @@ const saved = {
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
     configurable: true,
-    get() { return (this as HTMLElement).classList.contains('stage-answer') ? answerHeight : 0; },
+    get() {
+      const el = this as HTMLElement;
+      if (el.classList.contains('stage-answer')) return answerHeight;
+      return el.classList.contains('stage-steps__head') ? HEAD_HEIGHT : 0;
+    },
   });
   Object.defineProperty(Element.prototype, 'clientHeight', {
     configurable: true,
@@ -75,12 +84,24 @@ afterAll(() => {
 beforeEach(() => {
   streams.length = 0;
   scrolls = [];
+  columnScrolls = [];
+  answerTop = 700;
   Element.prototype.scrollIntoView = function (this: Element, arg?: unknown) {
     scrolls.push({ el: this, arg });
   } as typeof Element.prototype.scrollIntoView;
+  Element.prototype.scrollTo = function (this: Element, arg?: unknown) {
+    columnScrolls.push({ el: this, arg });
+  } as typeof Element.prototype.scrollTo;
+  const rect = Element.prototype.getBoundingClientRect;
+  rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    return this.classList.contains('stage-answer') ? ({ top: answerTop } as DOMRect) : rect.call(this);
+  });
   vi.mocked(loadGeometry).mockClear();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  rectSpy?.mockRestore();
+});
 
 function setup(agentId: string) {
   render(
@@ -109,7 +130,9 @@ async function turnWithAnswer(): Promise<void> {
   await flush();
 }
 
+// The answer is never scrolled into view itself (that would move the stage too); the column scrolls.
 const answerScrolls = () => scrolls.filter(({ el }) => el.classList.contains('stage-answer')).map(({ arg }) => arg);
+const columnTops = () => columnScrolls.filter(({ el }) => el.classList.contains('stage-steps')).map(({ arg }) => arg);
 
 describe('the board before the radar (N2)', () => {
   it('asks for this turn\'s board in this session\'s folder from the rest file\'s bucket, before any URL streams', async () => {
@@ -176,24 +199,39 @@ describe('the prepared plates (redesign §3.8.5, R6.6)', () => {
 });
 
 describe('the answer\'s first line in view when the turn ends (R6.10)', () => {
+  // The column is 500 px; the room under the 52 px head and above the 24 px fade is 424 px. The
+  // answer starts 700 px down the column, below the view, and the column has not scrolled.
   it('lands a vessel answer taller than the column\'s room at its first line', async () => {
-    answerHeight = 600;   // the room under the head and above the fade is 500 - 52 - 24 = 424
+    answerHeight = 600;
     setup('vessels');
     await turnWithAnswer();
-    expect(answerScrolls().at(-1)).toEqual({ block: 'start', behavior: 'smooth' });
+    expect(columnTops().at(-1)).toEqual({ top: 700 - HEAD_HEIGHT - 4, behavior: 'smooth' });
+    expect(answerScrolls()).toEqual([]);
   });
 
   it('keeps nearest for a vessel answer that fits, so the steps above it stay in view', async () => {
     answerHeight = 300;
     setup('vessels');
     await turnWithAnswer();
-    expect(answerScrolls().at(-1)).toEqual({ block: 'nearest', behavior: 'smooth' });
+    // The least scroll that brings it in view: its foot at the fade, 700 + 300 - 500 + 24.
+    expect(columnTops().at(-1)).toEqual({ top: 524, behavior: 'smooth' });
+    expect(answerScrolls()).toEqual([]);
   });
 
-  it('keeps nearest on the other acts', async () => {
-    answerHeight = 600;
+  it('leaves a vessel answer that fits and is already in view where it is', async () => {
+    answerHeight = 300;
+    answerTop = 100;
+    setup('vessels');
+    await turnWithAnswer();
+    expect(columnTops()).toEqual([]);
+    expect(answerScrolls()).toEqual([]);
+  });
+
+  it('brings the first line to the top on the other acts (B5)', async () => {
+    answerHeight = 300;
     setup('dev');
     await turnWithAnswer();
-    expect(answerScrolls().at(-1)).toEqual({ block: 'nearest', behavior: 'smooth' });
+    expect(columnTops().at(-1)).toEqual({ top: 700 - HEAD_HEIGHT - 4, behavior: 'smooth' });
+    expect(answerScrolls()).toEqual([]);
   });
 });
