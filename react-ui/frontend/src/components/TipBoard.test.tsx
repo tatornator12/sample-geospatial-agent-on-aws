@@ -94,3 +94,12 @@ describe('TipBoard Carbon Mapper line', () => {
     expect(container.querySelector('.tip-row__cm')).toBeNull();
   });
 });
+
+describe('TipBoard Carbon Mapper unavailable', () => {
+  it('says the check could not be made, and shows no source line', () => {
+    const cm = { 'south caspian': parseCmPlumes({ lat: 39.4379, lon: 53.573, radius_km: 5, since: '2025-01-01', status: 'unavailable' })! };
+    const { container } = render(<TipBoard tips={tips} cued={cued} expected={3} tallies={tallies} cm={cm} />);
+    expect(rowOf(container, 'South Caspian').querySelector('.tip-row__cm')?.textContent).toBe('Carbon Mapper: could not be checked');
+    expect(container.querySelector('.tip-row--source')).toBeNull();
+  });
+});

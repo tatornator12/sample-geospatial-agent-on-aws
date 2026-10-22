@@ -320,7 +320,8 @@ def latest_confirmed(emit: dict | None, cm_latest: str | None) -> dict | None:
 
 def about(value: float | None) -> int | None:
     """A rate as the room hears it: to the nearest 10 kg/h."""
-    return None if value is None else int(round(value / 10.0) * 10)
+    # Half up, as the stage rounds (JS Math.round): 265 is 270 on the board and in the brief alike.
+    return None if value is None else int(math.floor(value / 10.0 + 0.5) * 10)
 
 
 def say_line(count: int, radius_km: float, since: str, latest: dict | None) -> str:
@@ -374,6 +375,11 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
         plumes, source, fetched = load_plumes(lat, lon, radius_km, since, s3)
     except CatalogueError:
         emit = emit_record(lat, lon, s3)
+        try:   # the board says the check could not be made, rather than going quiet
+            mt._put_json(stage_key(lat, lon, "json"), {"lat": round(lat, 4), "lon": round(lon, 4), "radius_km": radius_km,
+                                                        "since": since.isoformat(), "status": "unavailable"})
+        except Exception as e:
+            logger.warning("carbon mapper record failed: %s", type(e).__name__)
         return json.dumps({
             "error": "Carbon Mapper's catalogue could not be reached and nothing is cached for this site; the "
                      "independent check is unavailable, so the choice rests on EMIT's passes alone.",
@@ -418,7 +424,8 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
                     "uncertainty_kg_h": p["uncertainty_kg_h"], "distance_km": p["distance_km"], "sector": p["sector"]}
                    for p in plumes[:CM_LIST_MAX]],
         "emit": emit,
-        "latest_confirmed": latest_confirmed(emit, summary["latest_date"]),
+        # The follow rule counts Carbon Mapper plumes within 5 km, whatever radius was asked for.
+        "latest_confirmed": latest_confirmed(emit, next((p["date"] for p in plumes if p["distance_km"] <= CM_RADIUS_KM), None)),
         "say": say_line(len(plumes), radius_km, since.isoformat(), latest),
         "attribution": ATTRIBUTION,
         "next_steps": ("Compare the two cued sites' latest_confirmed dates (the follow rule). A rate is Carbon "

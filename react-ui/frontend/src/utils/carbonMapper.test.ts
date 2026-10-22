@@ -29,7 +29,7 @@ describe('the Carbon Mapper record', () => {
 
   it('keeps numbers, dates and a code only, and refuses a malformed record', () => {
     expect(parseCmPlumes(KRASNOVODSK)).toEqual({ point: [53.573, 39.4379], radiusKm: 5, since: '2025-01-01', count: 45,
-      latest: '2026-06-20', rateKgH: 273.1, instrument: 'tanager' });
+      latest: '2026-06-20', rateKgH: 273.1, instrument: 'tanager', unavailable: false });
     const none = parseCmPlumes({ ...KRASNOVODSK, count: 0, latest: null, rate_kg_h: null, instrument: null });
     expect(none).toMatchObject({ count: 0, latest: null, rateKgH: null, instrument: null });
     expect(parseCmPlumes({ ...KRASNOVODSK, instrument: '<b>Acme</b>' })?.instrument).toBeNull();
@@ -99,5 +99,19 @@ describe('the map', () => {
       .toEqual({ date: 'n/a', instrument: 'n/a', rate: 'not published' });
     expect(detectionPopupRows({ date: '2026-06-20<script>', rate_kg_h: null, instrument: 'emit' }).date).toBe('2026-06-20');
     expect(CARBON_MAPPER_SOURCE).toBe('Source: Carbon Mapper (data.carbonmapper.org)');
+  });
+});
+
+describe('when Carbon Mapper could not be checked', () => {
+  it('the record says so, with no numbers', () => {
+    const c = parseCmPlumes({ lat: 37.8938, lon: 113.5625, radius_km: 5, since: '2025-01-01', status: 'unavailable' })!;
+    expect(c).toMatchObject({ unavailable: true, count: 0, latest: null, rateKgH: null });
+    expect(cmLineText(c)).toBe('Carbon Mapper: could not be checked');
+    expect(parseCmPlumes(KRASNOVODSK)?.unavailable).toBe(false);
+  });
+
+  it('a site followed for its Carbon Mapper points is found at the board\'s 2 decimals', () => {
+    const cues = [call('check_recent_passes', { lat: 39.43791, lon: 53.57304 }, 'c1')];
+    expect(chosenCue(cues, [[]], [call('display_visual', { s3_url: `${DIR}cmplumes_39.4379_53.5730.geojson` })])).toBe(0);
   });
 });

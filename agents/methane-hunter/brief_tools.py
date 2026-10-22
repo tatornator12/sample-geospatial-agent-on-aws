@@ -334,7 +334,8 @@ def carbon_mapper_line(rec: dict) -> str | None:
         return None
     rate = _num(rec.get("rate_kg_h"), 0, 1_000_000)
     unc = _num(rec.get("uncertainty_kg_h"), 0, 1_000_000) if rate is not None else None
-    tens = lambda v: f"{int(round(v / 10.0) * 10):,}"   # noqa: E731  (to the nearest 10 kg/h)
+    # To the nearest 10 kg/h, half up, as the stage rounds (JS Math.round).
+    tens = lambda v: f"{int(math.floor(v / 10.0 + 0.5) * 10):,}"   # noqa: E731
     est = (f", Carbon Mapper's estimate about {tens(rate)}{f' ± {tens(unc)}' if unc is not None else ''} kg/h"
            if rate is not None else ", no emission estimate published")
     noun = "plume" if count == 1 else "plumes"

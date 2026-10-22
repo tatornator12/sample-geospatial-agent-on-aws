@@ -331,3 +331,18 @@ def test_a_carbon_mapper_record_at_another_site_is_not_this_briefs(brief, fake_s
     _cm_record(fake_s3, 37.8938, 113.5625)
     out = json.loads(_run(brief.draft_brief(**good())))
     assert "Independent detections" not in out["markdown"]
+
+
+def test_the_nearest_carbon_mapper_record_within_2_km_is_the_briefs(brief, fake_s3):
+    _cm_record(fake_s3, 39.4800, 53.6435, count=3)       # ~650 m away
+    _cm_record(fake_s3, 39.4745, 53.6440, count=45)      # ~50 m away: this one
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert "Carbon Mapper lists 45 methane plumes" in out["markdown"]
+
+
+def test_an_unavailable_carbon_mapper_record_adds_no_line(brief, fake_s3):
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/methane/cmplumes_39.4741_53.6435.json",
+                       Body=json.dumps({"lat": 39.4741, "lon": 53.6435, "radius_km": 5.0, "since": "2025-01-01",
+                                        "status": "unavailable"}).encode())
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert "Independent detections" not in out["markdown"]

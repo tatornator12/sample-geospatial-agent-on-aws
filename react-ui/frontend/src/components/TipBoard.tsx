@@ -58,6 +58,13 @@ function CueLine({ tally }: { tally: CueTally }) {
 
 /** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h" (the words of cmLineText), numbers in mono. */
 function CmLine({ cm }: { cm: CmPlumes }) {
+  if (cm.unavailable) {
+    return (
+      <span role="cell" className="tip-row__cue tip-row__cm">
+        Carbon Mapper: could not be checked
+      </span>
+    );
+  }
   if (cm.count === 0) {
     return (
       <span role="cell" className="tip-row__cue tip-row__cm">
@@ -91,7 +98,8 @@ export function TipBoard({ tips, cued, chosen = null, expected, tallies = {}, cm
   const shown = limit === undefined ? tips : tips.filter((tip, i) => i < limit || cued.includes(tip.area.name));
   const more = tips.length - shown.length;
   const cmFor = (name: string) => (cued.includes(name) && Object.prototype.hasOwnProperty.call(cm, name) ? cm[name] : undefined);
-  const cmShown = shown.some((tip) => cmFor(tip.area.name));
+  // The source line shows only when Carbon Mapper's numbers do (not for "could not be checked").
+  const cmShown = shown.some((tip) => cmFor(tip.area.name)?.unavailable === false);
   return (
     <div className="tip-board" role="table" aria-label="TROPOMI tips by watch area, strongest first">
       {shown.map((tip) => {

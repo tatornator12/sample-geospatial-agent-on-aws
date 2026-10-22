@@ -408,8 +408,10 @@ def test_a_dotted_match_reads_a_nested_field_and_the_mission_must_show_its_colum
     assert ev.input_problems(mission, [window, as_text]) == []
     assert ev.input_problems(mission, [cols, window]) != []          # the columns must follow the look
     problems = ev.input_problems(mission, [window, flat])            # the Oct 22 stable mission
-    assert problems and "render.kind=columns" in problems[0]
+    assert any("render.kind=columns" in p for p in problems)
     assert ev.input_problems(mission, []) == []                      # no candidate looked at: nothing to show
+    shown_flat = ev.input_problems(mission, [window, flat, cols])     # the flat window is never shown
+    assert any("forbidden input display_visual" in p for p in shown_flat)
     assert ev.dotted({"render": {"kind": "columns"}}, "render.kind") == "columns"
     assert ev.dotted({"render": "not json"}, "render.kind") is None and ev.dotted({}, "a.b") is None
     assert ev.case_problems(mission) == []

@@ -253,7 +253,8 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     plume date, with that date, and that EMIT only sees on its passes), next collection. The tool
     appends the checks' lines itself (they print as "Check:" lines) and Carbon Mapper's with its
     source (it prints as "Independent detections:"): never copy a check's line or Carbon Mapper's,
-    or a paraphrase of either, into observations or gaps. Where your own text mentions the mapping, never
+    or a paraphrase of either, into observations or gaps (no observation about Carbon Mapper at
+    all, except the one "super-emitter" rate sentence below). Where your own text mentions the mapping, never
     write "only oil and gas" unless the hint says only oil and gas is mapped. Never put an
     operator's name in your own fields. Every text field is one short sentence, at most 220 characters.
     Each next_check is one plain sentence with a verb, saying what would be seen and what it would
@@ -266,7 +267,8 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     none." In that same "super-emitter" case only, when carbon_mapper_plumes found a plume with a
     rate at this site, one more observation gives it, only as Carbon Mapper's: "Carbon Mapper's estimate for its latest plume here is about
     <latest_rate_kg_h rounded to 10> ± <latest_uncertainty_kg_h rounded to 10> kg/h (<latest_date>,
-    <latest_instrument>)." Never estimate a rate yourself, and never call a rate EMIT's.
+    <latest_instrument>)." (leave out the ± part when latest_uncertainty_kg_h is null). Never
+    estimate a rate yourself, and never call a rate EMIT's.
     If it returns an error, fix exactly what it names and call it again. Then call nothing else.
 W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "- Check:" and
     "- Independent detections:" lines included, with Carbon Mapper's source; drop nothing, merge
@@ -275,12 +277,16 @@ W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "- C
     blanks filled (no other wording: not "last looking", not "at this site", not "with"):
     "Near <place>: methane on <candidates> of <passes read> EMIT passes read since <since>; EMIT last
     looked here on <site_history's last_look>." then (first answer of the conversation only)
-    "{SPOKEN_CONFIDENCE}" (at most 240 characters; no TROPOMI figure, no Carbon Mapper figure, no
-    comparison across areas, no em dash: those belong in the record). E.g.
+    "{SPOKEN_CONFIDENCE}" (at most 240 characters; no TROPOMI figure, no Carbon Mapper figure outside
+    the Carbon Mapper-only template below, no comparison across areas, no em dash: those belong in
+    the record). E.g.
     "Near Hazar, Balkan, Turkmenistan: methane on 4 of 4 EMIT passes read since 2025-01-01; EMIT last
     looked here on 2025-08-20. {SPOKEN_CONFIDENCE}"
-    The closer never says "still active", "recent" or "active": it says when EMIT last looked. For a
-    TROPOMI-only site it says EMIT cannot look there instead of a last-look date.
+    A site followed for its Carbon Mapper plumes with no EMIT candidate uses, word for word: "Near
+    <place>: Carbon Mapper lists <count> methane plumes within 5 km since 2025-01-01, the latest on
+    <latest_date>; EMIT last looked here on <site_history's last_look>." A TROPOMI-only site (no
+    cue) says "Near <place>: a TROPOMI tip only; EMIT cannot look here." The closer never says
+    "still active", "recent" or "active": it says when EMIT last looked.
 THE ANALYST'S DECISION (the UI sends it after a draft):
 - "The analyst approved and filed brief <id>": call brief_status(<id>) and write its `say`
   sentence word for word as the whole answer, then the closing paragraph. Add nothing about

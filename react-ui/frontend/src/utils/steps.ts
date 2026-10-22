@@ -160,11 +160,12 @@ export function chosenCue(cues: ToolCall[], framesByCue: Array<PassFrame[] | nul
     if (scenes.length > 0 && frames?.some((f) => f.chipUrl && scenes.some((s) => f.chipUrl!.includes(s)))) return i;
   }
   if (scenes.length > 0) return null;
+  // At 2 decimals, as the board matches a tip to its cue (tipCued).
   const points = urls.map((u) => u.match(CM_POINT_IN_URL)).filter((m): m is RegExpMatchArray => !!m);
   for (let i = 0; i < cues.length; i++) {
-    const lat = coord(cues[i].params?.lat, 4);
-    const lon = coord(cues[i].params?.lon, 4);
-    if (points.some((m) => m[1] === lat && m[2] === lon)) return i;
+    const lat = coord(cues[i].params?.lat, 2);
+    const lon = coord(cues[i].params?.lon, 2);
+    if (points.some((m) => coord(m[1], 2) === lat && coord(m[2], 2) === lon)) return i;
   }
   return null;
 }
@@ -432,6 +433,8 @@ export interface CmPlumes {
   /** Carbon Mapper's estimate for that plume, kg/h; null when none is published. */
   rateKgH: number | null;
   instrument: CmInstrument | null;
+  /** The catalogue could not be read and nothing was cached: the board says so (no numbers, no source). */
+  unavailable: boolean;
 }
 
 /** The record, field by field; null when it is not one (a count or a radius out of range, a bad date). */
@@ -442,16 +445,24 @@ export function parseCmPlumes(raw: unknown): CmPlumes | null {
   const lon = num(r.lon, -180, 180);
   const radiusKm = num(r.radius_km, 0.5, 10);
   const since = isoDay(r.since);
+  if (lat === null || lon === null || radiusKm === null || !since) return null;
+  if (r.status === 'unavailable') {
+    return { point: [lon, lat], radiusKm, since, count: 0, latest: null, rateKgH: null, instrument: null, unavailable: true };
+  }
   const count = typeof r.count === 'number' && Number.isInteger(r.count) && r.count >= 0 && r.count <= 10_000 ? r.count : null;
-  if (lat === null || lon === null || radiusKm === null || !since || count === null) return null;
+  if (count === null) return null;
   const latest = count > 0 ? isoDay(r.latest) : null;
   if (count > 0 && !latest) return null;
   const instrument = (CM_INSTRUMENTS as readonly unknown[]).includes(r.instrument) ? (r.instrument as CmInstrument) : null;
-  return { point: [lon, lat], radiusKm, since, count, latest, rateKgH: count > 0 ? num(r.rate_kg_h, 0, 1_000_000) : null, instrument };
+  return {
+    point: [lon, lat], radiusKm, since, count, latest, rateKgH: count > 0 ? num(r.rate_kg_h, 0, 1_000_000) : null, instrument,
+    unavailable: false,
+  };
 }
 
 /** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h"; "Carbon Mapper: no plumes within 5 km". */
 export function cmLineText(c: CmPlumes): string {
+  if (c.unavailable) return 'Carbon Mapper: could not be checked';
   if (c.count === 0) return `Carbon Mapper: no plumes within ${c.radiusKm} km`;
   const rate = c.rateKgH !== null ? ` · ~${(Math.round(c.rateKgH / 10) * 10).toLocaleString('en-US')} kg/h` : '';
   return `Carbon Mapper: ${c.count} ${c.count === 1 ? 'plume' : 'plumes'} · latest ${c.latest}${rate}`;

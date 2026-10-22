@@ -223,3 +223,28 @@ def test_inputs_are_validated_before_any_request(cm, serve):
     for args in ((95, 10), (10, 200), ("37.9", 113.5), (37.9, 113.5, 50), (37.9, 113.5, math.nan)):
         assert "error" in json.loads(_run(cm.carbon_mapper_plumes(*args)))
     assert requests == []
+
+
+def test_an_unreachable_catalogue_leaves_a_record_the_board_can_say_it_with(cm, serve, fake_s3):
+    serve(fail=httpx.ConnectError("down"))
+    out = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI)))
+    assert "could not be reached" in out["error"]
+    rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/cmplumes_37.8938_113.5625.json"])
+    assert rec["status"] == "unavailable" and "count" not in rec
+
+
+def test_the_follow_rule_counts_plumes_within_5_km_whatever_the_radius(cm, serve):
+    serve(page("carbonmapper_shanxi_2026-10-22.json"))
+    wide = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI, radius_km=6)))
+    assert wide["summary"]["latest_date"] == "2026-06-10"        # the seven plumes at ~5.1 km
+    assert wide["latest_confirmed"] is None                        # none of them within 5 km
+
+
+def test_rates_round_half_up_like_the_stage():
+    import importlib
+    cm = importlib.import_module("carbon_mapper")
+    brief = importlib.import_module("brief_tools")
+    assert cm.about(265.0) == 270 and cm.about(264.9) == 260 and cm.about(1513.1) == 1510
+    rec = {"radius_km": 5.0, "since": "2025-01-01", "count": 1, "latest": "2026-06-20", "rate_kg_h": 265.0,
+           "uncertainty_kg_h": 255.0, "instrument": "tanager"}
+    assert "about 270 ± 260 kg/h" in brief.carbon_mapper_line(rec)
