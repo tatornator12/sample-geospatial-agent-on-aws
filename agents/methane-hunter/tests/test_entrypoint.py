@@ -102,6 +102,10 @@ def test_the_watch_reads_its_dates_from_the_tools_and_says_when_emit_last_looked
     assert "on a tie, the site with MORE EMIT candidate passes; then the higher peak ppm·m" in p
     assert "its latest confirmed detection is a Carbon Mapper plume on 2026-06-20, against an EMIT candidate pass" in p
     assert "EMIT last looked here on" in p and "last_look" in p
+    # Oct 22 (task 25): the closer is a template, word for word ("with EMIT last looking on" failed
+    # 3 of 4 mission runs on dev v44).
+    assert ("WORD FOR WORD with only the blanks filled (no other wording: not \"last looking\", not \"at this site\"" in p
+            and "EMIT passes read since <since>; EMIT last looked here on <site_history's last_look>." in p)
     assert 'never says "still active", "recent" or "active"' in p
     assert "NASA's highest published emission rate at this site" in p and "Never estimate a rate yourself" in p
     assert 'never write "only oil and gas"' in p and "one plain sentence with a verb" in p

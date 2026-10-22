@@ -271,10 +271,12 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
 W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "- Check:" and
     "- Independent detections:" lines included, with Carbon Mapper's source; drop nothing, merge
     nothing); then the line "{CONFIDENCE_SENTENCE}";
-    then the line "Decision: analyst's."; then the closing paragraph: ONE sentence with the place,
-    the candidate count and the date EMIT last looked there (site_history's last_look), then (first
-    answer of the conversation only) "{SPOKEN_CONFIDENCE}" (at most 240 characters; no TROPOMI
-    figure, no comparison across areas, no em dash: those belong in the record). E.g.
+    then the line "Decision: analyst's."; then the closing paragraph, WORD FOR WORD with only the
+    blanks filled (no other wording: not "last looking", not "at this site", not "with"):
+    "Near <place>: methane on <candidates> of <passes read> EMIT passes read since <since>; EMIT last
+    looked here on <site_history's last_look>." then (first answer of the conversation only)
+    "{SPOKEN_CONFIDENCE}" (at most 240 characters; no TROPOMI figure, no Carbon Mapper figure, no
+    comparison across areas, no em dash: those belong in the record). E.g.
     "Near Hazar, Balkan, Turkmenistan: methane on 4 of 4 EMIT passes read since 2025-01-01; EMIT last
     looked here on 2025-08-20. {SPOKEN_CONFIDENCE}"
     The closer never says "still active", "recent" or "active": it says when EMIT last looked. For a
