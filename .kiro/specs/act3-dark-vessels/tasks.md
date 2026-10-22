@@ -320,5 +320,19 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   - Stable, `demo-stable` and Slack untouched: every eval and browser check ran with empty
     `SLACK_*` variables. Dev is left on version 14 with `VESSEL_CACHE_PREFIX=vessels/cache/v1r`,
     which task 11 removes at G4
+- Oct 22 (first stable runtime, all four acts + frontend, ahead of G4 by the user's call):
+  `demo-stable` = `ab10a09`, tag `deployed-2026-10-22` (pushed to `fork`). Gates: pytest
+  dark-vessels 260, geo_agent 132, methane 156, archaeologist 51; vitest 558; backend 77;
+  detector 0. Dev evals (`dark_vessels_dev` v17, v1r): 11/11 and `open-question` x3 3/3 (median
+  62.4 s) in preflight; 11/11 in `promote.sh` run 2 (run 1 stopped on a methane NASA CMR timeout,
+  nothing moved). Stable `dark_vessels` **v1** (created, `dark_vessels-Pwdo0x4pem`), cache prefix
+  the default `vessels/cache/v1` (no `VESSEL_CACHE_PREFIX`, no GFW token; 5 env keys), smoke
+  `open-question` PASS 81 s; stable eval **11/11**, `open-question` x3 **3/3** (64, 62, 67 s, 0
+  refusals, `read_pass:newest`), no reruns; `second-question` passed with 1 refusal. Registered in
+  `AGENT_RUNTIMES` as `vessels`; the task role's invoke grant covers `dark_vessels` only (not dev).
+  Tasking secret `geospatial-agent/dev/slack-tasking-webhook` set, ECS rolled; the task logs "Slack
+  on filed taskings: on (workflow webhook)". Not yet seen: the switcher entry, a live turn and the
+  `vessels-open-question` replay while signed in, one real approve posting to Slack, 7.1 and 7.2's
+  timings. Way back: `deployed-2026-10-21` (no stable Dark Vessels)
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)

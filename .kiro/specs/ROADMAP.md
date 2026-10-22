@@ -101,3 +101,16 @@ Oct 12 when Dark Vessels was chosen for Act 3.)
   wording flake), archaeologist 8/8. `cdk diff`: the taskings `PutObject` grant, image, header
   rotation, archaeologist invoke grant; nothing else. Not yet seen: the signed-in switcher and
   replay walk-through. Way back: `deployed-2026-10-12` (`f9f67c3`).
+- Oct 22 (all four acts, the user's call): `develop` promoted to `demo-stable` = `ab10a09`, tag
+  `deployed-2026-10-22` (pushed to `fork`). Acts 1-4 + frontend: `geospatial_agent_on_aws` v74,
+  `methane_hunter` v5, `ai_archaeologist` v2, `dark_vessels` v1 (new, `dark_vessels-Pwdo0x4pem`, cache
+  `vessels/cache/v1`, no GFW token), `GeospatialAgentStack` UI + backend (`AGENT_RUNTIMES` gained
+  `vessels`, task definition rev 51). Gates: pytest geo_agent 132, methane 156, archaeologist 51,
+  dark-vessels 260, scripts 23; vitest 558; backend 77; tsc and build clean; detector 0. Dev evals:
+  earth 8/8, methane 13/13, archaeologist 8/8, vessels 11/11 (in `promote.sh` run 2; run 1 stopped at
+  its gate on methane `plumes-permian`, a NASA CMR timeout, nothing moved). Stable evals: earth 8/8,
+  methane 13/13, archaeologist 8/8, vessels 11/11 and `open-question` x3 3/3, no reruns. `cdk diff`:
+  the tasking secret and its execution-role read, image, header rotation, vessels invoke grant;
+  nothing else. Tasking secret live: `geospatial-agent/dev/slack-tasking-webhook` set, ECS rolled,
+  the task logs "Slack on filed taskings: on (workflow webhook)". Not yet seen: the signed-in
+  rehearsal and one real approve posting to Slack. Way back: `deployed-2026-10-21` (`9a5c6f9`).
