@@ -150,7 +150,8 @@ def _km_to_box(lon: float, lat: float, bounds) -> float:
     return vs.km((lon, lat), (min(max(lon, w), e), min(max(lat, s), n)))
 
 
-HOTSPOTS_SHOW = "Show the heat and the boxes (display_visual with each render); say the check with say, word for word."
+HOTSPOTS_SHOW = ("Show the heat and the boxes next (display_visual with each render), in a response of their own "
+                 "with no other tool; say the check with say, word for word.")
 HOTSPOTS_DRAFT = "Choose which box to draft and announce it with decide in the same response as next_look."
 HOTSPOTS_STOP = "No pass read in this question could be checked, so there is no box to draft: decide stop, then write the answer."
 
@@ -320,7 +321,8 @@ async def fleet_pattern() -> str:
         **s, "heat_s3_url": url,
         "render": {"kind": "points", "group": "maritime", "legend": "Squid fleet hours", "property": "v"},
         "say": say, "attribution": vs.ATTRIBUTION,
-        "next_steps": "Show the fleet's hours (display_visual with heat_s3_url and render); say it with say, in one "
+        "next_steps": "Show the fleet's hours (display_visual with heat_s3_url and render) in a response of its own, "
+                      "with no other tool; say it with say, in one "
                       "sentence. The fleet is a fleet: no vessel, flag or country is named.",
     })
 
@@ -361,7 +363,8 @@ async def next_look(box: int = 0) -> str:
         "looks": [{k: lk[k] for k in ("satellite", "start", "relative_orbit", "share")} | {"text": _look_line(lk)} for lk in looks],
         "plan": source, "footprint_s3_url": url,
         "render": {"kind": "vector", "group": "maritime", "legend": "Next radar look", "label": "label"},
-        "next_steps": "Show the look (display_visual with footprint_s3_url and render); say the first look's time in UTC.",
+        "next_steps": "Show the look (display_visual with footprint_s3_url and render) in a response of its own, with "
+                      "no other tool; say the first look's time in UTC.",
     })
 
 
@@ -438,7 +441,8 @@ async def reachable_area() -> str:
         "render": {"kind": "vector", "group": "maritime", "legend": "Reach by water", "label": "label"},
         "fixed_sentence": vs.CANNOT_SAY,
         "next_steps": "With your next call, get that pass's radar (find_pass with pass_id); then show the radar and the "
-                      "area (display_visual with area_s3_url and render) together. Say the date plainly (an earlier "
+                      "area (display_visual with area_s3_url and render) together, in a response of their own with no "
+                      "other tool. Say the date plainly (an earlier "
                       "pass), the speed and the hours, the targets inside, the fixed sentence word for word, then where "
                       "the AIS came back on; end with one short paragraph, \"" + vs.RECORD_ONLY + "\" then the "
                       "closer. Say only what the record shows: never call a target inside a coincidence or a match.",

@@ -129,7 +129,7 @@ async def find_pass(when: str = "latest") -> str:
                    "legend": "Radar backscatter", "bounds": built["bounds"]},
         "source": "Copernicus Sentinel-1 (ESA), VV, read ahead of time from Microsoft Planetary Computer",
         "next_steps": "Look at the radar once (inspect_image with s3_url) and say what you see in one sentence; "
-                      "show it with display_visual(s3_url, render=render).",
+                      "then show it (display_visual with s3_url and render) in a response of its own, with no other tool.",
     })
 
 
@@ -229,5 +229,6 @@ async def detect_vessels(pass_id: str) -> str:
         "detectors": "ours: a two-parameter CA-CFAR on the VV radar at 20 m; GFW: its public SAR vessel detections "
                      "(larger vessels); a pair is one of each within 1 km",
         "attribution": vs.ATTRIBUTION,
-        "next_steps": "Show the targets (display_visual with targets_s3_url and render); then the coverage check.",
+        "next_steps": "Show the targets (display_visual with targets_s3_url and render) in a response of its own, "
+                      "with no other tool; then the coverage check.",
     })

@@ -48,7 +48,7 @@ def test_the_prompt_quotes_the_standard_and_the_cap_from_the_store(prompt):
 
 def test_the_blocks_kept_replaced_and_added(prompt):
     text = flat(prompt)
-    blocks = ["HARD RULES", "RESPONSE STYLE:", "DISPLAY RIDES ALONG:", "LOOK BEFORE YOU ANALYSE:", "UNITS:",
+    blocks = ["HARD RULES", "RESPONSE STYLE:", "DISPLAY ON ITS OWN:", "LOOK BEFORE YOU ANALYSE:", "UNITS:",
               "ATTRIBUTION:", "GOAL:", "START:", "THE STANDARD:", "DECISIONS:", "BUDGET:", "STOP:", "ANSWER (",
               "SPARES (only when asked):"]
     positions = [text.index(b) for b in blocks]

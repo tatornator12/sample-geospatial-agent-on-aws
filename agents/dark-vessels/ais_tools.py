@@ -39,10 +39,13 @@ SAY_AS = {"broadcasting": "broadcasting", "port": "at or near a port", "unproven
 
 STALE_RECORDS = "Those records are from an earlier question: read the pass again."
 # match_ais' next steps, word for word (design §3.5, review M2): showing the matched targets is what
-# lets the map reveal them; it is not investigation order.
-NEXT_WITH_CANDIDATES = "Show the targets (display_visual with targets_s3_url and render) with your next call; then the evidence."
-NEXT_NO_CANDIDATES = ("Show the targets (display_visual with targets_s3_url and render) with your next call. "
-                      "No candidates on this pass: decide what follows.")
+# lets the map reveal them; it is not investigation order. The display goes in a response of its own
+# (final gates, Oct 21): a run that put it in one response with the next tool showed each step's
+# maps one tool late, and the matched targets never.
+NEXT_WITH_CANDIDATES = ("Show the targets (display_visual with targets_s3_url and render) next, in a response of its "
+                        "own with no other tool; then the evidence.")
+NEXT_NO_CANDIDATES = ("Show the targets (display_visual with targets_s3_url and render) next, in a response of its "
+                      "own with no other tool. No candidates on this pass: decide what follows.")
 
 
 _t = vs.parse_t
@@ -163,8 +166,9 @@ async def check_ais_coverage(pass_id: str) -> str:
         "unproven_means": vs.RECEPTION_UNKNOWN,
         # Both areas, every time: the map shows where a missing broadcast proves nothing before any
         # target is called a candidate (gate A attempt 1 showed one area only, once in four runs).
-        "next_steps": "Show both areas with your next call, as two display_visual calls: heard_s3_url with "
-                      "heard_render, and unproven_s3_url with unproven_render; then judge this pass against the standard.",
+        "next_steps": "Show both areas next, in a response of their own with no other tool: two display_visual calls, "
+                      "heard_s3_url with heard_render and unproven_s3_url with unproven_render; then judge this pass "
+                      "against the standard.",
     })
 
 

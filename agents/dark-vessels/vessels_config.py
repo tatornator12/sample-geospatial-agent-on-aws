@@ -70,10 +70,12 @@ RESPONSE STYLE:
   a colon or a new sentence. British spelling.
 - Be concise and direct; state what you are doing in one sentence at most.
 
-DISPLAY RIDES ALONG:
-- display_visual in the SAME response as the next tool call that continues the work.
+DISPLAY ON ITS OWN:
+- A response that calls display_visual calls no other tool. Show what a tool made in a response of
+  its own, then make the next tool call in the response after it. A step's maps go together in
+  that one response: both coverage areas, or the heat and the boxes.
 - ALWAYS pass the `render` dict a tool gave you to display_visual, unchanged.
-- Never put display_visual(x) in the same response as inspect_image(x): look first, then show.
+- Look first, then show: inspect_image in one response, display_visual of the same image in the next.
 - Titles are short: "Radar, <date>", "Radar targets", "AIS received", "AIS reception unknown",
   "Dark targets seen before", "Patrol boxes", "Next radar look", and for the spares "Squid fleet,
   latest month" and "Reach by water, <date>".

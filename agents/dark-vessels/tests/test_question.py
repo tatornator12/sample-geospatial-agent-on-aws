@@ -617,21 +617,25 @@ def test_match_ais_refuses_a_pass_under_the_standard_and_a_stale_record(vessels)
 
 
 def test_match_ais_next_steps_word_for_word(vessels):
+    """M2's words, reworded at the final gates (Oct 21): the display goes in a response of its own. One
+    run in three had put it in one response with the next tool, so the matched targets were never shown."""
     run(vessels.ais.check_ais_coverage(STAR))
     assert run(vessels.ais.match_ais(STAR))["next_steps"] == (
-        "Show the targets (display_visual with targets_s3_url and render) with your next call; then the evidence.")
+        "Show the targets (display_visual with targets_s3_url and render) next, in a response of its own with no "
+        "other tool; then the evidence.")
     run(vessels.ais.check_ais_coverage(SEP18))
     out = run(vessels.ais.match_ais(SEP18))
     assert out["counts"]["candidate"] == 0 and out["next_steps"] == (
-        "Show the targets (display_visual with targets_s3_url and render) with your next call. "
-        "No candidates on this pass: decide what follows.")
+        "Show the targets (display_visual with targets_s3_url and render) next, in a response of its own with no "
+        "other tool. No candidates on this pass: decide what follows.")
 
 
-def test_coverage_next_steps_ask_for_both_areas_with_the_next_call(vessels):
-    """Gate A attempt 1: one run in four showed only the received area before match_ais (M2's check)."""
+def test_coverage_next_steps_ask_for_both_areas_in_a_response_of_their_own(vessels):
+    """Gate A attempt 1: one run in four showed only the received area before match_ais (M2's check). The
+    final gates: a run put the received area in match_ais' response and the other in gather_evidence's."""
     assert run(vessels.ais.check_ais_coverage(STAR))["next_steps"] == (
-        "Show both areas with your next call, as two display_visual calls: heard_s3_url with heard_render, and "
-        "unproven_s3_url with unproven_render; then judge this pass against the standard.")
+        "Show both areas next, in a response of their own with no other tool: two display_visual calls, heard_s3_url "
+        "with heard_render and unproven_s3_url with unproven_render; then judge this pass against the standard.")
 
 
 def test_reachable_area_next_steps_get_the_radar_first_and_end_on_the_closer(vessels):
@@ -655,7 +659,8 @@ def test_next_steps_name_no_call_order(vessels):
     ask(vessels, "Same question, end of August")                           # a thin pass only: the forecast ends on stop
     read_and_cover(vessels, AUG30, because="asked")
     outs["predict_hotspots (thin)"] = run(vessels.ft.predict_hotspots(AUG30))
-    assert outs["detect_vessels"]["next_steps"] == "Show the targets (display_visual with targets_s3_url and render); then the coverage check."
+    assert outs["detect_vessels"]["next_steps"] == ("Show the targets (display_visual with targets_s3_url and render) in a "
+                                                    "response of its own, with no other tool; then the coverage check.")
     assert outs["check_ais_coverage"]["next_steps"].endswith("judge this pass against the standard.")
     for name, out in outs.items():
         steps = out["next_steps"]
@@ -667,13 +672,42 @@ def test_next_steps_name_no_call_order(vessels):
         assert "fleet_pattern" not in steps and "in the same response as" not in fork and "decide" not in fork, name
 
 
+def test_every_display_the_tools_ask_for_is_a_response_of_its_own(vessels):
+    """The final gates (Oct 21): one open-question run in three put each map call in one response with the
+    tool after it, tool first, so match_ais ran before either coverage area was on the map and the matched
+    targets were never shown (no reveal, no candidates line). Every tool that asks for a display_visual
+    asks for it in a response of its own, with no other tool, and the prompt says the same."""
+    import vessels_config as c
+    outs = {"reachable_area": run(vessels.ft.reachable_area())}           # the spares, with no question open
+    run(vessels.ais.check_ais_coverage(SEP18))
+    outs["match_ais (none)"] = run(vessels.ais.match_ais(SEP18))
+    ask(vessels)
+    decide(vessels, "read_pass", "newest", STAR)
+    outs |= {"find_pass": run(vessels.pt.find_pass(STAR)), "detect_vessels": run(vessels.pt.detect_vessels(STAR)),
+             "check_ais_coverage": run(vessels.ais.check_ais_coverage(STAR)), "match_ais": run(vessels.ais.match_ais(STAR)),
+             "predict_hotspots": run(vessels.ft.predict_hotspots(STAR)), "next_look": run(vessels.ft.next_look(1)),
+             "fleet_pattern": run(vessels.ft.fleet_pattern())}
+    for name, out in outs.items():
+        steps = out["next_steps"]
+        assert "display_visual" in steps, name
+        assert re.search(r"in a response of (its|their) own,? with no other tool", steps), name
+        assert "with your next call" not in steps.split("display_visual", 1)[1], name   # never "with the next call"
+    prompt = " ".join(c.build_prompt("2026-10-23").split())
+    assert ("DISPLAY ON ITS OWN: - A response that calls display_visual calls no other tool. Show what a tool made in "
+            "a response of its own, then make the next tool call in the response after it. A step's maps go together "
+            "in that one response: both coverage areas, or the heat and the boxes.") in prompt
+    assert "Look first, then show: inspect_image in one response, display_visual of the same image in the next." in prompt
+    assert "RIDES ALONG" not in prompt and "SAME response as the next tool call" not in prompt
+
+
 # --- predict_hotspots(pass_id) ------------------------------------------------------------------------
 
 def test_predict_hotspots_next_steps_name_the_ending_this_questions_records_allow(vessels):
     """Review B1: after thin passes only, the forecast's next steps end on stop, never on a draft (so no
     'Decided: Drafting box k' line precedes a tasking that cannot be drafted); after a checked pass
     they ask for the box. With no question open they read as today."""
-    show = "Show the heat and the boxes (display_visual with each render); say the check with say, word for word. "
+    show = ("Show the heat and the boxes next (display_visual with each render), in a response of their own with no "
+            "other tool; say the check with say, word for word. ")
     draft = show + "Choose which box to draft and announce it with decide in the same response as next_look."
     stop = show + "No pass read in this question could be checked, so there is no box to draft: decide stop, then write the answer."
     assert run(vessels.ft.predict_hotspots())["next_steps"] == draft          # no question open
