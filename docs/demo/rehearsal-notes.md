@@ -1,6 +1,6 @@
 # Agentic AI for Earth: rehearsal and speaker notes
 
-**DRAFT, 21 October 2026 (refreshed the same evening; Act 3 written late that evening from the built redesign).** Act 3's one-question redesign passed both dev gates and is merged on `develop`; its seconds are measured on dev, and its minutes are not yet timed by hand (Thu 29 Oct). Most of the stage review's known issues are fixed, in two batches: the first is on the stable stage since the 21 October promotion, the second reaches it at G4 (Fri 30 Oct). These notes describe the stage after G4; section 2 says what differs before then.
+**DRAFT, 22 October 2026 (updated after release `deployed-2026-10-22`).** Since 22 October the live site has all four acts on stable runtimes (Dark Vessels for the first time) and both batches of the stage review's fixes; the tasking post to Slack is on, and nothing has been posted yet. The stable evals passed that day: Earth Analyst 8/8, AI Archaeologist 8/8, Methane Watch 13/13, Dark Vessels 11/11 and its open question 3 of 3. Act 3's minutes are not yet timed by hand (Thu 29 Oct). These notes describe the live site as it is now; section 2 lists what is still open. The way back from this release is the tag `deployed-2026-10-21`, which has no stable Dark Vessels. Records: `.agents/tasks/promote-2026-10-21b/` (`report.md`, `verify.md`, `promote-status.md`).
 
 **Show order (decided 21 October):** Earth Analyst (Act 1), then AI Archaeologist (Act 4), then Methane Watch (Act 2), and Dark Vessels (Act 3) closes the show. The act numbers are the agents' names in the code and specs; only the running order changed. These notes keep the act numbers and put the sections in show order.
 
@@ -30,7 +30,7 @@ Why this order:
 - **Methane Watch third:** a whole mission at scale on live data, and the stage shows why it follows one site over the other.
 - **Dark Vessels last:** one open question. The agent chooses the radar pass and says why, checks that a silence can mean anything there, gives a measured prediction and drafts a patrol tasking. The officer approves it on the map, and the Slack post on a second screen is the final image.
 
-**Act 3 passed gate A and gate B on 21 October.** If G4 (Fri 30 Oct) promotes its four-turn version instead (R9.1), or Act 3 is cut on the day, Methane Watch closes the show:
+**Act 3 has been live on the stable stage since 22 October** (gates A and B on dev on 21 October, the stable evals on 22 October). Its fallbacks stay: first the `vessels-open-question` replay (section 9), then Methane Watch as the closer if Act 3 is cut on the day. The four-turn version, the tag `act3-four-turn-fallback` (R9.1), is an emergency option only: it would need a promotion. If it runs, or Act 3 is cut, Methane Watch closes the show:
 
 | Fallback | After the intro (0:00 to 2:00) |
 |---|---|
@@ -62,11 +62,10 @@ If you run long, cut in this order. The order across acts is proposed; Dark Vess
 
 ## 2. Until fixed
 
-> **Until fixed.** Recheck every line after the G4 promotion (Fri 30 Oct) and the freeze (Tue 3 Nov). Trimmed on 21 October: every other line of the first box was checked fixed on a local copy of the stage, at 1920×1080 and 1280×720. New session, the Stage link, refresh after a switch, Esc and Stop, earlier turns and Replay cases are now safe to use.
+> **Until fixed.** Recheck every line on Fri 30 Oct, the re-check before the freeze, and after the freeze (Tue 3 Nov). Trimmed on 21 October: every other line of the first box was checked fixed on a local copy of the stage, at 1920×1080 and 1280×720. New session, the Stage link, refresh after a switch, Esc and Stop, earlier turns and Replay cases are now safe to use. Trimmed again on 22 October, when both batches of fixes and the tasking post reached the live site.
 >
-> - **Before G4, on the stable stage only:** it has the first batch of fixes, not the second. There, pick "Earth Analyst (stable)" on the switcher, never a "(dev)" entry; don't open "How it works" (still the original sample's page); Act 1's plates are in the old order, rank 1 opens no popup and the lit step runs one behind; the Octagon replay lands both its layers at once; "Strongest plume ever" frames the Sahara before Utah.
 > - **Act 4:** if a layer row reads "LiDAR did not load", say so, and do not read the answer over plain imagery.
-> - **Act 3, Slack:** the tasking post reaches the second screen only once the tasking's own webhook is set. The live site's stack injects only the brief's webhook, so the tasking needs a production secret of its own (open decision). Until it is set, expect no post on the stable stage: say the filed-line sentence (section 9) and go into the close. On a local stage it posts when `SLACK_TASKING_WEBHOOK_URL` is set.
+> - **Act 3, Slack:** the tasking post has been on in production since 22 October, and nothing has been posted yet: the first real approve on the live site is the first post, so check the "Patrol taskings" channel during the rehearsal.
 > - **Act 3, the next look:** a box has a look only if ESA has published one. The plan read on 20 October had no look over these waters from 31 October to 9 November; if no newer plan adds one, every box reads "no look planned yet" and the plate shows no countdown. Say "ESA hasn't planned a radar look there yet."
 > - **Act 3 replay:** recorded on the Oct 17 rehearsal data, so its board and its figure (47%, 9.4 times chance) differ from the live stage, and after 24 October its next look reads "under way or passed". It is re-recorded on the new data on 6 November.
 > - **Act 3, browser console:** each decision file's first fetch logs a 500 before the stage's retry gets it. Nothing on the stage changes; nothing to do.
@@ -78,11 +77,13 @@ If you run long, cut in this order. The order across acts is proposed; Dark Vess
 
 | Date | What | Source |
 |---|---|---|
+| Thu 22 Oct | Release `deployed-2026-10-22`: all four acts and both fix batches live | release report (`promote-2026-10-21b`) |
 | Fri 23 Oct | Archaeologist dev gate; first batch of stage fixes | act3 design decision 9; review summary |
+| Sat 24 Oct (about) | Dark Vessels: the dev rehearsal data rebuilt with the Oct 18 pass once Global Fishing Watch's AIS reaches 19 October, data only | act3 tasks 6.3 |
 | Mon 26 Oct | Act 3 gate A drop-dead 12:00: passed early, Wed 21 Oct | act3 redesign U10; act3 gate log |
 | Wed 28 Oct | Act 3 gate B drop-dead 12:00: passed early, Wed 21 Oct, with the replay case recorded the same day | act3 redesign U10; act3 tasks 6.1 |
 | **Thu 29 Oct** | **Timing rehearsal:** Act 3 timed twice against dev, under 8:30, fallbacks recorded. Proposed: time every part against section 1 the same day, in the new order. | act3 tasks 7.1 |
-| Fri 30 Oct | G4: Release 3 with all four agents; Act 3 timed twice against stable; the 30-minute show once, in the new order (proposed: with the second screen) | act3 tasks 7.2 |
+| Fri 30 Oct | G4, now the re-check before the freeze: the evals rerun on stable; Act 3 timed twice against stable; the 30-minute show once, in the new order (proposed: with the second screen); and any fix made after 22 October | act3 tasks 7.2; release report |
 | **Tue 3 Nov** | **Freeze:** nothing new lands after this, only fixes | working agreement; roadmap |
 | 3 to 7 Nov | Demo readiness: runbook, backup videos, prewarm, two timed rehearsals (dates not set) | roadmap row 7 |
 | Thu 5 Nov | Dark Vessels data rerun (newest pass and AIS, refit), data only | act3 design decision 12 |
@@ -105,7 +106,7 @@ No act has a recorded rehearsal time yet. Fill this in as you go, in show order:
 
 ## 4. Setup checklist
 
-Commands run from the repo root on this Mac and need AWS credentials. The warm scripts use `AWS_PROFILE=main`; `prewarm.py` and `runtimes.py` name no profile, so using the same one is unconfirmed.
+Commands run from the repo root on this Mac and need AWS credentials. The warm scripts use `AWS_PROFILE=main`; `prewarm.py` and `runtimes.py` name no profile. `runtimes.py check-env` ran against stable with `AWS_PROFILE=main` on 22 October; for `prewarm.py`, using the same one is unconfirmed.
 
 ### Day before (Sun 8 Nov)
 
@@ -115,11 +116,12 @@ Commands run from the repo root on this Mac and need AWS credentials. The warm s
 - [ ] Warm the Act 3 radar plans: `AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py`
 - [ ] Check each stable runtime has its settings (prints names and presence only, never values; exit 0 when ready):
   `AWS_PROFILE=main .venv/bin/python scripts/runtimes.py check-env --agent earth --target stable`
-  Repeat with `--agent archaeologist`, `--agent methane`, `--agent vessels`. The Archaeologist has a stable runtime since the 21 October promotion; Dark Vessels reaches stable at G4 (unconfirmed until 30 Oct).
+  Repeat with `--agent archaeologist`, `--agent methane`, `--agent vessels`. The Archaeologist has a stable runtime since the 21 October promotion; Dark Vessels has one since the 22 October release.
 - [ ] Earthdata token (Act 2): valid to 16 November 2026 at the 12 October promotion; tokens last 60 days. If the methane stable runtime was redeployed since, note the new token's expiry.
+- [ ] Global Fishing Watch token (Act 3): none needed to run the demo. The stable Dark Vessels runtime holds no token and never calls Global Fishing Watch; the token in `agents/dark-vessels/.env` on this Mac is for the data refreshes only (about 24 October and 5 November).
 - [ ] Sign in on the stage URL in the presenting browser (Cognito; a new password needs 12 or more characters). Check the switcher lists Earth Analyst, AI Archaeologist, Methane Watch and Dark Vessels, in that order, with no act numbers. Rehearsal-only runtimes (such as "Earth Analyst · dev") appear only with `?dev=1` in the address, and `?dev=0` hides them again; never present with it. An act missing from the list has no stable runtime registered (an act left on a dev runtime shows only with `?dev=1`).
 - [ ] Open the deck on this Mac. Its fonts are not embedded, so present from this Mac or install Atkinson Hyperlegible on the presenting machine. Replace "Presenter name" on slide 1 and in its notes, and "[Your call to action]" on slide 4 and in its notes (section 10).
-- [ ] Sign in to Slack on the second screen (Act 3's last beat) and open the channel the "Patrol taskings" workflow posts to (proposed: a second display beside the projector). Which display, how it connects and whether the whole room can see it are unconfirmed; set them at the 30 October run-through.
+- [ ] Sign in to Slack on the second screen (Act 3's last beat) and open the channel the "Patrol taskings" workflow posts to (proposed: a second display beside the projector). The live site's tasking post has been on since 22 October (the tasking secret is set), so the second screen can be used at any rehearsal now; nothing has been posted yet. Which display, how it connects and whether the whole room can see it are unconfirmed; set them at the 30 October run-through.
 - [ ] Backup videos: planned in demo readiness, not made yet (unconfirmed). If they exist, put them on this Mac's desktop.
 
 ### Morning of (Mon 9 Nov)
@@ -154,7 +156,7 @@ Commands run from the repo root on this Mac and need AWS credentials. The warm s
   - `/?scenario=vessels-open-question&agent=vessels`
 - [ ] **Network:** a wired connection if offered (proposed). Load each replay once. This proves the bucket, the backend, the imagery tile server, the basemap tiles and the web fonts are reachable, and it warms the tile server (the first replay after a cold start waited 15.6 s for tiles). Replays make no live data calls but still need that network, so they are not a no-network fallback.
 - [ ] **Sign-in:** sign in again shortly before the start (proposed; the sign-in session's lifetime is unconfirmed).
-- [ ] **Slack:** approvals in Acts 2 and 3 post to Slack workflows. Act 3's post is the final image on the second screen (decided 21 October); Act 2's is not shown (proposed). Act 3's post needs the tasking's own webhook, and the live site has no production secret for it yet (open decision, section 2).
+- [ ] **Slack:** approvals in Acts 2 and 3 post to Slack workflows. Act 3's post is the final image on the second screen (decided 21 October); Act 2's is not shown (proposed). Act 3's post uses the tasking's own webhook, whose production secret has been set since 22 October; nothing has been posted yet, so the first real approve is the first post (section 2).
 
 ### Five minutes before
 
@@ -192,7 +194,7 @@ The intro uses the deck's first three slides. The second half of the deck, the w
 
 Goal: the agent sees imagery, turns down a scene it cannot use, and finds places by example.
 
-**Plates on the stage** (stageCopy.ts order, the order you click them; the stable stage has this order from G4, 30 October):
+**Plates on the stage** (stageCopy.ts order, the order you click them; on the stable stage since the 22 October release):
 
 | # | Label | Prompt | Used |
 |---|---|---|---|
@@ -291,7 +293,7 @@ Goal: same eyes and similarity, a new domain, on known sites only; it chooses it
 
 **If a live turn fails**
 
-- "The Octagon, from space": `/?scenario=archaeologist-newark&agent=archaeologist` (re-recorded 21 October from dev). It holds the true colour on its own for about 8 s, then the hillshade lands: say the "from space" line while the true colour is alone. Before G4 the stable stage lands both layers at once: untick the hillshade in the layers plate, say the line, then tick it again.
+- "The Octagon, from space": `/?scenario=archaeologist-newark&agent=archaeologist` (re-recorded 21 October from dev). It holds the true colour on its own for about 8 s, then the hillshade lands: say the "from space" line while the true colour is alone.
 - "Measure an Octagon wall": no replay. If it fails, go on to the Great Circle.
 - "Measure the Great Circle": `/?scenario=archaeologist-great-circle&agent=archaeologist` (recorded with the plate's old words, "How big is the Great Circle, and how was it built?", until it is re-recorded).
 - "Where else, like this" has no replay. If its layer row reads "LiDAR did not load" (section 2; it failed in 1 of 2 review runs while the answer described it), say "the relief didn't load", don't read the answer, and go to the close line. If you are in a replay, skip it.
@@ -352,7 +354,7 @@ Goal: it senses the invisible and triages at scale, on live data, and shows why 
 
 Goal: one open question, answered with a draft patrol tasking. The agent chooses the radar pass and says why, checks that a missing broadcast can mean anything there, says where the patrol should look with a measured record behind it, and drafts a box. The officer decides, and the Slack post on the second screen ends the show.
 
-The one-question redesign passed gate A and gate B on dev on 21 October and is merged on `develop`; it reaches the stable stage at G4 (Fri 30 Oct). Sources: the Act 3 run sheet in `.kiro/specs/act3-dark-vessels/design.md`, the redesign's §3.2 and §3.3 (`redesign-open-question.md`) and the final gates (`.agents/tasks/act3-open-question/final-gates.md`). The seconds below are the final gates' four live stage runs on dev (runtime v17; three at 1920×1080, one at 1280×720), lowest to highest. Those runs used the Oct 17 rehearsal data: the passes on file plus a newer, narrower Oct 17 pass. The show runs on the passes on file, whose newest is Oct 12, until the Nov 5 data refresh; the words quoted below for that data are from gate B's runs on it (an earlier runtime, about 12 s quicker a turn).
+The one-question redesign passed gate A and gate B on dev on 21 October and has been on the stable stage since 22 October (runtime v1: evals 11/11 and the question 3 of 3). Sources: the Act 3 run sheet in `.kiro/specs/act3-dark-vessels/design.md`, the redesign's §3.2 and §3.3 (`redesign-open-question.md`) and the final gates (`.agents/tasks/act3-open-question/final-gates.md`). The seconds below are the final gates' four live stage runs on dev (runtime v17; three at 1920×1080, one at 1280×720), lowest to highest. Those runs used the Oct 17 rehearsal data: the passes on file plus a newer, narrower Oct 17 pass. The show runs on the passes on file, whose newest is Oct 12, until the Nov 5 data refresh; the words quoted below for that data are from gate B's runs on it (an earlier runtime, about 12 s quicker a turn). The stable runtime reads those passes on file (cache `vessels/cache/v1`): in five eval runs on 22 October it read Oct 12 as the newest pass, in 60 to 67 s (the first stable run, at the promotion, took 81 s).
 
 **Plates on the stage** (stageCopy.ts order):
 
@@ -406,7 +408,7 @@ While the agent works, a beat lands every few seconds, so say only the short lin
 
 **The moment a person decides:** you, as the officer. Say once, as the plate opens: "The agent drafts; it never files. I'm the officer." Choose the box (click it on the map or on the plate) and the candidates (click a ring or untick it to leave it out), then press "Approve the tasking" (not "Not now", which files nothing and posts nothing). The stage's backend, not the agent, files it with a map snapshot and posts to Slack. Say: "The agent drafted it; I approved it." Let the plate's filed line speak: it shows once, and the stage sends no follow-up turn. Then turn to the second screen and let the post land without reading it out. That is the show's last image; go into the close from there.
 
-- *Slack:* the post appears only where the tasking's own webhook is set. On a local stage that is `SLACK_TASKING_WEBHOOK_URL` in the backend's environment. On the live site the stack injects only the brief's webhook today, so the tasking needs a production secret of its own first (open decision, section 2). If the post hasn't landed within about 10 seconds (proposed), say "The filed line on the plate is the record; Slack is only the notice," and go into the close. A live approve with its post on the stable stage is unconfirmed until G4.
+- *Slack:* the post appears only where the tasking's own webhook is set. On a local stage that is `SLACK_TASKING_WEBHOOK_URL` in the backend's environment. On the live site it has been set since 22 October, from a production secret of its own (the backend logs "Slack on filed taskings: on (workflow webhook)"), but nothing has been posted yet: the first real approve is the first post, so do one at a rehearsal and read the post (section 2). If the post hasn't landed within about 10 seconds (proposed), say "The filed line on the plate is the record; Slack is only the notice," and go into the close.
 
 **Timing:** 8:00, and section 1 is unchanged (spec: under 8:30). The script reaches the close at about 5:00 (23:00): about a minute of agent time, about 3 minutes of narration and the officer's choice, then the post. The other 3 minutes are the closer's margin: a second try at the question and the replay both fit in it. If nothing fails, go into the close at once; the minutes go to questions, where the spare plate can run. Agent time on v17: the question 54.8 to 67.0 s on stage, with a median of 59.2 s over eight eval runs, about 12 s more than before the display rule. The spare plate took 90.3 s; on earlier runtimes five runs drafted in 67.9 to 101.8 s and one stopped at 46.1 s. A turn that read and set aside a newest pass took 81 to 89 s, on an interim runtime. Still to time by hand: twice on dev on Thu 29 Oct, twice on stable on Fri 30 Oct, and on the new data on Fri 6 Nov.
 
@@ -415,7 +417,7 @@ While the agent works, a beat lands every few seconds, so say only the short lin
 - The question stalls or errors: press Esc, reload `/?agent=vessels` and send the plate once more. With one question there is no reason to press New session.
 - It fails again: load `/?scenario=vessels-open-question&agent=vessels` (Replay cases, under Dark Vessels). It was recorded once on dev on 21 October, on the Oct 17 rehearsal data: the board has Oct 17 first and the line reads "Decided: Reading Oct 12: the newest pass that saw over half the reserve (53%).", so say the Oct 17 line from the speaker notes. Then 4 candidates, box 1, and "47% of the dark targets, 9.4 times chance". Its plate is read-only ("Recorded case: the decision is made live, not replayed."), so there is no approval and no Slack post. Say once: "This is a recording of the same question. A recording doesn't replay the decision; live, I'd approve it here." Then go into the close with its replay line (section 10). Afterwards `/?agent=vessels` returns to live.
 - The replay won't load either: say "the live run isn't cooperating today", give one sentence on what the act does, and go into the close with its "didn't reach the tasking" line (section 10).
-- The four-turn version runs only if G4 promotes it in place of the redesign: the commit tagged `act3-four-turn-fallback` (R9.1), which holds its four plates and its run sheet. The act then runs third and Methane Watch closes the show (section 1). It is not a switch to make mid-show.
+- The four-turn version is an emergency option only: the commit tagged `act3-four-turn-fallback` (R9.1), which holds its four plates and its run sheet, would need a promotion to replace the redesign on the stable stage. The act then runs third and Methane Watch closes the show (section 1). It is not a switch to make mid-show.
 - If Act 3 can't run on the day (decided at the 6 November rehearsal or the morning's smoke run), Methane Watch closes the show: section 1's fallback rows.
 - At 1280×720 the tasking plate's body scrolls; the show runs at 1920×1080.
 
@@ -470,14 +472,14 @@ If cost comes up: "We haven't measured what the platform costs to run, so I won'
 
 ## 12. Not confirmed yet
 
-- Act 3 (gates A and B passed and the replay recorded on 21 October): the act timed by hand (twice on dev on 29 October, twice on stable at G4); the redesign on the stable stage at G4, on the passes on file, which the deployed runtime (v17) has not run on yet (its seconds were measured on the Oct 17 rehearsal data, and the show data's words on an earlier runtime); the prediction's figure on the day; and a read-and-set-aside of a newest pass on the main question, never seen in a live browser run.
+- Act 3 (gates A and B passed and the replay recorded on 21 October; on the stable stage since 22 October): the act timed by hand (twice on dev on 29 October, twice on stable at the 30 October re-check); a live turn through the stage on the live site (the stable evals call the runtime directly); the prediction's figure on the day; and a read-and-set-aside of a newest pass on the main question, never seen in a live browser run.
 - Act 3's data: the Nov 5 refresh and the Nov 6 go/no-go (if any of three runs on the new data ends without a draft or takes over 120 s, restore the backups and present on the earlier data), with the replay re-recorded that day; the Oct 18 pass, to be built for the dev rehearsal once Global Fishing Watch's AIS reaches 19 October, before the freeze (act3 tasks 6.3); and the fallback tag `act3-four-turn-fallback`, not yet moved to its rebased commit because the four-turn eval has not been rerun.
-- The second screen: which display, how it connects, whether the room can see it, and the Slack post's wording on it. The production secret for the tasking's webhook (open decision).
-- Dark Vessels on the stable stage and the switcher (due at G4, 30 October). The second batch of stage fixes on the stable stage (G4): the switcher's room names, Replay cases by act, How it works, Act 1's plate order. The Archaeologist's switcher entry and replays on the signed-in stable stage.
-- The re-recorded replays have been in the bucket since 21 October, so the stable stage already plays them on its own code; not checked on the stable stage.
+- The second screen: which display, how it connects, whether the room can see it, and the Slack post's wording on it.
+- A signed-in full rehearsal on the live site: the switcher's four acts in show order, Replay cases by act, How it works, Act 1's plate order, and a live turn through the stage for each act. The 22 October release was checked signed out only (the bundle, the runtimes, the bucket and the evals).
+- The re-recorded replays, `vessels-open-question` included: in the bucket and matching the repo on 22 October, not yet played on the signed-in live site.
 - Any rehearsal time for any part, in the new order.
-- A live "Approve and file" and "Approve the tasking" on the stable stage, with the Slack post.
+- A live "Approve and file" and "Approve the tasking" on the stable stage, with the Slack post. The tasking post has been on since 22 October and nothing has been posted yet: the first real approve is the first post.
 - Act 1 live: Bergen (dev only; the line under its cloudy chip not seen yet), the look-alike search's rank-1 popup on stable, Folsom (and its slider), Palisades, Colorado, and the optional Inambari scan (never run). Act 4 live: the Octagon and the Great Circle (seen only as replays by the review), the Octagon wall (dev only) and the provocation tests.
-- `prewarm.py` and `runtimes.py check-env` against stable, and the AWS profile they use.
+- `prewarm.py` against stable, and the AWS profile it uses (`runtimes.py check-env` ran against stable with `AWS_PROFILE=main` on 22 October).
 - Projector resolution, the presenting browser, behaviour on a real GPU, and the sign-in session's lifetime.
 - Backup videos (planned, not made) and any observability trace for the close.
