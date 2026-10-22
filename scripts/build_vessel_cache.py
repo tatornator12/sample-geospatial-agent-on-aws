@@ -620,6 +620,46 @@ def cut_chips(rec: dict, out: Path) -> dict:
 
 # --- history --------------------------------------------------------------------------------------
 
+def _positive(v) -> float | None:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    return x if x > 0 else None
+
+
+def _instant(s: str) -> datetime:
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+def gap_row(e: dict, rp) -> dict | None:
+    """One AIS-off event as a history row (type only, no identity), or None when its off position or
+    start cannot be read. Hours, km and knots are GFW's own when it gives them; GFW's gaps events have
+    carried them as null since at least Oct 21 2026 (task 10's finding: v1r's rebuild had 0 on every
+    row), so each falls back to what the event itself records: hours from start to end, km between the
+    off and on positions (great circle), knots from the two. v1's rows, from Oct 16, match that within
+    0.07 h and 0.06 km."""
+    g = e.get("gap") or {}
+    off, on = g.get("offPosition") or {}, g.get("onPosition") or {}
+    try:
+        off_pt = (float(off["lon"]), float(off["lat"]))
+        on_pt = (float(on["lon"]), float(on["lat"])) if on.get("lon") not in (None, "") else None
+        start = _instant(e["start"])
+        end = _instant(e["end"]) if e.get("end") else None
+    except (KeyError, TypeError, ValueError):
+        return None
+    hours = _positive(g.get("durationHours")) or (max(0.0, (end - start).total_seconds() / 3600) if end else 0.0)
+    dist = _positive(g.get("distanceKm")) or (km(off_pt, on_pt) if on_pt else 0.0)
+    kn = _positive(g.get("impliedSpeedKnots")) or (dist / hours / 1.852 if hours > 0 and dist > 0 else 0.0)
+    return {"start": e["start"][:16] + "Z", "end": (e.get("end") or "")[:16] + ("Z" if e.get("end") else ""),
+            "type": str((e.get("vessel") or {}).get("type") or "unknown").lower(),
+            "off": [round(off_pt[0], 4), round(off_pt[1], 4)],
+            "on": [round(on_pt[0], 4), round(on_pt[1], 4)] if on_pt else None,
+            "hours": round(hours, 1), "km": round(dist, 1), "kn": round(kn, 1),
+            "intentional": bool(g.get("intentionalDisabling")),
+            "starts_in_reserve": rp.contains(Point(*off_pt))}
+
+
 def build_history(out: Path, until: date, reserve, ports) -> dict:
     started = time.time()
     rp = prep(reserve)
@@ -636,19 +676,9 @@ def build_history(out: Path, until: date, reserve, ports) -> dict:
     geom = mapping(box(*GAPS_BOX))
     for a, b in windows(HISTORY_FROM, until):
         for e in gfw.events(GAPS, geom, a.isoformat(), b.isoformat()):
-            g = e.get("gap") or {}
-            off, on = g.get("offPosition") or {}, g.get("onPosition") or {}
-            try:
-                rec = {"start": e["start"][:16] + "Z", "end": (e.get("end") or "")[:16] + ("Z" if e.get("end") else ""),
-                       "type": str((e.get("vessel") or {}).get("type") or "unknown").lower(),
-                       "off": [round(float(off["lon"]), 4), round(float(off["lat"]), 4)],
-                       "on": [round(float(on["lon"]), 4), round(float(on["lat"]), 4)] if on.get("lon") not in (None, "") else None,
-                       "hours": round(float(g.get("durationHours") or 0), 1), "km": round(float(g.get("distanceKm") or 0), 1),
-                       "kn": round(float(g.get("impliedSpeedKnots") or 0), 1), "intentional": bool(g.get("intentionalDisabling")),
-                       "starts_in_reserve": rp.contains(Point(float(off["lon"]), float(off["lat"])))}
-            except (KeyError, TypeError, ValueError):
-                continue
-            gaps.append(rec)
+            rec = gap_row(e, rp)
+            if rec:
+                gaps.append(rec)
         time.sleep(1)
     print(f"  history: {len(gaps)} AIS-off events near the reserve since {HISTORY_FROM} "
           f"({sum(g['intentional'] for g in gaps)} intentional)", flush=True)

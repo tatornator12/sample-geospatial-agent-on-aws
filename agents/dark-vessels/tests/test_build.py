@@ -466,3 +466,63 @@ def test_deploy_passes_the_prefix_only_on_dev():
     assert 'cache_env=(--env "VESSEL_CACHE_PREFIX=${VESSEL_CACHE_PREFIX}")' in text
     assert '[ "${DEPLOY_TARGET}" != "dev" ]' in text
     assert "^vessels/cache/v1[a-z0-9-]*$" in text
+
+
+# --- the history's AIS-off rows (task 10's finding F1) ---------------------------------------------------
+
+def gap_event(**gap) -> dict:
+    """A GFW gaps event as the API returns it since Oct 21 2026: durationHours, distanceKm and
+    impliedSpeedKnots present but null (Case 8's off and on, 355.9 h apart)."""
+    return {"start": "2026-03-31T17:50:31.000Z", "end": "2026-04-15T13:43:44.000Z", "type": "gap",
+            "vessel": {"type": "fishing"},
+            "gap": {"offPosition": {"lon": -91.9463, "lat": -1.8199}, "onPosition": {"lon": -94.2367, "lat": 1.8033},
+                    "durationHours": None, "distanceKm": None, "impliedSpeedKnots": None,
+                    "intentionalDisabling": True, **gap}}
+
+
+def test_a_gap_row_with_gfws_nulls_reads_hours_km_and_knots_from_the_event():
+    """F1: v1r's rebuild (task 9a, the Nov 5 runbook's --history) wrote 0 hours, 0 km and 0 knots on every
+    row, because GFW's gaps events now carry those fields as null. The row falls back to the event's own
+    start and end and its off and on positions, as v1's Oct 16 rows read them."""
+    reserve, _, _ = bvc.records()
+    rp = bvc.prep(reserve)
+    row = bvc.gap_row(gap_event(), rp)
+    assert row["start"] == "2026-03-31T17:50Z" and row["end"] == "2026-04-15T13:43Z"
+    assert row["hours"] == 355.9                              # v1's Case 8 row: 355.9 h
+    assert row["km"] == 476.6                                 # v1's row: 476.6 km (the back-on in the spare)
+    assert row["kn"] == 0.7                                   # v1's row: 0.7 kn
+    assert row["type"] == "fishing" and row["intentional"] is True and row["starts_in_reserve"] is False   # as v1's row
+    assert set(row) == {"start", "end", "type", "off", "on", "hours", "km", "kn", "intentional", "starts_in_reserve"}
+
+
+def test_a_gap_row_keeps_gfws_own_figures_when_it_gives_them():
+    reserve, _, _ = bvc.records()
+    row = bvc.gap_row(gap_event(durationHours=12.04, distanceKm="30.26", impliedSpeedKnots=1.36), bvc.prep(reserve))
+    assert (row["hours"], row["km"], row["kn"]) == (12.0, 30.3, 1.4)
+    # A zero from GFW is no figure: the event's own is used (a gap of 476 km cannot be 0 kn).
+    row = bvc.gap_row(gap_event(impliedSpeedKnots=0), bvc.prep(reserve))
+    assert row["kn"] == 0.7
+
+
+def test_a_gap_row_still_open_or_unreadable():
+    reserve, _, _ = bvc.records()
+    rp = bvc.prep(reserve)
+    e = gap_event()
+    e["end"] = None
+    e["gap"]["onPosition"] = {"lon": None, "lat": None}
+    row = bvc.gap_row(e, rp)
+    assert (row["end"], row["on"], row["hours"], row["km"], row["kn"]) == ("", None, 0.0, 0.0, 0.0)
+    assert bvc.gap_row({"start": "2026-03-31T17:50:31Z", "gap": {"offPosition": {}}}, rp) is None
+    assert bvc.gap_row({"gap": {"offPosition": {"lon": -91.9, "lat": -1.8}}}, rp) is None
+
+
+def test_build_history_writes_real_hours_km_and_knots(monkeypatch, tmp_path):
+    """The --history path end to end, GFW faked: no row of the written history has 0 hours, km or knots."""
+    monkeypatch.setattr(bvc.gfw, "report", lambda *a, **k: {"entries": []})
+    monkeypatch.setattr(bvc.gfw, "events", lambda *a, **k: [gap_event()])
+    monkeypatch.setattr(bvc.time, "sleep", lambda s: None)
+    reserve, ports, _ = bvc.records()
+    rec = bvc.build_history(tmp_path, datetime(2023, 6, 1).date(), reserve, ports)
+    rows = json.loads((tmp_path / "history_v1.json").read_text())["gaps"]["rows"]
+    assert rec["gaps"] == len(rows) == 1
+    assert all(r["hours"] > 0 and r["km"] > 0 and r["kn"] > 0 for r in rows)
