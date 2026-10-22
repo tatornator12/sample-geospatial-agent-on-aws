@@ -58,15 +58,19 @@ SAR = "public-global-sar-presence:latest"
 PRESENCE = "public-global-presence:latest"
 PLATFORM = {"sentinel-1a": "Sentinel-1A", "sentinel-1b": "Sentinel-1B", "sentinel-1c": "Sentinel-1C", "sentinel-1d": "Sentinel-1D"}
 PORT_KM = 10.0
-SILENT = {  # the spike's best moment (docs/spikes/galapagos.md, finding 5), re-read at 6 kn
-    "sensed_day": "2024-03-06", "satellite": "Sentinel-1A", "pass_time": "2024-03-06T00:26Z",
-    "gap": {"type": "fishing", "off_h_before_pass": 12.0, "silent_h": 30.0, "back_on_km": 26.1,
-            "off": [-92.76, -1.11]},
-    "speed_kn": 6, "reach_km": 133, "dark_in_reach_km": [50.7], "dark_out_of_reach_km": [256.4],
-    "why": "the tightest moment that holds at 6 kn: its reach excludes the day's other dark target, and the AIS "
-           "came back on 26 km from where it went off. 2024-05-05 also holds (81 km, a target at 70 km) but came back "
-           "100 km away; the two 2026-03-08 moments hold only because 32 to 35 h of silence give a 359 to 393 km "
-           "reach, most of the radar box, so the area says nothing; 2024-07-04 does not hold (56 km, the target at 75 km)",
+SILENT = {  # Case 8 of the Oct 21 spike (docs/spikes/galapagos-recent-silences.md, section 3), at 6 kn (task 15);
+    # Mar 6 2024 (docs/spikes/galapagos.md, finding 5) before it. Distances by water, measured on its built targets.
+    "sensed_day": "2026-04-01", "satellite": "Sentinel-1A", "pass_time": "2026-04-01T00:26Z",
+    "gap": {"type": "fishing", "off_h_before_pass": 6.6, "silent_h": 355.9, "back_on_km": 476.6,
+            "off": [-91.9463, -1.8199]},
+    "speed_kn": 6, "reach_km": 73, "dark_in_reach_km": [9.4, 72.1], "dark_out_of_reach": 6,
+    "plan": {"name": "s1a_mp_user_20260327t172127_20260416t194000",
+             "key": "vessels/cache/plan/s1a_mp_user_20260327t172127_20260416t194000.kml",
+             "look": "2026-04-01T00:26:26Z"},
+    "why": "Case 8 of the Oct 21 spike (docs/spikes/galapagos-recent-silences.md): the AIS went off 6.6 h before the "
+           "pass, 33 km outside the reserve, and ESA's S1A plan published Mar 27 already held the look; at 6 kn the "
+           "reach is 73 km, touching the reserve. Tighter than Mar 6 2024 (12 h, 133 km). Sentinel-1A has since "
+           "stopped, so it is an earlier pass",
 }
 
 

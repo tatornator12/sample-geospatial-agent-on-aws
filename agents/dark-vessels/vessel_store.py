@@ -185,7 +185,9 @@ def _sensed_ok(rec) -> bool:
 def passes() -> list[dict]:
     """Every pass on file: the manifest's records, one per id (the build writes each pass's metadata
     and imaged cells there, so a rerun needs no deploy), then the packaged silent vessel's entry for
-    the spare, over its manifest record when the build has one."""
+    the spare, over its manifest record when the build has one. An earlier spare's record (role
+    silent_vessel, another id: Mar 6 2024 since task 15 moved the spare to Apr 1 2026) stays in the
+    manifest for the four-turn version and is never a pass on file here."""
     silent = on_file()["silent_vessel"]
     recs = manifest().get("passes", {})
     by_id: dict[str, dict] = {}
@@ -194,6 +196,8 @@ def passes() -> list[dict]:
         pid = rec.get("pass_id") if isinstance(rec, dict) else None
         if pid == silent["pass_id"]:
             spare = {**rec, **silent}
+        elif isinstance(rec, dict) and rec.get("role") == "silent_vessel":
+            continue
         elif isinstance(pid, str) and PASS_ID_RE.fullmatch(pid) and pid not in by_id and _sensed_ok(rec):
             by_id[pid] = rec
     return list(by_id.values()) + [spare]

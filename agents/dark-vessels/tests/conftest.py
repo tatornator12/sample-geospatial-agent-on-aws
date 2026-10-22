@@ -72,7 +72,8 @@ SEP30 = "s1d-20260930t0018"         # wide, checkable, one candidate
 SEP18 = "s1d-20260918t0018"         # wide, checkable, no candidate (a broadcast and a port boat only)
 SEP7 = "s1d-20260907t1141"          # 47% imaged, checkable, one candidate
 AUG30 = "s1d-20260830t0026"         # thin: about a third imaged, under the 15% standard
-SILENT = "s1a-20240306t0027"
+SILENT = "s1a-20260401t0026"         # the spare, Case 8 (task 15); Mar 6 2024 before it
+OLD_SPARE = "s1a-20240306t0027"
 ON_FILE = (STAR, SEP30, SEP18, SEP7, AUG30)
 PASS_TIME = datetime(2026, 10, 12, 0, 18, 2, tzinfo=timezone.utc)
 # Each pass's swath over the reserve: water cells whose centre lies east or west of a longitude.
@@ -207,9 +208,9 @@ def imaged_fields(side: str, lon: float) -> dict:
 
 
 def silent_targets() -> dict:
-    return {"pass_id": SILENT, "sensed": "2024-03-06T00:27:07Z", "bounds": [-94.0, -2.5, -90.5, 1.0], "ours": [],
-            "gfw": [{"id": "G001", "lon": -92.4, "lat": -1.2, "n": 1, "matched": False},       # about 40 km by water
-                    {"id": "G002", "lon": -90.6, "lat": -0.1, "n": 1, "matched": False}]}      # far beyond 133 km
+    return {"pass_id": SILENT, "sensed": "2026-04-01T00:26:49Z", "bounds": [-94.0, -2.5, -90.5, 1.0], "ours": [],
+            "gfw": [{"id": "G001", "lon": -92.2, "lat": -1.9, "n": 1, "matched": False},       # about 30 km by water
+                    {"id": "G002", "lon": -90.6, "lat": -0.1, "n": 1, "matched": False}]}      # far beyond 73 km
 
 
 def history() -> dict:
@@ -224,9 +225,10 @@ def history() -> dict:
             d = date(y, 6, 1)
             dark.append([d.isoformat(), round(rng.uniform(-91.5, -89.5), 4), round(rng.uniform(-1.2, 0.5), 4), 1, 30.0])
     dark.append(["2026-09-01", -90.30, -0.76, 3, 1.5])          # by Puerto Ayora: left out of the map
-    went_off = datetime(2024, 3, 5, 12, 27, tzinfo=timezone.utc)
-    gaps = [{"start": _iso(went_off), "end": _iso(went_off + timedelta(hours=30)), "type": "fishing", "off": [-92.76, -1.11],
-             "on": [-92.55, -1.05], "hours": 30.0, "km": 26.1, "kn": 0.5, "intentional": True, "starts_in_reserve": False}]
+    went_off = datetime(2026, 3, 31, 17, 50, tzinfo=timezone.utc)          # Case 8: 6.6 h before the pass
+    gaps = [{"start": _iso(went_off), "end": _iso(went_off + timedelta(hours=355.9)), "type": "fishing",
+             "off": [-91.9463, -1.8199], "on": [-94.2367, 1.8033], "hours": 355.9, "km": 476.6, "kn": 0.7,
+             "intentional": True, "starts_in_reserve": False}]
     return {"built": "2026-10-16", "until": "2026-10-13", "dark": {"fields": ["day", "lon", "lat", "n", "port_km"], "rows": dark},
             "gaps": {"rows": gaps}}
 

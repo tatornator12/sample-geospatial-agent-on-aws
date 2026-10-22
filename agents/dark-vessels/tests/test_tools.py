@@ -36,7 +36,7 @@ def test_find_pass_latest_is_the_newest_pass_and_copies_its_radar_into_the_sessi
     assert out["render"] == {"kind": "raster", "colormap": "gray", "rescale": [1, 255], "group": "maritime",
                              "legend": "Radar backscatter", "bounds": [-91.33, -2.35, -88.38, 1.6]}
     assert out["s3_url"].endswith(f"{PRE}radar_{STAR}.tif") and (f"vessels/cache/v1/{STAR}_display.tif", f"{PRE}radar_{STAR}.tif") in vessels.s3.copies
-    assert run(vessels.pt.find_pass("2024-03-06"))["pass_id"] == SILENT
+    assert run(vessels.pt.find_pass("2026-04-01"))["pass_id"] == SILENT
 
 
 def test_a_pass_not_on_file_is_refused_with_the_passes_on_file(vessels):
@@ -209,9 +209,12 @@ def test_next_look_reads_a_cached_chain(vessels, fake_s3):
 
 def test_reachable_area_goes_by_water_and_keeps_the_reveal_for_last(vessels):
     out = run(vessels.ft.reachable_area())
-    assert out["pass_id"] == SILENT and out["speed_kn"] == 6.0 and out["hours"] == 12.0 and out["reach_km"] == 133
+    # The spare is Case 8 (task 15): AIS off 6.6 h before the Apr 1 2026 pass, 73 km at 6 kn.
+    assert out["pass_id"] == SILENT and out["speed_kn"] == 6.0 and out["hours"] == 6.6 and out["reach_km"] == 73
+    assert out["sensed"] == "2026-04-01T00:26:49Z" and out["went_off"] == "2026-03-31T17:50Z"
     assert [t["source"] for t in out["targets_inside"]] == ["gfw"] and out["targets_inside"][0]["km_by_water"] < 60
-    assert out["back_on"]["km_from_off"] == pytest.approx(24.4, abs=2) and out["fixed_sentence"] == vessels.vs.CANNOT_SAY
+    assert out["back_on"]["km_from_off"] == pytest.approx(476.6, abs=2) and out["back_on"]["hours_after_off"] == 355.9
+    assert out["fixed_sentence"] == vessels.vs.CANNOT_SAY
     kinds = [f["properties"]["kind"] for f in vessels.s3.json(f"{PRE}reach_{SILENT}.geojson")["features"]]
     assert kinds[0] == "reach" and kinds[-1] == "on" and "off" in kinds
 

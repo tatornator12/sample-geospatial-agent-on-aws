@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import AUG30, BUCKET, NOW, SEP18, SEP30, SEP7, SESSION, SILENT, STAR, manifest_record
+from conftest import AUG30, BUCKET, NOW, OLD_SPARE, SEP18, SEP30, SEP7, SESSION, SILENT, STAR, manifest_record
 
 PRE = f"session_data/{SESSION}/vessels/"
 QUESTION = "Is anyone in the reserve without broadcasting, and where should the patrol look next?"
@@ -114,6 +114,20 @@ def test_passes_come_from_the_manifest_one_per_id_with_the_spare_appended(vessel
     vessels.vs.clear_cache()
     ids = [p["pass_id"] for p in vessels.vs.passes()]
     assert ids.count(STAR) == 1 and ids.count(SILENT) == 1
+
+
+def test_an_earlier_spares_record_is_never_a_pass_on_file(vessels):
+    """Task 15 moved the spare to Case 8 (Apr 1 2026). The Mar 6 2024 spare's record stays in the
+    manifest, untouched, for the four-turn version; here it is not listed, read or found."""
+    m = vessels.s3.json("vessels/cache/v1/manifest.json")
+    m["passes"][OLD_SPARE] = {"pass_id": OLD_SPARE, "role": "silent_vessel", "sensed": "2024-03-06T00:27:07Z",
+                              "satellite": "Sentinel-1A", "imaged_share": 0.309, "products": {}, "chips": {}}
+    vessels.s3.put_object(Bucket=BUCKET, Key="vessels/cache/v1/manifest.json", Body=json.dumps(m))
+    vessels.vs.clear_cache()
+    ids = [p["pass_id"] for p in vessels.vs.passes()]
+    assert OLD_SPARE not in ids and ids[-1] == SILENT
+    assert OLD_SPARE not in json.dumps(ask(vessels)["passes"])
+    assert vessels.vs.pass_entry(OLD_SPARE) is None and "error" in run(vessels.pt.find_pass("2024-03-06"))
 
 
 def test_list_passes_lists_newest_first_without_the_spare_and_opens_a_question(vessels):
