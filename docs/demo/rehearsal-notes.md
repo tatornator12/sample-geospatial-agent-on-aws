@@ -1,12 +1,12 @@
 # Agentic AI for Earth: rehearsal and speaker notes
 
-**DRAFT, 21 October 2026.** Act 3 is being redesigned and the stage review's known issues are still open, so beats, timings and the "until fixed" box will change before the show.
+**DRAFT, 21 October 2026 (refreshed the same evening).** Act 3 is being redesigned, so its beats and timings will change before the show. Most of the stage review's known issues are fixed, in two batches: the first is on the stable stage since the 21 October promotion, the second reaches it at G4 (Fri 30 Oct). These notes describe the stage after G4; section 2 says what differs before then.
 
 **Show order (decided 21 October):** Earth Analyst (Act 1), then AI Archaeologist (Act 4), then Methane Watch (Act 2), and Dark Vessels (Act 3) closes the show. The act numbers are the agents' names in the code and specs; only the running order changed. These notes keep the act numbers and put the sections in show order.
 
-One presenter, 30 minutes, Monday 9 November 2026, for a mixed technical and non-technical room. Each act gives a plain line for everyone and one line for the technical half. "(unconfirmed)" means the repo does not confirm it; "proposed" means these notes suggest it and no spec or run sheet sets it. Sources per section: `.agents/tasks/demo-deck-2026-10-20/notes-verification.md` (numbered before the 21 October reorder: its sections 7, 8 and 9 are now sections 8, 9 and 7).
+One presenter, 30 minutes, Monday 9 November 2026, for a mixed technical and non-technical room. Each act gives a plain line for everyone and one line for the technical half. "(unconfirmed)" means the repo does not confirm it; "proposed" means these notes suggest it and no spec or run sheet sets it. Sources per section: `.agents/tasks/demo-deck-2026-10-20/notes-verification.md` (numbered before the 21 October reorder: its sections 7, 8 and 9 are now sections 8, 9 and 7); the 21 October refresh's stage checks are in `.agents/tasks/stage-fixes-2/ge-verification.md`.
 
-Stage addresses below are relative to the stage URL (the `ApplicationURL` stack output, not written here). Agent ids: `stable` (Act 1, Earth Analyst), `methane` (Act 2), `vessels` (Act 3), `archaeologist` (Act 4).
+Stage addresses below are relative to the stage URL (the `ApplicationURL` stack output, not written here). Agent ids, with the switcher's names: `stable` (Act 1, Earth Analyst), `archaeologist` (Act 4, AI Archaeologist), `methane` (Act 2, Methane Watch), `vessels` (Act 3, Dark Vessels).
 
 ---
 
@@ -15,7 +15,7 @@ Stage addresses below are relative to the stage URL (the `ApplicationURL` stack 
 | In the show | Part | Minutes | Clock | Ends on |
 |---|---|---|---|---|
 | | Intro (deck, 5 slides) | 3 | 0:00 to 3:00 | "Let's start with the Earth Analyst." |
-| First | Act 1, Earth Analyst | 6 | 3:00 to 9:00 | "Same eyes, same search, new domains next." |
+| First | Act 1, Earth Analyst | 6 | 3:00 to 9:00 | "Same eyes, new domains next." |
 | Second | Act 4, AI Archaeologist | 4 | 9:00 to 13:00 | "Both are already on the World Heritage list. I only work with sites on the public record." |
 | Third | Act 2, Methane Hunter (Methane Watch) | 6 | 13:00 to 19:00 | "It found the invisible and told you what it could not confirm." |
 | Last, the closer | Act 3, Dark Vessels | 8 | 19:00 to 27:00 | The officer approves the tasking on the map; the Slack post lands on the second screen (pending the redesign). |
@@ -40,7 +40,7 @@ Why this order:
 Where the minutes come from (the roadmap carries the same minutes since 21 October):
 
 - **Intro 3:** the deck's notes run about 3:13 at 150 words a minute (483 spoken words), so take about 13 s out in rehearsal. Slide 5 is optional; without it the intro is about 2:31.
-- **Act 1 at 6:** its run sheet is 7:00 with the hand-off at 5:50. These notes skip its "click rank 1" popup beat, which fails today. The Folsom compare is now the run sheet's spare.
+- **Act 1 at 6:** its run sheet is 7:00 with the hand-off at 5:50. These notes open on its judgement beat (Bergen) and make the look-alike search the centrepiece, with its "click rank 1" popup optional to save time. Its NDVI opener (Central Park) and the Folsom compare are spares.
 - **Act 4 at 4:** its run sheet, closing at 3:40.
 - **Act 2 at 6:** the mission is 79 to 135 s of agent time in test runs, so most of the run sheet's 7 minutes is narration. The 6 minutes keep the approval. Run sheet: 7:00, approval at 6:30.
 - **Act 3 at 8:** the spec's limit is under 8:30. The redesign plans about 1 minute of agent time and about 2 for the officer's choice and narration, which leaves room for the second screen and the spare question (unconfirmed until timed).
@@ -51,7 +51,7 @@ Each act's minutes include the switch and about 20 s of talk while its runtime w
 
 If you run long, cut in this order. The order across acts is proposed; Dark Vessels closes, so it gives up time last. Each cut is that act's own run sheet fallback unless marked otherwise.
 
-1. Act 1: skip the transcript drawer beat (proposed) and say what it skipped from the step line. The run sheet's spare, the Folsom compare, is already out.
+1. Act 1: skip the optional rank-1 popup (proposed). The run sheet's spare, the Folsom compare, is already out.
 2. Act 4: drop the Great Circle measure (Act 4 run sheet).
 3. Act 2: run the mission replay instead of the live mission (Act 2 run sheet: "start from the globe replay case").
 4. Questions take what is left (proposed).
@@ -62,19 +62,11 @@ If you run long, cut in this order. The order across acts is proposed; Dark Vess
 
 ## 2. Until fixed
 
-> **Until fixed.** Recheck every line after the G4 promotion (Fri 30 Oct) and the freeze (Tue 3 Nov).
+> **Until fixed.** Recheck every line after the G4 promotion (Fri 30 Oct) and the freeze (Tue 3 Nov). Trimmed on 21 October: every other line of the first box was checked fixed on a local copy of the stage, at 1920×1080 and 1280×720. New session, the Stage link, refresh after a switch, Esc and Stop, earlier turns and Replay cases are now safe to use.
 >
-> - **Never press New session, in any act.** To start over, refresh the browser, but only while the address bar shows the act you are on. The switcher does not update `?agent=`, so a refresh after a switch lands on the previous act. Safest: load `/?agent=stable`, `/?agent=methane`, `/?agent=vessels` or `/?agent=archaeologist`. In Act 3, New session (or a runtime crash) blacks out the sea; after a replay, New session keeps the recording attached to every later prompt.
-> - **Leave a replay by loading `/?agent=<id>`** with the ids above, never with New session or the rail's "Stage" link (both keep the replay's layers or its case id).
-> - **Open Act 1 replays only with Act 1 selected.** They name no act and play under whichever act is on.
-> - **Do not quote the Act 1 replay figures:** "2.6× Manhattan", "85 km²", or the gallery's "Dense Vegetation Loss 15.71 km²" (that figure is the 2025 dense area, which went up). The gallery's Palisades card ("21,000 acres", "29.4%") comes from the same unsupported narrative. If you need a Palisades figure: "about 96 km² lies inside the mapped perimeter".
-> - **Don't open Replay cases on the projector:** the Act 1 cards show "21,000 acres", "29.4%" and "Dense Vegetation Loss 15.71 km²", and the Palisades replay opens already scrolled to its wrong figures. Restore the Act 1 fallback at the post-G4 recheck only once the corrected cards and the re-recorded case have landed.
-> - **Act 2, "still active":** the plate's question says it, but the evidence rests on EMIT looks that can be months old (in the recorded case, 20 August 2025), and the brief card shows no last-look date. Say "where methane keeps showing up", give the tip's window (TROPOMI, the last 14 days) and the date of EMIT's newest pass from the filmstrip, and never say a site is active now.
-> - **Esc does not stop a turn, and Stop does not end it cleanly.** If a turn goes wrong, load `/?agent=<id>` and send the plate again.
-> - **Earlier steps are not on the stage.** The column shows only the latest turn and "+N earlier" cannot be clicked. Earlier turns are in the transcript drawer (the icon beside New session; mind the neighbour).
-> - **Act 1:** stay at 1920 wide (the look-alike layer went missing at 1280 in 2 of 3 runs), skip the rank-1 click (no popup), and expect the lit step to run one behind. The agent's "I see" sentence does not show on the stage; it is in the transcript.
-> - **Act 4, beat 3:** if the LiDAR does not draw, say so. Do not read the answer over plain imagery.
-> - **Do not open "How it works"**: it is still the original sample's page. On the switcher, pick "Earth Analyst (stable)", never a "(dev)" entry.
+> - **Before G4, on the stable stage only:** it has the first batch of fixes, not the second. There, pick "Earth Analyst (stable)" on the switcher, never a "(dev)" entry; don't open "How it works" (still the original sample's page); Act 1's plates are in the old order, rank 1 opens no popup and the lit step runs one behind; the Octagon replay lands both its layers at once; "Strongest plume ever" frames the Sahara before Utah.
+> - **Act 4:** if a layer row reads "LiDAR did not load", say so, and do not read the answer over plain imagery.
+> - **Lake Mead (Replay cases only, not in the run):** its figures cover the Sentinel-2 scene, not the whole boundary. The west end, Las Vegas Bay, is outside the scene, as the answer now says. Quote them as the scene's, or not at all.
 
 ---
 
@@ -119,9 +111,9 @@ Commands run from the repo root on this Mac and need AWS credentials. The warm s
 - [ ] Warm the Act 3 radar plans: `AWS_PROFILE=main .venv/bin/python scripts/warm_vessels.py`
 - [ ] Check each stable runtime has its settings (prints names and presence only, never values; exit 0 when ready):
   `AWS_PROFILE=main .venv/bin/python scripts/runtimes.py check-env --agent earth --target stable`
-  Repeat with `--agent archaeologist`, `--agent methane`, `--agent vessels`. Dark Vessels and the Archaeologist reach stable at G4 (unconfirmed until 30 Oct).
+  Repeat with `--agent archaeologist`, `--agent methane`, `--agent vessels`. The Archaeologist has a stable runtime since the 21 October promotion; Dark Vessels reaches stable at G4 (unconfirmed until 30 Oct).
 - [ ] Earthdata token (Act 2): valid to 16 November 2026 at the 12 October promotion; tokens last 60 days. If the methane stable runtime was redeployed since, note the new token's expiry.
-- [ ] Sign in on the stage URL in the presenting browser (Cognito; a new password needs 12 or more characters). Check the switcher lists Earth Analyst (stable), Methane Hunter, Dark Vessels and AI Archaeologist.
+- [ ] Sign in on the stage URL in the presenting browser (Cognito; a new password needs 12 or more characters). Check the switcher lists Earth Analyst, AI Archaeologist, Methane Watch and Dark Vessels, in that order, with no act numbers. Rehearsal-only runtimes (such as "Earth Analyst · dev") appear only with `?dev=1` in the address, and `?dev=0` hides them again; never present with it. An act missing from the list has no stable runtime registered (an act left on a dev runtime shows only with `?dev=1`).
 - [ ] Open the deck on this Mac. Its fonts are not embedded, so present from this Mac or install Atkinson Hyperlegible on the presenting machine. Replace "Presenter name" on slide 1 and in its notes.
 - [ ] Sign in to Slack on the second screen (Act 3's last beat) and open the channel the "Patrol taskings" workflow posts to (proposed: a second display beside the projector). Which display, how it connects and whether the whole room can see it are unconfirmed; set them at the 30 October run-through.
 - [ ] Backup videos: planned in demo readiness, not made yet (unconfirmed). If they exist, put them on this Mac's desktop.
@@ -149,24 +141,26 @@ Commands run from the repo root on this Mac and need AWS credentials. The warm s
 - [ ] **Deck and stage on one Mac** (proposed): the slideshow in PowerPoint, the browser behind it. After slide 5, end the slideshow and switch to the browser. In full screen, Cmd+L should bring up the address bar for the `/?agent=` loads (check on the day). With the second screen attached, check the slideshow and the stage both open on the projector, not on the Slack screen.
 - [ ] **Second screen:** Slack full screen on the "Patrol taskings" channel, newest post in view, no other channel or notification visible (proposed). Read the newest post before the room sees it: it is the show's last image, so it must keep the content rules in section 9.
 - [ ] **Bookmarks** in one folder, in show order: `/?agent=stable`, `/?agent=archaeologist`, `/?agent=methane`, `/?agent=vessels`, and the replays:
+  - `/?scenario=la-fires-2025&agent=stable`
+  - `/?scenario=earth-places-like-central-park&agent=stable`
   - `/?scenario=archaeologist-newark&agent=archaeologist`
   - `/?scenario=archaeologist-great-circle&agent=archaeologist`
   - `/?scenario=methane-watch-mission&agent=methane`
   - `/?scenario=methane-permian-2024&agent=methane`
-  - Act 3: no replay yet. The redesign records `vessels-open-question` (due Wed 28 Oct); until then the gallery's `vessels-s1d-20261012t0018` card shows "coming soon".
+  - Act 3: no replay yet. The redesign records `vessels-open-question` (due Wed 28 Oct); until then its card in Replay cases (`vessels-s1d-20261012t0018`, under Dark Vessels) shows "Coming soon".
 - [ ] **Network:** a wired connection if offered (proposed). Load each replay once. This proves the bucket, the backend, the imagery tile server, the basemap tiles and the web fonts are reachable, and it warms the tile server (the first replay after a cold start waited 15.6 s for tiles). Replays make no live data calls but still need that network, so they are not a no-network fallback.
 - [ ] **Sign-in:** sign in again shortly before the start (proposed; the sign-in session's lifetime is unconfirmed).
 - [ ] **Slack:** approvals in Acts 2 and 3 post to Slack workflows. Act 3's post is the final image on the second screen (decided 21 October); Act 2's is not shown (proposed). Act 3's production webhook goes live at G4 (unconfirmed until then).
 
 ### Five minutes before
 
-- [ ] Load `/?agent=stable` fresh. Act 1 goes first, then the Archaeologist, Methane Watch and Dark Vessels; a fresh load also warms Act 1's runtime. Check the rail reads "Earth Analyst (stable)" and the six plates show.
+- [ ] Load `/?agent=stable` fresh. Act 1 goes first, then the Archaeologist, Methane Watch and Dark Vessels; a fresh load also warms Act 1's runtime. Check the rail reads "Earth Analyst" and the six plates show, "A cloudy day, Bergen" first.
 - [ ] Second screen on the "Patrol taskings" channel, scrolled to the newest post (proposed).
 - [ ] Deck on slide 1, in front of the browser.
 
 ### Between acts
 
-- [ ] Switch with the agent switcher, as the run sheets do (the switch warms the next runtime), or load the act's bookmark, which keeps the address bar in step so a later refresh is safe (proposed). Talk for about 20 s before the first plate.
+- [ ] Switch with the agent switcher, as the run sheets do (the switch warms the next runtime, and the address bar follows it, so a refresh stays on the act), or load the act's bookmark. Talk for about 20 s before the first plate.
 
 ---
 
@@ -187,6 +181,7 @@ The full script is in each slide's notes pane: a "Point to land" line, a "Say" p
 - Slide 3 says Dark Vessels "checks where those broadcasts can be heard" and that a silent target there is a candidate. Act 3's plain words below use the same rule; keep them in step.
 - Slide 5 promises that you will play the analyst in the methane act and the officer in Dark Vessels, and tells the room the last act ends on the agent's own choices, a prediction checked against past radar days and a draft tasking. Keep those moments in the run.
 - If Act 3 misses gate B, the deck needs a pass: slide 3's order and markers, "the last act" on slides 2 and 5, and slide 5's ending (proposed: "In the vessels act, I'll play the officer and decide whether to approve the patrol tasking.", or nothing if Act 3 is cut).
+- Slide 3 and its notes call the methane act "Methane Hunter". The switcher and Replay cases call it "Methane Watch", and the stage's speaker label still reads "Methane Hunter". Either name is fine aloud; the deck is not changed for this.
 - If you drop slide 5, change slide 4's transition to "Let's start with the Earth Analyst."
 - After the last transition, switch to the browser, already on `/?agent=stable`.
 
@@ -196,53 +191,56 @@ The full script is in each slide's notes pane: a "Point to land" line, a "Say" p
 
 Goal: the agent sees imagery, turns down a scene it cannot use, and finds places by example.
 
-**Plates on the stage** (stageCopy.ts order on `develop`; the stable stage has them from G4, 30 October):
+**Plates on the stage** (stageCopy.ts order, the order you click them; the stable stage has this order from G4, 30 October):
 
 | # | Label | Prompt | Used |
 |---|---|---|---|
-| 1 | Vegetation, Central Park | `Show vegetation health for Central Park, New York` | beat 1 |
-| 2 | A cloudy day, Bergen | `Show vegetation health for Bergen, Norway as of 2025-09-15` | beat 2 |
-| 3 | Wildfire, Pacific Palisades | `Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025` | spare (not run live by the review) |
+| 1 | A cloudy day, Bergen | `Show vegetation health for Bergen, Norway as of 2025-09-15` | beat 1 |
+| 2 | Places like Central Park | `Find places across New York State that look like Central Park` | beat 2, the centrepiece |
+| 3 | Vegetation, Central Park | `Show vegetation health for Central Park, New York` | spare |
 | 4 | Water, Folsom Lake | `Compare water levels for Folsom Lake, California 2021 vs 2022` | the run sheet's spare |
 | 5 | Scan Colorado | `Scan Colorado for land change between 2019 and 2024` | spare (not run live by the review) |
-| 6 | Places like Central Park | `Find places across New York State that look like Central Park` | beat 3 |
+| 6 | Wildfire, Pacific Palisades | `Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025` | spare (not run live by the review; it has a replay) |
 
-**Beats.** Times are proposed, compressed from the 7-minute run sheet:
+**Beats.** Times are proposed, compressed from the 7-minute run sheet: about 1:30 for Bergen, about 3:30 for the look-alike search.
 
 | Time | Do | The room sees |
 |---|---|---|
-| 0:00 | The stage is already on `/?agent=stable` and warm. Do not press New session (the run sheet's "New session" open is replaced by the fresh load). | A flat world map on satellite imagery, the console "Ask about any place on Earth", six plates. |
-| 0:15 | Click "Vegetation, Central Park". | About 26 s, 9 steps, among them Find the place, Get the boundary (cyan outline), Fetch Sentinel-2, Look at the image (an evidence chip of the scene), Compute the index, then NDVI over the park. The answer gives the mean NDVI and the share of dense vegetation. |
-| 1:20 | Click "A cloudy day, Bergen". | 35 to 56 s on dev (not run live by the review). Fetch Sentinel-2 names its window, "Scenes from 2025-07-17 to 2025-09-15"; an evidence chip of the cloudy 2025-09-06 scene; Fetch Sentinel-2 again with "skipping 2025-09-06" in mono; a chip of the clear 2025-07-18 scene; NDVI; an answer that names the scene it used. In one of five dev runs the agent turned the cloudy scene down from its numbers without looking, so the first chip was missing; "skipping 2025-09-06" showed in all five. |
-| 2:30 | Say: "That is one park. Now the whole state." | |
-| 2:40 | Click "Places like Central Park". | About 57 s. Step 02 stays lit for about 20 s while the search runs. Rank numbers 1 to 10 land across New York State, then two evidence chips of top matches (West Point and Lake George in the review's run), a table, and the line "190,329 cells compared across New York State". |
-| 4:20 | Open the transcript drawer, read the sentence where the agent turned down the Bergen scene, close it. | The agent's own words about why it skipped the scene. |
+| 0:00 | The stage is already on `/?agent=stable` and warm. Say in one line what the agent does. | A flat world map on satellite imagery, the console "Ask about any place on Earth", six plates, "A cloudy day, Bergen" first. |
+| 0:15 | Click "A cloudy day, Bergen". | 35 to 56 s on dev (not run live by the review). Fetch Sentinel-2 names its window, "Scenes from 2025-07-17 to 2025-09-15"; an evidence chip of the cloudy 2025-09-06 scene, with what the agent saw on a line under it (not yet seen on a Bergen run); Fetch Sentinel-2 again with "skipping 2025-09-06" in mono; a chip of the clear 2025-07-18 scene; NDVI; an answer that names the scene it used. In one of five dev runs the agent turned the cloudy scene down from its numbers without looking, so the first chip was missing; "skipping 2025-09-06" showed in all five. |
+| 1:40 | Say: "That is one city. Now a whole state, by example." | |
+| 1:50 | Click "Places like Central Park". | About 52 to 57 s. The "Find similar places" step lights as the search starts and stays lit for about 15 s while it runs: explain the fingerprint then. Ten dots land across New York State, the top five numbered (at 1280 a number that would collide is dropped), then two evidence chips of the top matches, each with what the agent saw under it (West Point and Lake George in the review's run and in the recorded case), and a table of the top five with similarity and distance from the park. |
+| 4:00 | Optional: click rank 1's dot. | A popup, "Match 1", with its similarity, its centre and its distance from the example (0.9573 and 68.5 km, West Point, in the recorded case). |
+| 4:20 | Point at the two chips and the table, then say the honest line. | |
 | 5:20 | Say the hand-off line, then switch to AI Archaeologist. | |
 
 **Speaker notes**
 
-- *Central Park, plain:* "It's finding the park and its outline, then fetching the latest Sentinel-2 picture. Before it measures anything, it looks at the picture to check the park is clear of cloud. Then it measures plant health: the greener, the denser the vegetation." Point at the chip: "That's the image it looked at."
-- The red patch in the middle is the Reservoir, which is water. The legend's low end says "bare", so say "water" yourself.
-- *Technical:* "Sentinel-2 from Earth Search over STAC, NDVI per pixel inside the boundary. If a scene is cloudy, the model can reject it after looking and fetch the next one."
-- *Bergen, plain:* "Same measurement, a rainy city. The first picture it picks is cloudy over the city, so it turns it down, says why, and fetches the next clear one before it measures anything." Point at "skipping 2025-09-06" in the step.
-- *Technical:* "It inspects the rendered scene, rejects it, then fetches again with that date left out. On dev it read 47.6% cloud over the city on 2025-09-06 and used 2025-07-18." Quote the cloud figure only if the stage or the transcript shows it.
-- *Places like Central Park, plain:* "Now it compares Central Park with the whole state, about 190,000 patches of land, using a compact numerical fingerprint of what each patch looks like from space. Then it looks at the top matches to check them."
-- If step 02 looks stuck: "That's the search running; the step list runs one behind." Point at the table, not the map's numbers: they overlap, and the map shows 10 while the answer names 5.
-- *Technical:* "Clay v1.5 embeddings from LGND's public dataset, cosine similarity, fanned out across partitions through a Lambda."
+- *Bergen, plain:* "It's measuring plant health in Bergen, a rainy city. Before it measures anything, it looks at the picture. The first one it picks is cloudy over the city, so it turns it down, says why, and fetches the next clear one." Point at the chip and the line under it, then at "skipping 2025-09-06" in the step.
+- *Technical:* "Sentinel-2 from Earth Search over STAC, NDVI per pixel inside the boundary. It inspects the rendered scene, rejects it, then fetches again with that date left out. On dev it read 47.6% cloud over the city on 2025-09-06 and used 2025-07-18." Quote the cloud figure only if the stage or the transcript shows it.
+- *Places like Central Park, plain, while the search step is lit:* "Now it compares Central Park with the whole state, about 190,000 patches of land. A model has turned each patch's picture from space into a fingerprint, a short list of numbers, so patches that look alike get similar fingerprints. It finds the patches whose fingerprints are closest to the park's, then looks at the top two itself to check them."
+- *Technical:* "Clay v1.5 embeddings from LGND's public dataset: the park's mean vector against every cell in the state by cosine similarity, fanned out across partitions through a Lambda. Then the model inspects the top two matches' Sentinel-2 scenes."
+- For the ranking, point at the table: the map shows ten matches and numbers the top five.
+- *The hand-off:* the link to the next act is the eyes, not the search. Don't say the archaeologist uses Clay or "the same search": its "Where else, like this" ranks known sites by the catalogue's published description of their form, not by embeddings.
+- *Optional, typed by hand (proposed; never run on dev or stable, so try it at a rehearsal first):* if the act is running short, type a land-change scan of the Inambari River in Madre de Dios, Peru, in the same form as the Scan Colorado plate. Describe what it finds as "cleared land consistent with mining" and, if the agent checks protected areas, say what overlaps them on the public record. Never say "illegal". Keep the act inside 6:00: skip it if the hand-off would fall after 5:20.
+- *Vegetation, Central Park (spare), plain:* "It's finding the park and its outline, then fetching the latest Sentinel-2 picture. Before it measures anything, it looks at the picture to check the park is clear of cloud. Then it measures plant health: the greener, the denser the vegetation." Point at the chip: "That's the image it looked at." About 26 s, 9 steps. The red patch in the middle is the Reservoir, which is water.
 - *Folsom (spare), plain:* "Same lake, two years. It fetches a scene from each year, looks at both, measures open water, and gives me a slider to compare them." *Technical:* "NDWI on two dated scenes." Drag the slider if it appears (not run live by the review: unconfirmed).
-- *At the close, the honest line:* "In this act the model makes real choices: which tool suits the size of the area, which dates, whether a scene is usable. Bergen puts one of them on the stage, the scene it skipped; the reasons sit in the transcript." (The review rates this act agentic, but hidden; the Bergen beat came after the review.)
+- *Wildfire, Pacific Palisades (spare):* its replay, re-recorded on 21 October from dev, opens on "46.1 km² of net new burn damage" and an estimated 691 tonnes of CO2, between Sentinel-2 scenes of 2024-11-08 and 2025-01-12, and offers "Compare before and after". Every figure in it comes from its own tools; quote only what is on screen.
+- *At the close, the honest line:* "In this act the model makes real choices: which tool suits the size of the area, which dates, whether a scene is usable. Bergen puts one of them on the stage: the scene it skipped, with what it saw under the chip." (The review rates this act agentic, but hidden; the Bergen beat and the lines under the chips came after the review.)
 
 **The moment a person decides:** none on the stage. There is no approve step in this act. Say once: "The agent measures; the analyst reads the evidence and decides what it means."
 
-**Timing:** 6:00 (run sheet 7:00, hand-off at 5:50). Agent time about 26 s, 35 to 56 s for Bergen, and 57 s for the look-alike search.
+**Timing:** 6:00 (run sheet 7:00, hand-off at 5:50). Agent time 35 to 56 s for Bergen and about 52 to 57 s for the look-alike search.
 
 **If a live turn fails**
 
-- Load `/?agent=stable` and send the same plate once more. If it fails again: "That's the live network; let's take the next one," and go on.
+- Load `/?agent=stable` (or press New session) and send the same plate once more. If it fails again: "That's the live network; let's take the next one," and go on.
 - Bergen: if the chip of the cloudy scene is missing, point at "skipping 2025-09-06": it turned the scene down from its numbers. If it kept the cloudy scene (not seen in five dev runs), say so plainly and move on.
-- Look-alike map stays empty (seen at 1280, not at 1920): talk to the table.
-- If every live turn fails, say "the live run isn't cooperating today", give one sentence on what the act does, and move to the Archaeologist (Act 4). The Act 1 replays show the wrong figures until the stage fix lands (section 2), so don't open them.
-- Over 6:30 in rehearsal (proposed): skip the transcript drawer (cut 1 in section 1) and say what it skipped from the step line. The run sheet's spare, the Folsom compare, runs only if rehearsal two is under 5:30; "Scan Colorado" can take that slot only once narration before its 20 s step has been added (run sheet).
+- Look-alike search: load `/?scenario=earth-places-like-central-park&agent=stable` (recorded 21 October on dev: West Point first at 0.957, then Lake George). It plays the steps, the chips and the table with no live call. Say once: "This is a recording of the same search."
+- Wildfire spare: `/?scenario=la-fires-2025&agent=stable`.
+- Both replays play under Earth Analyst whichever act is on. Leave them with `/?agent=stable` or New session.
+- If every live turn fails, say "the live run isn't cooperating today", play the look-alike replay, and move to the Archaeologist (Act 4).
+- Over 6:30 in rehearsal (proposed): skip the rank-1 popup (cut 1 in section 1). The run sheet's spare, the Folsom compare, runs only if rehearsal two is under 5:30; "Scan Colorado" can take that slot only once narration before its 20 s step has been added (run sheet).
 
 ---
 
@@ -250,7 +248,7 @@ Goal: the agent sees imagery, turns down a scene it cannot use, and finds places
 
 Goal: same eyes and similarity, a new domain, on known sites only; it chooses its own line to measure.
 
-**Plates on the stage** (stageCopy.ts order on `develop`, all used in order; the stable stage has them from G4):
+**Plates on the stage** (stageCopy.ts order, all used in order; on the stable stage since the 21 October promotion):
 
 | # | Label | Prompt |
 |---|---|---|
@@ -269,7 +267,7 @@ Goal: same eyes and similarity, a new domain, on known sites only; it chooses it
 | 1:20 | Click "Measure an Octagon wall". | The local relief lands and the agent looks at it, says which wall it will cross and which way, then measures. The step names the direction it chose and calls it the agent's line (north to south in the stage run on dev), and the cross-section draws under it. About 30 s on dev; not run live by the review. If the line crosses no bank it says "I cannot confirm a bank on this line.": a designed outcome, not a failure. |
 | 2:00 | Click "Measure the Great Circle". | Local relief, red higher and blue lower, the line from the record (the step reads "The record's verified line"), and a cross-section under the step. Recorded take: "362 m bank to bank", bank +2.6 m, ditch −2.7 m, beside about 366 m documented. About 25 to 45 s on dev. |
 | 2:50 | Click "Where else, like this". | About 25 s: sites of the same form from the catalogue, the answer opening on the top match's name, then the camera flies to the top match and its LiDAR. The top match has varied: Seip Earthworks in both review runs, Fort Hill Earthworks & Nature Preserve on dev on 21 October. |
-| 3:40 | Say the close line, then switch to Methane Hunter. | |
+| 3:40 | Say the close line, then switch to Methane Watch. | |
 
 **Speaker notes**
 
@@ -280,11 +278,10 @@ Goal: same eyes and similarity, a new domain, on known sites only; it chooses it
 - Which wall a line crossed is the agent's reading of the relief, not checked against the record (run sheet). Quote only the numbers on screen.
 - *Measure, plain:* "Red is higher, blue is lower. Here it measures on the line the record gives, straight across the Great Circle, then puts its number beside the one in the published record." *Technical:* "The profile is sampled live from the cached elevation model along the site's recorded line; code finds the banks and ditches, and the model reports them."
 - If someone asks how it was built: "It sticks to what it can measure. How it was built is the archaeologists' record, not the agent's guess." (The agent doesn't describe construction methods; that is a rule.)
-- Quote only the figures on screen. On the map the transect labels overlap at 1920, so point at the cross-section in the step column.
+- Quote only the figures on screen.
 - *Like this, plain:* "Where else did people build this shape? It only searches sites already on the record, never open ground." *Technical:* "Ranked by the catalogue's published description of each site's form, then one look at the top match's local relief."
 - The close line names two sites as World Heritage. The Great Circle and Seip are both components of the Hopewell Ceremonial Earthworks, and so is Hopeton. Fort Hill, the top match on dev on 21 October, is on the National Register, not the World Heritage list: if it comes up, say only the second sentence.
 - *The honest line:* "The terrain was prepared in advance. The live parts are the satellite look, the measurements and, on the Octagon, the line it chooses from the relief." (The review rated the act scripted before the agent's line was added; not re-rated.)
-- Don't use the draw tools on this act; they are still on the map's edge.
 
 **The moment a person decides:** no approve button. The decision is built in: the agent works only with sites people have already recorded and published, and nothing on the stage marks a new place. Say once: "That's a rule we chose, not the agent: publishing unknown sites puts them at risk of looting."
 
@@ -292,10 +289,10 @@ Goal: same eyes and similarity, a new domain, on known sites only; it chooses it
 
 **If a live turn fails**
 
-- "The Octagon, from space": `/?scenario=archaeologist-newark&agent=archaeologist`. It lands both layers at once, so untick the hillshade in the layers plate, say the "from space" line, then tick it again.
+- "The Octagon, from space": `/?scenario=archaeologist-newark&agent=archaeologist` (re-recorded 21 October from dev). It holds the true colour on its own for about 8 s, then the hillshade lands: say the "from space" line while the true colour is alone. Before G4 the stable stage lands both layers at once: untick the hillshade in the layers plate, say the line, then tick it again.
 - "Measure an Octagon wall": no replay. If it fails, go on to the Great Circle.
 - "Measure the Great Circle": `/?scenario=archaeologist-great-circle&agent=archaeologist` (recorded with the plate's old words, "How big is the Great Circle, and how was it built?", until it is re-recorded).
-- "Where else, like this" (the "beat 3" of section 2) has no replay. If the LiDAR doesn't draw (it failed in 1 of 2 review runs while the answer described it), say "the relief didn't load", don't read the answer, and go to the close line. If you are in a replay, skip it.
+- "Where else, like this" has no replay. If its layer row reads "LiDAR did not load" (section 2; it failed in 1 of 2 review runs while the answer described it), say "the relief didn't load", don't read the answer, and go to the close line. If you are in a replay, skip it.
 - Over 4:30 in rehearsal: drop the Great Circle measure; "Where else, like this" then follows the Octagon, whose top form match by the catalogue's ranking is Hopeton Earthworks, 87 km away (not yet run on dev). Last resort: the Octagon replay's "under the grass" beat only, as a 90-second teaser in this slot.
 
 ---
@@ -304,7 +301,7 @@ Goal: same eyes and similarity, a new domain, on known sites only; it chooses it
 
 Goal: it senses the invisible and triages at scale, on live data, and shows why it follows one site.
 
-**Plates on the stage** (stageCopy.ts order on `develop`; the stable stage has plate 1's new wording from G4):
+**Plates on the stage** (stageCopy.ts order; on the stable stage since the 21 October promotion):
 
 | # | Label | Prompt | Used |
 |---|---|---|---|
@@ -316,9 +313,9 @@ Goal: it senses the invisible and triages at scale, on live data, and shows why 
 
 | Time | Do | The room sees |
 |---|---|---|
-| 0:00 | Switch to Methane Hunter; talk over the globe while it warms. | A dimmed globe turning in a starfield: dots and rings (×5 to ×10) on repeat methane sites, nine dashed watch-area boxes. Nothing on screen explains them, so you do. |
-| 0:25 | Click "Methane Watch brief". | The plan strip "Baseline · Tip · Cue · Check · Brief"; a tip board of the nine areas (about 15 s); filmstrips of EMIT passes over the two strongest tips (about 25 s), weak ones dimmed with the reason in words; each cued row on the board then gains its tally (for example "2 of 4 candidate passes · latest 2025-08-20") and one reads "following"; methane columns over a Sentinel-2 scene; then the draft brief card (79 to 135 s in test runs). The end frame keeps the other site's summary line beside the followed site's filmstrip. |
-| 2:30 | Scroll the column up to the plan strip and tip board (it auto-scrolls past them), point at the two tallies, then back to the card. Click the newest filmstrip frame to show its date. | Why it follows this site, side by side with the other; the followed site, "Methane recurs here: …", "Cause: unconfirmed until a ground or aircraft check", the ground-record lines. |
+| 0:00 | Switch to Methane Watch (the speaker label reads Methane Hunter); talk over the globe while it warms. | A dimmed globe turning in a starfield: dots and rings (×5 to ×10) on repeat methane sites, nine dashed watch-area boxes. Nothing on screen explains them, so you do. |
+| 0:25 | Click "Methane Watch brief". | The plan strip "Baseline · Tip · Cue · Check · Brief"; a tip board of the nine areas (about 15 s); filmstrips of EMIT passes over the two strongest tips (about 25 s), weak ones dimmed with the reason in words; each cued row on the board then gains its tally (for example "4 of 8 candidate passes · latest 2025-11-30" in the 21 October recording) and one reads "following"; methane columns over a Sentinel-2 scene; then the draft brief card (79 to 135 s in test runs). The end frame keeps the other site's summary line beside the followed site's filmstrip. |
+| 2:30 | Point at the card's first line: the chain from tip to cue to check to brief, with the followed site's tally. To show why it follows this site over the other, scroll the column up (it scrolls past them to the card): the plan strip, the tip board with both tallies and "following", and the filmstrips. Click the newest filmstrip frame to show its date, then scroll back to the card. | Why it follows this site, side by side with the other; the followed site, "Methane recurs here: …", "Cause: unconfirmed until a ground or aircraft check", the ground-record lines. |
 | 4:00 | Say the decision line, then press "Approve and file". | The backend files the brief, the card shows its filed line, and the agent confirms in a short turn (its time is unconfirmed). |
 | 5:30 | Say the hand-off line, then switch to Dark Vessels, the closer. | |
 
@@ -327,9 +324,10 @@ Goal: it senses the invisible and triages at scale, on live data, and shows why 
 - *Over the globe, plain:* "Methane is invisible to the eye. Each dot is a place NASA's EMIT instrument saw a methane plume between 2022 and 2025; a ring means plumes on five or more dates. The dashed boxes are the nine areas we watch."
 - *While the mission runs, plain, in the order things land:* "It states a plan: baseline, tip, cue, check, brief." "First TROPOMI, a satellite instrument that sees wide but coarse, scans all nine areas over the last two weeks. Its cells are kilometres across, so this is a tip, not a finding." "Then it cues a sharper instrument, EMIT on the space station, over the two strongest tips it can see, and judges each pass against its own noise. The dimmed frames are passes it rejected, with the reason." "Then it checks the ground record: night-time heat, what's mapped nearby, and a public facility registry. And it drafts a brief for a person. It never names a cause."
 - *Technical:* "TROPOMI 14-day median composites from the Registry of Open Data on AWS. EMIT raw passes through NASA's CMR and LP DAAC; a pass counts only when enough pixels clear three times their own uncertainty. Then VIIRS heat from FIRMS, Overture Maps and the OGIM registry for the ground."
-- *The honest line:* "The live data decides which site it follows, by a fixed rule: the site with more candidate passes; a tie goes to the site whose newest candidate is more recent, then the higher peak. Both tallies stay on the board, so you can check the choice." (The review rates this act guided. The 12 October recording predates the tie rule and the tallies: a 2-to-2 tie broken on peak, with the reason only in the transcript.)
-- The followed site comes from the day's data (Shanxi on 7 October and on dev on 20 and 21 October, Krasnovodsk in the 12 October recording). Don't promise a place.
-- *On "still active":* the plate on `develop` asks where methane keeps showing up, and the answer closes on "EMIT last looked here on" and a date. The stable stage keeps the old wording until G4 (section 2). Either way, say "methane keeps showing up here, and here are the dates". The tip is the last 14 days; EMIT's newest pass is the date on the filmstrip frame you clicked.
+- If the TROPOMI layer over the south Caspian is on screen (when the agent follows Krasnovodsk, as in the old 12 October recording), its brightest cells run along the shore. Expect "is that a coastline effect?". It is an observation, not a claim either way: "Fair question, and we haven't checked it. That's why a TROPOMI tip only cues a sharper look."
+- *The honest line:* "The live data decides which site it follows, by a fixed rule: the site with more candidate passes; a tie goes to the site whose newest candidate is more recent, then the higher peak. Both tallies stay on the board, so you can check the choice." (The review rates this act guided. The 21 October recording shows the tallies: 4 of 8 candidate passes at Shanxi against 1 of 8 for the south Caspian, so the count decides.)
+- The followed site comes from the day's data (Shanxi on 7 October, on dev on 20 and 21 October and in the 21 October recording; Krasnovodsk in the old 12 October recording). Don't promise a place.
+- *On "still active":* the plate asks where methane keeps showing up. The card says when EMIT last looked ("Last EMIT look Aug 17 2026" in the recording), and the agent's closing line, in the transcript, reads "EMIT last looked here on" and a date. Never say a site is active now: say "methane keeps showing up here, and here are the dates". The tip is the last 14 days; EMIT's newest pass is the date on the filmstrip frame you clicked.
 - Don't read out any operator name in the ground record. The registry line itself says it tells you nothing about where the methane came from.
 - The brief gives peak readings in ppm·m, not an emission rate, so don't call a site a super-emitter by rate.
 
@@ -339,9 +337,9 @@ Goal: it senses the invisible and triages at scale, on live data, and shows why 
 
 **If a live turn fails**
 
-- Mission fails, or a live source is down: load `/?scenario=methane-watch-mission&agent=methane` (recorded 12 October: the south Caspian and Shanxi cued, the brief on Krasnovodsk). It predates the 21 October changes: it keeps the old plate's words and the old tie rule, and whether its board shows the tallies is unconfirmed (re-record open, methane tasks 24). The card is read-only: "Recorded case: the decision is made live, not replayed." Say: "In a recording the decision isn't replayed; live, this is where I'd file it." Leave it with `/?agent=methane`.
-- The two-beat fallback (the spec's earlier run sheet): plate 2 finished with `the Permian Basin` (22.5 s live in the review: ranks 1 to 3 and a table), then plate 3 (64.7 s; the camera frames the Sahara first, then dives to Utah, so say "it frames all ten, then goes to the strongest"). If asked "why 2024?": NASA's plume product is dense through 2024 and nearly empty after.
-- Permian replay: `/?scenario=methane-permian-2024&agent=methane`. Its plume renders flat yellow on an old colour scale. Plate 3 has no replay.
+- Mission fails, or a live source is down: load `/?scenario=methane-watch-mission&agent=methane` (re-recorded 21 October from dev on the plate's words: Shanxi and the south Caspian cued, the brief on Shanxi, near Yangquan City, with both tallies on the board). The card is read-only: "Recorded case: the decision is made live, not replayed." Say: "In a recording the decision isn't replayed; live, this is where I'd file it." Leave it with `/?agent=methane` or New session.
+- The two-beat fallback (the spec's earlier run sheet): plate 2 finished with `the Permian Basin` (22.5 s live in the review: ranks 1 to 3 and a table), then plate 3 (64.7 s; the camera flies to the strongest plume, near Woodruff, Utah, in the recorded run). If asked "why 2024?": NASA's plume product is dense through 2024 and nearly empty after.
+- Permian replay: `/?scenario=methane-permian-2024&agent=methane` (re-recorded 21 October; the plume is on its own ramp, 500 to 7,000+ ppm·m). Plate 3 has no replay.
 - Over 6:30 in rehearsal (proposed; run sheet: over 7:30 against 7:00): use the mission replay from the start.
 - If this act closes the show (Act 3 missed gate B), its hand-off line becomes the way into the close (section 10).
 
@@ -436,12 +434,11 @@ If cost comes up: "We haven't measured what the platform costs to run, so I won'
 
 - Act 3: whether it passes gate B (and so which act closes the show), the redesigned question on the stage, its beats and timing, the prediction's figure on the day, and whether its replay case is recorded by 28 October.
 - The second screen: which display, how it connects, whether the room can see it, and the Slack post's wording on it.
-- Dark Vessels and the Archaeologist on the stable stage and the switcher (due at G4, 30 October), with the new Act 1, Act 2 and Act 4 plates.
+- Dark Vessels on the stable stage and the switcher (due at G4, 30 October). The second batch of stage fixes on the stable stage (G4): the switcher's room names, Replay cases by act, How it works, Act 1's plate order. The Archaeologist's switcher entry and replays on the signed-in stable stage.
+- The re-recorded replays have been in the bucket since 21 October, so the stable stage already plays them on its own code; not checked on the stable stage.
 - Any rehearsal time for any part, in the new order.
 - A live "Approve and file" and "Approve the tasking" on the stable stage, with the Slack post.
-- Act 1 live: Bergen (dev only), Folsom (and its slider), Palisades, Colorado. Act 4 live: the Octagon and the Great Circle (seen only as replays by the review), the Octagon wall (dev only) and the provocation tests.
-- The methane mission replay re-recorded on the new plate and tie rule.
+- Act 1 live: Bergen (dev only; the line under its cloudy chip not seen yet), the look-alike search's rank-1 popup on stable, Folsom (and its slider), Palisades, Colorado, and the optional Inambari scan (never run). Act 4 live: the Octagon and the Great Circle (seen only as replays by the review), the Octagon wall (dev only) and the provocation tests.
 - `prewarm.py` and `runtimes.py check-env` against stable, and the AWS profile they use.
 - Projector resolution, the presenting browser, behaviour on a real GPU, and the sign-in session's lifetime.
-- `/?scenario=la-fires-2025&agent=stable` binding the case to Act 1.
 - Backup videos (planned, not made) and any observability trace for the close.
