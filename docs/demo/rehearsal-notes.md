@@ -250,54 +250,55 @@ Goal: the agent sees imagery, turns down a scene it cannot use, and finds places
 
 ## 7. Act 4: AI Archaeologist, second (8:00 to 12:00)
 
-Goal: same eyes and similarity, a new domain, on known sites only; it chooses its own line to measure.
+Goal: same eyes, a new domain, on known sites only; the agent judges, site by site, whether the form still shows in the ground.
 
-**Plates on the stage** (stageCopy.ts order, all used in order; on the stable stage since the 21 October promotion):
+**Plates on the stage** (stageCopy.ts order; the first two are the act, the third is a spare, asked only):
 
 | # | Label | Prompt |
 |---|---|---|
 | 1 | The Octagon, from space | `Show me the Newark Octagon the way an archaeologist sees it` |
-| 2 | Measure an Octagon wall | `Measure across a wall of the Newark Octagon, on a line you choose from the local relief.` |
+| 2 | Where else, like this | `Where else did they build like this?` |
 | 3 | Measure the Great Circle | `Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?` |
-| 4 | Where else, like this | `Where else did they build like this?` |
+
+"Measure an Octagon wall" left the act on 22 October: a measuring tool measures, which shows no judgement, and the Octagon has no verified line to measure on. Until the survey is released, the stable stage still shows the old four plates.
 
 **Beats** (the run sheet's times):
 
 | Time | Do | The room sees |
 |---|---|---|
 | 0:00 | Switch to AI Archaeologist; talk over the rest view. | The eastern US at dusk, low and tilted: 28 dots for sites on the public record, rings on the 10 World Heritage sites, "Hopewell Ceremonial Earthworks, 8 sites". |
-| 0:10 | Click "The Octagon, from space". | Sentinel-2 true colour: mown grass in a suburban grid, the old fairways of a golf course that closed in 2025. An evidence chip. |
-| 0:50 | (same turn) | The 1 m LiDAR hillshade dissolves in, a low light sweeps round it, and the octagon, its circle and the avenue stand out under the old fairways. The review saw this only in the replay, about 20 s in; live timing is unconfirmed. |
-| 1:20 | Click "Measure an Octagon wall". | The local relief lands and the agent looks at it, says which wall it will cross and which way, then measures. The step names the direction it chose and calls it the agent's line (north to south in the stage run on dev), and the cross-section draws under it. About 30 s on dev; not run live by the review. If the line crosses no bank it says "I cannot confirm a bank on this line.": a designed outcome, not a failure. |
-| 2:00 | Click "Measure the Great Circle". | Local relief, red higher and blue lower, the line from the record (the step reads "The record's verified line"), and a cross-section under the step. Recorded take: "362 m bank to bank", bank +2.6 m, ditch −2.7 m, beside about 366 m documented. About 25 to 45 s on dev. |
-| 2:50 | Click "Where else, like this". | About 25 s: sites of the same form from the catalogue, the answer opening on the top match's name, then the camera flies to the top match and its LiDAR. The top match has varied: Seip Earthworks in both review runs, Fort Hill Earthworks & Nature Preserve on dev on 21 October. |
-| 3:40 | Say the close line, then switch to Methane Watch. | |
+| 0:10 | Click "The Octagon, from space". | Sentinel-2 true colour: mown grass in a suburban grid, the old fairways of a golf course that closed in 2025. An evidence chip. 30 to 52 s on dev. |
+| 0:50 | (same turn) | The 1 m LiDAR hillshade dissolves in, a low light sweeps round it, and the octagon, its circle and the avenue stand out under the old fairways. |
+| 1:20 | Click "Where else, like this". | "Find sites of the same form" reads "Matched on the public record's descriptions". Then, site by site, the close relief lands on the map, the agent looks at it, and a row lands under "Judge what still shows": the site, its distance, its verdict and the reason, beside the image it judged. The answer opens on the count: "Two of the three sites like the Octagon Earthworks still show in the ground; one is faint." About 55 to 65 s on dev. |
+| 2:40 | Say the close line, then switch to Methane Watch. | |
+
+What the agent decided on dev (22 October, 10 survey runs with the close look, dev v18 to v20): Hopeton Earthworks (87 km) and High Bank Works (93 km) "Still shows: ploughed down, still traced" every time; Seip Earthworks (112 km) "Faint" 9 times and "Cannot confirm" once. The verdicts converge because the ground is what it is; the point is that the agent looked and said so, and you can check each one against the image beside it.
 
 **Speaker notes**
 
 - *At rest, plain:* "Every dot is a site already on the public record, published by UNESCO, the National Park Service or a state or tribal steward. The agent can't look anywhere else."
 - *From space, plain:* "From space it still looks like a golf course. It was one until 2025, and the old fairways still show." *Technical:* "A live Sentinel-2 search and clip; the agent looks at the scene before it says anything."
 - *Under the grass, plain:* "Now LiDAR: a laser survey from the air at 1 metre detail, with the grass and trees taken away. With the light low and raking, like a torch at dusk, the walls stand up: the octagon, its circle and the avenue." *Technical:* "USGS 3DEP 1 m LiDAR, pre-rendered offline to a hillshade; the stage relights the site's own elevation model live."
-- *The agent's line, plain:* "This time I don't give it a line. It looks at the relief, picks a wall, says which one and which way, then measures across it. If its line misses the bank, it says so." *Technical:* "The measuring tool takes one of four directions through the site's centre; the model never writes coordinates."
-- Which wall a line crossed is the agent's reading of the relief, not checked against the record (run sheet). Quote only the numbers on screen.
-- *Measure, plain:* "Red is higher, blue is lower. Here it measures on the line the record gives, straight across the Great Circle, then puts its number beside the one in the published record." *Technical:* "The profile is sampled live from the cached elevation model along the site's recorded line; code finds the banks and ditches, and the model reports them."
-- If someone asks how it was built: "It sticks to what it can measure. How it was built is the archaeologists' record, not the agent's guess." (The agent doesn't describe construction methods; that is a rule.)
-- Quote only the figures on screen.
-- *Like this, plain:* "Where else did people build this shape? It only searches sites already on the record, never open ground." *Technical:* "Ranked by the catalogue's published description of each site's form, then one look at the top match's local relief."
-- The close line names two sites as World Heritage. The Great Circle and Seip are both components of the Hopewell Ceremonial Earthworks, and so is Hopeton. Fort Hill, the top match on dev on 21 October, is on the National Register, not the World Heritage list: if it comes up, say only the second sentence.
-- *The honest line:* "The terrain was prepared in advance. The live parts are the satellite look, the measurements and, on the Octagon, the line it chooses from the relief." (The review rated the act scripted before the agent's line was added; not re-rated.)
+- *The survey, plain:* "Where else did people build like this? It finds the sites whose published descriptions match, then looks at each one's LiDAR and says whether that shape still shows in the ground today. A measuring tool can give you a number; it can't tell you whether a wall ploughed nearly flat is still there to see. That's the agent's call, and it gives the reason." Point at a row and its picture.
+- *Honest line:* "The matches come from the record's descriptions, not from the LiDAR. The LiDAR is how it checks them."
+- *If a row says "Cannot confirm":* "When it can't trace the walls, it says so instead of guessing. That's a result, not a failure."
+- *Technical:* "The ranking reads the catalogue's published descriptions. For each match the agent cuts the 1.2 km around the site from the prepared LiDAR, looks at it, and records a verdict from a fixed set. The tool refuses a verdict before the look, for a site that wasn't a match, or 'walls standing' where the record says they were ploughed down. The stage shows only verdicts the tool accepted, in its own words."
+- If someone asks how it was built: "It sticks to what it can see. How it was built is the archaeologists' record, not the agent's guess." (The agent doesn't describe construction methods; that is a rule.)
+- It states no dimensions in the survey. Quote only what is on screen.
+- The close line: Hopeton, High Bank and Seip are all components of the Hopewell Ceremonial Earthworks World Heritage property, so "They are already on the World Heritage list" holds for this survey.
+- *The honest line on what's live:* "The terrain was prepared in advance. The live parts are the satellite look, the agent's look at each site, and its verdicts."
 
 **The moment a person decides:** no approve button. The decision is built in: the agent works only with sites people have already recorded and published, and nothing on the stage marks a new place. Say once: "That's a rule we chose, not the agent: publishing unknown sites puts them at risk of looting."
 
-**Timing:** 4:00 (run sheet), closing at 3:40.
+**Timing:** about 4:00 (run sheet), closing at 2:40 plus the narration over the survey. The Great Circle plate is a spare for the questions, about 25 to 50 s.
 
 **If a live turn fails**
 
-- "The Octagon, from space": `/?scenario=archaeologist-newark&agent=archaeologist` (re-recorded 21 October from dev). It holds the true colour on its own for about 8 s, then the hillshade lands: say the "from space" line while the true colour is alone.
-- "Measure an Octagon wall": no replay. If it fails, go on to the Great Circle.
-- "Measure the Great Circle": `/?scenario=archaeologist-great-circle&agent=archaeologist` (recorded with the plate's old words, "How big is the Great Circle, and how was it built?", until it is re-recorded).
-- "Where else, like this" has no replay. If its layer row reads "LiDAR did not load" (section 2; it failed in 1 of 2 review runs while the answer described it), say "the relief didn't load", don't read the answer, and go to the close line. If you are in a replay, skip it.
-- Over 4:30 in rehearsal: drop the Great Circle measure; "Where else, like this" then follows the Octagon, whose top form match by the catalogue's ranking is Hopeton Earthworks, 87 km away (not yet run on dev). Last resort: the Octagon replay's "under the grass" beat only, as a 90-second teaser in this slot.
+- "Where else, like this": the survey replay, `/?scenario=archaeologist-survey&agent=archaeologist` (recorded 22 October from dev; Hopeton and High Bank still show, Seip faint). It plays the survey on its own, without the Octagon first.
+- "The Octagon, from space", or if the survey replay fails too: the Newark replay, `/?scenario=archaeologist-newark&agent=archaeologist` (re-recorded 21 October from dev). It holds the true colour on its own for about 8 s, then the hillshade lands: say the "from space" line while the true colour is alone.
+- "Measure the Great Circle" (asked only): `/?scenario=archaeologist-great-circle&agent=archaeologist` (recorded with the plate's old words, "How big is the Great Circle, and how was it built?", until it is re-recorded).
+- If a layer row reads "LiDAR did not load" (section 2), say "the relief didn't load", don't read the answer over plain imagery, and go to the close line.
+- Over 4:30 in rehearsal: say less over the survey; never cut a verdict mid-row. Last resort: the Newark replay's "under the grass" beat only, as a 90-second teaser in this slot.
 
 ---
 

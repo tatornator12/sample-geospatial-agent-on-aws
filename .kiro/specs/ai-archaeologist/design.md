@@ -2,13 +2,15 @@
 
 Status: **APPROVED Oct 12** (the user approved all eight decisions at the end; work starts early).
 Decision 9 (the agent picks the line it measures) added Oct 20 from the stage review (D5, D10).
+Decision 10 (the condition survey replaces the Octagon wall measure) decided by the user Oct 22.
 
 ## Overview
 
 One week, four pieces:
 
-1. `agents/ai-archaeologist/`: a third AgentCore runtime with four tools of its own
-   (`find_known_site`, `show_terrain`, `measure_profile`, `find_similar_sites`) and the
+1. `agents/ai-archaeologist/`: a third AgentCore runtime with five tools of its own
+   (`find_known_site`, `show_terrain`, `measure_profile`, `find_similar_sites` and, since
+   decision 10, `record_condition`) and the
    platform's shared tools (`display_visual`, `inspect_image`, `get_rasters`,
    `create_bbox_from_coordinates`, ArcGIS `reverse_geocode`).
 2. A curated catalogue of public, already-documented sites and an offline build that
@@ -94,12 +96,18 @@ a small alias table. No fuzzy geocoding. Writes the frame as GeoJSON to the sess
 `get_rasters` and the map. Unknown name: `{"error": "I only work with sites already on the
 public record.", "known_sites": [names…]}` with no coordinates.
 
-### 3. `show_terrain(site_id, product)`
+### 3. `show_terrain(site_id, product, extent="frame")`
 
 `product` ∈ {`hillshade`, `lrm`}. `s3.copy_object` from the cache into
 `session_data/<sid>/terrain/<site_id>_<product>.tif` (server-side, under a second for 6 to 40 MB;
 keeps the backend's presign allowlist and the evidence chip path unchanged). Returns bounds from
 the manifest and the render hint. Missing cache object: error naming `build_site_catalogue.py`.
+`extent="site"` (the LRM only, decision 10) cuts the centre 1.2 km of the cached LRM around the
+catalogue centre at its own 1 m (a windowed read, a tiled deflate GeoTIFF with overviews, about
+6 MB) into `terrain/lrm(03)_<id>_site.tif`, with the cut's own bounds: the close look a condition
+survey judges on. The whole 3 km frame at 1024 px drowns a 300 m ploughed octagon among roads and
+river banks (one Oct 22 run called High Bank Works "cannot confirm" from it); the 1.2 km cut shows
+it plainly. A ±0.3 m relief carries a `relief_note` (ploughed walls, tens of centimetres high).
 
 ### 4. `measure_profile(site_id, bearing=None)`
 
@@ -125,6 +133,27 @@ line." `find_known_site` says `has_verified_transect`, so the agent knows which 
 - Option B, form by eye: rank catalogue sites by the published `form` field (same form first,
   then the same culture, then distance), then compose one contact sheet of the top four LRM
   thumbnails with labels (`inspect_image` once) so the model compares the forms it sees.
+- Since decision 10 each match carries its `rank` and `lidar` (the manifest built its LRM), and
+  the tool notes this turn's matches for `record_condition`. The ranking reads the record's
+  descriptions, never the LiDAR; the stage says so under the step.
+
+### 5b. `record_condition(site_id, verdict, because)` (decision 10, `survey_tools.py`)
+
+Enums only. `verdict` ∈ {`visible`, `faint`, `cannot_confirm`}; `because` per verdict: visible
+{`walls_in_relief`, `ploughed_but_traced`}, faint {`ploughed_but_traced`, `low_relief_only`},
+cannot_confirm {`low_relief_only`, `no_form_seen`}. Refused, writing nothing, unless: the pair is
+allowed; the site is in the catalogue and among THIS turn's `find_similar_sites` matches (the
+entrypoint begins a turn per invocation); its LRM is built (a match without one is skipped and
+gets no verdict); `inspect_image` saved its rendering of that site's LRM (frame or close look)
+after the turn began (S3 LastModified, 2 s slack) and not in the same model response as this
+verdict (the last assistant message may not hold both the look and the verdict, so it saw the
+image first; that refusal has its own words, "Do not look again", since the image comes back with
+it); the site has no verdict yet
+this turn; and `walls_in_relief` is not claimed for a ±0.3 m site (the build chose that stretch
+because the walls are ploughed). An accepted verdict writes
+`session_data/<sid>/archaeology/survey_<toolUseId>.json` (turn id, tool-use id, order, site id,
+verdict, reason, example, rank, distance in km: enums and numbers). `@tool(context=True)` gives
+the id, as for Dark Vessels' decisions.
 
 ### 6. Shared and frontend changes
 
@@ -133,15 +162,26 @@ line." `find_known_site` says `has_verified_transect`, so the agent knows which 
 - `react-ui/frontend/src/utils/render.ts`: `COLORMAPS` += `gray`, `rdbu_r` with `RAMP_ANCHORS`
   from TiTiler's own entries; `RENDER_GROUPS` += `terrain`. Legend words for the LRM.
 - An `archaeoLayers.ts` (transect line style, LRM legend) following `methaneLayers.ts`.
-- `stageCopy.ts`: four prepared prompts (decision 9 added "Measure an Octagon wall"; D10 reworded
-  the Great Circle's), placeholder "Name a known site, or ask how they built it"; step names for
-  the four tools.
+- `stageCopy.ts`: three prepared prompts in click order since decision 10: "The Octagon, from
+  space", "Where else, like this", "Measure the Great Circle" (the asked-only spare; D10 reworded
+  it); "Measure an Octagon wall" removed. Placeholder "Name a known site, or ask how they built
+  it"; step names for the five tools ("Judge what still shows", grouped "Judge 3 sites").
+- `survey.ts` and `SurveyRow.tsx` (decision 10): under each `record_condition` step, one row per
+  verdict whose file loaded and is that call's own (same tool-use id and site): the site's short
+  name from `SITE_NAMES` (the catalogue's first names, pinned by `test_stage_mirror.py`), the
+  distance, "Still shows" / "Faint" / "Cannot confirm" and the reason in the stage's words, and
+  the relief the agent inspected as a 72 px thumbnail (the inspect step's chip moves into the row,
+  re-titled "<site>, local relief", no Saw line). A refused verdict writes no file and shows no
+  row. Rows are pinned like the tip board. `find_similar_sites`'s step reads "Matched on the
+  public record's descriptions". `archaeoLayers.ts`: `reliefSite` and the camera share know the
+  close look's `_site` files.
 - `steps.ts`: the measure step's line, from tool inputs only: `BEARING_LABELS` ("NW–SE, the
   agent's line") and `VERIFIED_TRANSECT_SITES` ("The record's verified line"), both pinned to
   the tool and the catalogue by `tests/test_stage_mirror.py`; anything else prints nothing.
 - `display_tools.py`: the agent's own `display_visual`, the platform's plus a check that a
   session URL exists (a HEAD), ported from Dark Vessels (stage review P0-2).
-- `UseCaseGallery.tsx`: "Newark Earthworks" card, `agent: 'archaeologist'`.
+- `UseCaseGallery.tsx`: "Newark Earthworks" card, `agent: 'archaeologist'`; since decision 10
+  the survey's card ("Sites like the Octagon, surveyed", `archaeologist-survey`).
 
 ## Security and the known-sites rule
 
@@ -192,18 +232,20 @@ line." `find_known_site` says `has_verified_transect`, so the agent knows which 
 
 | t | Beat | Prompt / action | What the room sees |
 |---|---|---|---|
-| 0:00 | Switch | Agent switcher → AI Archaeologist (pre-warmed) | Its four prepared plates |
+| 0:00 | Switch | Agent switcher → AI Archaeologist (pre-warmed) | Its three prepared plates |
 | 0:10 | From space | "Show me the Newark Octagon the way an archaeologist sees it" | Sentinel-2 true colour (the Octagon has long sat under a country club's golf course; day 1 checks what current imagery shows); chip; one sentence on what is visible from space |
 | 0:50 | Under the grass | (same turn) | Hillshade lands: the Octagon and its circle appear under the fairways; chip; one sentence |
-| 1:20 | The agent's line | "Measure across a wall of the Newark Octagon, on a line you choose from the local relief." | The local relief lands and the agent looks at it, says which wall it will cross and which way, then measures: the step reads "NW–SE, the agent's line" (or the bearing it chose), the section draws under it. If the line crosses no bank it says "I cannot confirm a bank on this line." and what the LiDAR does show: a designed outcome, not a failure. About 30 s on dev |
-| 2:00 | Measure | "Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?" | LRM (red bank, blue ditch), transect line, the step reads "The record's verified line"; "362 m measured, about 366 m documented, bank +2.6 m, ditch −2.7 m". About 25 to 45 s on dev |
-| 2:50 | Like this | "Where else did they build like this?" | Sites of the same form from the catalogue (option B); the answer opens on the top match's name ("Fort Hill Earthworks & Nature Preserve, 133 km away, shares the Great Circle's form: a circle, a ditch, and an enclosure."); the top match's LiDAR. About 25 s on dev |
-| 3:40 | Close | | "Both are already on the World Heritage list. I only work with sites on the public record." Hand-off to Methane Watch (Act 2), third in the show |
+| 1:20 | Where else, like this: the survey (decision 10) | "Where else did they build like this?" | The step "Find sites of the same form" reads "Matched on the public record's descriptions". For each of the top matches with LiDAR (Hopeton Earthworks 87 km, High Bank Works 93 km, Seip Earthworks 112 km on today's catalogue) the close relief lands on the map, the agent looks at it, and a row lands under "Judge what still shows": the site, its distance, "Still shows", "Faint" or "Cannot confirm" and the reason, beside the relief it looked at. The answer opens on the counts ("Two of the three sites like the Octagon still show in the ground; one is faint."). About 65 s on dev |
+| 2:40 | Close | | "They are already on the World Heritage list. I only work with sites on the public record." Hand-off to Methane Watch (Act 2), third in the show |
+| spare | Measure (asked only) | "Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?" | LRM (red bank, blue ditch), transect line, the step reads "The record's verified line"; "362 m measured, about 366 m documented, bank +2.6 m, ditch −2.7 m". About 25 to 45 s on dev |
 
-Fallback if over 4:30 on rehearsal two: drop the Great Circle measure; "Where else, like this"
-then follows the Octagon, whose top form match is Hopeton Earthworks (87 km; avenue, circle,
-enclosure) by the catalogue's own ranking, not yet run on dev. Cut-list fallback (90-second
-teaser in its second-act slot): the replay's "under the grass" beat only.
+The act runs about 4:00 with the presenter's words between the beats. Fallbacks: the
+`archaeologist-survey` replay (the survey's recorded take), then the `archaeologist-newark` replay.
+Cut-list fallback (90-second teaser in its second-act slot): the replay's "under the grass" beat
+only. "Measure an Octagon wall" left the run on Oct 22 (decision 10): a measure tool measures,
+which is not the agent's judgement, and the Octagon's line was unreliable (no verified line, the
+catalogue centre on the avenue between the circle and the octagon, four bearings, golf-course
+grading, no documented width).
 
 Beat note, the agent's line on dev v14 (Oct 21): three Octagon runs, each find_known_site →
 show_terrain(lrm) → inspect_image → measure_profile with a bearing. Eval run 1 chose north-south
@@ -250,3 +292,13 @@ which walls a line crossed is the agent's reading of the relief, not checked aga
    (no bearing). A line that crosses no bank is a designed outcome: "I cannot confirm a bank on
    this line." (PRODUCT.md principle 2). The stage names the line from tool inputs only: "NW–SE,
    the agent's line" against "The record's verified line".
+10. The condition survey (the user, Oct 22). "Where else, like this" after "The Octagon, from
+   space" becomes the act's decision: the agent looks at the close relief of the top two or three
+   matches that have LiDAR and gives each one verdict from fixed options, with its reason
+   (`record_condition`, enums only; "cannot confirm" is a designed outcome), and the answer opens
+   on the counts. The stage shows a row per site with the relief it judged on. The "Measure an
+   Octagon wall" plate is removed; "Measure the Great Circle" stays as the last plate, asked only.
+   Feasibility checked first (`.agents/tasks/act4-survey/check.md`): the Octagon's top three
+   (Hopeton, High Bank, Seip) all have an LRM; Seip, where only the rebuilt Central Mound stands,
+   is the overclaim risk, so a "visible" there fails the golden case. The matches come from the
+   record's descriptions, not the LiDAR, and the notes say so.

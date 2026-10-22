@@ -8,6 +8,7 @@ the real geo_agent/ (via _paths) with the same stubs for runtime-only dependenci
 in-memory fake; the DEM is a synthetic earthwork (a ring bank with an interior ditch) written to a
 temporary GeoTIFF on the Newark Great Circle's grid.
 """
+import datetime
 import importlib
 import io
 import json
@@ -107,13 +108,21 @@ class FakeS3:
 
     def __init__(self):
         self.objects: dict[str, bytes] = {}
+        self.modified: dict[str, datetime.datetime] = {}   # LastModified, as S3 reports it (whole seconds)
         self.copies: list[tuple[str, str]] = []
         self.fail_copy = False
         self.fail_list = False
+        self.fail_put = False
+
+    def _touch(self, key):
+        self.modified[key] = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 
     def put_object(self, Bucket, Key, Body, ContentType=None):
         assert Bucket == BUCKET
+        if self.fail_put:
+            raise RuntimeError("SlowDown")
         self.objects[Key] = Body if isinstance(Body, bytes) else Body.encode()
+        self._touch(Key)
 
     def get_object(self, Bucket, Key):
         assert Bucket == BUCKET
@@ -126,13 +135,14 @@ class FakeS3:
         if self.fail_copy or CopySource["Key"] not in self.objects:
             raise _NoSuchKey(CopySource["Key"])
         self.objects[Key] = self.objects[CopySource["Key"]]
+        self._touch(Key)
         self.copies.append((CopySource["Key"], Key))
 
     def head_object(self, Bucket, Key):
         assert Bucket == BUCKET
         if Key not in self.objects:
             raise _NoSuchKey(Key)
-        return {"ContentLength": len(self.objects[Key])}
+        return {"ContentLength": len(self.objects[Key]), "LastModified": self.modified[Key]}
 
     def list_objects_v2(self, Bucket, Prefix, MaxKeys=1000):
         assert Bucket == BUCKET
@@ -150,7 +160,9 @@ def manifest_for(sites) -> dict:
         dlat, dlon = 1500 / 110574.0, 1500 / (111320.0 * math.cos(math.radians(lat)))
         out[s["id"]] = {"id": s["id"], "bounds": [round(lon - dlon, 6), round(lat - dlat, 6),
                                                    round(lon + dlon, 6), round(lat + dlat, 6)],
-                        "tiles": [{"title": "USGS 1 Meter test tile", "publication_date": "2025-01-01"}]}
+                        "tiles": [{"title": "USGS 1 Meter test tile", "publication_date": "2025-01-01"}],
+                        "products": {p: {"key": f"archaeology/cache/v1/{s['id']}_{p}.tif"}
+                                     for p in ("dem", "hillshade", "lrm")}}
     return {"version": "v1", "sites": out}
 
 
@@ -172,5 +184,7 @@ def tools(fake_s3, monkeypatch):
     for s in sites:
         for product in ("dem", "hillshade", "lrm"):
             fake_s3.put_object(Bucket=BUCKET, Key=f"{mod.CACHE_PREFIX}/{s['id']}_{product}.tif", Body=b"II*\x00")
+    mod.begin_turn()
     yield mod
     mod._manifest_cache.clear()
+    mod._turn.update(turn_id=None, started_at=0.0, matches={}, recorded={})

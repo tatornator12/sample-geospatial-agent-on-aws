@@ -40,7 +40,10 @@ from utils.tools import (  # noqa: E402
 import archaeo_config  # noqa: E402
 # The platform's display_visual plus a check that the file is one this session wrote (act4 P0-2).
 from display_tools import display_visual  # noqa: E402
+import site_tools  # noqa: E402
 from site_tools import find_known_site, find_similar_sites, measure_profile, show_terrain  # noqa: E402
+# The condition survey's verdicts (decision 10): enums only, after a look, for this turn's matches.
+from survey_tools import record_condition  # noqa: E402
 
 app = BedrockAgentCoreApp()
 
@@ -63,6 +66,7 @@ LOCAL_TOOLS = [
     show_terrain,
     measure_profile,
     find_similar_sites,
+    record_condition,
     display_visual,
     inspect_image,
     get_rasters,
@@ -112,6 +116,9 @@ async def ai_archaeologist_agent(payload, context=None):
         logger.info("🔥 prewarm: runtime is up for this session")
         yield "warm"
         return
+
+    # A new turn: the survey's guards ("this turn's matches", "looked at this turn") start empty.
+    site_tools.begin_turn()
 
     from utils.langfuse_setup import setup_langfuse_env_vars
     setup_langfuse_env_vars()

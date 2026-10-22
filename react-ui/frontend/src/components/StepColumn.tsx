@@ -13,11 +13,13 @@ import type { EvidenceItem } from '../utils/evidence.ts';
 import { EvidenceChip } from './EvidenceChip.tsx';
 import { PassFilmstrip } from './PassFilmstrip.tsx';
 import { ProfileSection } from './ProfileSection.tsx';
+import { SurveyRow } from './SurveyRow.tsx';
 import { TipBoard } from './TipBoard.tsx';
 import { VesselStepExtras, type VesselStage } from './VesselStepExtras.tsx';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { isVesselTurn } from '../utils/vesselSteps.ts';
 import type { ProfileData } from '../utils/profileSection.ts';
+import { belongsTo, parseSurvey, surveyEvidence, surveyUrl, type SurveyRecord } from '../utils/survey.ts';
 import {
   PLAN_STAGES,
   chosenCue,
@@ -52,6 +54,8 @@ interface StepColumnProps {
   compact?: boolean;
   /** The archaeologist's measured sections, by site id, drawn under the measure step that made them. */
   profiles?: Record<string, ProfileData>;
+  /** Where the archaeologist's survey files live (this session's archaeology/ folder, or a replay case's). */
+  archaeologyDir?: string | null;
   /** Dark Vessels: whose board and decision files to read, the turn's send time, the map's reveals. */
   vessel?: VesselStage;
 }
@@ -74,9 +78,25 @@ function sectionsFor(group: StepGroup, profiles: Record<string, ProfileData>): P
 }
 
 export function StepColumn({
-  steps, live, evidence = [], onOpenEvidence, methaneDir = null, tips = [], compact = false, profiles = {}, vessel,
+  steps, live, evidence = [], onOpenEvidence, methaneDir = null, tips = [], compact = false, profiles = {},
+  archaeologyDir = null, vessel,
 }: StepColumnProps) {
   const [expanded, setExpanded] = useState(false);
+
+  // The archaeologist's survey: one file per verdict record_condition accepted, named by the call's
+  // id (a refused call writes none, so it shows no row); a file is shown only under its own call.
+  const conditionUrls = new Map<string, string>();
+  for (const call of steps) {
+    const url = surveyUrl(archaeologyDir, call);
+    if (url) conditionUrls.set(call.id, url);
+  }
+  const surveyFiles = useStageFiles<SurveyRecord>([...new Set(conditionUrls.values())], (raw) => parseSurvey(raw));
+  const surveyByCall: Record<string, SurveyRecord> = {};
+  for (const call of steps) {
+    const url = conditionUrls.get(call.id);
+    const record = url && Object.prototype.hasOwnProperty.call(surveyFiles, url) ? surveyFiles[url] : null;
+    if (record && belongsTo(record, call)) surveyByCall[call.id] = record;
+  }
 
   // The cue steps' manifests (one per cued site), loaded here so the end frame can tell which site
   // the agent followed: the one whose passes include the scene it then put on the map.
@@ -97,6 +117,7 @@ export function StepColumn({
   }
 
   const groups = groupSteps(steps);
+  const stepIndex = new Map(steps.map((s, i) => [s.id, i]));
   const lastCue = steps.map((s) => s.name).lastIndexOf('check_recent_passes');
   const chosen = chosenCue(cues, cues.map(framesFor), steps.slice(lastCue + 1));
   const cuedAreas = tips.filter((t) => tipCued(t, cues)).map((t) => t.area.name);
@@ -111,14 +132,32 @@ export function StepColumn({
 
   const hasFilm = (g: StepGroup) => g.name === 'check_recent_passes' && manifestUrls.length > 0;
   const hasBoard = (g: StepGroup) => g.name === 'scan_tropomi' && tips.length > 0;
+  // A step with survey rows stays in view like the board: the verdicts never fold under "Show N earlier".
+  const pinnedStep = (g: StepGroup) => hasFilm(g) || hasBoard(g) || surveyRows(g).length > 0;
+  // The survey's rows, each with the relief the agent looked at. That chip moves into its row (the
+  // verdict beside its evidence), so the look step above no longer shows it a second time.
+  function surveyRows(g: StepGroup): Array<{ record: SurveyRecord; item: EvidenceItem | null }> {
+    if (g.name !== 'record_condition') return [];
+    return g.calls
+      .filter((c) => !!surveyByCall[c.id])
+      .map((c) => {
+        const record = surveyByCall[c.id];
+        // The look the verdict was made on: the latest one before this call, never one after it.
+        const at = stepIndex.get(c.id) ?? Infinity;
+        return { record, item: surveyEvidence(record, evidence, (toolId) => (stepIndex.get(toolId) ?? Infinity) < at) };
+      });
+  }
+  const inRows = new Set(
+    groups.flatMap((g) => surveyRows(g)).map((r) => r.item?.toolId).filter((id): id is string => !!id),
+  );
   // The end frame of a mission: the plan, the tip board, the chosen site's filmstrip and the brief;
   // the full list of steps is one click away. While working, the last steps, with the board and the
   // cue pinned so they never scroll away under "+N earlier".
   const collapsed = compact && !live && !expanded;
   const showAll = expanded;   // "Show all N steps" or "Show N earlier steps": every step, 01 included
   const tail = groups.slice(-MAX_VISIBLE);
-  const pinned = groups.slice(0, groups.length - tail.length).filter((g) => hasFilm(g) || hasBoard(g));
-  const visible = collapsed ? groups.filter((g) => hasFilm(g) || hasBoard(g)) : showAll ? groups : [...pinned, ...tail];
+  const pinned = groups.slice(0, groups.length - tail.length).filter(pinnedStep);
+  const visible = collapsed ? groups.filter(pinnedStep) : showAll ? groups : [...pinned, ...tail];
   const earlier = groups.length - pinned.length - tail.length;
   const litIndex = live ? visible.length - 1 : -1;
   const evidenceByTool = new Map(evidence.map((item) => [item.toolId, item]));
@@ -167,7 +206,10 @@ export function StepColumn({
           // A call still streaming has no inputs yet: its line waits for them rather than guess.
           const settled = group.calls.filter((c) => c.status !== 'executing');
           const detail = settled.length > 0 ? groupDetail({ ...group, calls: settled }, groups.slice(0, at)) : null;
-          const items = group.calls.map((c) => evidenceByTool.get(c.id)).filter((x): x is EvidenceItem => !!x);
+          const items = group.calls
+            .map((c) => evidenceByTool.get(c.id))
+            .filter((x): x is EvidenceItem => !!x && !inRows.has(x.toolId));
+          const rows = surveyRows(group);
           // The filmstrips under a cue step: every cued site while working and in the full list; in
           // the end frame the site the agent followed with its frames, the others as their summary line.
           const allFilms = group.name === 'check_recent_passes'
@@ -282,6 +324,12 @@ export function StepColumn({
               {onOpenEvidence && items.map((item) => (
                 <div key={item.toolId} style={{ gridColumn: '1 / -1' }}>
                   <EvidenceChip item={item} onOpen={onOpenEvidence} />
+                </div>
+              ))}
+              {/* The archaeologist's survey: a row per site it judged, under the step that judged it. */}
+              {rows.map(({ record, item }) => (
+                <div key={record.toolUseId} style={{ gridColumn: '1 / -1' }}>
+                  <SurveyRow record={record} evidence={item} onOpenEvidence={onOpenEvidence} />
                 </div>
               ))}
               {/* The archaeologist's cross-section lands under the step that measured it. */}

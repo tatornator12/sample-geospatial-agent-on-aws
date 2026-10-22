@@ -79,7 +79,7 @@ def test_prewarm_yields_warm_and_builds_nothing(entry):
 
 def test_no_tool_can_place_a_point_outside_the_catalogue(entry):
     names = [t.__name__ for t in entry.LOCAL_TOOLS]
-    assert names[:4] == ["find_known_site", "show_terrain", "measure_profile", "find_similar_sites"]
+    assert names[:5] == ["find_known_site", "show_terrain", "measure_profile", "find_similar_sites", "record_condition"]
     assert {"display_visual", "inspect_image", "get_rasters"} <= set(names)
     # display_visual is the agent's own, with the session-file check (act4 P0-2).
     assert next(t for t in entry.LOCAL_TOOLS if t.__name__ == "display_visual").__module__ == "display_tools"
@@ -126,9 +126,39 @@ def test_prompt_lets_the_agent_choose_the_line_and_show_only_the_files_it_was_gi
         assert f'"{code}"' in p
     # No bank on the line is a designed outcome (PRODUCT.md principle 2), in the tool's own words.
     assert site_tools.NO_BANK == "I cannot confirm a bank on this line." and site_tools.NO_BANK in p
-    # Workflow C opens on the top match's name, never on "The LiDAR" (act4 P1-5).
-    assert "FIRST LINE starts with the top match's name" in p and 'Never open with "The LiDAR"' in p
     assert "\u2014" not in p and "\u2013" not in p
+
+
+def test_prompt_makes_where_else_a_condition_survey():
+    # Decision 10 (Oct 22): the agent judges each similar site from its LiDAR, with the tool's enums;
+    # the answer opens on the survey's counts, never on "The LiDAR" (act4 P1-5).
+    import archaeo_config as c
+    import survey_tools as s
+    p = c.build_prompt("2026-10-22")
+    assert "CONDITION SURVEY" in p and "record_condition(site_id, verdict, because)" in p
+    for verdict, reasons in s.PAIRS.items():
+        assert f'"{verdict}"' in p and all(f'"{b}"' in p for b in reasons)
+    assert "cannot_confirm is a designed outcome" in p and "Look closely before you judge" in p
+    assert 'show_terrain(site_id, "lrm", extent="site")' in p
+    assert "never in the same\n     response as its inspect_image (a verdict made before the image arrives is refused)" in p
+    assert "Two of the three sites\n     like the Octagon still show in the ground; one I cannot confirm." in p
+    assert 'Never open with a site\'s name or "The LiDAR"' in p
+    assert "construction methods" in p and "known sites only" in p
+    assert "\u2014" not in p and "\u2013" not in p
+
+
+def test_every_turn_begins_the_surveys_turn(entry):
+    import site_tools
+    site_tools.begin_turn()
+    site_tools.current_turn()["matches"]["hopeton-earthworks"] = {"lidar": True}
+    before = site_tools.current_turn()["turn_id"]
+    _collect(entry.ai_archaeologist_agent({"prompt": "Where else did they build like this?"},
+                                          types.SimpleNamespace(session_id="s" * 33)))
+    assert site_tools.current_turn()["turn_id"] != before and site_tools.current_turn()["matches"] == {}
+    # A pre-warm is not a turn: it leaves the survey's state alone.
+    site_tools.current_turn()["matches"]["seip-earthworks"] = {"lidar": True}
+    _collect(entry.ai_archaeologist_agent({"prewarm": True}, types.SimpleNamespace(session_id="s" * 33)))
+    assert "seip-earthworks" in site_tools.current_turn()["matches"]
 
 
 _CASE = {

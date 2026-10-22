@@ -38,11 +38,17 @@ const GROUP_NAMES: Record<string, (n: number) => string> = {
   inspect_image: (n) => (n > 1 ? `Look at ${n} images` : 'Look at the image'),
   display_visual: (n) => (n > 1 ? `Put ${n} layers on the map` : 'Put it on the map'),
   reverse_geocode: (n) => (n > 1 ? `Name ${n} places` : 'Name the place'),
+  // The archaeologist's condition survey (calls of the agent's own, made after a look).
+  record_condition: (n) => (n > 1 ? `Judge ${n} sites` : 'Judge what still shows'),
 };
 
 /** What the room reads for a step group. */
 export function groupName(group: StepGroup): string {
-  const n = group.calls.length;
+  // A survey's verdicts count the sites judged: a refused verdict and its retry are one site.
+  const sites = group.name === 'record_condition'
+    ? new Set(group.calls.map((c) => c.params?.site_id).filter((s): s is string => typeof s === 'string')).size
+    : 0;
+  const n = sites || group.calls.length;
   const named = Object.prototype.hasOwnProperty.call(GROUP_NAMES, group.name) ? GROUP_NAMES[group.name] : undefined;
   if (named) return named(n);
   return n > 1 ? `${stepName(group.name)} ×${n}` : stepName(group.name);
@@ -335,6 +341,8 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
   }
   // The AI Archaeologist: the line it measured, its own bearing or the record's line.
   if (group.name === 'measure_profile') return measureLine(group);
+  // Its similar sites come from the record's words, not the LiDAR: the room reads that once, here.
+  if (group.name === 'find_similar_sites') return { text: "Matched on the public record's descriptions" };
   return null;
 }
 

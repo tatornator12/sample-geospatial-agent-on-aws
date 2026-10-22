@@ -20,6 +20,8 @@ interface EvidenceChipProps {
   item: EvidenceItem;
   /** Called with the resolved image URL when the presenter opens the chip. */
   onOpen: (item: EvidenceItem, imageUrl: string) => void;
+  /** The thumbnail alone, for a row that names the image itself (the archaeologist's survey rows). */
+  compact?: boolean;
 }
 
 /** Resolve to a loadable image URL, or null when the object is not there (yet). */
@@ -38,7 +40,7 @@ async function probe(candidates: string[]): Promise<string | null> {
   return null;
 }
 
-export function EvidenceChip({ item, onOpen }: EvidenceChipProps) {
+export function EvidenceChip({ item, onOpen, compact = false }: EvidenceChipProps) {
   const [state, setState] = useState<LoadState>('looking');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const startedAt = useRef(Date.now());
@@ -75,7 +77,7 @@ export function EvidenceChip({ item, onOpen }: EvidenceChipProps) {
     <>
       <button
         type="button"
-        className={`evidence-chip evidence-chip--${state}`}
+        className={`evidence-chip evidence-chip--${state}${compact ? ' evidence-chip--compact' : ''}`}
         onClick={open}
         disabled={state !== 'ready'}
         aria-label={
@@ -98,16 +100,18 @@ export function EvidenceChip({ item, onOpen }: EvidenceChipProps) {
                   <i />
                   <i />
                 </span>
+              ) : compact ? (
+                ''
               ) : (
                 'not saved'
               )}
             </span>
           )}
         </span>
-        <span className="evidence-chip__title">{item.title}</span>
+        {!compact && <span className="evidence-chip__title">{item.title}</span>}
       </button>
       {/* What the agent said it saw, in its words: beside the button, not part of its name. */}
-      {item.saw && (
+      {item.saw && !compact && (
         <p className="evidence-chip__saw">
           <span className="evidence-chip__saw-label">Saw:</span> {item.saw}
         </p>

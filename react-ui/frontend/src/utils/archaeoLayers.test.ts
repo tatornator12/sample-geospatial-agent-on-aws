@@ -149,6 +149,11 @@ describe('isTerrainLayer and the plate', () => {
     expect(siteWindowShare(`${S}lrm03_seip-earthworks.tif`)).toBe(FINE_RELIEF_WINDOW);
     expect(siteWindowShare(`${S}lrm_newark-great-circle.tif`)).toBe(0.4);
     expect(siteWindowShare(`${S}hillshade_newark-octagon.tif`)).toBe(0.4);
+    // The survey's close look is the frame's centre 1.2 km: the camera lands on the same ground.
+    expect(reliefSite(`${S}lrm03_high-bank-works_site.tif`)).toBe('high-bank-works');
+    expect(reliefSite(`${S}lrm_fort-hill_site.tif`)).toBe('fort-hill');
+    expect(siteWindowShare(`${S}lrm03_high-bank-works_site.tif`)).toBeCloseTo(FINE_RELIEF_WINDOW * 2.5);
+    expect(siteWindowShare(`${S}lrm_fort-hill_site.tif`)).toBe(1);
     // About 800 m of the 3 km frame.
     const [w, , e] = siteWindow([0, 0, 3, 3], FINE_RELIEF_WINDOW);
     expect(Math.round((e - w) * 1000)).toBe(810);

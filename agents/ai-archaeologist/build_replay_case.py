@@ -24,6 +24,7 @@ import json
 import re
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import boto3
@@ -31,7 +32,7 @@ import boto3
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
-from eval import extract_tool_calls, new_session_id, resolve_agent_arn, stream_invoke, tool_spans  # noqa: E402
+from eval import evaluate, extract_tool_calls, new_session_id, resolve_agent_arn, stream_invoke, tool_spans  # noqa: E402
 from replay_case import house_style, saw_by_tool, shown, styled_params, write_sid  # noqa: E402
 
 FILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(tif|tiff|geojson|json|png|jpg)$")
@@ -49,8 +50,10 @@ RESULTS = {
     "show_terrain": "1 m LiDAR terrain from the cache",
     "measure_profile": "Transect measured on the 1 m DEM",
     "find_similar_sites": "Sites of the same form ranked",
+    "record_condition": "Verdict recorded",
     "reverse_geocode": "Place named",
 }
+TOOL_USE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 CASES = {
     "octagon": {
@@ -64,6 +67,18 @@ CASES = {
         # hillshade this long so the room sees the scene from space alone first (stage review D10).
         "hold_terrain_ms": 8000,
     },
+    "survey": {
+        "id": "archaeologist-survey",
+        # The stage's "Where else, like this" plate after "The Octagon, from space" (decision 10): the
+        # setup turn runs first in the same session and is not recorded; the take must pass the
+        # golden like-this case, so the replay is a passing dev session.
+        "setup": "Show me the Newark Octagon the way an archaeologist sees it",
+        "prompt": "Where else did they build like this?",
+        "golden": "like-this",
+        "name": "Sites like the Octagon, surveyed",
+        "description": "The agent looks at the 1 m LiDAR of the recorded sites that share the Octagon's form and judges whether each still shows in the ground",
+        "location": "Ohio",
+    },
     "great-circle": {
         "id": "archaeologist-great-circle",
         # The stage's "Measure the Great Circle" plate, word for word (stage review D10: not "how was it built?").
@@ -73,6 +88,20 @@ CASES = {
         "location": "Newark, Ohio",
     },
 }
+
+
+def golden_case(name: str) -> dict:
+    """A case from this agent's golden prompts, by name."""
+    cases = json.loads((HERE / "golden_prompts.json").read_text())["prompts"]
+    return next(c for c in cases if c["name"] == name)
+
+
+def survey_name(tool: dict) -> str | None:
+    """The file a record_condition call wrote when its verdict was accepted (survey_tools.survey_key)."""
+    tid = tool.get("toolUseId")
+    if tool.get("name") != "record_condition" or not isinstance(tid, str) or not TOOL_USE_ID_RE.fullmatch(tid):
+        return None
+    return f"survey_{tid}.json"
 
 
 def tool_input(tool: dict) -> dict:
@@ -115,7 +144,16 @@ def main() -> int:
     client = boto3.client("bedrock-agentcore", region_name=args.region)
     print(f"Recording {case_id} on {arn.rsplit('/', 1)[1]} (session {sid[:13]}…)")
     write_sid(args.sid_file, sid)
+    if preset.get("setup") and not args.prompt:
+        print(f"  setup turn (not recorded): {preset['setup']}")
+        stream_invoke(client, arn, preset["setup"], 900, sid)
+    started = time.monotonic()
     text, _ = stream_invoke(client, arn, prompt, 900, sid)
+    elapsed = time.monotonic() - started
+    if preset.get("golden") and not args.prompt:
+        problems, _ = evaluate(golden_case(preset["golden"]), text, elapsed)
+        if problems:
+            raise SystemExit(f"the take fails the golden {preset['golden']} case ({'; '.join(problems)}); record it again")
     if args.stream_file:
         Path(args.stream_file).write_text(text)
     tools = extract_tool_calls(text)
@@ -181,6 +219,15 @@ def main() -> int:
                         break
     if not bucket:
         raise SystemExit("the run put nothing on the map; not a usable replay case")
+    # The survey's verdicts: one file per accepted record_condition, named by its call's id (a refused
+    # call wrote none). The stage reads them beside the case's layers, under the same names.
+    surveyed = 0
+    for t in tools:
+        name = survey_name(t)
+        if name and fetch(bucket, f"{session_prefix}archaeology/{name}", name):
+            surveyed += 1
+    if preset.get("golden") == "like-this" and surveyed < 2:
+        raise SystemExit(f"the take recorded {surveyed} verdict(s); the survey needs two or more")
 
     def rewrite(url: str) -> str | None:
         m = url_re.match(url)
@@ -203,6 +250,9 @@ def main() -> int:
             if not new:
                 params["render"].pop("dem", None)
         call = {"name": t["name"], "params": params, "result": RESULTS.get(t["name"], "Done")}
+        # The call keeps its own id (the stage finds a verdict's file by it; ChatSidebar RECORDED_ID).
+        if isinstance(t.get("toolUseId"), str) and TOOL_USE_ID_RE.fullmatch(t["toolUseId"]):
+            call = {"id": t["toolUseId"], **call}
         if t["name"] == "inspect_image" and saw.get(t.get("toolUseId")):
             call["saw"] = saw[t["toolUseId"]]  # what the agent said it saw (the chip's Saw line)
         tool_calls.append(call)

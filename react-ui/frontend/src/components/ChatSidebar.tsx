@@ -17,6 +17,7 @@ import { EvidencePlate } from './EvidencePlate.tsx';
 import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
 import { groupSteps, methaneDirFrom, parseTip, tipManifestUrl, type Tip } from '../utils/steps.ts';
+import { archaeologyDirFrom } from '../utils/survey.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { useReplayReveal } from '../hooks/useReplayReveal.ts';
 import { currentBriefId, groundChecks } from '../utils/brief.ts';
@@ -702,6 +703,9 @@ export function ChatSidebar({
   // Where this session's methane files live (the pass filmstrip reads its manifest there): from
   // any s3_url a tool was given in this session, this turn first.
   const methaneDir = methaneDirFrom([...stepTools, ...messages.flatMap((m) => m.tools ?? [])], sessionId);
+  // The archaeologist's survey files (one per accepted verdict), the same way: this session's
+  // archaeology/ folder off its terrain/ folder, or a replay case's folder.
+  const archaeologyDir = archaeologyDirFrom([...stepTools, ...messages.flatMap((m) => m.tools ?? [])], sessionId);
   // The draft brief on the stage, if the latest answer drafted one (or the decision on it is pending).
   const briefId = currentBriefId(messages);
   // The TROPOMI tips: one manifest per scanned area, read as the scans finish. The step column lists
@@ -878,6 +882,7 @@ export function ChatSidebar({
                   showSaw={showSaw}
                   onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
                   methaneDir={methaneDir}
+                  archaeologyDir={archaeologyDir}
                   profiles={profiles}
                 />
               )}
@@ -889,6 +894,7 @@ export function ChatSidebar({
                   evidence={evidence}
                   onOpenEvidence={(item, imageUrl) => setOpenEvidence({ item, imageUrl })}
                   methaneDir={methaneDir}
+                  archaeologyDir={archaeologyDir}
                   tips={tips}
                   compact={showBrief && draftedBrief}
                   profiles={profiles}

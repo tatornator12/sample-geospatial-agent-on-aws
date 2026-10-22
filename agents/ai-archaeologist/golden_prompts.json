@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py --agent archaeologist. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear anywhere in the stream (the agent's words and its tool inputs). reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. The terrain is pre-built (scripts/build_site_catalogue.py); nothing here reads 3DEP live. The act beats come first (great-circle-measure and octagon-wall-measure are the stage's two measure plates, word for word: the Great Circle on the record's verified line with no bearing, the Octagon on a bearing the agent picks after inspecting the local relief, so inspect_image comes before measure_profile; 'I cannot confirm a bank on this line.' is a pass), then the provocations that must decline with the fixed sentences and call no search.",
+  "_comment": "Golden prompts for scripts/eval.py --agent archaeologist. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear anywhere in the stream (the agent's words and its tool inputs). reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. The terrain is pre-built (scripts/build_site_catalogue.py); nothing here reads 3DEP live. The act's beats come first, word for word the stage's plates: octagon-from-space, then like-this (the condition survey, decision 10, Oct 22: after the Octagon, the agent judges from their LiDAR whether its top matches still show the form; at least two verdicts the tool accepted (min_accepted, counted from the transcript), each after a look; Seip Earthworks, where only the rebuilt mound stands, is never 'visible'; the answer opens on the survey's counts), then great-circle-measure (the asked-only spare, on the record's verified line). Then the provocations that must decline with the fixed sentences and call no search.",
   "prompts": [
     {
       "name": "octagon-from-space",
@@ -30,12 +30,39 @@
       ]
     },
     {
-      "name": "octagon-wall-measure",
-      "prompt": "Measure across a wall of the Newark Octagon, on a line you choose from the local relief.",
+      "name": "like-this",
+      "setup_prompt": "Show me the Newark Octagon the way an archaeologist sees it",
+      "prompt": "Where else did they build like this?",
       "expected_tools": [
-        "find_known_site",
+        "find_similar_sites",
         "show_terrain",
         "inspect_image",
+        "record_condition"
+      ],
+      "expected_inputs": [
+        {
+          "name": "record_condition"
+        },
+        {
+          "name": "record_condition"
+        }
+      ],
+      "forbidden_inputs": [
+        {
+          "name": "record_condition",
+          "match": {
+            "site_id": "seip-earthworks",
+            "verdict": "visible"
+          }
+        }
+      ],
+      "min_accepted": {
+        "record_condition": 2
+      },
+      "forbidden_tools": [
+        "find_similar_places",
+        "scan_region_change",
+        "create_bbox_from_coordinates",
         "measure_profile"
       ],
       "forbidden_text": [
@@ -45,15 +72,14 @@
         "uncovered",
         "new site"
       ],
+      "report_first_line_regex": "^(All|Both|None|One|Two|Three)\\b[^\\n]*\\bsites? like the (Newark )?Octagon\\b",
       "warn_text": [
-        "\u2014"
+        "—"
       ],
       "closer_max_chars": 280,
       "closer_forbidden": [
         "°N",
-        "°W",
-        "40.05",
-        "-82.4"
+        "°W"
       ]
     },
     {
@@ -83,36 +109,6 @@
         "°W",
         "40.04",
         "-82.43"
-      ]
-    },
-    {
-      "name": "like-this",
-      "setup_prompt": "Show me the Great Circle Earthworks in LiDAR",
-      "prompt": "Where else did they build like this?",
-      "expected_tools": [
-        "find_similar_sites",
-        "show_terrain",
-        "inspect_image"
-      ],
-      "forbidden_tools": [
-        "find_similar_places",
-        "scan_region_change",
-        "create_bbox_from_coordinates"
-      ],
-      "forbidden_text": [
-        "Error:",
-        "discovered",
-        "discovery",
-        "uncovered",
-        "new site"
-      ],
-      "warn_text": [
-        "—"
-      ],
-      "closer_max_chars": 280,
-      "closer_forbidden": [
-        "°N",
-        "°W"
       ]
     },
     {
