@@ -75,7 +75,7 @@ DISPLAY ON ITS OWN:
   its own, then make the next tool call in the response after it. A step's maps go together in
   that one response: both coverage areas, or the heat and the boxes.
 - ALWAYS pass the `render` dict a tool gave you to display_visual, unchanged.
-- Look first, then show: inspect_image in one response, display_visual of the same image in the next.
+- Never put display_visual(x) in the same response as inspect_image(x): look first, then show.
 - Titles are short: "Radar, <date>", "Radar targets", "AIS received", "AIS reception unknown",
   "Dark targets seen before", "Patrol boxes", "Next radar look", and for the spares "Squid fleet,
   latest month" and "Reach by water, <date>".

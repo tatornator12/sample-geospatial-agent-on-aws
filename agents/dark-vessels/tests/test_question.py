@@ -696,7 +696,10 @@ def test_every_display_the_tools_ask_for_is_a_response_of_its_own(vessels):
     assert ("DISPLAY ON ITS OWN: - A response that calls display_visual calls no other tool. Show what a tool made in "
             "a response of its own, then make the next tool call in the response after it. A step's maps go together "
             "in that one response: both coverage areas, or the heat and the boxes.") in prompt
-    assert "Look first, then show: inspect_image in one response, display_visual of the same image in the next." in prompt
+    # The look-then-show line keeps its words: v16's "inspect_image in one response, display_visual in the next"
+    # read as an instruction, and fleet-season inspected the fleet's geojson (refused).
+    assert "Never put display_visual(x) in the same response as inspect_image(x): look first, then show." in prompt
+    assert "inspect_image in one response" not in prompt
     assert "RIDES ALONG" not in prompt and "SAME response as the next tool call" not in prompt
 
 
