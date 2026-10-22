@@ -353,10 +353,13 @@ The agent answers it in one turn, choosing the pass, what follows a thin or empt
 
 "After the click" is measured on dev: gate B's headless live runs (Oct 21, three at 1920 x 1080
 and one at 1280 x 720, v1 data, `.agents/tasks/act3-open-question/gate-b.md` section 6). Task 9's
-fix W1 came after them: the boxes beat now holds 3 s before the next look, so the look, the answer
-and the plate land about 2.5 s later than gate B measured. The act minutes in the first column are
-a plan, not yet timed: the presenter's timed rehearsal x2 on dev (task 7.1, Act 3 under 8:30
-twice) is manual and has not been run.
+fix W1 came after them: the boxes beat now holds 3 s before the next look (3.00 s measured, against
+0.50 to 0.52 s at gate B), so only the next look's swath and countdown land about 2.5 s later than
+gate B measured. W1 does not hold the answer or the plate: in task 9's two runs with W1 the turn
+ended 4.6 and 5.5 s after the look and the plate opened 5.2 and 6.0 s after it, against 6.4 to 7.7 s
+and 6.4 to 8.1 s at gate B (`t9-verification.md` section 2, `evals/t9-browser-r2.json`). The act
+minutes in the first column are a plan, not yet timed: the presenter's timed rehearsal x2 on dev
+(task 7.1, Act 3 under 8:30 twice) is manual and has not been run.
 
 | t | After the click (s, measured) | Beat | Presenter | What the room sees |
 |---|---|---|---|---|
@@ -371,8 +374,8 @@ twice) is manual and has not been run.
 | 1:01 | 28.5 to 35.4 | Evidence | | One evidence chip |
 | 1:06 | 33.1 to 39.9 | Where to look | Read the figure beside its layer | The heat; clock "Where to look on the next pass" with the top 5% figure |
 | 1:11 | 37.8 to 44.5 | The boxes | | 5 s after the heat, the three patrol boxes with the boxes' own figure, held 3 s |
-| 1:14 | 37.2 to 44.0 (line), 38.2 to 45.0 (look, before W1) | The box | | "Decided: Drafting box 1: it held the most past dark targets, 9%."; the swath over the box with its countdown, or "no look planned yet" |
-| 1:20 | 45.9 to 52.0 (before W1) | The draft | Let the answer land | The answer, its first line in view: "4 candidates on the Oct 12 pass; I drafted box 1 for the next look."; the tasking plate opens on the agent's box |
+| 1:14 | 37.2 to 44.0 (line), 38.2 to 45.0 (look at gate B; about 2.5 s later since W1) | The box | | "Decided: Drafting box 1: it held the most past dark targets, 9%."; the swath over the box with its countdown, or "no look planned yet" |
+| 1:20 | 45.9 to 52.0 | The draft | Let the answer land | The answer, its first line in view: "4 candidates on the Oct 12 pass; I drafted box 1 for the next look."; the tasking plate opens on the agent's box |
 | 1:25 to 4:30 | | The officer's decision | Change the box or leave out a candidate, then Approve the tasking | The plate's filed line, "Filed by the officer at … UTC. The agent did not file it.", once, on the plate; no follow-up turn |
 | 4:30 | | Slack, the close | Turn to the second screen | The tasking's Slack post, "From the pass": "AIS was received over {heard}% of the reserve; this pass could check {checkable}%." with the targets and candidates counts |
 
@@ -387,8 +390,9 @@ approve.
 
 **The other asked-only spares:** "Has a vessel gone silent near here?" (task 15 moved it to Case 8:
 an earlier pass, Apr 1 2026, the AIS off 6.6 h before it, 73 km by water at 6 kn, two dark targets
-in reach; 23.5 s on dev, against 19.9 to 22.2 s on Mar 6 2024) and "When is the squid fleet near
-the Galápagos?" (6.8 to 10.4 s).
+in reach; 23.5 s on dev, against 19.9 to 31.3 s over the four passing runs on Mar 6 2024 from gate
+A to task 9a) and "When is the squid fleet near the Galápagos?" (6.8 to 11.2 s over the five runs
+from gate A to task 9a).
 
 **Stage rules for the act:**
 - No New session in Act 3; refresh instead, until Bug 5A's fix is on `develop`. Status Oct 21: the

@@ -417,8 +417,11 @@ the "Measured on dev" column is what gate B's round 3 headless live runs saw (Oc
 runtime `dark_vessels_dev` v11, v1 data, three runs at 1920 × 1080 and one at 1280 × 720, every
 run on the clean path; `.agents/tasks/act3-open-question/gate-b.md` §6), as the lowest to the
 highest of the four. Task 9's W1 fix (`5f97d30`) came after them: the boxes beat holds 3 s before
-the next look (3.00 s measured at both sizes, `t9-verification.md` §2, against 0.5 s at gate B),
-so the look, the answer and the plate now land about 2.5 s later than this column.
+the next look (3.00 s measured at both sizes, `t9-verification.md` §2, against 0.50 to 0.52 s at
+gate B), so only the next look's swath and countdown now land about 2.5 s later than this column.
+W1 does not hold the answer or the plate: in task 9's two runs with W1 the turn ended 4.6 and 5.5 s
+after the look and the plate opened 5.2 and 6.0 s after it, against 6.4 to 7.7 s and 6.4 to 8.1 s
+at gate B.
 
 | t (planned) | Measured on dev (s) | What the room sees | Source |
 |---|---|---|---|
@@ -431,8 +434,8 @@ so the look, the answer and the plate now land about 2.5 s later than this colum
 | 30 | 28.5 to 35.4 | One evidence chip | `gather_evidence`, `inspect_image` |
 | 39 | 33.1 to 39.9 | The heat. Clock: "Where to look on the next pass", with the top 5% figure | `predict_hotspots(pass_id)` |
 | 44 | 37.8 to 44.5 | The boxes (5 s after the heat). Clock: "Three patrol boxes", with the boxes' own figure | the same call |
-| 45 | line 37.2 to 44.0; look 38.2 to 45.0 (before W1) | Swath over the chosen box with its countdown, or "no look planned yet". Line, for example "Decided: Drafting box <k>: its radar look comes first, <look>." | `decide(draft)`, `next_look` |
-| 50 to 60 | answer 45.9 to 52.0; plate 46.3 to 52.3 (before W1) | The plate opens on the agent's box, and the answer lands, its first line in view | `draft_tasking` |
+| 45 | line 37.2 to 44.0; look 38.2 to 45.0 (gate B; about 2.5 s later since W1) | Swath over the chosen box with its countdown, or "no look planned yet". Line, for example "Decided: Drafting box <k>: its radar look comes first, <look>." | `decide(draft)`, `next_look` |
+| 50 to 60 | answer 45.9 to 52.0; plate 46.3 to 52.3 | The plate opens on the agent's box, and the answer lands, its first line in view | `draft_tasking` |
 | then | | The officer changes the box or the candidates and approves; the plate shows its filed line | the officer |
 
 Measured against the plan: the board came early, the read line up to 1.3 s late (N2's 10 s
@@ -1330,15 +1333,16 @@ costs one more round trip, about 2 to 3 s. Gate A measures this.
 | Evidence | `gather_evidence`, one chip | 6 s | 3.8 to 4.9 s |
 | Forecast | `predict_hotspots(pass_id)`, two displays | 9 s | 8.6 to 11.3 s, the chip to the boxes beat, with the heat's 5 s hold |
 | Box and look | `decide`, `next_look`, display | 6 s | the draft line lands during the heat hold, 8.1 to 10.8 s after the chip; the look 0.5 s after the boxes beat at gate B, 3.0 s since W1 (task 9) |
-| Draft and answer | `draft_tasking`, about 110 words | 13 s | 6.4 to 7.7 s, the look to the answer |
-| **Clean path** | | **about 60 s** | **45.9 to 52.0 s on stage (gate B, before W1); turns of 43.8 to 81.1 s in the eval, median 51.3 s over 12 runs** |
+| Draft and answer | `draft_tasking`, about 110 words | 13 s | 6.4 to 7.7 s, the look to the answer at gate B; 4.6 and 5.5 s since W1, which holds only the look (task 9) |
+| **Clean path** | | **about 60 s** | **45.9 to 52.0 s on stage (gate B); turns of 43.8 to 81.1 s in the eval, median 51.3 s over 12 runs** |
 | Set-aside path | plus a decision, a look, detect and coverage | about 77 s | 67.9 to 101.8 s over five `thin-pass` runs with a draft (gate A 101.8, 82.5 and 81.2 s; task 9a 67.9 s; task 9 94.7 s) |
 | `stop` ending | the set-aside path to the forecast, then `decide(stop)` and a short answer | about 75 s | 46.1 s, once (gate B, one refusal) |
 | Worst inside the budget | two passes read, a refusal and a second chip | about 95 s | the slowest run recorded is 101.8 s (`thin-pass`, gate A attempt 1, before its fixes); since the fixes, 94.7 s (task 9) |
 
 The "Measured on dev" column (Oct 21) has two sources. The segment rows are stage seconds from gate
 B's round 3 headless live runs: three at 1920 and one at 1280, all on the clean path, before task
-9's W1 hold (`.agents/tasks/act3-open-question/gate-b.md` §6). The path rows are the eval's turn
+9's W1 hold (`.agents/tasks/act3-open-question/gate-b.md` §6), except the task 9 figures named in
+their rows (`t9-verification.md` §2, `evals/t9-browser-r2.json`). The path rows are the eval's turn
 seconds: gate A (`gate-a.md`, runtime v8 to v10, v1 data), gate B (`gate-b.md`, v11, v1) and task
 9a (`t9a.md`, v12, v1r), plus task 9's `thin-pass` (`t9-verification.md` §4, v13, v1r). Each of
 the 12 `open-question` runs read one pass and drafted, with 0 refusals. The ASSUMPTION above is
