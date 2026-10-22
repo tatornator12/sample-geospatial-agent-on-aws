@@ -435,8 +435,8 @@ so the look, the answer and the plate now land about 2.5 s later than this colum
 | 50 to 60 | answer 45.9 to 52.0; plate 46.3 to 52.3 (before W1) | The plate opens on the agent's box, and the answer lands, its first line in view | `draft_tasking` |
 | then | | The officer changes the box or the candidates and approves; the plate shows its filed line | the officer |
 
-Measured against the plan: the board came early, the read line up to about 1 s late (N2's 10 s
-holds), the radar 3 to 9 s late, and the turn ended inside or ahead of the 50 to 60 s plan.
+Measured against the plan: the board came early, the read line up to 1.3 s late (N2's 10 s
+holds), the radar 3.2 to 9.2 s late, and the turn ended inside or ahead of the 50 to 60 s plan.
 
 **Thin path.** If the first pass is too thin to check:
 - Its coverage stays drawn, with "Checked: This pass can check only 9% of the reserve, under the

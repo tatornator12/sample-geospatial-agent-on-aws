@@ -280,6 +280,13 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
     and uploaded as 26 new keys under `vessels/cache/v1/`; its record in the v1 and v1r manifests
     after backups to `backup-2026-10-22`; the Mar 27 S1A plan cached; agent pytest 255 passed;
     smoke 1/1 (22 s); `gone-silent` 1/1 in 23.5 s with "2026" (`evals/t15-*`; redesign §4)
+  - Finding from task 15, nothing changed for it: v1r's history (task 9a's `--history` rebuild,
+    Oct 21) has 0 hours, 0 km and 0 knots on all 5,748 AIS-off rows; v1's (Oct 16) has hours and
+    km on all 5,664 and knots on 5,542. The likely cause, not checked against GFW's API: its gaps
+    events no longer fill the fields `build_history` reads (`durationHours`, `distanceKm`,
+    `impliedSpeedKnots`, read with a default of 0). On v1r `reachable_area` therefore
+    returns `hours_after_off` 0.0. The Nov 5 runbook's `--history` (task 13) would write the same
+    into v1, so the build needs a fix and a test before then
   - Task 10, docs: the run sheet (`design.md`), the redesign's §3.2 and §3.9 with the seconds
     measured above, and DESIGN.md's Act 3 paragraph. The presenter's timed rehearsal x2 on dev
     (7.1, Act 3 under 8:30 twice) is manual and was not done in this run
