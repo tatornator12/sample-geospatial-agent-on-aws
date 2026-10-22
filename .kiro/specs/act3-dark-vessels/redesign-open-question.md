@@ -232,6 +232,10 @@ evidence order: pass, detect, coverage, match, then words.
   - The fallback also carries the stage fixes. Once `stage-fixes-1` merges into `develop`, the
     branch is rebased onto `develop` (`MapView.tsx` keeping both sides), the frontend gates and the
     four-turn eval on dev are rerun, and `act3-four-turn-fallback` moves to that rebased commit.
+  - The show order puts Act 3 last, as the closer (U15 as amended Oct 21). Under the fallback,
+    Methane Watch closes the show instead (the user's call, Oct 21, via the orchestrator).
+  - Status Oct 21: both gates passed, so no gate triggers the fallback. The tag is on `11da083`
+    (`11da08319909c843792c13d0c8e07e90679de397`), moved there by gate B's rebase.
 - R9.2 IF any of three eval runs on the Nov 5 data ends without a draft or takes over 120 s, THEN
   the backups SHALL be restored and the act SHALL be presented on the pre-rerun data.
 
@@ -408,31 +412,44 @@ patrol look next, and why?", is shorter but hides the first half of the work. Th
 not used: in a reserve that bans industrial fishing, it presumes an activity the evidence cannot
 show.
 
-**Beats.** Times are agent seconds after the click (§3.9).
+**Beats.** Times are agent seconds after the click (§3.9). The "t (planned)" column is the plan;
+the "Measured on dev" column is what gate B's round 3 headless live runs saw (Oct 21, `3415058`,
+runtime `dark_vessels_dev` v11, v1 data, three runs at 1920 × 1080 and one at 1280 × 720, every
+run on the clean path; `.agents/tasks/act3-open-question/gate-b.md` §6), as the lowest to the
+highest of the four. Task 9's W1 fix (`5f97d30`) came after them: the boxes beat holds 3 s before
+the next look (3.00 s measured at both sizes, `t9-verification.md` §2, against 0.5 s at gate B),
+so the look, the answer and the plate now land about 2.5 s later than this column.
 
-| t | What the room sees | Source |
-|---|---|---|
-| 0 | Sea at night. The AIS replay runs on: "while the agent chooses a radar pass" | rest, `forward` beat |
-| 4 to 8 | Column: "Weigh the passes on file", then the board. Decision line, for example "Reading <date>: the newest pass that saw over half the reserve (53%)." | `list_passes`, `decide(read_pass)` |
-| 10 | The radar sweeps in, with one sentence on what the agent sees and a radar chip | `find_pass`, `inspect_image` |
-| 15 | Grey rings; the broadcasts claim theirs | `detect_vessels` |
-| 19 | The received wash (inside the radar) and the reception-unknown hatch. Clock: "This pass can check 19% of the reserve". Line: "Checked: This pass can check 19% of the reserve, over the 15% standard." | `check_ais_coverage` |
-| 24 | Candidates turn orchid. Then the line "Checked: 4 candidates where AIS was received, seen by both detectors." | `match_ais`, then the map's reveal |
-| 30 | One evidence chip | `gather_evidence`, `inspect_image` |
-| 39 | The heat. Clock: "Where to look on the next pass", with the top 5% figure | `predict_hotspots(pass_id)` |
-| 44 | The boxes (5 s after the heat). Clock: "Three patrol boxes", with the boxes' own figure | the same call |
-| 45 | Swath over the chosen box with its countdown, or "no look planned yet". Line, for example "Decided: Drafting box <k>: its radar look comes first, <look>." | `decide(draft)`, `next_look` |
-| 50 to 60 | The plate opens on the agent's box, and the answer lands, its first line in view | `draft_tasking` |
-| then | The officer changes the box or the candidates and approves; the plate shows its filed line | the officer |
+| t (planned) | Measured on dev (s) | What the room sees | Source |
+|---|---|---|---|
+| 0 | 0 | Sea at night. The AIS replay runs on: "while the agent chooses a radar pass" | rest, `forward` beat |
+| 4 to 8 | board 3.0 to 3.6; line 8.2 to 9.3 | Column: "Weigh the passes on file", then the board. Decision line, for example "Reading <date>: the newest pass that saw over half the reserve (53%)." | `list_passes`, `decide(read_pass)` |
+| 10 | 13.2 to 19.2 | The radar sweeps in, with one sentence on what the agent sees and a radar chip | `find_pass`, `inspect_image` |
+| 15 | 16.1 to 22.0 | Grey rings; the broadcasts claim theirs | `detect_vessels` |
+| 19 | 19.2 to 25.1 | The received wash (inside the radar) and the reception-unknown hatch. Clock: "This pass can check 19% of the reserve". Line: "Checked: This pass can check 19% of the reserve, over the 15% standard." | `check_ais_coverage` |
+| 24 | 24.1 to 31.5 | Candidates turn orchid. Then the line "Checked: 4 candidates where AIS was received, seen by both detectors." | `match_ais`, then the map's reveal |
+| 30 | 28.5 to 35.4 | One evidence chip | `gather_evidence`, `inspect_image` |
+| 39 | 33.1 to 39.9 | The heat. Clock: "Where to look on the next pass", with the top 5% figure | `predict_hotspots(pass_id)` |
+| 44 | 37.8 to 44.5 | The boxes (5 s after the heat). Clock: "Three patrol boxes", with the boxes' own figure | the same call |
+| 45 | line 37.2 to 44.0; look 38.2 to 45.0 (before W1) | Swath over the chosen box with its countdown, or "no look planned yet". Line, for example "Decided: Drafting box <k>: its radar look comes first, <look>." | `decide(draft)`, `next_look` |
+| 50 to 60 | answer 45.9 to 52.0; plate 46.3 to 52.3 (before W1) | The plate opens on the agent's box, and the answer lands, its first line in view | `draft_tasking` |
+| then | | The officer changes the box or the candidates and approves; the plate shows its filed line | the officer |
+
+Measured against the plan: the board came early, the read line up to about 1 s late (N2's 10 s
+holds), the radar 3 to 9 s late, and the turn ended inside or ahead of the 50 to 60 s plan.
 
 **Thin path.** If the first pass is too thin to check:
 - Its coverage stays drawn, with "Checked: This pass can check only 9% of the reserve, under the
   15% standard."
 - Then "Decided: Set <date> aside: it can check only 9% of the reserve. Reading <date>."
 - A second radar sweeps in, and the date reset hides the first pass's layers (`MapView.tsx`
-  `showPass`). This adds about 17 s.
+  `showPass`). This adds about 17 s. Measured on dev (the eval's turn seconds, `thin-pass` with a
+  draft after a second pass): 81.2 s at gate A and 67.9 s in task 9a, against the clean path's
+  repeat medians of 54.5 s (gate A) and 49.1 s (task 9a), so about 19 to 27 s more; task 9 measured
+  94.7 s for the same path.
 
-If the agent goes to the forecast instead, the question ends on the `stop` line with no draft.
+If the agent goes to the forecast instead, the question ends on the `stop` line with no draft
+(measured once on dev: 46.1 s at gate B, with one refusal).
 
 **No candidates on a checked pass.** If every pass it reads is checked and empty, the agent drafts
 a box with no candidates on the way ("No candidates on the <date> pass; I drafted box <k> for the
@@ -440,6 +457,10 @@ next look."). `near_candidates` is refused, since no box has any.
 
 The question takes about 1 minute of agent time, plus about 2 minutes for the officer's choice and
 narration. That frees about 3 of the act's 8 minutes, which the spare question (U7) can use.
+Measured on dev: the clean path's turn took 43.8 to 81.1 s over the 12 `open-question` runs of
+gate A, gate B and task 9a (median 51.3 s; the three repeat runs' medians 54.5, 47.2 and 49.1 s).
+The officer's minutes and the narration are not measured yet: the presenter's timed rehearsal x2
+(task 10) is manual.
 
 ### 3.3 Decision points: what is genuinely open
 
@@ -1300,20 +1321,29 @@ The baseline is the stage review's live timings: turn A 33.1 s, turn C 21.4 s an
 response as the call it announces, as `display_visual` does today. If it does not, each decision
 costs one more round trip, about 2 to 3 s. Gate A measures this.
 
-| Segment | Calls (`decide` rides along) | Budget |
-|---|---|---|
-| Choose | `list_passes`, `decide`, `find_pass` | 6 s |
-| Look and detect | `inspect_image`, `display_visual`, `detect_vessels` | 9 s |
-| Coverage | `check_ais_coverage`, two displays | 4 s |
-| Match | `match_ais`, display, the reveal | 5 s |
-| Evidence | `gather_evidence`, one chip | 6 s |
-| Forecast | `predict_hotspots(pass_id)`, two displays | 9 s |
-| Box and look | `decide`, `next_look`, display | 6 s |
-| Draft and answer | `draft_tasking`, about 110 words | 13 s |
-| **Clean path** | | **about 60 s** |
-| Set-aside path | plus a decision, a look, detect and coverage | about 77 s |
-| `stop` ending | the set-aside path to the forecast, then `decide(stop)` and a short answer | about 75 s |
-| Worst inside the budget | two passes read, a refusal and a second chip | about 95 s |
+| Segment | Calls (`decide` rides along) | Budget | Measured on dev |
+|---|---|---|---|
+| Choose | `list_passes`, `decide`, `find_pass` | 6 s | 8.2 to 9.3 s, the click to the read line |
+| Look and detect | `inspect_image`, `display_visual`, `detect_vessels` | 9 s | 7.9 to 13.4 s, the read line to the rings |
+| Coverage | `check_ais_coverage`, two displays | 4 s | 3.1 to 3.9 s |
+| Match | `match_ais`, display, the reveal | 5 s | 4.9 to 7.4 s, with the reveal's 1.4 s wait |
+| Evidence | `gather_evidence`, one chip | 6 s | 3.8 to 4.9 s |
+| Forecast | `predict_hotspots(pass_id)`, two displays | 9 s | 8.6 to 11.3 s, the chip to the boxes beat, with the heat's 5 s hold |
+| Box and look | `decide`, `next_look`, display | 6 s | the draft line lands during the heat hold, 8.1 to 10.8 s after the chip; the look 0.5 s after the boxes beat at gate B, 3.0 s since W1 (task 9) |
+| Draft and answer | `draft_tasking`, about 110 words | 13 s | 6.4 to 7.7 s, the look to the answer |
+| **Clean path** | | **about 60 s** | **45.9 to 52.0 s on stage (gate B, before W1); turns of 43.8 to 81.1 s in the eval, median 51.3 s over 12 runs** |
+| Set-aside path | plus a decision, a look, detect and coverage | about 77 s | 67.9 to 101.8 s over five `thin-pass` runs with a draft (gate A 101.8, 82.5 and 81.2 s; task 9a 67.9 s; task 9 94.7 s) |
+| `stop` ending | the set-aside path to the forecast, then `decide(stop)` and a short answer | about 75 s | 46.1 s, once (gate B, one refusal) |
+| Worst inside the budget | two passes read, a refusal and a second chip | about 95 s | the slowest run recorded is 101.8 s (`thin-pass`, gate A attempt 1, before its fixes); since the fixes, 94.7 s (task 9) |
+
+The "Measured on dev" column (Oct 21) has two sources. The segment rows are stage seconds from gate
+B's round 3 headless live runs: three at 1920 and one at 1280, all on the clean path, before task
+9's W1 hold (`.agents/tasks/act3-open-question/gate-b.md` §6). The path rows are the eval's turn
+seconds: gate A (`gate-a.md`, runtime v8 to v10, v1 data), gate B (`gate-b.md`, v11, v1) and task
+9a (`t9a.md`, v12, v1r), plus task 9's `thin-pass` (`t9-verification.md` §4, v13, v1r). Each of
+the 12 `open-question` runs read one pass and drafted, with 0 refusals. The ASSUMPTION above is
+still not measured on its own: the segment times include each `decide`, and no run timed one
+apart from the call it announces.
 
 - Gate A fails if the median is over 90 s or the maximum over 120 s.
 - A refusal from the gate or from `decide` costs one round trip. The eval counts refusals per run.
@@ -1658,6 +1688,28 @@ If the redesign falls behind, cut in this order:
 
 Never cut `decide`, the gate, the lines, the coverage standard, task 9a or the copy fixes.
 
+**Task 15 outcome (Oct 21): done, not cut** (`412aa1a`). Its conditions held: gates A and B PASS,
+the task 9a and task 9 reviews approved, and the date before Oct 29. The writes were additive and
+backed up first, and dev's eval sees them:
+- the Case 8 pass `s1a-20260401t0026` (Sentinel-1A, Apr 1 2026 00:26 UTC, orbit 106, two frames)
+  built from Planetary Computer and GFW, uploaded as 26 new keys under `vessels/cache/v1/`, and
+  its record merged into v1's manifest;
+- the same record (pointing at the v1 objects, as v1r's seeded records do) added to v1r's
+  manifest, which dev reads;
+- both manifests, the history, the fleet and v1's rest file backed up first to new folders
+  `backup-2026-10-22` (the UTC day; the `backup-2026-10-21` folders were not touched);
+- ESA's S1A plan published Mar 27 cached as a new key,
+  `vessels/cache/plan/s1a_mp_user_20260327t172127_20260416t194000.kml` (`latest.json` untouched).
+  It holds the look over where the AIS went off: S1A Apr 1 00:26 UTC, orbit 106.
+
+The packaged `silent_vessel` entry moved to Case 8 (the AIS off 6.6 h before the pass, 73 km by
+water at 6 kn, two dark targets in reach at 9.4 and 72.1 km, back on 355.9 h later, 476.6 km away),
+the golden `gone-silent` year is "2026", and the Mar 6 2024 record stays in both manifests for the
+four-turn version, which reads the packaged list. `vs.passes()` never lists an earlier spare's
+record (role `silent_vessel`, another id), with a pytest. Agent pytest 255 passed; dev deployed
+(`dark_vessels_dev` version 14, v1r); `eval.py --only gone-silent` on dev passed, 1/1 in 23.5 s,
+"On an earlier pass, 1 April 2026 …", ending on the closer.
+
 ## 5. Decisions (approved Oct 21)
 
 The user approved all fifteen on Wed Oct 21. Each line gives the decision as approved; the options
@@ -1675,7 +1727,8 @@ it was chosen from are in revision 3 and the notes.
   still decides what follows a thin pass.
 - **U4. The automatic "Is it filed?" turn.** Dropped.
 - **U5. The silent-vessel beat.** Out of the run. It stays as an asked-only spare on Mar 6 2024.
-  Task 15 (moving it to Case 8, Apr 1 2026) is optional and cut first.
+  Task 15 (moving it to Case 8, Apr 1 2026) is optional and cut first. Task 15 was done on Oct 21
+  (§4, `412aa1a`): the spare is now Case 8; the four-turn fallback keeps Mar 6 2024.
 - **U6. The squid fleet.** Out of the run, as an asked-only spare.
 - **U7. A sceptic's spare plate.** Yes: a second plate, "Same question, end of August". The agent
   sets the thin Aug 30 pass aside live, and `decide` accepts "as asked" only because those words

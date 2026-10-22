@@ -335,25 +335,83 @@ AWS is ESA's plan, one host, bounded, cached.
 - Live (recorded in tasks.md): the build's seconds and bytes per pass; each beat's time on dev; the
   eval; the replay's network log.
 
-## Act 3 run sheet (8 min)
+## Act 3 run sheet (8 min, the show's closer)
 
-| t | Beat | Prompt / action | What the room sees |
-|---|---|---|---|
-| 0:00 | Switch | Dark Vessels (pre-warmed) | The sea from below at night, the AIS replay in motion, the reserve and its ports |
-| 0:20 | The pass | "Who is in the reserve unseen?" | The AIS stops at the pass's minute; the radar sweeps in along its track; chip; one sentence |
-| 1:00 | The claim | (same turn) | Targets light up; broadcasting vessels claim theirs; the port boats set aside; the rest stay grey |
-| 1:40 | Coverage | (same turn) | Heard water lit, unproven water hatched; "AIS was heard over 30% of the reserve" |
-| 2:10 | Candidates | (same turn) | The grey rings in heard water turn orchid and take their labels: "candidates, not accusations" |
-| 2:30 | Evidence | (same turn) | Chips, both detectors, the nearest broadcast, the zone |
-| 3:20 | Gone silent | "Has a vessel gone silent near here?" | An earlier pass, dated plainly (Mar 6, 2024): the last broadcast, the area it could reach by water, the target inside it, then where the AIS came back on; "I cannot say which, if any, of these it is" |
-| 4:20 | Where to look | "Where should we look next?" | The hotspot heat; "fitted on everything before July 2026, the top 5% of the water held 45% of the 49 dark targets seen since, 9 times what that much water holds by chance"; three patrol boxes with their next passes |
-| 5:20 | The fleet | (same turn) | The camera pulls back to the fleet's lights off Peru; "it came in 9 of 9 years since 2017, and in 2026 it did not: in October 2026 it was off Peru" |
-| 6:00 | Act | "Draft the patrol tasking" | The boxes on the map; the presenter picks one, drops a candidate, approves; "Filed by the officer. The agent did not file it." |
-| 7:10 | Close | | "{n} candidates, not accusations; the radar looks again {next look}. The decision was the officer's." |
+Rewritten Oct 21 for the one-question redesign (`redesign-open-question.md`, task 10), which
+passed gate A and gate B on dev that day. The four-turn run sheet it replaces stays in the commit
+tagged `act3-four-turn-fallback` (`11da083`), the version G4 promotes if the redesign is pulled
+(R9.1).
 
-About 7:30 with 30 s in hand. Fallback if over 8:30: fold the evidence into the first answer's
-chips, then shorten the silent vessel to its reveal. Cut-list fallback: the replay of the first
-turn, then the tasking live.
+**Show order** (U15 as amended Oct 21): Act 1 Earth Analyst (about 6 min), Act 4 AI Archaeologist
+(about 4 min), Act 2 Methane Watch (about 6 min), then Act 3 Dark Vessels (8 min) as the closer.
+The act ends on the officer's approval on the map and the tasking's Slack post landing on a second
+screen. If the four-turn fallback goes to G4 instead, Methane Watch closes the show.
+
+**The one question** (U1), on the prepared plate "Who is there without broadcasting, and where
+next?": "Is anyone in the reserve without broadcasting, and where should the patrol look next?"
+The agent answers it in one turn, choosing the pass, what follows a thin or empty pass, and the box.
+
+"After the click" is measured on dev: gate B's headless live runs (Oct 21, three at 1920 x 1080
+and one at 1280 x 720, v1 data, `.agents/tasks/act3-open-question/gate-b.md` section 6). Task 9's
+fix W1 came after them: the boxes beat now holds 3 s before the next look, so the look, the answer
+and the plate land about 2.5 s later than gate B measured. The act minutes in the first column are
+a plan, not yet timed: the presenter's timed rehearsal x2 on dev (task 7.1, Act 3 under 8:30
+twice) is manual and has not been run.
+
+| t | After the click (s, measured) | Beat | Presenter | What the room sees |
+|---|---|---|---|---|
+| 0:00 | | Switch | Choose Dark Vessels; the stage prewarms its runtime | The sea from below at night, the AIS replay in motion with its date, the reserve and its ports |
+| 0:30 | 0 | The question | Click "Who is there without broadcasting, and where next?" | "Weigh the passes on file" lights |
+| 0:33 | 3.0 to 3.6 | The board | | The passes on file, newest first, each with the share of the reserve it imaged |
+| 0:39 | 8.2 to 9.3 | The choice | Point at the board and the line | The read line, worded from the decision file. On the task 9a data (v1r): "Decided: Reading Oct 12: the newest pass that saw over half the reserve (53%)." Say: "the newest pass is Oct 17, but it saw only about a third of the reserve, so the agent chose Oct 12 and told us why." Never say the newest pass was read and set aside. On v1 the line reads "the newest pass on file" |
+| 0:45 | 13.2 to 19.2 | The pass | | The radar sweeps in along its track, then a chip and one sentence |
+| 0:48 | 16.1 to 22.0 | The claim | | Grey rings; the broadcasts claim theirs |
+| 0:51 | 19.2 to 25.1 | Coverage | Say that 15% is a policy line set from the passes on file | The AIS-received wash inside the radar and the reception-unknown hatch; clock "This pass can check 19% of the reserve"; "Checked: This pass can check 19% of the reserve, over the 15% standard." |
+| 0:57 | 24.1 to 31.5 | Candidates | "Candidates, not accusations" | The rings in received water turn orchid; then "Checked: 4 candidates where AIS was received, seen by both detectors." |
+| 1:01 | 28.5 to 35.4 | Evidence | | One evidence chip |
+| 1:06 | 33.1 to 39.9 | Where to look | Read the figure beside its layer | The heat; clock "Where to look on the next pass" with the top 5% figure |
+| 1:11 | 37.8 to 44.5 | The boxes | | 5 s after the heat, the three patrol boxes with the boxes' own figure, held 3 s |
+| 1:14 | 37.2 to 44.0 (line), 38.2 to 45.0 (look, before W1) | The box | | "Decided: Drafting box 1: it held the most past dark targets, 9%."; the swath over the box with its countdown, or "no look planned yet" |
+| 1:20 | 45.9 to 52.0 (before W1) | The draft | Let the answer land | The answer, its first line in view: "4 candidates on the Oct 12 pass; I drafted box 1 for the next look."; the tasking plate opens on the agent's box |
+| 1:25 to 4:30 | | The officer's decision | Change the box or leave out a candidate, then Approve the tasking | The plate's filed line, "Filed by the officer at … UTC. The agent did not file it.", once, on the plate; no follow-up turn |
+| 4:30 | | Slack, the close | Turn to the second screen | The tasking's Slack post, "From the pass": "AIS was received over {heard}% of the reserve; this pass could check {checkable}%." with the targets and candidates counts |
+
+**The spare plate "Same question, end of August"** (U7), asked only. It sends "Is anyone in the
+reserve without broadcasting at the end of August, and where should the patrol look next?";
+`decide` accepts "as asked" only because those words name the Aug 30 pass, and the agent sets it
+aside (10% checkable, under the 15% standard). It is the only place the read-and-set-aside path is
+shown. Measured on dev (`thin-pass`, six runs from gate A to task 9): five drafted after a second
+pass in 67.9 to 101.8 s, and one ended on the stop line in 46.1 s (gate B). Run it after the Slack
+post, in the questions, so the act still closes on the post: a stop ending leaves no tasking to
+approve.
+
+**The other asked-only spares:** "Has a vessel gone silent near here?" (task 15 moved it to Case 8:
+an earlier pass, Apr 1 2026, the AIS off 6.6 h before it, 73 km by water at 6 kn, two dark targets
+in reach; 23.5 s on dev, against 19.9 to 22.2 s on Mar 6 2024) and "When is the squid fleet near
+the Galápagos?" (6.8 to 10.4 s).
+
+**Stage rules for the act:**
+- No New session in Act 3; refresh instead, until Bug 5A's fix is on `develop`. Status Oct 21: the
+  fix (`b9e7214`) is on `develop` and in this branch. With one question there is no reason to
+  reset mid-act anyway.
+- After a fallback to the replay case, load `/?agent=vessels` to return to live, until Bug 5C's fix
+  is on `develop`. Status Oct 21: the fix (`6cf71ce`) is on `develop` and in this branch; task 9
+  saw `/?agent=vessels` return to live at 1920 and 1280.
+- The replay case is `vessels-open-question` (U11): the question recorded once on dev on the task
+  9a data (Oct 12 read as the newest wide pass, 4 candidates, box 1 drafted, 0 refusals). Its plate
+  is inert ("Recorded case: the decision is made live, not replayed."), so a replay has no approval
+  and no Slack post: the act then closes on the replay's answer, with the presenter saying the
+  decision is the officer's. Its look (Oct 24 00:17 UTC) is in the past after Oct 24; task 14
+  re-records the case on Nov 6 on the rerun data, under the same id.
+- Slack (U15, yes): the post appears only where the tasking webhook is set, on stable after G4 (the
+  URL becomes the ECS secret, tasks 5.4 and 7.2). No eval or browser check in the Oct 21 run posted
+  to Slack.
+- Quote the figures from the data in use. The rolling check read "45% of the dark targets, 9 times
+  chance" on v1 (gate B) and "47%, 9.4 times" on the task 9a data; the Nov 5 rerun moves them again.
+- At 1280 the tasking plate's body scrolls (gate B's W4); the show runs at 1920.
+
+**If it runs long** (over 8:30): shorten the narration over the beats, never the officer's
+decision or the Slack post. If the runtime fails mid-question: refresh, then the replay case.
 
 ## Decisions to approve
 
@@ -409,4 +467,6 @@ turn, then the tasking live.
 10. **The silent-vessel beat is in the run** (the user, Oct 16: "add silent-vessel beat"): its own
     short turn after the evidence ("Has a vessel gone silent near here?"), on the best moment on file
     (today the Mar 6, 2024 case, dated plainly as an earlier pass), about a minute. The run sheet
-    above has it at 3:20.
+    above has it at 3:20. **Superseded Oct 21** (`redesign-open-question.md` U5): the beat leaves the
+    run and is an asked-only spare; task 15 moved it to Case 8 (Sentinel-1A, Apr 1 2026), and the
+    run sheet above lists it with the other spares.

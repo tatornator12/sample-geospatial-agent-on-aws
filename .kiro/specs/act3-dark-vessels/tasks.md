@@ -191,8 +191,10 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
 ## Day 9 (Wednesday Oct 28): the replay case and the evals
 
 - [ ] 6. Replay and eval
-  - [ ] 6.1 `build_replay_case.py` (refuses forbidden phrases, identifiers, a turn without the
-    coverage check); record the star turn; stage it; the gallery card; the network log
+  - [x] 6.1 `build_replay_case.py` (refuses forbidden phrases, identifiers, a turn without the
+    coverage check); record the star turn; stage it; the gallery card; the network log. Done Oct 21
+    as the redesign's task 9: the one question recorded as `vessels-open-question` (U11), the card
+    available, AC 8 passing at 1920 and 1280 (gate log)
   - [ ] 6.2 Evals for all four agents on dev; record counts below
   - [ ] 6.3 Follow-up (redesign task 9a): Re-run task 9a with s1d-20261018t1149 once GFW's AIS
     reaches Oct 19 (about Oct 24), before the Nov 3 freeze, still on v1r. The Oct 21 run built the
@@ -203,7 +205,8 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
 ## Days 10–11 (Oct 29–30): rehearsal and G4
 
 - [ ] 7. Gate and Release 3
-  - [ ] 7.1 Thursday Oct 29: Act 3 timed twice against dev (under 8:30); fallbacks recorded
+  - [ ] 7.1 Thursday Oct 29: Act 3 timed twice against dev (under 8:30); fallbacks recorded. The
+    presenter's, by hand, on the run sheet in `design.md` (rewritten Oct 21); not yet run
   - [ ] 7.2 Friday Oct 30, G4: pytest (all four agents), vitest, backend, `npm run design:check`;
     `promote.sh` with all four agents (the frontend's `cdk diff` shows the `taskings/*` grant and
     the usual task-definition and origin-header changes, nothing else); stable envs checked and smoked; evals on stable; Act 3 timed
@@ -241,5 +244,50 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   (`/tmp/eval_vessels_dev3.json`); plans warmed as a chain (S1C Oct 19 to Nov 8, no look over the
   reserve; S1D Oct 19 + Oct 16, four looks to Nov 5, next Oct 24 00:17 UTC, 54%), `--check`
   clear; pytest dark-vessels 71 (no skip now the image is staged); nothing stable touched
+- Oct 21 (the one-question redesign, `redesign-open-question.md`, branch `act3-open-question`, dev
+  only). Hashes are after gate B's rebase onto `develop` `f50b2b6` unless marked pre-rebase. The
+  run's notes and eval reports are in `.agents/tasks/act3-open-question/` (not committed):
+  - Task 1, the copy fixes both versions need: the four-turn eval on dev 6/7, then 7/7
+    (`evals/t1d-four-turn-dev-run2.*`, dev version 7: unseen 37 s, gone-silent 24 s, where-next
+    19 s, draft-tasking 9 s, the provocations 2 to 3 s). The tag `act3-four-turn-fallback` was made
+    then; it moved three times in task 1 and once with gate B's rebase, and is now `11da083`
+    (`11da08319909c843792c13d0c8e07e90679de397`)
+  - Gate A attempt 1, 15:29 EDT, **FAIL** (`54be770` pre-rebase, version 8, v1 data): all cases
+    9/11; `open-question` x3 1/3 (124 and 121 words over the cap), median 55.5 s, max 60.8 s
+    (`evals/gate-a-1-*`)
+  - Gate A attempt 2, 16:07 EDT, **PASS** (`71781c3` pre-rebase, version 10, v1): all cases 11/11
+    (also 11/11 on version 9, the round before); `open-question` x3 3/3 on one path, median 54.5 s,
+    max 58.3 s, 108 words, 0 refusals; `thin-pass` 81.2 s with a draft; `named-pass` 55.5 s;
+    `second-question` 60.8 s (1 refusal, the gate working); `gone-silent` 21.5 s (`gate-a.md`,
+    `evals/gate-a-2-*`)
+  - Gate B attempt 1, 18:27 EDT, **PASS** (`3415058`; the agent from `73410d9`, version 11, v1):
+    the rebase replayed 41 commits with no conflict; vitest 447, backend 76, detector `[]`,
+    design:check 0; all cases 11/11; `open-question` x3 3/3, median 47.2 s, max 48.9 s, 0 refusals;
+    `thin-pass` 46.1 s on the stop line (1 refusal, W2); headless live runs, three at 1920 and one
+    at 1280, every AC 6 check met, the answer landing 45.9 to 52.0 s after the click; findings W1 to
+    W6 (`gate-b.md`, `evals/gate-b-*`)
+  - Task 9a, 18:28 to 19:05 EDT (`vessels/cache/v1r` with the Oct 17 pass added, version 12):
+    **AC 7 met**: `open-question` 74.6 s (all cases), then x3 49.1, 43.8 and 50.9 s (median
+    49.1 s, max 50.9 s), each reading Oct 12 as `newest_wide`, drafting box 1, 0 refusals; all
+    cases 11/11; no U14 signal (`t9a.md`, `evals/t9a-*`)
+  - Task 9, 19:10 to 19:50 EDT (version 13, v1r): gate B's W1 to W4 first (the boxes beat held
+    3.00 s; `decide(draft)` refused before a match; no key row clipped at 1920; W4 recorded as known
+    1280 behaviour); `thin-pass` 94.7 s with a draft; the replay case `vessels-open-question`
+    recorded once (take 2: 21 calls, 0 refusals). **AC 8**, as amended that day, **passes** at
+    1920 and 1280: 0 agent invocations, no live data call waited on (`t9-verification.md`,
+    `evals/t9-*`)
+  - Task 15, **done** (version 14, v1r): the Case 8 pass `s1a-20260401t0026` built in 203.2 s
+    and uploaded as 26 new keys under `vessels/cache/v1/`; its record in the v1 and v1r manifests
+    after backups to `backup-2026-10-22`; the Mar 27 S1A plan cached; agent pytest 255 passed;
+    smoke 1/1 (22 s); `gone-silent` 1/1 in 23.5 s with "2026" (`evals/t15-*`; redesign §4)
+  - Task 10, docs: the run sheet (`design.md`), the redesign's §3.2 and §3.9 with the seconds
+    measured above, and DESIGN.md's Act 3 paragraph. The presenter's timed rehearsal x2 on dev
+    (7.1, Act 3 under 8:30 twice) is manual and was not done in this run
+  - U14, recorded for after this run (tasks 13 and 14, Nov 5 and 6): if any of three runs on the
+    rerun data ends without a draft or takes over 120 s, restore the backups and present on the
+    pre-rerun data; task 9a showed no such signal, so the rerun stands
+  - Stable, `demo-stable` and Slack untouched: every eval and browser check ran with empty
+    `SLACK_*` variables. Dev is left on version 14 with `VESSEL_CACHE_PREFIX=vessels/cache/v1r`,
+    which task 11 removes at G4
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)
