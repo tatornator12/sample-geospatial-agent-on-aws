@@ -366,3 +366,55 @@ the act is memorable from the back of the room.
 3. WHEN the mission replay case is recorded THEN it SHALL load offline like
    `methane-permian-2024`, including the filmstrip and the brief, and the approval control SHALL
    be inert in replay.
+
+## Act 2 v3: Carbon Mapper, an independent check (Oct 22, 2026)
+
+Carbon Mapper publishes the methane plumes it detects (the Tanager-1 satellite, its own
+processing of EMIT, and aircraft) in a public catalogue, each with its own emission estimate,
+about 30 days after detection. Licence (https://carbonmapper.org/terms, January 2026):
+non-commercial use, attribution "Source: Carbon Mapper (data.carbonmapper.org)", share-alike.
+**The user cleared its use for this demo on 22 October 2026.**
+
+### Requirement 13: Independent detections and the follow rule
+
+**User Story:** As the presenter, I want the agent to check a second, independent source before it
+chooses a site, so that the room sees the choice rest on the newest evidence from two catalogues.
+
+#### Acceptance Criteria
+
+1. WHEN the agent calls `carbon_mapper_plumes(lat, lon, radius_km=5)` THEN the tool SHALL return
+   the CH4 plumes Carbon Mapper published within the radius since 2025-01-01, newest first, at
+   most 10, each with its date, its instrument in words (Tanager-1, EMIT, airborne), Carbon
+   Mapper's rate and uncertainty in kg/h (none when withheld), its distance in km and its sector
+   in words; a summary (count, latest date, latest rate); the site's newest EMIT candidate pass
+   from the session's pass record and the newer of the two (`latest_confirmed`); the attribution;
+   and SHALL write a numbers-only record (`cmplumes_<lat>_<lon>.json`) and the plume points
+   (`cmplumes_<lat>_<lon>.geojson`) to the session.
+2. WHEN the catalogue is read THEN the request SHALL be built from validated numbers only, go to
+   one host with a timeout and a size cap, read at most three pages, and every field SHALL be
+   validated and mapped to fixed words, so no catalogue text or link reaches the model, the brief
+   or the stage. The result SHALL be cached in the bucket for 12 hours; WHEN the catalogue cannot
+   be reached THEN the cached record SHALL answer, however old, and say so; with neither, the
+   tool SHALL say the check is unavailable and the choice SHALL rest on EMIT alone.
+3. WHEN the two cued sites' passes have been read THEN the agent SHALL call
+   `carbon_mapper_plumes` for both, and SHALL follow the site whose latest confirmed detection
+   (its newest EMIT candidate pass or Carbon Mapper plume within 5 km) is the most recent; a tie
+   SHALL go to more EMIT candidate passes, then the higher peak. It SHALL say the outcome in one
+   sentence with both sites' latest confirmed detections and their dates.
+4. WHEN the brief is drafted THEN `draft_brief` SHALL add an "Independent detections" line
+   written by code from Carbon Mapper's record (count, latest date, instrument, about X ± u kg/h,
+   "Source: Carbon Mapper (data.carbonmapper.org)"); a rate SHALL appear in the agent's own
+   observations only where "super-emitter" is asked, and only as Carbon Mapper's estimate. The
+   agent SHALL still never name a cause or an operator, and SHALL never repeat Carbon Mapper's
+   sector label as one.
+5. WHEN Carbon Mapper's numbers are on the stage THEN each cued row of the tip board SHALL show
+   "Carbon Mapper: n plumes · latest <date> · ~X kg/h" (numbers and dates only, at least 15 px),
+   the plume points MAY show on the map as rings with a legend row, the brief card SHALL show the
+   independent detections line, and the attribution SHALL show wherever its data does (board,
+   legend, card).
+
+### Requirement 14: The 3D columns are always shown for the followed candidate
+
+1. WHEN the agent has looked at the followed site's strongest EMIT candidate THEN it SHALL put
+   that candidate on the map as its 3D columns (`display_visual` with `render.kind` "columns"),
+   and the golden mission cases SHALL check it.

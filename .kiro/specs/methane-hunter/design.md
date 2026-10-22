@@ -501,3 +501,64 @@ draft. "Request another look" sends a normal prompt naming the next collection.
    list; never state one, never name an operator, owner, government or intent".
 5. The human decision is enforced by the backend, not by the prompt.
 6. Promote today's Release 2 (the two-beat Act 2) as a safety net before this rebuild starts.
+
+## Act 2 v3: Carbon Mapper and the missing columns (Oct 22, 2026; branch `methane-fixes`)
+
+**Use cleared.** Carbon Mapper's catalogue is non-commercial, attribution, share-alike
+(https://carbonmapper.org/terms, January 2026). The user cleared it for this demo on 22 October
+2026. The attribution "Source: Carbon Mapper (data.carbonmapper.org)" is on the tip board, the map
+legend and the brief card whenever its data shows.
+
+### The missing columns (root cause)
+
+The user's live mission on the stable stage (session `79b2b35c…`, 22 October, 14:31 to 14:33 EDT)
+drew no 3D columns. `check_recent_passes` had built `columns_<scene>.geojson` for the strongest
+candidate (Shanxi, 2025-09-25, peak 5,121.5 ppm·m) and returned its URL, but the stored
+conversation shows the cue's batch called `display_visual` for the flat pass window and never for
+the columns, beside the frame and the three ground checks (six calls asked for in one response).
+The same drop is in 14 of the 43 missions stored since 20 October (8 of 17 on 22 October). The
+replay was recorded from a take that kept it, and no eval checked it. The runtime logs carry the
+session id only in the app's JSON lines (`{ $.sessionId = "…" }`); the tool lines are plain text in
+the `[runtime-logs]` stream of that minute, and `display_visual` writes none.
+
+Fix: the columns are the candidate's only display (they are built from the same pixels as the
+window, which no longer goes on the map), said in W5 and in `check_recent_passes`' `next_steps`.
+The golden missions require, after any `inspect_image` of a `pass_EMIT_…` window, a
+`display_visual` whose `render.kind` is "columns" (`eval.py` match keys may now be dotted). A site
+followed for Carbon Mapper's plumes alone has no window, so the check does not apply to it.
+`build_replay_case.py` refuses a take that looked at a window without its columns, or never
+checked Carbon Mapper.
+
+### The mission, with the independent check
+
+| Step | What the agent does | What the room sees |
+|---|---|---|
+| W1 | "Plan: 1 baseline, 2 tip with TROPOMI, 3 cue EMIT and check Carbon Mapper, 4 check the ground record, 5 brief." | The plan strip (unchanged: Baseline · Tip · Cue · Check · Brief) |
+| W4 | One sentence per cued site on its passes, then `carbon_mapper_plumes` for both, in parallel | "Check Carbon Mapper on 2 sites"; each cued row gains "Carbon Mapper: n plumes · latest <date> · ~X kg/h" under its EMIT tally, and the board's last line is the source |
+| W4b | Follows the site whose latest confirmed detection is newest (EMIT candidate pass or Carbon Mapper plume within 5 km); tie: more EMIT candidates, then the higher peak. Says it with both dates | The chosen row reads "following" |
+| W5 | The TROPOMI composite, the followed site's Carbon Mapper rings (when it has plumes) and a look at the candidate's window; then the 3D columns with the frame and the ground checks | Mint rings on the ground (legend: "Carbon Mapper plume, 2025 on" and the source); the columns rise |
+| W6 | `draft_brief`; the tool adds "Independent detections: …" from Carbon Mapper's record | The card's "Independent detections" block, above the ground record |
+| W7 | The closer, word for word: "Near <place>: methane on <n> of <m> EMIT passes read since <date>; EMIT last looked here on <date>." | |
+
+The tool (`agents/methane-hunter/carbon_mapper.py`): one GET to
+`https://api.carbonmapper.org/api/v1/catalog/plumes/annotated?bbox=W&bbox=S&bbox=E&bbox=N&limit=1000&offset=N`
+with a browser User-Agent (the catalogue answers browsers) carrying our name, 15 s timeout, 6 MB
+cap, at most three pages; kept: CH4, status "published", a valid point within the radius, a
+scene date since 2025-01-01. Instrument codes map to Tanager-1, EMIT, airborne or "another
+instrument"; IPCC sector codes to words; withheld rates (`hide_emission`) to none. The latest
+plume is the newest date's nearest plume with a rate. Cache `methane/cache/carbonmapper_v1_<lat>_<lon>_<r>km.json`
+(validated rows only, revalidated on read), 12 h; a stale record answers when the API is down.
+`scripts/warm_watch.py` warms it for each area's cued hotspots. httpx, no new dependency.
+
+Stage: `cmPlumesUrl`/`parseCmPlumes`/`cmLineText` (`steps.ts`); the render kind `detections`
+(`render.ts`, `methaneLayers.ts`: mint `#6fe0b8` rings on a dark halo, no camera move, a popup of
+date, instrument and Carbon Mapper's estimate); the legend key `detections` (`layerStack.ts`);
+`chosenCue` also recognises a site followed by its Carbon Mapper points; the backend passes the
+card's `independent` line only when it carries the source.
+
+On 22 October's data no cued site had a Carbon Mapper plume within 5 km (Shanxi's seven
+coal-mine plumes lie 5.1 km from the tip; the south Caspian tips at 37.69, 53.78 and 39.02, 53.82
+have none), so the mission followed Shanxi on its EMIT candidate of 2025-11-30. On a day the south
+Caspian tip lands near Krasnovodsk (39.44, 53.57), Carbon Mapper lists 45 Tanager-1 plumes there
+since 2025, the latest on 2026-06-20, newer than Shanxi's newest EMIT candidate (2025-11-30): the
+agent would follow the south Caspian, and the rings would show.
