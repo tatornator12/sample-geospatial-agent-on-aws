@@ -247,6 +247,19 @@ export class GeospatialAgentStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // Slack webhook for filed patrol taskings (Act 3; react-ui/backend/src/slack.ts
+    // taskingWebhookUrl). Same pattern as the brief's: a random placeholder the backend reads as
+    // "off" until the operator sets the real URL with `aws secretsmanager put-secret-value` and
+    // restarts the tasks (`aws ecs update-service --force-new-deployment`). While it is off,
+    // taskings go to the brief's URL only when that is an app's incoming webhook, never to the
+    // brief's workflow trigger. The URL is never in the task definition, the template or a log line.
+    const slackTaskingWebhookSecret = new secretsmanager.Secret(this, 'SlackTaskingWebhook', {
+      secretName: `geospatial-agent/${environment}/slack-tasking-webhook`,
+      description: 'Slack webhook URL the backend posts to when an officer approves a patrol tasking (Act 3). A random placeholder until set; the backend treats anything but a hooks.slack.com URL as off.',
+      generateSecretString: { excludePunctuation: true, passwordLength: 32 },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // ========================================
     // ECS Cluster
     // ========================================
@@ -404,6 +417,7 @@ export class GeospatialAgentStack extends cdk.Stack {
         // Injected by ECS at task start from Secrets Manager (the execution role is granted the read).
         secrets: {
           SLACK_WEBHOOK_URL: ecs.Secret.fromSecretsManager(slackWebhookSecret),
+          SLACK_TASKING_WEBHOOK_URL: ecs.Secret.fromSecretsManager(slackTaskingWebhookSecret),
         },
         taskRole: taskRole,
         logDriver: ecs.LogDrivers.awsLogs({
@@ -741,6 +755,11 @@ export class GeospatialAgentStack extends cdk.Stack {
       description: 'Set the Slack incoming-webhook URL here (put-secret-value), then force a new ECS deployment',
     });
 
+    new cdk.CfnOutput(this, 'SlackTaskingWebhookSecretArn', {
+      value: slackTaskingWebhookSecret.secretArn,
+      description: 'Set the Slack patrol-tasking webhook URL here (put-secret-value), then force a new ECS deployment',
+    });
+
     new cdk.CfnOutput(this, 'CustomHeaderSecretArn', {
       value: customHeaderSecret.secretArn,
       description: '🔒 CloudFront custom header secret (for ALB security)',
@@ -766,6 +785,12 @@ export class GeospatialAgentStack extends cdk.Stack {
       },
     ]);
     NagSuppressions.addResourceSuppressions(slackWebhookSecret, [
+      {
+        id: 'AwsSolutions-SMG4',
+        reason: 'A Slack incoming-webhook URL is issued by Slack and rotated there (regenerate the webhook, put the new value); Secrets Manager cannot rotate it.',
+      },
+    ]);
+    NagSuppressions.addResourceSuppressions(slackTaskingWebhookSecret, [
       {
         id: 'AwsSolutions-SMG4',
         reason: 'A Slack incoming-webhook URL is issued by Slack and rotated there (regenerate the webhook, put the new value); Secrets Manager cannot rotate it.',

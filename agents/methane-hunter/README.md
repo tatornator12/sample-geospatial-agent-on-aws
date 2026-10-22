@@ -211,6 +211,19 @@ rotated; put the new value where the old one was.
   aws ecs update-service --cluster geospatial-agent-dev --service geospatial-agent-dev --force-new-deployment
   ```
   Anything but a `hooks.slack.com` URL leaves the feature off, and the URL is never logged.
+- Patrol taskings (Act 3, `POST /api/tasking/approve`) post to their own webhook,
+  `SLACK_TASKING_WEBHOOK_URL` (`taskingWebhookUrl` in `react-ui/backend/src/slack.ts`; its
+  workflow declares the ten variables in `react-ui/backend/.env.example`). Locally it sits beside
+  `SLACK_WEBHOOK_URL` in `react-ui/backend/.env`; the backend logs
+  `Slack on filed taskings: on (workflow webhook)`. On the CloudFront stack the CDK creates
+  `geospatial-agent/<env>/slack-tasking-webhook` the same way (random placeholder, read as off;
+  stack output `SlackTaskingWebhookSecretArn`). Set it once and restart the tasks:
+  ```bash
+  aws secretsmanager put-secret-value --secret-id geospatial-agent/dev/slack-tasking-webhook --secret-string 'https://hooks.slack.com/triggers/...'
+  aws ecs update-service --cluster geospatial-agent-dev --service geospatial-agent-dev --force-new-deployment
+  ```
+  While it is off, taskings go to the brief's URL only when that is an app's incoming webhook,
+  never to the brief's workflow trigger (its message says "brief"). The URL is never logged.
 
 ## Data notes
 
