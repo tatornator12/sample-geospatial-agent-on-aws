@@ -14,12 +14,12 @@ Stage addresses below are relative to the stage URL (the `ApplicationURL` stack 
 
 | In the show | Part | Minutes | Clock | Ends on |
 |---|---|---|---|---|
-| | Intro (deck, 5 slides) | 3 | 0:00 to 3:00 | "Let's start with the Earth Analyst." |
-| First | Act 1, Earth Analyst | 6 | 3:00 to 9:00 | "Same eyes, new domains next." |
-| Second | Act 4, AI Archaeologist | 4 | 9:00 to 13:00 | "Both are already on the World Heritage list. I only work with sites on the public record." |
-| Third | Act 2, Methane Hunter (Methane Watch) | 6 | 13:00 to 19:00 | "It found the invisible and told you what it could not confirm." |
-| Last, the closer | Act 3, Dark Vessels | 8 | 19:00 to 27:00 | The officer approves the tasking on the map; the Slack post lands on the second screen. |
-| | Close | 1 | 27:00 to 28:00 | "Happy to take questions." |
+| | Intro (deck, slides 1 to 3) | 2 | 0:00 to 2:00 | "Let's start with the Earth Analyst." |
+| First | Act 1, Earth Analyst | 6 | 2:00 to 8:00 | "Same eyes, new domains next." |
+| Second | Act 4, AI Archaeologist | 4 | 8:00 to 12:00 | "Both are already on the World Heritage list. I only work with sites on the public record." |
+| Third | Act 2, Methane Hunter (Methane Watch) | 6 | 12:00 to 18:00 | "It found the invisible and told you what it could not confirm." |
+| Last, the closer | Act 3, Dark Vessels | 8 | 18:00 to 26:00 | The officer approves the tasking on the map; the Slack post lands on the second screen. |
+| | Close (deck, slides 4 and 5: the wrap-up and How it's built) | 2 | 26:00 to 28:00 | "Happy to take questions." |
 | | Questions | 2 | 28:00 to 30:00 | |
 | | **Total** | **30** | | |
 
@@ -32,19 +32,19 @@ Why this order:
 
 **Act 3 passed gate A and gate B on 21 October.** If G4 (Fri 30 Oct) promotes its four-turn version instead (R9.1), or Act 3 is cut on the day, Methane Watch closes the show:
 
-| Fallback | After the intro (0:00 to 3:00) |
+| Fallback | After the intro (0:00 to 2:00) |
 |---|---|
-| Four-turn Act 3, third | Act 1 3:00 to 9:00 · Act 4 9:00 to 13:00 · Act 3, four turns, 13:00 to 21:00 · Act 2, the closer, 21:00 to 27:00 · Close 27:00 to 28:00 · Questions 28:00 to 30:00 |
-| Act 3 cut | Act 1 3:00 to 9:00 · Act 4 9:00 to 13:00 · Act 2, the closer, 13:00 to 19:00 · Close 19:00 to 20:00 · Questions 20:00 to 30:00 (proposed; set a fuller plan at the 29 October rehearsal if it comes to this) |
+| Four-turn Act 3, third | Act 1 2:00 to 8:00 · Act 4 8:00 to 12:00 · Act 3, four turns, 12:00 to 20:00 · Act 2, the closer, 20:00 to 26:00 · Close 26:00 to 28:00 · Questions 28:00 to 30:00 |
+| Act 3 cut | Act 1 2:00 to 8:00 · Act 4 8:00 to 12:00 · Act 2, the closer, 12:00 to 18:00 · Close 18:00 to 20:00 · Questions 20:00 to 30:00 (proposed; set a fuller plan at the 29 October rehearsal if it comes to this) |
 
-Where the minutes come from (the roadmap carries the same minutes since 21 October):
+Where the minutes come from (the act minutes are the roadmap's since 21 October; the 22 October deck change moved a minute from the intro to the close, and the roadmap still reads intro 3, close 1):
 
-- **Intro 3:** the deck's notes run about 3:13 at 150 words a minute (483 spoken words), so take about 13 s out in rehearsal. Slide 5 is optional; without it the intro is about 2:31.
+- **Intro 2:** slides 1 to 3; their notes run about 1:50 at 150 words a minute (274 spoken words). The old "What to watch for" slide is gone: its three cues are said live in Act 1's first 30 seconds (section 6), and "How it's built" moved to the close.
 - **Act 1 at 6:** its run sheet is 7:00 with the hand-off at 5:50. These notes open on its judgement beat (Bergen) and make the look-alike search the centrepiece, with its "click rank 1" popup optional to save time. Its NDVI opener (Central Park) and the Folsom compare are spares.
 - **Act 4 at 4:** its run sheet, closing at 3:40.
 - **Act 2 at 6:** the mission is 79 to 135 s of agent time in test runs, so most of the run sheet's 7 minutes is narration. The 6 minutes keep the approval. Run sheet: 7:00, approval at 6:30.
 - **Act 3 at 8:** the spec's limit is under 8:30. Measured on dev, the question takes about a minute of agent time (54.8 to 67.0 s on stage). The run sheet gives the narration and the officer's choice about 3 minutes, and the Slack post lands at about 4:30, so about 3 minutes are left as the closer's margin for a retry or the replay (section 9). Not timed by hand yet.
-- **Close at 1:** the roadmap's old 2 minutes held a teaser of the act not shown and an observability trace. All four acts are in the show, so there is nothing to tease. No trace is prepared, and whether any stable runtime sends one is unconfirmed. Leave both out unless one is built and rehearsed.
+- **Close at 2:** back to the deck for slide 4, the wrap-up (about 54 s), and slide 5, How it's built (about 50 s): 259 spoken words, about 1:44, plus the switch back to the slideshow. The roadmap's first plan also gave the close 2 minutes, for a teaser of the act not shown and an observability trace. All four acts are in the show, so there is nothing to tease. No trace is prepared, and whether any stable runtime sends one is unconfirmed. Leave both out unless one is built and rehearsed.
 - **Questions 2:** the roadmap had no question time before 21 October.
 
 Each act's minutes include the switch and about 20 s of talk while its runtime warms. A cold boot measured 23.7 s, and the stage's own pre-warm absorbed it.
@@ -93,12 +93,12 @@ No act has a recorded rehearsal time yet. Fill this in as you go, in show order:
 
 | Part | Target | Thu 29 Oct | Fri 30 Oct | Fri 6 Nov |
 |---|---|---|---|---|
-| Intro | 3:00 | | | |
+| Intro | 2:00 | | | |
 | Act 1 | 6:00 | | | |
 | Act 4 | 4:00 (under 4:30) | | | |
 | Act 2 | 6:00 | | | |
 | Act 3 | 8:00 (under 8:30) | | | |
-| Close | 1:00 | | | |
+| Close | 2:00 | | | |
 | Whole show | 28:00 before questions | | | |
 
 ---
@@ -118,7 +118,7 @@ Commands run from the repo root on this Mac and need AWS credentials. The warm s
   Repeat with `--agent archaeologist`, `--agent methane`, `--agent vessels`. The Archaeologist has a stable runtime since the 21 October promotion; Dark Vessels reaches stable at G4 (unconfirmed until 30 Oct).
 - [ ] Earthdata token (Act 2): valid to 16 November 2026 at the 12 October promotion; tokens last 60 days. If the methane stable runtime was redeployed since, note the new token's expiry.
 - [ ] Sign in on the stage URL in the presenting browser (Cognito; a new password needs 12 or more characters). Check the switcher lists Earth Analyst, AI Archaeologist, Methane Watch and Dark Vessels, in that order, with no act numbers. Rehearsal-only runtimes (such as "Earth Analyst · dev") appear only with `?dev=1` in the address, and `?dev=0` hides them again; never present with it. An act missing from the list has no stable runtime registered (an act left on a dev runtime shows only with `?dev=1`).
-- [ ] Open the deck on this Mac. Its fonts are not embedded, so present from this Mac or install Atkinson Hyperlegible on the presenting machine. Replace "Presenter name" on slide 1 and in its notes.
+- [ ] Open the deck on this Mac. Its fonts are not embedded, so present from this Mac or install Atkinson Hyperlegible on the presenting machine. Replace "Presenter name" on slide 1 and in its notes, and "[Your call to action]" on slide 4 and in its notes (section 10).
 - [ ] Sign in to Slack on the second screen (Act 3's last beat) and open the channel the "Patrol taskings" workflow posts to (proposed: a second display beside the projector). Which display, how it connects and whether the whole room can see it are unconfirmed; set them at the 30 October run-through.
 - [ ] Backup videos: planned in demo readiness, not made yet (unconfirmed). If they exist, put them on this Mac's desktop.
 
@@ -142,7 +142,7 @@ Commands run from the repo root on this Mac and need AWS credentials. The warm s
 
 - [ ] **Browser:** Chrome (unconfirmed; the review used headless Chrome and the presenting browser is not recorded), zoom 100%, full screen. Notifications off, other apps closed (proposed).
 - [ ] **Window and projector:** the stage at 1920×1080. Check the projector really shows 1920×1080 (unconfirmed; the product notes say "assume 1080p, plan for 4K"). On a 4K display, use 200% scaling so the stage lays out at 1920×1080 as rehearsed (proposed). Never 1280×720: Acts 1, 2 and 3 clip there. The stage has only been checked at 1920×1080 and 1280×720.
-- [ ] **Deck and stage on one Mac** (proposed): the slideshow in PowerPoint, the browser behind it. After slide 5, end the slideshow and switch to the browser. In full screen, Cmd+L should bring up the address bar for the `/?agent=` loads (check on the day). With the second screen attached, check the slideshow and the stage both open on the projector, not on the Slack screen.
+- [ ] **Deck and stage on one Mac** (proposed): the slideshow in PowerPoint, the browser behind it. After slide 3, end the slideshow and switch to the browser; after Dark Vessels, back to the slideshow on slide 4 (section 10). In full screen, Cmd+L should bring up the address bar for the `/?agent=` loads (check on the day). With the second screen attached, check the slideshow and the stage both open on the projector, not on the Slack screen.
 - [ ] **Second screen:** Slack full screen on the "Patrol taskings" channel, newest post in view, no other channel or notification visible (proposed). Read the newest post before the room sees it: it is the show's last image, so it must keep the content rules in section 9.
 - [ ] **Bookmarks** in one folder, in show order: `/?agent=stable`, `/?agent=archaeologist`, `/?agent=methane`, `/?agent=vessels`, and the replays:
   - `/?scenario=la-fires-2025&agent=stable`
@@ -168,30 +168,27 @@ Commands run from the repo root on this Mac and need AWS credentials. The warm s
 
 ---
 
-## 5. Intro: the deck (0:00 to 3:00)
+## 5. Intro: the deck (0:00 to 2:00)
 
-The full script is in each slide's notes pane: a "Point to land" line, a "Say" paragraph and a "Transition" line.
+The intro uses the deck's first three slides. The second half of the deck, the wrap-up (slide 4) and How it's built (slide 5), is the close (section 10); slide 6 is the backup for technical questions. The full script is in each slide's notes pane: a "Point to land" line, a "Say" paragraph and a "Transition" line.
 
 | Slide | Title | Point to land | Spoken |
 |---|---|---|---|
 | 1 | Agentic AI for Earth | The agent does the work; a person decides. | about 33 s |
-| 2 | Why this matters | The agent does the legwork; a person makes the call. | about 38 s |
-| 3 | Four acts, one map | Four jobs, one platform; candidates, never accusations. | about 39 s |
-| 4 | How it's built | One runtime per agent; a person files. | about 40 s |
-| 5 | What to watch for (optional) | Steps, evidence, and nothing filed until a person approves; the show ends on the officer's call. | about 42 s |
+| 2 | Why this matters | There is more Earth data than people can read, so the agent reads and a person decides. | about 30 s |
+| 3 | Four acts, one map | Four different jobs, one platform. | about 46 s |
 
-- 483 spoken words, about 3:13 at 150 words a minute: about 13 s over the slot, so tighten in rehearsal or drop slide 5.
-- Slide 3 shows the acts left to right in show order, each screenshot with its own name: Earth Analyst, AI Archaeologist, Methane Hunter, Dark Vessels. Its markers number them 1 to 4 by their place in the show, and its notes say "first", "second", "third" and "last", never the code's act numbers. Slide 2's notes say "the first act", "the methane act" and "the last act".
-- Slide 3 says Dark Vessels "checks where those broadcasts can be heard" and that a silent target there is a candidate. Act 3's plain words below use the same rule; keep them in step.
-- Slide 5 promises that you will play the analyst in the methane act and the officer in Dark Vessels, and tells the room the last act ends on the agent's own choices, a prediction checked against past radar days and a draft tasking. Keep those moments in the run.
-- If Act 3 is cut or its four-turn version runs third (section 1), the deck needs a pass: slide 3's order and markers, "the last act" on slides 2 and 5, and slide 5's ending (proposed: "In the vessels act, I'll play the officer and decide whether to approve the patrol tasking.", or nothing if Act 3 is cut).
+- 274 spoken words, about 1:50 at 150 words a minute, inside the 2 minutes.
+- Slide 3 shows the acts left to right in show order, each screenshot with its own name: Earth Analyst, AI Archaeologist, Methane Hunter, Dark Vessels. Its markers number them 1 to 4 by their place in the show, and its notes say "first", "second", "third" and "last", never the code's act numbers.
+- Slide 3 says Dark Vessels "checks where those broadcasts can be heard" and that a target not broadcasting there is a reason for a patrol to look. Act 3's plain words below use the same rule; keep them in step.
+- There is no "What to watch for" slide any more. Its three cues (the steps, the map, the moment a person decides) are said live in Act 1's first 30 seconds, pointing at the stage (section 6). They promise that you will play the analyst in Methane Watch and the officer in Dark Vessels; keep those moments in the run.
+- If Act 3 is cut or its four-turn version runs third (section 1), the deck needs a pass: slide 3's order and markers and its notes' "Last", and slide 4's notes, whose recap ends on Dark Vessels (section 10 has the lines). Act 1's third cue also changes: "at the end, in Dark Vessels" becomes "in Dark Vessels", or drop the Dark Vessels half if Act 3 is cut.
 - Slide 3 and its notes call the methane act "Methane Hunter". The switcher and Replay cases call it "Methane Watch", and the stage's speaker label still reads "Methane Hunter". Either name is fine aloud; the deck is not changed for this.
-- If you drop slide 5, change slide 4's transition to "Let's start with the Earth Analyst."
-- After the last transition, switch to the browser, already on `/?agent=stable`.
+- Slide 3's transition is "Let's start with the Earth Analyst." Then end the slideshow and switch to the browser, already on `/?agent=stable`.
 
 ---
 
-## 6. Act 1: Earth Analyst, first (3:00 to 9:00)
+## 6. Act 1: Earth Analyst, first (2:00 to 8:00)
 
 Goal: the agent sees imagery, turns down a scene it cannot use, and finds places by example.
 
@@ -206,12 +203,12 @@ Goal: the agent sees imagery, turns down a scene it cannot use, and finds places
 | 5 | Scan Colorado | `Scan Colorado for land change between 2019 and 2024` | spare (not run live by the review) |
 | 6 | Wildfire, Pacific Palisades | `Assess wildfire damage near Pacific Palisades, Los Angeles in January 2025` | spare (not run live by the review; it has a replay) |
 
-**Beats.** Times are proposed, compressed from the 7-minute run sheet: about 1:30 for Bergen, about 3:30 for the look-alike search.
+**Beats.** Times are proposed, compressed from the 7-minute run sheet: about 30 s for the three things to watch, about 1:10 for Bergen, about 3:30 for the look-alike search.
 
 | Time | Do | The room sees |
 |---|---|---|
-| 0:00 | The stage is already on `/?agent=stable` and warm. Say in one line what the agent does. | A flat world map on satellite imagery, the console "Ask about any place on Earth", six plates, "A cloudy day, Bergen" first. |
-| 0:15 | Click "A cloudy day, Bergen". | 35 to 56 s on dev (not run live by the review). Fetch Sentinel-2 names its window, "Scenes from 2025-07-17 to 2025-09-15"; an evidence chip of the cloudy 2025-09-06 scene, with what the agent saw on a line under it (not yet seen on a Bergen run); Fetch Sentinel-2 again with "skipping 2025-09-06" in mono; a chip of the clear 2025-07-18 scene; NDVI; an answer that names the scene it used. In one of five dev runs the agent turned the cloudy scene down from its numbers without looking, so the first chip was missing; "skipping 2025-09-06" showed in all five. |
+| 0:00 | The stage is already on `/?agent=stable` and warm. Say in one line what the agent does, then the three things to watch, pointing at the screen as you name each (speaker notes). | A flat world map on satellite imagery, the console "Ask about any place on Earth", six plates, "A cloudy day, Bergen" first. |
+| 0:30 | Click "A cloudy day, Bergen". | 35 to 56 s on dev (not run live by the review). Fetch Sentinel-2 names its window, "Scenes from 2025-07-17 to 2025-09-15"; an evidence chip of the cloudy 2025-09-06 scene, with what the agent saw on a line under it (not yet seen on a Bergen run); Fetch Sentinel-2 again with "skipping 2025-09-06" in mono; a chip of the clear 2025-07-18 scene; NDVI; an answer that names the scene it used. In one of five dev runs the agent turned the cloudy scene down from its numbers without looking, so the first chip was missing; "skipping 2025-09-06" showed in all five. |
 | 1:40 | Say: "That is one city. Now a whole state, by example." | |
 | 1:50 | Click "Places like Central Park". | About 52 to 57 s. The "Find similar places" step lights as the search starts and stays lit for about 15 s while it runs: explain the fingerprint then. Ten dots land across New York State, the top five numbered (at 1280 a number that would collide is dropped), then two evidence chips of the top matches, each with what the agent saw under it (West Point and Lake George in the review's run and in the recorded case), and a table of the top five with similarity and distance from the park. |
 | 4:00 | Optional: click rank 1's dot. | A popup, "Match 1", with its similarity, its centre and its distance from the example (0.9573 and 68.5 km, West Point, in the recorded case). |
@@ -220,6 +217,7 @@ Goal: the agent sees imagery, turns down a scene it cannot use, and finds places
 
 **Speaker notes**
 
+- *Three things to watch, live in the first 30 seconds, before the first click* (they replace the deck's old "What to watch for" slide; point at the real screen as you say each): "Three things to watch. On the left, the agent's steps light one at a time, with the images it looked at." Point at the column on the left, where the steps will light. "On the map, every layer is evidence you can check." Point at the map. "And the moment a person decides: in Methane Watch I play the analyst and file the brief; at the end, in Dark Vessels, I play the officer and approve the patrol." About 25 s.
 - *Bergen, plain:* "It's measuring plant health in Bergen, a rainy city. Before it measures anything, it looks at the picture. The first one it picks is cloudy over the city, so it turns it down, says why, and fetches the next clear one." Point at the chip and the line under it, then at "skipping 2025-09-06" in the step.
 - *Technical:* "Sentinel-2 from Earth Search over STAC, NDVI per pixel inside the boundary. It inspects the rendered scene, rejects it, then fetches again with that date left out. On dev it read 47.6% cloud over the city on 2025-09-06 and used 2025-07-18." Quote the cloud figure only if the stage or the transcript shows it.
 - *Places like Central Park, plain, while the search step is lit:* "Now it compares Central Park with the whole state, about 190,000 patches of land. A model has turned each patch's picture from space into a fingerprint, a short list of numbers, so patches that look alike get similar fingerprints. It finds the patches whose fingerprints are closest to the park's, then looks at the top two itself to check them."
@@ -248,7 +246,7 @@ Goal: the agent sees imagery, turns down a scene it cannot use, and finds places
 
 ---
 
-## 7. Act 4: AI Archaeologist, second (9:00 to 13:00)
+## 7. Act 4: AI Archaeologist, second (8:00 to 12:00)
 
 Goal: same eyes and similarity, a new domain, on known sites only; it chooses its own line to measure.
 
@@ -301,7 +299,7 @@ Goal: same eyes and similarity, a new domain, on known sites only; it chooses it
 
 ---
 
-## 8. Act 2: Methane Hunter and the Methane Watch, third (13:00 to 19:00)
+## 8. Act 2: Methane Hunter and the Methane Watch, third (12:00 to 18:00)
 
 Goal: it senses the invisible and triages at scale, on live data, and shows why it follows one site.
 
@@ -349,7 +347,7 @@ Goal: it senses the invisible and triages at scale, on live data, and shows why 
 
 ---
 
-## 9. Act 3: Dark Vessels, the closer (19:00 to 27:00)
+## 9. Act 3: Dark Vessels, the closer (18:00 to 26:00)
 
 Goal: one open question, answered with a draft patrol tasking. The agent chooses the radar pass and says why, checks that a missing broadcast can mean anything there, says where the patrol should look with a measured record behind it, and drafts a box. The officer decides, and the Slack post on the second screen ends the show.
 
@@ -371,22 +369,22 @@ Asked only, typed by hand in the questions (not plates; the golden prompts' word
 
 | Time (clock) | After the click (s) | Do | The room sees |
 |---|---|---|---|
-| 0:00 (19:00) | | Switch to Dark Vessels and talk over the rest view for about 30 s while its runtime warms. | The reserve from under the sea at night: the islands, the dashed boundary, ships' broadcasts replayed in motion. Clock: "AIS replay" with its date and time, then "… vessels broadcasting · the 36 hours to the radar pass · Powered by Global Fishing Watch." The two plates under the console. |
-| 0:30 (19:30) | 0 | Click "Who is there without broadcasting, and where next?". | "Weigh the passes on file" lights; the clock's second line becomes "while the agent chooses a radar pass". |
-| 0:34 (19:34) | 3.1 to 4.6 | Point at the board. | The pass board under the step, in mono: the passes on file, newest first, each with its satellite and the share of the reserve it imaged. Five rows on the show's data, Oct 12 first. |
-| 0:38 (19:38) | 7.1 to 8.8 | Point at the line under "Find the radar pass" and say the choice. | Oct 12 marked "reading" on the board, and the read line: "Decided: Reading Oct 12: the newest pass on file. It saw 53% of the reserve." |
-| 0:45 (19:45) | 14.2 to 19.7 | | The radar sweeps in along its track; under "Look at the radar", a chip ("Radar, Oct 12") and one sentence on what the agent sees. Then grey rings on the radar targets, and the broadcasts claim theirs, each ring tied by a hairline to its broadcast. |
-| 0:51 (19:51) | 20.8 to 27.9 | One short line. | The "AIS received" wash inside the radar, and hatched water, "reception unknown". Clock: "This pass can check 19% of the reserve", then "the radar imaged it and other ships' AIS was received there near the pass · hatched: reception unknown". Line: "Checked: This pass can check 19% of the reserve, over the 15% standard." |
-| 1:00 (20:00) | 29.9 to 37.3 | "Those are the candidates." | The rings in received water turn orchid, labelled T01 to T04, "no AIS". Line: "Checked: 4 candidates where AIS was received, seen by both detectors." |
-| 1:03 (20:03) | 33.3 to 41.6 | | One evidence chip under "Gather the evidence": a close radar look at one candidate (T04 in the final gates' runs; the agent picks). |
-| 1:09 (20:09) | 39.1 to 48.0 | | The heat. Clock: "Where to look on the next pass", then "refitted before each radar day since July, its top 5% of water held 45% of the dark targets" (45% on the show's data at gate B, 47% on the Oct 17 rehearsal data; the Nov 5 refresh moves it). |
-| 1:14 (20:14) | 43.9 to 52.9 | | The three patrol boxes, each labelled with its next look. Clock: "Three patrol boxes", with the boxes' own figure ("the three boxes, refitted the same way, held 10%" at the final gates), held 3 to 5 s. Under "When the radar looks again" (44.5 to 53.4 s): "Decided: Drafting box 1: it held the most past dark targets, 9%." |
-| 1:17 (20:17) | 47.3 to 56.1 | | The next radar look's swath over the box. Clock: "Next radar look" with its satellite and time, then a countdown "from ESA's published plan" ("S1-D Oct 24 00:17 UTC", "in 1 d 21 h" at the final gates). With no look planned, the boxes read "no look planned yet" (section 2). |
-| 1:31 (20:31) | 54.8 to 67.0 | Let the answer land. | The answer, its first line in view: "4 candidates on the Oct 12 pass; I drafted box 1 for the next look." It ends "The decision is the officer's; I only draft. Candidates are a reason to look, not accusations." The tasking plate opens on box 1 (55.4 to 67.2 s); clock "Patrol tasking draft", "choose a box and the candidates, then approve". |
-| 1:45 (20:45) | | The fuller lines: coverage, candidates, the prediction, the boxes. Then walk the plate as the officer. | The plate: "Patrol box (from past dark targets)", three boxes with their shares and next looks, the candidates by distance from port, "Nothing is filed until you approve.", then "Approve the tasking" and "Not now". |
-| 4:00 (23:00) | | Choose the box and the candidates, say the decision line, press "Approve the tasking". | A box not chosen steps back; a candidate left out turns grey, "left out". Then the filed line, once, on the plate: "Filed by the officer at … UTC. The agent did not file it." Clock: "Patrol tasking filed", "box 1 · 4 of 4 candidates · next radar look in …". No follow-up turn. |
-| 4:30 (23:30) | | Turn to the second screen. Don't read the post out. | The tasking's post lands in "Patrol taskings": the box and its next look, the candidates kept and any left out, and the pass line, worded like "AIS was received over 30% of the reserve; this pass could check 19%." with the counts of radar targets and candidates (the backend's wording, pinned by its tests). The show's final image. |
-| 5:00 (24:00) | | Go into the close (section 10). | |
+| 0:00 (18:00) | | Switch to Dark Vessels and talk over the rest view for about 30 s while its runtime warms. | The reserve from under the sea at night: the islands, the dashed boundary, ships' broadcasts replayed in motion. Clock: "AIS replay" with its date and time, then "… vessels broadcasting · the 36 hours to the radar pass · Powered by Global Fishing Watch." The two plates under the console. |
+| 0:30 (18:30) | 0 | Click "Who is there without broadcasting, and where next?". | "Weigh the passes on file" lights; the clock's second line becomes "while the agent chooses a radar pass". |
+| 0:34 (18:34) | 3.1 to 4.6 | Point at the board. | The pass board under the step, in mono: the passes on file, newest first, each with its satellite and the share of the reserve it imaged. Five rows on the show's data, Oct 12 first. |
+| 0:38 (18:38) | 7.1 to 8.8 | Point at the line under "Find the radar pass" and say the choice. | Oct 12 marked "reading" on the board, and the read line: "Decided: Reading Oct 12: the newest pass on file. It saw 53% of the reserve." |
+| 0:45 (18:45) | 14.2 to 19.7 | | The radar sweeps in along its track; under "Look at the radar", a chip ("Radar, Oct 12") and one sentence on what the agent sees. Then grey rings on the radar targets, and the broadcasts claim theirs, each ring tied by a hairline to its broadcast. |
+| 0:51 (18:51) | 20.8 to 27.9 | One short line. | The "AIS received" wash inside the radar, and hatched water, "reception unknown". Clock: "This pass can check 19% of the reserve", then "the radar imaged it and other ships' AIS was received there near the pass · hatched: reception unknown". Line: "Checked: This pass can check 19% of the reserve, over the 15% standard." |
+| 1:00 (19:00) | 29.9 to 37.3 | "Those are the candidates." | The rings in received water turn orchid, labelled T01 to T04, "no AIS". Line: "Checked: 4 candidates where AIS was received, seen by both detectors." |
+| 1:03 (19:03) | 33.3 to 41.6 | | One evidence chip under "Gather the evidence": a close radar look at one candidate (T04 in the final gates' runs; the agent picks). |
+| 1:09 (19:09) | 39.1 to 48.0 | | The heat. Clock: "Where to look on the next pass", then "refitted before each radar day since July, its top 5% of water held 45% of the dark targets" (45% on the show's data at gate B, 47% on the Oct 17 rehearsal data; the Nov 5 refresh moves it). |
+| 1:14 (19:14) | 43.9 to 52.9 | | The three patrol boxes, each labelled with its next look. Clock: "Three patrol boxes", with the boxes' own figure ("the three boxes, refitted the same way, held 10%" at the final gates), held 3 to 5 s. Under "When the radar looks again" (44.5 to 53.4 s): "Decided: Drafting box 1: it held the most past dark targets, 9%." |
+| 1:17 (19:17) | 47.3 to 56.1 | | The next radar look's swath over the box. Clock: "Next radar look" with its satellite and time, then a countdown "from ESA's published plan" ("S1-D Oct 24 00:17 UTC", "in 1 d 21 h" at the final gates). With no look planned, the boxes read "no look planned yet" (section 2). |
+| 1:31 (19:31) | 54.8 to 67.0 | Let the answer land. | The answer, its first line in view: "4 candidates on the Oct 12 pass; I drafted box 1 for the next look." It ends "The decision is the officer's; I only draft. Candidates are a reason to look, not accusations." The tasking plate opens on box 1 (55.4 to 67.2 s); clock "Patrol tasking draft", "choose a box and the candidates, then approve". |
+| 1:45 (19:45) | | The fuller lines: coverage, candidates, the prediction, the boxes. Then walk the plate as the officer. | The plate: "Patrol box (from past dark targets)", three boxes with their shares and next looks, the candidates by distance from port, "Nothing is filed until you approve.", then "Approve the tasking" and "Not now". |
+| 4:00 (22:00) | | Choose the box and the candidates, say the decision line, press "Approve the tasking". | A box not chosen steps back; a candidate left out turns grey, "left out". Then the filed line, once, on the plate: "Filed by the officer at … UTC. The agent did not file it." Clock: "Patrol tasking filed", "box 1 · 4 of 4 candidates · next radar look in …". No follow-up turn. |
+| 4:30 (22:30) | | Turn to the second screen. Don't read the post out. | The tasking's post lands in "Patrol taskings": the box and its next look, the candidates kept and any left out, and the pass line, worded like "AIS was received over 30% of the reserve; this pass could check 19%." with the counts of radar targets and candidates (the backend's wording, pinned by its tests). The show's final image. |
+| 5:00 (23:00) | | Go into the close (section 10). | |
 
 **Speaker notes**
 
@@ -409,7 +407,7 @@ While the agent works, a beat lands every few seconds, so say only the short lin
 
 - *Slack:* the post appears only where the tasking's own webhook is set. On a local stage that is `SLACK_TASKING_WEBHOOK_URL` in the backend's environment. On the live site the stack injects only the brief's webhook today, so the tasking needs a production secret of its own first (open decision, section 2). If the post hasn't landed within about 10 seconds (proposed), say "The filed line on the plate is the record; Slack is only the notice," and go into the close. A live approve with its post on the stable stage is unconfirmed until G4.
 
-**Timing:** 8:00, and section 1 is unchanged (spec: under 8:30). The script reaches the close at about 5:00 (24:00): about a minute of agent time, about 3 minutes of narration and the officer's choice, then the post. The other 3 minutes are the closer's margin: a second try at the question and the replay both fit in it. If nothing fails, go into the close at once; the minutes go to questions, where the spare plate can run. Agent time on v17: the question 54.8 to 67.0 s on stage, with a median of 59.2 s over eight eval runs, about 12 s more than before the display rule. The spare plate took 90.3 s; on earlier runtimes five runs drafted in 67.9 to 101.8 s and one stopped at 46.1 s. A turn that read and set aside a newest pass took 81 to 89 s, on an interim runtime. Still to time by hand: twice on dev on Thu 29 Oct, twice on stable on Fri 30 Oct, and on the new data on Fri 6 Nov.
+**Timing:** 8:00, and section 1 is unchanged (spec: under 8:30). The script reaches the close at about 5:00 (23:00): about a minute of agent time, about 3 minutes of narration and the officer's choice, then the post. The other 3 minutes are the closer's margin: a second try at the question and the replay both fit in it. If nothing fails, go into the close at once; the minutes go to questions, where the spare plate can run. Agent time on v17: the question 54.8 to 67.0 s on stage, with a median of 59.2 s over eight eval runs, about 12 s more than before the display rule. The spare plate took 90.3 s; on earlier runtimes five runs drafted in 67.9 to 101.8 s and one stopped at 46.1 s. A turn that read and set aside a newest pass took 81 to 89 s, on an interim runtime. Still to time by hand: twice on dev on Thu 29 Oct, twice on stable on Fri 30 Oct, and on the new data on Fri 6 Nov.
 
 **If a live turn fails**
 
@@ -426,22 +424,32 @@ While the agent works, a beat lands every few seconds, so say only the short lin
 
 ---
 
-## 10. Close (27:00 to 28:00)
+## 10. Close (26:00 to 28:00)
 
-About 170 words, a little over a minute. Go into it from the Slack post on the second screen.
+The close is the deck's second half. After Dark Vessels' Slack post lands on the second screen, go back to PowerPoint and start the slideshow on slide 4, "What you just saw", then slide 5, "How it's built". Slide 6, "Backup: the architecture in detail", is the backup for technical questions: go to it only if someone asks how it works. Before the day, replace "[Your call to action]" on slide 4 and in its notes.
 
-> Four acts, one pattern. The Earth Analyst looked at the scene before it measured, and turned down a cloudy one. The archaeologist chose its own line across an Octagon wall and put its numbers beside the published record. The Methane Hunter followed a satellite tip, checked it with a sharper instrument and the ground record, showed why it followed one site, and told us what it could not confirm. Dark Vessels chose its radar pass, checked whether a silence could mean anything there, gave a prediction it had checked against past radar days, and drafted a patrol. The officer decided whether that patrol goes.
+| Slide | Title | Point to land | Spoken |
+|---|---|---|---|
+| 4 | What you just saw | Four acts, one pattern: the agent does the legwork and drafts; a person decides. | about 54 s, plus your call to action |
+| 5 | How it's built | Four agents share one model; the analyst or officer decides. | about 50 s |
+
+- 259 spoken words, about 1:44 at 150 words a minute, which leaves about 15 s for the switch back to the slideshow and your call to action.
+- Slide 4 shows three lines, with the person's decision on the amber dot: "The agents chose their tools, looked before they measured, and showed their reasons", "The agent does the legwork and drafts; the analyst or officer decides" and "One platform: each agent is its own runtime on Amazon Bedrock AgentCore", then "[Your call to action]".
+- Slide 4's notes recap the four acts in show order, one sentence each, ending on the officer's decision:
+
+> Four acts, one pattern. The Earth Analyst looked at a scene before it measured, and turned down a cloudy one. The AI Archaeologist chose its own line to measure across an Octagon wall. Methane Watch followed a satellite tip, checked it with a sharper instrument, and told us what it could not confirm. Dark Vessels chose its radar pass, checked whether a silence could mean anything there, predicted where to look and drafted a patrol; the officer decided whether it goes. Not every step was the model choosing live: some of the data was prepared ahead of time, and I've pointed out which. Each agent is its own runtime on Amazon Bedrock AgentCore, on one shared map. The agent does the legwork and drafts; a person decides. [Your call to action]
 >
-> Not every step was the model choosing live. The Earth Analyst picks its own tools, dates and scenes. The archaeologist follows a set path over LiDAR prepared ahead of time, but picks its own line. The methane mission runs on live data with fixed rules. Dark Vessels reads radar and broadcasts prepared ahead of time, and chooses its own way through them. I've pointed out which is which.
->
-> Each agent is its own runtime on Amazon Bedrock AgentCore, on one shared map. The agent does the legwork and drafts. A person decides. Thank you. Happy to take questions.
+> Here's how it's built.
 
-Alternative lines:
+- Slide 5 walks the diagram left to right: the analyst or officer, the web app, the four runtimes, the model and the data sources along the bottom, then the filed record going to S3 and Slack. It ends: "Happy to take questions."
+- Slide 4's notes call the methane act "Methane Watch", as the switcher does; slide 3 calls it "Methane Hunter" (section 5).
 
-- If Act 4 ran as the 90-second teaser, say instead: "The archaeologist showed a known site under the grass, from the public record only."
+Alternative lines (each takes the place of a sentence in slide 4's recap):
+
+- If Act 4 ran as the 90-second teaser, say instead: "The AI Archaeologist showed a known site under the grass, from the public record only."
 - If Act 3 didn't reach the tasking, end the recap on: "Dark Vessels keeps its candidates as candidates, and the officer decides whether a patrol goes."
 - If Act 3 ran as its replay (proposed): "Dark Vessels drafted a patrol. A recording doesn't replay the decision: live, the officer decides whether that patrol goes."
-- If Methane Watch closes the show (section 1's fallback rows), say the recap in that order and end on: "The Methane Hunter followed a satellite tip, checked it with a sharper instrument and the ground record, showed why it followed one site, and told us what it could not confirm. The analyst decided what was filed." If the four-turn Act 3 ran third, its sentence comes before the methane one: "Dark Vessels kept its candidates as candidates, and the officer decided whether a patrol goes." In the second paragraph, say instead: "The vessels act follows a set path over radar prepared ahead of time." If Act 3 was cut, say "Three acts, one pattern." and leave out every Dark Vessels sentence.
+- If Methane Watch closes the show (section 1's fallback rows), go back to the slideshow on slide 4 after its hand-off line, say the recap in that order and end on: "Methane Watch followed a satellite tip, checked it with a sharper instrument and the ground record, showed why it followed one site, and told us what it could not confirm. The analyst decided what was filed." If the four-turn Act 3 ran third, its sentence comes before the methane one: "Dark Vessels kept its candidates as candidates, and the officer decided whether a patrol goes." After the honest line, add: "The vessels act follows a set path over radar prepared ahead of time." If Act 3 was cut, say "Three acts, one pattern." and leave out every Dark Vessels sentence.
 
 ---
 
