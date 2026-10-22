@@ -199,7 +199,9 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   - [ ] 6.3 Follow-up (redesign task 9a): Re-run task 9a with s1d-20261018t1149 once GFW's AIS
     reaches Oct 19 (about Oct 24), before the Nov 3 freeze, still on v1r. The Oct 21 run built the
     Oct 17 pass only (`--until 2026-10-18`): GFW's AIS then reached Oct 17 and showed 0 vessels in
-    every hour of the Oct 18 pass's window, so building it would have shown a false 0% heard
+    every hour of the Oct 18 pass's window, so building it would have shown a false 0% heard.
+    Its `--history` step now writes real hours, km and knots (the gate log's Oct 21 entry, "the
+    final gates"): GFW's gaps events carry them as null, so 9a's zeros were not a quirk of the seed
   - _Requirements: 13.1, 13.2, 14.1_
 
 ## Days 10–11 (Oct 29–30): rehearsal and G4
@@ -286,10 +288,32 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
     events no longer fill the fields `build_history` reads (`durationHours`, `distanceKm`,
     `impliedSpeedKnots`, read with a default of 0). On v1r `reachable_area` therefore
     returns `hours_after_off` 0.0. The Nov 5 runbook's `--history` (task 13) would write the same
-    into v1, so the build needs a fix and a test before then
+    into v1, so the build needs a fix and a test before then (fixed at the final gates, below)
   - Task 10, docs: the run sheet (`design.md`), the redesign's §3.2 and §3.9 with the seconds
     measured above, and DESIGN.md's Act 3 paragraph. The presenter's timed rehearsal x2 on dev
     (7.1, Act 3 under 8:30 twice) is manual and was not done in this run
+  - The final gates, 21:00 to 23:00 EDT. The rebase onto `develop` `452cac3` needed three of
+    Act 3's tests fixed (`124df77`). Then:
+    - **v15** (`124df77`): all cases 11/11; `open-question` x3 **2/3**. One run put each map call
+      one tool late (redesign §3.4).
+    - **The display fix** (`2bac6d6`, `752330c`): each step's maps go in a response of their own.
+    - **v17** (`752330c`, v1r): all cases 11/11; `open-question` x3 3/3 (median 58.1 s), then x5
+      5/5 (median 59.6 s). All nine runs read Oct 12 as `newest_wide`, with 0 refusals. The turn is
+      about 12 s longer than v15's.
+    - **AC 6**, three live runs at 1920 and one at 1280 on v17: every check met (`final-gates.md`).
+  - Finding F1, the history's 0 hours, km and knots: **found and fixed** (`2aa7c09`).
+    - The cause is not the seed. GFW's gaps events now return `durationHours`, `distanceKm` and
+      `impliedSpeedKnots` as null on every event (three windows probed: 2025, Case 8's and Oct
+      2026). So any `--history` build, the Nov 5 runbook's included, wrote zeros.
+    - The fix: `gap_row` keeps GFW's figures when it gives them. Otherwise it reads hours from the
+      event's start and end, km between the off and on positions, and knots from the two. v1's
+      Oct 16 rows match that to the 0.1 rounding wherever GFW's event is unchanged. Pytests.
+    - v1r's history was rebuilt after a backup to `vessels/cache/v1r/backup-2026-10-22-history/`
+      (`--history --until 2026-10-18 --prefix vessels/cache/v1r`). Now 5,748 of 5,748 rows have
+      hours and km, and 5,634 have knots (the rest round to 0.0).
+    - v1 is untouched: its 5,664 rows have hours and km. Its knots are 0 on 122 rows, as GFW gave
+      them on Oct 16.
+    - The silent-vessel spare reads 355.9 h, 476.6 km and 0.7 kn on both prefixes
   - U14, recorded for after this run (tasks 13 and 14, Nov 5 and 6): if any of three runs on the
     rerun data ends without a draft or takes over 120 s, restore the backups and present on the
     pre-rerun data; task 9a showed no such signal, so the rerun stands

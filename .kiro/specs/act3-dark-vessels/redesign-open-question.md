@@ -525,6 +525,14 @@ The read-and-set-aside path is shown only by the spare plate "Same question, end
 Every run drafted, in 44 to 75 s, with 0 refusals, so task 9a gives no U14 signal. Task 10's run
 sheet carries these lines.
 
+At the final gates (Oct 21, same data) the choice held on the deployed prompt: runtime v17 read
+Oct 12 as `newest_wide` in all nine `open-question` runs and all four live stage runs. One interim
+prompt, v16 (the look-then-show line reworded, §3.4), read Oct 17 first in 5 of 8 runs, set it aside
+as `coverage_thin` (8% checkable) and then read Oct 12, in 81 to 89 s. That rewording was reverted
+for another reason (§3.4), but it shows the first pick on this data is open: the set-aside of the
+newest pass can happen live. The stage's 14-step path covers it (vitest); the run sheet's board line
+is right for v17's path.
+
 ### 3.4 The prompt (`vessels_config.py`) and the entrypoint
 
 Every block, kept, replaced or deleted:
@@ -536,7 +544,7 @@ Every block, kept, replaced or deleted:
 | RESPONSE STYLE | 60-63 | Kept |
 | FINAL REPORT | 65-80 | Deleted (replaced by ANSWER) |
 | CONFIDENCE | 82-83 | Deleted (it says "heard water") |
-| DISPLAY RIDES ALONG | 85-91 | Bullets kept. The titles become placeholders: "Radar, <date>", "Radar targets", "AIS received", "AIS reception unknown", "Dark targets seen before", "Patrol boxes", "Next radar look", and for the spares "Squid fleet, latest month" and "Reach by water, <date>" |
+| DISPLAY RIDES ALONG | 85-91 | Bullets kept. The titles become placeholders: "Radar, <date>", "Radar targets", "AIS received", "AIS reception unknown", "Dark targets seen before", "Patrol boxes", "Next radar look", and for the spares "Squid fleet, latest month" and "Reach by water, <date>". At the final gates (Oct 21) the block becomes DISPLAY ON ITS OWN, and its first bullet is replaced (below) |
 | LOOK BEFORE YOU ANALYSE | 93-98 | The radar sentence and the chip description are kept. "at most two evidence chips" and "At most 4 inspections" are deleted; BUDGET holds the counts |
 | UNITS, ATTRIBUTION | 100-101 | Kept |
 | WORKFLOW | 103-121 | Deleted, and replaced by the blocks below |
@@ -614,6 +622,41 @@ is `RECORD_ONLY` ("That is all the record shows.") and the closer, never "a coin
 match" (`reachable_area`'s `next_steps` say the same). The golden `gone-silent` case forbids
 "coincid" and "a match" in the prose, and `named-pass`, a single pass, forbids "aside".
 
+**The final gates (Oct 21): each step's maps in a response of their own.** After the rebase onto
+`develop` `452cac3`, `open-question --repeat 3` on v15 passed 2 of 3. The failing run (47.1 s, 0
+refusals, the usual path) obeyed DISPLAY RIDES ALONG's "display_visual in the SAME response as the
+next tool call", but put the tool first and each step's map one tool late:
+- `match_ais` was in one response with the received area, before the reception-unknown area;
+- the targets were shown with `check_ais_coverage`, before the match, and never again after it.
+
+So the map never revealed the candidates, and the column never said "Checked: 4 candidates". The
+user's call: each `display_visual` is a call of its own, before the next tool and never in the same
+response as another tool. Its first bullet now reads:
+
+```
+DISPLAY ON ITS OWN:
+- A response that calls display_visual calls no other tool. Show what a tool made in a response of
+  its own, then make the next tool call in the response after it. A step's maps go together in
+  that one response: both coverage areas, or the heat and the boxes.
+```
+
+"Another tool" means a tool other than `display_visual`. The two maps of one step (both coverage
+areas, or the heat and the boxes, as `HOTSPOTS_SHOW` already asks) share their response, because
+their order between themselves changes nothing on the stage. The other three bullets are unchanged.
+v16 also reworded the look-then-show bullet to "inspect_image in one response, display_visual of
+the same image in the next". `fleet-season` then called `inspect_image` on the fleet's GeoJSON
+(refused), so v17 restored the original words.
+
+Every tool `next_steps` that asks for a display says the same: "in a response of its own, with no
+other tool" (§3.5). A pytest pins both the prompt bullet and every such tool string.
+
+Cost, measured on v17 against v15 on the same v1r data, one pass read in every run:
+- model turns: a median of 13 per `open-question` turn became 18;
+- turn seconds: 45.4 to 49.8 s (median 46.8 s over 4 runs) became 55.6 to 64.4 s (median 59.2 s
+  over 8 runs), about 12 s more;
+- on stage: the answer landed 54.8 to 67.0 s after the click, against 45.9 to 52.0 s at gate B;
+- the transcripts: no response holds both a tool and a display.
+
 Gate A attempt 1 (Oct 21) tightened the block above without changing its content: the pass and
 candidates bullets have fixed words (the longest legal answer is 117 words, pinned from these
 templates), the answer begins on its first line, dates carry no year, a date not on file names the
@@ -670,9 +713,9 @@ No tools are merged:
 | `decide(step, because, pass_id="", box=0)` | **new**, `decide_tools.py` | Spec below |
 | `find_pass` | changed | `latest` means the newest listed pass, by `sensed`. There is no star. It returns `imaged_share`, and drops `role` and `reserve_share`. While a question is open (only in the turn that opened it, below), it refuses a pass not yet read once two have been read ("Two passes read: go to the forecast."). In a later turn the budget does not apply, so a spare's `find_pass` runs as today. `next_steps` drops the call order |
 | `inspect_image`, `display_visual` | unchanged | |
-| `detect_vessels` | gated | While a question is open, refuses a pass with no accepted `read_pass` in this question (below). `next_steps`: "show the targets; then the coverage check" |
-| `check_ais_coverage` | changed, gated | The same gate. Returns `imaged_share`, `heard_share` (the received share, kept under its old key because `draft_tasking` copies it, `tasking_tools.py:90`, and the backend needs it, `tasking.ts:155-158`), `checkable_share`, `standard` and `unexplained: {received, unknown}`. Imaged cells are the pass's `imaged_cells` plus every cell holding one of its targets. The received wash is clipped to the imaged cells, and the hatch is the imaged cells minus the received ones. `cv.agree` runs on the clipped shape. The heard feature gains `imaged`, `checkable` and `standard`. The coverage record keeps `heard_share` and gains `imaged_share`, `checkable_share` and the `question_id`. `next_steps`: "show both areas; judge this pass against the standard" |
-| `match_ais` | changed, gated | The same gate. Refuses when the pass's coverage record is under `CHECKABLE_FLOOR`: `{"error": "This pass can check only N% of the reserve, under the 15% standard: no target on it can be called a candidate.", "checkable_pct", "standard_pct"}`. In any turn, refuses a coverage record from a question other than the session's latest ("Run check_ais_coverage again for this question."). Adds `checkable_share` and `say_as`. The match record gains the `question_id`. `next_steps` depends on the count, word for word: with candidates, "Show the targets (display_visual with targets_s3_url and render) with your next call; then the evidence."; with none, "Show the targets (display_visual with targets_s3_url and render) with your next call. No candidates on this pass: decide what follows." Showing a tool's own output is not investigation order, so R2.2 holds; without that display the map never reveals the matched targets |
+| `detect_vessels` | gated | While a question is open, refuses a pass with no accepted `read_pass` in this question (below). `next_steps`: "show the targets in a response of its own, with no other tool; then the coverage check" (the final gates) |
+| `check_ais_coverage` | changed, gated | The same gate. Returns `imaged_share`, `heard_share` (the received share, kept under its old key because `draft_tasking` copies it, `tasking_tools.py:90`, and the backend needs it, `tasking.ts:155-158`), `checkable_share`, `standard` and `unexplained: {received, unknown}`. Imaged cells are the pass's `imaged_cells` plus every cell holding one of its targets. The received wash is clipped to the imaged cells, and the hatch is the imaged cells minus the received ones. `cv.agree` runs on the clipped shape. The heard feature gains `imaged`, `checkable` and `standard`. The coverage record keeps `heard_share` and gains `imaged_share`, `checkable_share` and the `question_id`. `next_steps`: "show both areas in a response of their own with no other tool; judge this pass against the standard" (the final gates) |
+| `match_ais` | changed, gated | The same gate. Refuses when the pass's coverage record is under `CHECKABLE_FLOOR`: `{"error": "This pass can check only N% of the reserve, under the 15% standard: no target on it can be called a candidate.", "checkable_pct", "standard_pct"}`. In any turn, refuses a coverage record from a question other than the session's latest ("Run check_ais_coverage again for this question."). Adds `checkable_share` and `say_as`. The match record gains the `question_id`. `next_steps` depends on the count, word for word: with candidates, "Show the targets (display_visual with targets_s3_url and render) next, in a response of its own with no other tool; then the evidence."; with none, "Show the targets (display_visual with targets_s3_url and render) next, in a response of its own with no other tool. No candidates on this pass: decide what follows." Showing a tool's own output is not investigation order, so R2.2 holds; without that display the map never reveals the matched targets. **Reworded at the final gates (Oct 21).** M2's words were "... with your next call; ..." and "... with your next call. ...". They are changed because "with your next call" let the display share a response with the next tool. In one run in three that response put `match_ais` first, and the matched targets were never shown (§3.4). M2's intent, the display after each `match_ais` (golden `expected_after`), is kept |
 | `gather_evidence` | strings, one check | As listed in §3.4, plus `say_else`. In any turn, refuses a match record from a question other than the session's latest ("Those records are from an earlier question: read the pass again.") |
 | `predict_hotspots(pass_id="")` | changed | Adds the rolling check (§3.7) with `say` and `say_boxes`, and keeps today's single hold-out in the record. With `pass_id`, each box carries `candidates_near`: that pass's candidates inside the box or within 5 km of it, from this question's match record, and 0 for every box when there is none. The heat file's first feature carries the top 5% figures (`check_pct`, `check_times`, `check_since`), the way the heard file's first feature carries `share` today (`MapView.tsx:629`). Every box feature carries the boxes' figures (`boxes_pct`, `boxes_times`, `boxes_days_hit`, `days`) and no top 5% number. The map's box label becomes "Box {k}", without the share (`forecast_tools.py:162`). A box's share of past dark targets then appears in two places only, each worded as history: the `most_past_targets` line and the tasking plate's box options ("Box {k}  {NN}% of past dark targets", `TaskingPlate.tsx:194`). The boxes' measured figure is on the clock (§3.7, §3.8.4). The record gains the `question_id` |
 | `next_look` | unchanged | |
@@ -1334,7 +1377,7 @@ costs one more round trip, about 2 to 3 s. Gate A measures this.
 | Forecast | `predict_hotspots(pass_id)`, two displays | 9 s | 8.6 to 11.3 s, the chip to the boxes beat, with the heat's 5 s hold |
 | Box and look | `decide`, `next_look`, display | 6 s | the draft line lands during the heat hold, 8.1 to 10.8 s after the chip; the look 0.5 s after the boxes beat at gate B, 3.0 s since W1 (task 9) |
 | Draft and answer | `draft_tasking`, about 110 words | 13 s | 6.4 to 7.7 s, the look to the answer at gate B; 4.6 and 5.5 s since W1, which holds only the look (task 9) |
-| **Clean path** | | **about 60 s** | **45.9 to 52.0 s on stage (gate B); turns of 43.8 to 81.1 s in the eval, median 51.3 s over 12 runs** |
+| **Clean path** | | **about 60 s** | **45.9 to 52.0 s on stage (gate B); turns of 43.8 to 81.1 s in the eval, median 51.3 s over 12 runs. Since the final gates' display rule (v17, v1r): 54.8 to 67.0 s on stage, turns of 55.6 to 64.4 s, median 59.2 s over 8 runs (§3.4)** |
 | Set-aside path | plus a decision, a look, detect and coverage | about 77 s | 67.9 to 101.8 s over five `thin-pass` runs with a draft (gate A 101.8, 82.5 and 81.2 s; task 9a 67.9 s; task 9 94.7 s) |
 | `stop` ending | the set-aside path to the forecast, then `decide(stop)` and a short answer | about 75 s | 46.1 s, once (gate B, one refusal) |
 | Worst inside the budget | two passes read, a refusal and a second chip | about 95 s | the slowest run recorded is 101.8 s (`thin-pass`, gate A attempt 1, before its fixes); since the fixes, 94.7 s (task 9) |
@@ -1563,6 +1606,10 @@ lane item "Act 3 coverage and officer copy" (`summary.md:162`) is dropped, becau
 - `vs.begin_turn`: a new `turn_id` each call, and the prompt capped at 2,000 characters.
 - `match_ais` refusing under the floor, and refusing an earlier question's coverage record; its two
   `next_steps` pinned word for word, with candidates and with none.
+- Every display the tools ask for (`find_pass`, `detect_vessels`, `check_ais_coverage`, `match_ais`
+  with and without candidates, `predict_hotspots`, `next_look`, `fleet_pattern`, `reachable_area`)
+  is asked for "in a response of its own (or their own), with no other tool". The prompt carries
+  DISPLAY ON ITS OWN's first bullet and the original look-then-show bullet (the final gates).
 - `passes()`: read from the manifest, with duplicates removed by id.
 - `find_pass("latest")` returning the newest pass, and its output carrying no `role` and no
   `reserve_share`.
@@ -1823,7 +1870,7 @@ carry each fix into the code and tests are named in the last column.
 | Finding | Response | Where |
 |---|---|---|
 | M1 the question never closes, so the two-pass budget breaks the silent-vessel spare in a later turn | Addressed as given: a question is open only during the turn that opened it (`vs.current_question()` checks `turn_id`); the gate and `find_pass`'s budget apply only then, and `decide` refuses in a later turn with no `list_passes`; `draft_tasking`'s checks (a) to (c) and the stale-record checks in `match_ais` and `gather_evidence` use the session's latest question in any turn; a later turn that skips `list_passes` is ungated; pytest for the spare after a two-pass question; `gone-silent` set up with the question and run at gate A and in task 9a | R2.9 to R2.11, §3.5 (rows, question state, the gate), §3.6 task 9a, §3.10, §3.14, AC 1 and 4; tasks 3 and 5 |
-| M2 a "no candidates" line can beat the map's reveal, and `match_ais` no longer asks for the targets to be shown | Addressed as given: `match_ais`'s two `next_steps` written out word for word; the two `no_candidates` lines and the board's "no candidates" state render only once `revealedPasses` holds the `from` pass; `open-question` and `thin-pass` require a `display_visual` with `targets_{pass_id}` after each `match_ais`, through a new `expected_after` key (the review allowed this or an `expected_before` form; `expected_after` is the one that says "after"); vitest for a `no_candidates` file loaded before the reveal | R4.2, R8.1, §3.5 `match_ais`, §3.8.1, §3.10, §3.14, AC 5 and 6; tasks 3, 5, 7a and 7b |
+| M2 a "no candidates" line can beat the map's reveal, and `match_ais` no longer asks for the targets to be shown | Addressed as given: `match_ais`'s two `next_steps` written out word for word; the two `no_candidates` lines and the board's "no candidates" state render only once `revealedPasses` holds the `from` pass; `open-question` and `thin-pass` require a `display_visual` with `targets_{pass_id}` after each `match_ais`, through a new `expected_after` key (the review allowed this or an `expected_before` form; `expected_after` is the one that says "after"); vitest for a `no_candidates` file loaded before the reveal. (`match_ais`'s two `next_steps` reworded at the final gates, Oct 21, so the display has a response of its own: §3.5.) | R4.2, R8.1, §3.5 `match_ais`, §3.8.1, §3.10, §3.14, AC 5 and 6; tasks 3, 5, 7a and 7b |
 | M3 `rest_v1.json` never gets the `bucket` the early board depends on | Addressed as given: task 2 republishes the star's rest replay on v1 with `bucket` right after `--imaged` and confirms the payload; `warm_vessels.py --check` fails without a valid `bucket`; `loadVesselRest` with no `bucket` leaves the fallback off (vitest); the Nov 5 backup and restore therefore carry it. R9.1 now says the rest file is not republished with `--newest` under the fallback, since task 2's republish (which adds only `bucket`) stands | R7.3, R7.4, R9.1, §3.6, §3.8.1, §3.14, AC 5; tasks 2 and 7b |
 | M4 "Slack stays off stage in Act 3" was an open decision | Addressed: U15 added and approved "No" on Oct 21, then amended the same day to "Yes" (Act 3 becomes the closer, ending on the Slack post). The review's "if yes" branch is taken: N3 amended, the Slack `pass` line and "From the pass" section reworded in task 1 with `checkable_share` optional and backend tests, the ten workflow keys unchanged, the show order in task 10's run sheet | §2.4, N3, §5 U15, §4 tasks 1 and 10 |
 | M5 the 13 px step numbers and 11 px "working" label were handed to a fix that did not exist | Addressed: the item now exists as `stage-fixes-1` item 13 (its plan's Group 4, user-approved Oct 21: step numbers 13 to 15 px and the working label 11 to 15 px in every act), owned by that run and landing before gate B. AC 6 and R6.6 cite it, and AC 6's 15 px check covers the whole column. This design does not change those sizes | R6.6, AC 6, §3.11 coordination |

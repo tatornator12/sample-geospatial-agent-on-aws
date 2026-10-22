@@ -361,6 +361,23 @@ and 6.4 to 8.1 s at gate B (`t9-verification.md` section 2, `evals/t9-browser-r2
 minutes in the first column are a plan, not yet timed: the presenter's timed rehearsal x2 on dev
 (task 7.1, Act 3 under 8:30 twice) is manual and has not been run.
 
+**Since the final gates (Oct 21, runtime v17, v1r data):** the agent now shows each step's maps in
+a response of their own (redesign §3.4). The beats keep their order, but each lands later than in
+the table below. Over four live runs (three at 1920, one at 1280; `final-gates.md`):
+- the board, 3.1 to 4.6 s;
+- the read line, 7.1 to 8.8 s;
+- the radar, 14.2 to 19.7 s;
+- coverage, 20.8 to 27.9 s;
+- the reveal, 29.9 to 37.3 s;
+- the chip, 33.3 to 41.6 s;
+- the heat, 39.1 to 48.0 s;
+- the boxes, 43.9 to 52.9 s;
+- the draft line, 44.5 to 53.4 s;
+- the look, 47.3 to 56.1 s;
+- the answer, 54.8 to 67.0 s.
+
+The answer lands about 9 to 15 s later than gate B. The boxes beat held 3.2 to 5.0 s before the look.
+
 | t | After the click (s, measured) | Beat | Presenter | What the room sees |
 |---|---|---|---|---|
 | 0:00 | | Switch | Choose Dark Vessels; the stage prewarms its runtime | The sea from below at night, the AIS replay in motion with its date, the reserve and its ports |
