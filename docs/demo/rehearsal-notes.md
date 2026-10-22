@@ -340,6 +340,7 @@ Goal: it senses the invisible and triages at scale, on live data, and shows why 
 **If a live turn fails**
 
 - Mission fails, or a live source is down: load `/?scenario=methane-watch-mission&agent=methane` (re-recorded 21 October from dev on the plate's words: Shanxi and the south Caspian cued, the brief on Shanxi, near Yangquan City, with both tallies on the board). The card is read-only: "Recorded case: the decision is made live, not replayed." Say: "In a recording the decision isn't replayed; live, this is where I'd file it." Leave it with `/?agent=methane` or New session.
+- If NASA's search is down (no plumes appear), switch to the Methane Watch replay.
 - The two-beat fallback (the spec's earlier run sheet): plate 2 finished with `the Permian Basin` (22.5 s live in the review: ranks 1 to 3 and a table), then plate 3 (64.7 s; the camera flies to the strongest plume, near Woodruff, Utah, in the recorded run). If asked "why 2024?": NASA's plume product is dense through 2024 and nearly empty after.
 - Permian replay: `/?scenario=methane-permian-2024&agent=methane` (re-recorded 21 October; the plume is on its own ramp, 500 to 7,000+ ppm·m). Plate 3 has no replay.
 - Over 6:30 in rehearsal (proposed; run sheet: over 7:30 against 7:00): use the mission replay from the start.
