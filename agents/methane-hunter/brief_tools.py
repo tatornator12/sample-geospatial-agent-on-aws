@@ -304,6 +304,70 @@ def find_checks(lat: float, lon: float) -> dict:
     return out
 
 
+_CM_KEY = re.compile(r"^cmplumes_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
+CM_ATTRIBUTION = "Source: Carbon Mapper (data.carbonmapper.org)"
+CM_INSTRUMENT_WORDS = {"tanager": "Tanager-1", "emit": "EMIT", "airborne": "airborne", "other": "another instrument"}
+
+
+def _num(value, lo: float, hi: float) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return float(value) if lo <= value <= hi else None
+
+
+def carbon_mapper_line(rec: dict) -> str | None:
+    """The brief's "Independent detections" sentence, written by code from Carbon Mapper's record
+    (carbon_mapper_plumes' cmplumes_<lat>_<lon>.json): count, latest date, instrument, rate ± its
+    uncertainty, the attribution. None when the record is malformed."""
+    count = rec.get("count")
+    radius = _num(rec.get("radius_km"), 0.5, 10)
+    since = rec.get("since")
+    if isinstance(count, bool) or not isinstance(count, int) or not 0 <= count <= 10_000 or radius is None \
+            or not isinstance(since, str) or not _DAY.fullmatch(since):
+        return None
+    where = f"within {radius:g} km since {since}"
+    if count == 0:
+        return f"Carbon Mapper lists no methane plume {where}. {CM_ATTRIBUTION}."
+    latest = rec.get("latest")
+    instrument = CM_INSTRUMENT_WORDS.get(rec.get("instrument"))
+    if not isinstance(latest, str) or not _DAY.fullmatch(latest) or not instrument:
+        return None
+    rate = _num(rec.get("rate_kg_h"), 0, 1_000_000)
+    unc = _num(rec.get("uncertainty_kg_h"), 0, 1_000_000) if rate is not None else None
+    tens = lambda v: f"{int(round(v / 10.0) * 10):,}"   # noqa: E731  (to the nearest 10 kg/h)
+    est = (f", Carbon Mapper's estimate about {tens(rate)}{f' ± {tens(unc)}' if unc is not None else ''} kg/h"
+           if rate is not None else ", no emission estimate published")
+    noun = "plume" if count == 1 else "plumes"
+    return f"Carbon Mapper lists {count} methane {noun} {where}; the latest on {latest} by {instrument}{est}. {CM_ATTRIBUTION}."
+
+
+def find_carbon_mapper(lat: float, lon: float) -> dict | None:
+    """Carbon Mapper's record for this site this session (nearest within 2 km), with its sentence.
+    None when carbon_mapper_plumes did not run here (or its record is malformed)."""
+    s3 = mt._s3()
+    best = None
+    try:
+        listing = s3.list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=f"{mt.session_prefix()}cmplumes_")
+        for obj in listing.get("Contents", []):
+            m = _CM_KEY.fullmatch(obj["Key"].rsplit("/", 1)[-1])
+            if not m:
+                continue
+            d = math.hypot((float(m[1]) - lat) * 110.574, (float(m[2]) - lon) * 111.320 * math.cos(math.radians(lat)))
+            if d <= CHECK_RADIUS_KM and (best is None or d < best[0]):
+                best = (d, obj["Key"])
+        if best is None:
+            return None
+        rec = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=best[1])["Body"].read(100_000))
+        line = carbon_mapper_line(rec) if isinstance(rec, dict) else None
+        if not line:
+            return None
+        return {k: rec.get(k) for k in ("count", "latest", "rate_kg_h", "uncertainty_kg_h", "instrument",
+                                        "radius_km", "since")} | {"line": line}
+    except Exception as e:  # an addition to the brief, never a reason to fail it
+        logger.warning("carbon mapper lookup failed: %s", type(e).__name__)
+        return None
+
+
 # The registry check's sentences, in the order the brief and the card print them.
 REGISTRY_LINES = ("line", "field_line", "gem_field_line", "mine_line")
 _SHARE = re.compile(r"\s*\(\d+(?:\.\d+)?%\)\s*$")
@@ -376,6 +440,9 @@ def render_markdown(brief: dict, brief_id: str) -> str:
                    if c and c.get("line")]
     registry = checks.get("registry") or {}
     check_lines += [f"- Check: {registry[k]}" for k in REGISTRY_LINES if registry.get(k)]
+    cm = checks.get("carbon_mapper") or {}
+    if cm.get("line"):
+        check_lines.append(f"- Independent detections: {cm['line']}")
     lines = [
         f"**Methane Watch brief: {brief['title']}** (draft `{brief_id}`, not filed)",
         "",
@@ -451,6 +518,9 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
         brief.update(candidates=passes["candidates"], passes_read=passes["read"], passes_since=passes["since"])
         brief["title"] = compose_title(brief["place"], brief["confidence"], brief["candidates"])
     brief["checks"] = find_checks(brief["lat"], brief["lon"])
+    cm = find_carbon_mapper(brief["lat"], brief["lon"])
+    if cm:   # Carbon Mapper's independent detections, in the tool's own sentence (with its attribution)
+        brief["checks"]["carbon_mapper"] = cm
     named = check_record_names(brief, record_names(brief["checks"])) + check_only_oil_gas(brief, brief["checks"])
     if named:   # nothing is written: the model rewrites its fields and calls again
         return json.dumps({"error": "Rewrite these parts of the brief: " + "; ".join(named[:8])})

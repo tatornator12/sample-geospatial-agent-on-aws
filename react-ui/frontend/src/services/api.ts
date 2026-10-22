@@ -470,6 +470,8 @@ export interface BriefCardData {
   /** What the data cannot show, and the recommended next look. */
   gaps?: string[];
   nextCollection?: string;
+  /** Carbon Mapper's independent detections at the site, the tool's own sentence with its source. */
+  independent?: string;
 }
 
 export interface BriefState {

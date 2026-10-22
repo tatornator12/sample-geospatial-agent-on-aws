@@ -124,6 +124,7 @@ const STEP_NAMES: Record<string, string> = {
   watch_baseline: 'Build the baseline',
   scan_tropomi: 'Scan with TROPOMI',
   check_recent_passes: 'Cue EMIT',
+  carbon_mapper_plumes: 'Check Carbon Mapper',
   site_history: 'Check the site history',
   draft_brief: 'Draft the brief',
   brief_status: 'Check the brief',

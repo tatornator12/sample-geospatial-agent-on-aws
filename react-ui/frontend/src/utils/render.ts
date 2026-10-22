@@ -11,9 +11,10 @@
  */
 
 /** raster: a COG through TiTiler; vector: graduated outlines; points: site dots and repeat rings;
- * columns: 3D cells extruded by a numeric property. */
-export type RenderKind = 'raster' | 'vector' | 'points' | 'columns';
-export const RENDER_KINDS: readonly RenderKind[] = ['raster', 'vector', 'points', 'columns'];
+ * columns: 3D cells extruded by a numeric property; detections: another catalogue's plume points
+ * (Carbon Mapper), drawn as rings that never move the camera. */
+export type RenderKind = 'raster' | 'vector' | 'points' | 'columns' | 'detections';
+export const RENDER_KINDS: readonly RenderKind[] = ['raster', 'vector', 'points', 'columns', 'detections'];
 
 // `gray` and `rdbu_r` are the AI Archaeologist's terrain products (a hillshade, a local relief model).
 export const COLORMAPS = ['plasma', 'viridis', 'magma', 'ice', 'rdylgn', 'rdylgn_r', 'blues', 'spectral', 'gray', 'rdbu_r'] as const;

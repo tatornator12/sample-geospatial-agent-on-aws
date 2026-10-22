@@ -387,3 +387,29 @@ def test_every_agents_golden_cases_are_well_formed():
 def test_repeat_must_be_one_or_more(repeat):
     with pytest.raises(SystemExit):
         ev.main(["--target", "dev", "--agent", "vessels", "--repeat", repeat, "--dry-run"])
+
+
+def test_a_dotted_match_reads_a_nested_field_and_the_mission_must_show_its_columns():
+    """Oct 22: the production mission looked at its EMIT candidate's window and never put the 3D
+    columns on the map. The golden mission cases now require a display_visual with render.kind
+    'columns' after any inspect_image of a pass window (and nothing when no window was looked at)."""
+    import json as _json
+    from pathlib import Path
+    cases = _json.loads((Path(ev.REPO_ROOT) / "agents" / "methane-hunter" / "golden_prompts.json").read_text())["prompts"]
+    mission = next(c for c in cases if c["name"] == "watch-mission")
+    d = "s3://bucket/session_data/eval-x/methane/"
+    window = {"name": "inspect_image", "input": _json.dumps({"s3_url": f"{d}pass_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.tif"})}
+    flat = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}pass_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.tif",
+                                                             "render": {"kind": "raster", "colormap": "plasma"}})}
+    cols = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}columns_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.geojson",
+                                                             "render": {"kind": "columns", "property": "ppm_m"}})}
+    as_text = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}columns_x.geojson", "render": '{"kind": "columns"}'})}
+    assert ev.input_problems(mission, [window, cols]) == []
+    assert ev.input_problems(mission, [window, as_text]) == []
+    assert ev.input_problems(mission, [cols, window]) != []          # the columns must follow the look
+    problems = ev.input_problems(mission, [window, flat])            # the Oct 22 stable mission
+    assert problems and "render.kind=columns" in problems[0]
+    assert ev.input_problems(mission, []) == []                      # no candidate looked at: nothing to show
+    assert ev.dotted({"render": {"kind": "columns"}}, "render.kind") == "columns"
+    assert ev.dotted({"render": "not json"}, "render.kind") is None and ev.dotted({}, "a.b") is None
+    assert ev.case_problems(mission) == []

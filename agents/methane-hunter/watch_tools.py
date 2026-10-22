@@ -876,7 +876,11 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
         "render": {**mt.scaled(RENDER_PASS, best and best.get("peak_ppm_m")),
                    "bounds": [round(v, 5) for v in box_around(lat, lon, WINDOW_KM / 2)]},
         "render_columns": mt.scaled(RENDER_COLUMNS, best and best.get("peak_ppm_m")),
+        # The candidate's one display is its columns (built from the same pixels as the window): with
+        # two display_visual calls in the cue's batch the model dropped the columns in 14 of 43 missions
+        # (Oct 20-22), and the room saw a flat window and no 3D.
         "next_steps": ("Say how many passes were candidates and which were rejected and why (use the short reasons). "
-                       "inspect_image the strongest candidate's window_s3_url, then display_visual it with "
-                       "render=render and display_visual(columns_s3_url, render=render_columns)."),
+                       "Then carbon_mapper_plumes(lat, lon) for this site. If you follow it: inspect_image the "
+                       "strongest candidate's window_s3_url, then display_visual(strongest_candidate.columns_s3_url, "
+                       "render=render_columns): the columns are the candidate's only display, never the flat window."),
     })

@@ -147,6 +147,8 @@ export type StackLegend =
   | { kind: 'measure'; key: string; label: string; ramp: ColormapName; lo: number; hi: number; units: string; note?: string }
   /** The watch baseline's dots and rings. */
   | { kind: 'sites'; key: 'sites' }
+  /** Carbon Mapper's plumes near the site: a mint ring each, with its source. */
+  | { kind: 'detections'; key: 'detections' }
   /** The similarity map's violet ramp. */
   | { kind: 'similar'; key: 'similar' }
   /** The archaeologist's local relief: signed metres in the mono face, "lower" and "higher" in words. */
@@ -185,6 +187,7 @@ export function layerLegend(layer: LayerMetadata): StackLegend | null {
     const hint = layer.render;
     if (!hint) return null;
     if (hint.kind === 'points') return { kind: 'sites', key: 'sites' };
+    if (hint.kind === 'detections') return { kind: 'detections', key: 'detections' };
     const ramp = hint.colormap ?? hint.ramp;
     if (!ramp || !hint.rescale) return null;
     const units = hint.units ?? 'ppm·m';
@@ -229,7 +232,8 @@ export function stackLegends(layersTopFirst: readonly LayerMetadata[], shown: (i
     out.push(legend);
   }
   const isKey = (l: StackLegend) =>
-    (l.kind === 'sites' || l.kind === 'similar' || l.kind === 'hillshade' || l.kind === 'record' || l.kind === 'vessels' || l.kind === 'coverage' ? 1 : 0);
+    (l.kind === 'sites' || l.kind === 'detections' || l.kind === 'similar' || l.kind === 'hillshade' || l.kind === 'record' ||
+      l.kind === 'vessels' || l.kind === 'coverage' ? 1 : 0);
   return out.sort((a, b) => isKey(a) - isKey(b));
 }
 

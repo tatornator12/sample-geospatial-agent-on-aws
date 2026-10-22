@@ -56,6 +56,7 @@ RESULTS = {
     "scan_tropomi": "TROPOMI composite scanned",
     "check_recent_passes": "Recent EMIT passes judged",
     "site_history": "Site history read",
+    "carbon_mapper_plumes": "Carbon Mapper's public plumes checked",
     "thermal_anomalies": "VIIRS heat checked",
     "nearby_infrastructure": "Overture Maps checked, by type",
     "registry_lookup": "Public registry checked",
@@ -142,13 +143,19 @@ def main() -> int:
     brief_ids = BRIEF_RE.findall(narrative)
     if preset["needs_brief"] and not brief_ids:
         raise SystemExit("the recorded mission drafted no brief; not a usable Methane Watch case")
-    # The mission's cue step puts the pass window and its 3D columns on the map together; a take that
-    # dropped the columns is a partial mission (the model skips it now and then), so record it again.
+    # The mission puts the followed site's EMIT candidate on the map as its 3D columns; a take that
+    # looked at a candidate's window and never showed its columns is a partial mission (the Oct 22
+    # production run), so record it again. A site followed for Carbon Mapper's plumes alone has no
+    # EMIT candidate and so no columns.
     def shows_columns(t: dict) -> bool:
         render = tool_input(t).get("render")
         return t["name"] == "display_visual" and isinstance(render, dict) and render.get("kind") == "columns"
-    if preset["needs_brief"] and not any(shows_columns(t) for t in tools):
+    looked_at_window = any(t["name"] == "inspect_image" and "/pass_EMIT_" in str(tool_input(t).get("s3_url", ""))
+                           for t in tools)
+    if preset["needs_brief"] and looked_at_window and not any(shows_columns(t) for t in tools):
         raise SystemExit("the recorded mission never showed the 3D columns; record it again")
+    if preset["needs_brief"] and not any(t["name"] == "carbon_mapper_plumes" for t in tools):
+        raise SystemExit("the recorded mission never checked Carbon Mapper; record it again")
 
     s3 = boto3.client("s3", region_name=args.region)
     # A fresh take replaces the previous one entirely: a stale chip, draft or window from an earlier
@@ -229,6 +236,19 @@ def main() -> int:
             name = f"tip_{area.strip().lower().replace(' ', '_')}.json"
             if name not in local_for.values() and fetch(bucket, f"{session_prefix}methane/{name}", name):
                 local_for[f"{session_prefix}methane/{name}"] = name
+
+    # Carbon Mapper's record per cued site: the tip board's line (the UI derives the name from the
+    # call's lat/lon, like the filmstrip). Its plume points ride along as a layer when shown.
+    for t in tools:
+        if t["name"] != "carbon_mapper_plumes":
+            continue
+        params = tool_input(t)
+        lat, lon = coord(params.get("lat")), coord(params.get("lon"))
+        if lat is None or lon is None:
+            continue
+        name = f"cmplumes_{lat}_{lon}.json"
+        if name not in local_for.values() and fetch(bucket, f"{session_prefix}methane/{name}", name):
+            local_for[f"{session_prefix}methane/{name}"] = name
 
     # The ground-record checks' records (draft_brief embedded them already; kept for completeness).
     for t in tools:

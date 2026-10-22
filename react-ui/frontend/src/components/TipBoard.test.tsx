@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render } from '@testing-library/react';
 import { TipBoard } from './TipBoard.tsx';
-import { cueTallyText, parseTip, type CueTally, type Tip } from '../utils/steps.ts';
+import { cueTallyText, parseCmPlumes, parseTip, type CueTally, type Tip } from '../utils/steps.ts';
 
 afterEach(cleanup);
 
@@ -66,5 +66,31 @@ describe('TipBoard in the end frame (B15, A2 P1-2)', () => {
     const { container } = render(<TipBoard tips={nine} cued={['south caspian']} expected={9} />);
     expect(container.querySelectorAll('.tip-row')).toHaveLength(9);
     expect(container.querySelector('.tip-row--more')).toBeNull();
+  });
+});
+
+describe('TipBoard Carbon Mapper line', () => {
+  const cm = {
+    'south caspian': parseCmPlumes({ lat: 39.4379, lon: 53.573, radius_km: 5, since: '2025-01-01', count: 45, latest: '2026-06-20', rate_kg_h: 273.1, instrument: 'tanager' })!,
+    'shanxi coal basin': parseCmPlumes({ lat: 35.5528, lon: 112.6889, radius_km: 5, since: '2025-01-01', count: 0, latest: null })!,
+    // A record for an area that was not cued is never printed.
+    'zagros foreland': parseCmPlumes({ lat: 31.1, lon: 50.2, radius_km: 5, since: '2025-01-01', count: 3, latest: '2026-01-01' })!,
+  };
+
+  it('prints each cued row\'s Carbon Mapper plumes under its EMIT tally, then the source once', () => {
+    const { container } = render(<TipBoard tips={tips} cued={cued} chosen="south caspian" expected={3} tallies={tallies} cm={cm} />);
+    const caspian = rowOf(container, 'South Caspian');
+    expect(caspian.querySelector('.tip-row__cm')?.textContent).toBe('Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h');
+    expect([...caspian.querySelectorAll('.tip-row__cm .tip-row__num')].map((el) => el.textContent)).toEqual(['45', '2026-06-20', '270']);
+    expect(rowOf(container, 'Shanxi').querySelector('.tip-row__cm')?.textContent).toBe('Carbon Mapper: no plumes within 5 km');
+    expect(rowOf(container, 'Zagros').querySelector('.tip-row__cm')).toBeNull();
+    const sources = [...container.querySelectorAll('.tip-row--source')].map((el) => el.textContent);
+    expect(sources).toEqual(['Source: Carbon Mapper (data.carbonmapper.org)']);
+  });
+
+  it('shows no source line when no Carbon Mapper numbers show', () => {
+    const { container } = render(<TipBoard tips={tips} cued={cued} expected={3} tallies={tallies} />);
+    expect(container.querySelector('.tip-row--source')).toBeNull();
+    expect(container.querySelector('.tip-row__cm')).toBeNull();
   });
 });

@@ -68,7 +68,12 @@ export interface BriefCard {
   /** What the data cannot show (1 to 4 lines) and the recommended next look. */
   gaps: string[];
   nextCollection?: string;
+  /** Carbon Mapper's independent detections at the site: the tool's sentence, with its source. */
+  independent?: string;
 }
+
+/** Carbon Mapper's licence asks for its source wherever its data shows: a line without it is not shown. */
+const CARBON_MAPPER_SOURCE = 'Source: Carbon Mapper (data.carbonmapper.org)';
 
 /** A check's sentence, as the tool wrote it: bounded, plain, no markup or control characters. */
 function checkLine(value: unknown): string | null {
@@ -129,6 +134,9 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
   const nextCollection = checkLine(b.next_collection);
   const watchArea = text(b.watch_area, 60);
   const passesSince = typeof b.passes_since === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.passes_since) ? b.passes_since : null;
+  const cm = ((b.checks ?? {}) as Record<string, unknown>).carbon_mapper as { line?: unknown } | undefined;
+  const cmLine = checkLine(cm?.line);
+  const independent = cmLine && cmLine.startsWith('Carbon Mapper ') && cmLine.endsWith(`${CARBON_MAPPER_SOURCE}.`) ? cmLine : null;
   return {
     briefId,
     title,
@@ -157,6 +165,7 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     })(),
     gaps,
     ...(nextCollection ? { nextCollection } : {}),
+    ...(independent ? { independent } : {}),
   };
 }
 

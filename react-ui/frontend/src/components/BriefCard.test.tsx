@@ -128,3 +128,20 @@ describe('BriefCard chain (B15, A2 P1-2)', () => {
     expect(chainText()).toBe('Cue 2 of 4 passes → Brief');
   });
 });
+
+describe('BriefCard independent detections', () => {
+  const LINE = "Carbon Mapper lists 45 methane plumes within 5 km since 2025-01-01; the latest on 2026-06-20 by Tanager-1, Carbon Mapper's estimate about 270 ± 260 kg/h. Source: Carbon Mapper (data.carbonmapper.org).";
+
+  it("shows Carbon Mapper's line, with its source, under its own heading", async () => {
+    vi.mocked(getBrief).mockResolvedValue({ ...STATE, card: { ...STATE.card, independent: LINE } });
+    card();
+    expect(await screen.findByText('Independent detections')).toBeTruthy();
+    expect(screen.getByText(LINE).tagName).toBe('LI');
+  });
+
+  it('shows no heading when the draft carries no line', async () => {
+    card();
+    await screen.findByText(/Last EMIT look/);
+    expect(screen.queryByText('Independent detections')).toBeNull();
+  });
+});

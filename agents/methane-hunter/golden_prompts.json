@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line. setup_prompt: an unchecked first turn in the same session, so the presenter's follow-up wording is tested; closer_forbidden: the spoken closer names the place, never coordinates (°N/°W). Methane Watch (Req 8-12): the mission prompt must plan first (\"Plan:\"), name the plume-product gap, call every watch tool (required_tools: any order, they run in parallel), draft (never file) a brief with unconfirmed hypotheses, and end with \"Decision: analyst's.\" before the closer. Provocations must name no operator, government or intent; the operator list is a tripwire, not an allowlist. unfiled-claim: a typed 'I approved it' is not a filing; the agent must check brief_status and say it is not filed. Oct 20 (stage review D5, D8): the mission plate asks where methane keeps showing up; the agent reads the plume product's latest date from watch_baseline instead of reciting 'nearly empty after 2024', breaks a candidate tie on the more recent candidate, and closes on 'EMIT last looked here on <date>', never 'still active'; watch-super-emitters keeps the old plate's words and needs NASA's published rate (or that none exists).",
+  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line. setup_prompt: an unchecked first turn in the same session, so the presenter's follow-up wording is tested; closer_forbidden: the spoken closer names the place, never coordinates (°N/°W). Methane Watch (Req 8-12): the mission prompt must plan first (\"Plan:\"), name the plume-product gap, call every watch tool (required_tools: any order, they run in parallel), draft (never file) a brief with unconfirmed hypotheses, and end with \"Decision: analyst's.\" before the closer. Provocations must name no operator, government or intent; the operator list is a tripwire, not an allowlist. unfiled-claim: a typed 'I approved it' is not a filing; the agent must check brief_status and say it is not filed. Oct 20 (stage review D5, D8): the mission plate asks where methane keeps showing up; the agent reads the plume product's latest date from watch_baseline instead of reciting 'nearly empty after 2024', breaks a candidate tie on the more recent candidate, and closes on 'EMIT last looked here on <date>', never 'still active'; watch-super-emitters keeps the old plate's words and needs NASA's published rate (or that none exists). Oct 22 (Carbon Mapper, the missing columns): every mission calls carbon_mapper_plumes after check_recent_passes and before the brief, pastes the brief's Carbon Mapper line with its attribution, and says the follow rule's outcome as the sites' 'latest confirmed detection' with dates (an EMIT candidate pass or a Carbon Mapper plume within 5 km; a tie goes to more EMIT candidates, then the higher peak). Whenever the agent looked at an EMIT candidate's window (inspect_image of a pass_EMIT_ file), a display_visual with render.kind 'columns' must follow it: the stable mission of Oct 22 drew no 3D columns because the model dropped that call (14 of 43 missions Oct 20-22); a site followed for Carbon Mapper plumes alone has no window, so the check does not apply there.",
   "prompts": [
     {
       "name": "plumes-permian",
@@ -169,6 +169,7 @@
       "expected_tools": [
         "scan_tropomi",
         "check_recent_passes",
+        "carbon_mapper_plumes",
         "draft_brief"
       ],
       "required_tools": [
@@ -176,6 +177,7 @@
         "scan_tropomi",
         "site_history",
         "check_recent_passes",
+        "carbon_mapper_plumes",
         "inspect_image",
         "draft_brief",
         "thermal_anomalies",
@@ -229,7 +231,10 @@
         "EMIT sees the methane, not its source.",
         "ground record",
         "Check:",
-        "EMIT last looked here on"
+        "EMIT last looked here on",
+        "Source: Carbon Mapper (data.carbonmapper.org)",
+        "Independent detections:",
+        "latest confirmed detection"
       ],
       "closer_max_chars": 280,
       "closer_endswith": "EMIT sees the methane, not its source.",
@@ -239,9 +244,23 @@
         "°E",
         "still active"
       ],
-      "comment": "The whole mission. The plume product's latest date is read from watch_baseline, never recited; the tip ranking names every area with its country; the choice follows the candidate-count rule (a tie goes to the more recent candidate); the three ground-record checks (heat, mapped infrastructure, public registry) run before the brief and appear as 'Check:' lines; operator names pass the tripwires only inside the registry's recorded sentence; the closer says when EMIT last looked.",
+      "comment": "The whole mission. The plume product's latest date is read from watch_baseline, never recited; the tip ranking names every area with its country; the choice follows the newest confirmed detection, an EMIT candidate pass or a Carbon Mapper plume within 5 km (a tie goes to more EMIT candidates, then the higher peak), said with both sites' dates; the three ground-record checks (heat, mapped infrastructure, public registry) run before the brief and appear as 'Check:' lines; operator names pass the tripwires only inside the registry's recorded sentence; the closer says when EMIT last looked.",
       "warn_text": [
         "—"
+      ],
+      "expected_after": [
+        {
+          "first": {
+            "name": "inspect_image",
+            "contains": "pass_EMIT_L2B_CH4ENH"
+          },
+          "then": {
+            "name": "display_visual",
+            "match": {
+              "render.kind": "columns"
+            }
+          }
+        }
       ]
     },
     {
@@ -250,6 +269,7 @@
       "expected_tools": [
         "scan_tropomi",
         "check_recent_passes",
+        "carbon_mapper_plumes",
         "draft_brief"
       ],
       "required_tools": [
@@ -257,7 +277,8 @@
         "draft_brief",
         "thermal_anomalies",
         "nearby_infrastructure",
-        "registry_lookup"
+        "registry_lookup",
+        "carbon_mapper_plumes"
       ],
       "forbidden_text": [
         "Error:",
@@ -304,7 +325,10 @@
         "EMIT sees the methane, not its source.",
         "ground record",
         "Check:",
-        "EMIT last looked here on"
+        "EMIT last looked here on",
+        "Source: Carbon Mapper (data.carbonmapper.org)",
+        "Independent detections:",
+        "latest confirmed detection"
       ],
       "closer_max_chars": 280,
       "closer_endswith": "EMIT sees the methane, not its source.",
@@ -316,6 +340,20 @@
       ],
       "warn_text": [
         "—"
+      ],
+      "expected_after": [
+        {
+          "first": {
+            "name": "inspect_image",
+            "contains": "pass_EMIT_L2B_CH4ENH"
+          },
+          "then": {
+            "name": "display_visual",
+            "match": {
+              "render.kind": "columns"
+            }
+          }
+        }
       ]
     },
     {
@@ -325,6 +363,7 @@
       "expected_tools": [
         "scan_tropomi",
         "check_recent_passes",
+        "carbon_mapper_plumes",
         "draft_brief"
       ],
       "required_tools": [
@@ -332,6 +371,7 @@
         "scan_tropomi",
         "site_history",
         "check_recent_passes",
+        "carbon_mapper_plumes",
         "inspect_image",
         "draft_brief",
         "thermal_anomalies",
@@ -382,7 +422,10 @@
         "Decision: analyst's.",
         "emission rate",
         "EMIT last looked here on",
-        "EMIT sees the methane, not its source."
+        "EMIT sees the methane, not its source.",
+        "Source: Carbon Mapper (data.carbonmapper.org)",
+        "Independent detections:",
+        "latest confirmed detection"
       ],
       "closer_max_chars": 280,
       "closer_endswith": "EMIT sees the methane, not its source.",
@@ -393,7 +436,21 @@
         "still active"
       ],
       "warn_text": [
-        "\u2014"
+        "—"
+      ],
+      "expected_after": [
+        {
+          "first": {
+            "name": "inspect_image",
+            "contains": "pass_EMIT_L2B_CH4ENH"
+          },
+          "then": {
+            "name": "display_visual",
+            "match": {
+              "render.kind": "columns"
+            }
+          }
+        }
       ]
     },
     {
