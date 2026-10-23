@@ -11,8 +11,9 @@ into `use-cases/<id>/` at the repo root, flat:
     config.json            name, question, agent, tool_calls (the streamed tool inputs), assets.layers
     narrative.md           the agent's final answer (record + spoken closer)
     <layers>               every file display_visual put on the map (footprints, plume, watch
-                           sites, TROPOMI composite, EMIT pass window, 3D columns, Sentinel-2)
+                           sites, the tip bars, the record bars, Sentinel-2)
     passes_<lat>_<lon>.json + passchip_*.png   the cue step's filmstrip (manifest and frames)
+    follow.json            the follow decision (the stage words it and the bars from it)
     <brief id>.draft.json  the draft brief (the card reads it; a replay never files it)
     inspections/*.png|jpg  what the agent looked at (the evidence chips)
 
@@ -26,6 +27,7 @@ import json
 import re
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
 
 import boto3
@@ -57,6 +59,7 @@ RESULTS = {
     "check_recent_passes": "Recent EMIT passes judged",
     "site_history": "Site history read",
     "carbon_mapper_plumes": "Carbon Mapper's public plumes checked",
+    "follow_site": "Site followed by the 90-day rule",
     "thermal_anomalies": "VIIRS heat checked",
     "nearby_infrastructure": "Overture Maps checked, by type",
     "registry_lookup": "Public registry checked",
@@ -75,7 +78,9 @@ CASES = {
         "needs_brief": False,
     },
     "watch": {
-        "id": "methane-watch-mission",
+        # The bars take (approved 2026-10-23). Never the older cases' ids: those prefixes serve the
+        # stable gallery and the earlier takes.
+        "id": "methane-watch-bars",
         # The stage's "Methane Watch brief" plate (react-ui/frontend/src/utils/stageCopy.ts), word for word.
         "prompt": "Brief me on the watch areas where methane keeps showing up, and how confident you are.",
         "name": "Methane Watch brief",
@@ -86,6 +91,11 @@ CASES = {
         "needs_brief": True,
     },
 }
+
+
+# The record bars land this long after the tip bars in a replay, so both bar layers stand on the map
+# in turn, as they did live (the replay reveals its steps in under 6 s; utils/heldLayers.ts).
+RECORD_BARS_HOLD_MS = 6000
 
 
 def tool_input(tool: dict) -> dict:
@@ -104,6 +114,86 @@ def coord(value) -> str | None:
     except (TypeError, ValueError):
         return None
     return f"{v:.4f}" if abs(v) <= 180 else None
+
+
+def shows_columns(t: dict, prop: str | None = None, file: str | None = None) -> bool:
+    inp = tool_input(t)
+    render = inp.get("render")
+    if isinstance(render, str):
+        try:
+            render = json.loads(render)
+        except json.JSONDecodeError:
+            render = None
+    url = str(inp.get("s3_url", ""))
+    return (t["name"] == "display_visual" and isinstance(render, dict) and render.get("kind") == "columns"
+            and (prop is None or render.get("property") == prop) and (file is None or url.endswith("/" + file)))
+
+
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+          "October", "November", "December")
+
+
+def fortnight_words(start: str, end: str) -> str | None:
+    """'5 to 18 October 2026' (or '25 September to 8 October 2026') for two ISO dates, else None."""
+    m1, m2 = (re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", str(d)) for d in (start, end))
+    if not m1 or not m2:
+        return None
+    (y1, mo1, d1), (y2, mo2, d2) = ((int(g) for g in m.groups()) for m in (m1, m2))
+    if not (1 <= mo1 <= 12 and 1 <= mo2 <= 12):
+        return None
+    head = f"{d1}" if (y1, mo1) == (y2, mo2) else f"{d1} {MONTHS[mo1 - 1]}" + ("" if y1 == y2 else f" {y1}")
+    return f"{head} to {d2} {MONTHS[mo2 - 1]} {y2}"
+
+
+def board_description(description: str, tip: dict | None, read_on: str) -> str:
+    """The case says which board it recorded: the TROPOMI fortnight, and the day EMIT and Carbon Mapper
+    were read (the take's day, which can be later than the fortnight)."""
+    words = fortnight_words((tip or {}).get("start", ""), (tip or {}).get("end", ""))
+    day = fortnight_words(read_on, read_on)
+    if not words or not day:
+        return description
+    return (f"{description}. Recorded on the TROPOMI fortnight {words}, "
+            f"with the EMIT and Carbon Mapper records as read on {day.split(' to ', 1)[1]}")
+
+
+def take_problems(tools: list[dict], narrative: str, follow: dict | None, needs_brief: bool) -> list[str]:
+    """Why a recorded take is not a usable replay case (empty: it is). The Methane Watch take must show
+    what the room is told: the tip bars always, and the record bars whenever the followed site has a
+    confirmation they were built from."""
+    problems = []
+    if CLOSER not in narrative:
+        problems.append("the recorded answer has no spoken closer")
+    if not needs_brief:
+        return problems
+    if not BRIEF_RE.findall(narrative):
+        problems.append("the recorded mission drafted no brief")
+    if not any(t["name"] == "carbon_mapper_plumes" for t in tools):
+        problems.append("the recorded mission never checked Carbon Mapper")
+    # A take that looked at a candidate's window and never showed its columns is a partial mission
+    # (the Oct 22 production run).
+    looked = [i for i, t in enumerate(tools)
+              if t["name"] == "inspect_image" and "/pass_EMIT_" in str(tool_input(t).get("s3_url", ""))]
+    if looked and not any(shows_columns(t, "ppm_m") for t in tools[looked[0] + 1:]):
+        problems.append("the recorded mission looked at an EMIT window and never showed its 3D columns")
+    if not isinstance(follow, dict):
+        problems.append("the recorded mission has no follow decision (follow.json)")
+        return problems
+    tip = (follow.get("tip_bars") or {}).get("file") if isinstance(follow.get("tip_bars"), dict) else None
+    tip_at = next((i for i, t in enumerate(tools) if tip and shows_columns(t, "ppb", tip)), None)
+    if tip_at is None:
+        problems.append("the recorded mission never showed the tip bars")
+    record = follow.get("record_bars") if isinstance(follow.get("record_bars"), dict) else None
+    latest = (follow.get("followed") or {}).get("latest") if isinstance(follow.get("followed"), dict) else None
+    days = (follow.get("followed") or {}).get("days_before_tip") if isinstance(follow.get("followed"), dict) else None
+    if latest and record is None and isinstance(days, int) and days <= follow.get("gap_days", 90):
+        problems.append("the followed site has a confirmation within 90 days but no record bars were built")
+    if record:
+        record_at = next((i for i, t in enumerate(tools) if shows_columns(t, None, record.get("file"))), None)
+        if record_at is None:
+            problems.append("the recorded mission has a confirmation but never showed its record bars")
+        elif tip_at is not None and record_at < tip_at:
+            problems.append("the record bars were shown before the tip bars")
+    return problems
 
 
 def main() -> int:
@@ -138,26 +228,20 @@ def main() -> int:
     # The room reads this; dashes become commas (a range "to") so the saved copy matches the house style.
     narrative = house_style((text[spans[-1][1]:] if spans else text).strip())
     saw = saw_by_tool(text)
-    if CLOSER not in narrative:
-        raise SystemExit("the recorded answer has no spoken closer; not a usable replay case")
     brief_ids = BRIEF_RE.findall(narrative)
-    if preset["needs_brief"] and not brief_ids:
-        raise SystemExit("the recorded mission drafted no brief; not a usable Methane Watch case")
-    # The mission puts the followed site's EMIT candidate on the map as its 3D columns; a take that
-    # looked at a candidate's window and never showed its columns is a partial mission (the Oct 22
-    # production run), so record it again. A site followed for Carbon Mapper's plumes alone has no
-    # EMIT candidate and so no columns.
-    def shows_columns(t: dict) -> bool:
-        render = tool_input(t).get("render")
-        return t["name"] == "display_visual" and isinstance(render, dict) and render.get("kind") == "columns"
-    looked_at_window = any(t["name"] == "inspect_image" and "/pass_EMIT_" in str(tool_input(t).get("s3_url", ""))
-                           for t in tools)
-    if preset["needs_brief"] and looked_at_window and not any(shows_columns(t) for t in tools):
-        raise SystemExit("the recorded mission never showed the 3D columns; record it again")
-    if preset["needs_brief"] and not any(t["name"] == "carbon_mapper_plumes" for t in tools):
-        raise SystemExit("the recorded mission never checked Carbon Mapper; record it again")
-
     s3 = boto3.client("s3", region_name=args.region)
+    follow = None
+    if preset["needs_brief"]:
+        urls = [str(tool_input(t).get("s3_url", "")) for t in tools]
+        bucket_of = next((m.group(1) for m in map(re.compile(r"^s3://([^/]+)/").match, urls) if m), None)
+        try:
+            follow = json.loads(s3.get_object(Bucket=bucket_of, Key=f"session_data/{sid}/methane/follow.json")["Body"].read(200_000))
+        except Exception as e:
+            print(f"  (no follow.json: {type(e).__name__})")
+    problems = take_problems(tools, narrative, follow, preset["needs_brief"])
+    if problems:
+        raise SystemExit("not a usable replay case; record it again: " + "; ".join(problems))
+
     # A fresh take replaces the previous one entirely: a stale chip, draft or window from an earlier
     # recording must never ride along into the staged case (the stage would list it, or worse, show it).
     if out.exists():
@@ -263,6 +347,10 @@ def main() -> int:
         if name not in local_for.values() and fetch(bucket, f"{session_prefix}methane/{name}", name):
             local_for[f"{session_prefix}methane/{name}"] = name
 
+    # The follow decision: the stage words the decision line and the bars' plate lines from it.
+    if follow is not None and fetch(bucket, f"{session_prefix}methane/follow.json", "follow.json"):
+        local_for[f"{session_prefix}methane/follow.json"] = "follow.json"
+
     # The draft brief the card shows (never filed in a replay).
     for bid in dict.fromkeys(brief_ids):
         fetch(bucket, f"{session_prefix}briefs/{bid}.draft.json", f"{bid}.draft.json")
@@ -298,6 +386,10 @@ def main() -> int:
             layer = {"file": name, "title": str(params.get("title", name))[:120]}
             if isinstance(params.get("render"), dict):
                 layer["render"] = params["render"]
+            # The record bars wait for the tip bars to stand alone first (one bar layer at a time).
+            record = (follow or {}).get("record_bars") if isinstance((follow or {}).get("record_bars"), dict) else None
+            if record and name == record.get("file"):
+                layer["delay_ms"] = RECORD_BARS_HOLD_MS
             layers.append(layer)
     # The replay lands layers in the order listed, as the live run did: the TROPOMI tip first, then
     # the EMIT finding (each methane raster goes on top of the one before), then the ground scene
@@ -307,13 +399,20 @@ def main() -> int:
         return 0 if f.startswith("tropomi_anomaly_") else 1 if f.startswith(("pass_", "ch4plm_")) else 2
     layers.sort(key=order)
 
+    # The board the take recorded, said plainly: the TROPOMI fortnight (EMIT and Carbon Mapper were read
+    # on the day of the take).
+    tip = (follow or {}).get("tip") if isinstance((follow or {}).get("tip"), dict) else {}
+    dates = dict(preset["dates"])
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(tip.get("start", ""))) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(tip.get("end", ""))):
+        dates["tip_window"] = f"{tip['start']}/{tip['end']}"
     config = {
         "name": preset["name"],
-        "description": preset["description"],
+        "description": (board_description(preset["description"], tip, date.today().isoformat())
+                        if preset["needs_brief"] else preset["description"]),
         "location": preset["location"],
         "user_question": prompt,
         "agent": "methane",
-        "dates": preset["dates"],
+        "dates": dates,
         "scenario_version": "1.1",
         "recorded_from": arn.rsplit("/", 1)[1].rsplit("-", 1)[0],
         "tool_calls": tool_calls,

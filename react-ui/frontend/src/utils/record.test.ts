@@ -92,19 +92,22 @@ describe('the brief card\'s decision line', () => {
     { ...base, reference: 'brief', daysBetween: 135 },
   ];
 
-  it('reads as the report has it, one sentence per point', () => {
-    expect(decisionText(base)).toBe('Methane keeps showing up here. The latest fine-scale confirmation is a Carbon Mapper plume on 10 Jun 2026, '
-      + 'about 4 months before the tip. The agent recommends a new fine-scale look.');
-    expect(decisionText(all[2])).toBe('Methane keeps showing up here. The latest fine-scale confirmation is an EMIT pass on 1 Aug 2026, '
-      + 'about 2 months before the tip. The agent sees no need for a new fine-scale look.');
-    expect(decisionText(all[3])).toBe('No fine-scale confirmation is on record here. The agent recommends a new fine-scale look.');
-    expect(decisionText(all[4])).toContain("an EMIT pass and a Carbon Mapper plume on 12 Oct 2026, inside the tip's window.");
-    expect(decisionText(all[5])).toContain('about 4 months before this brief.');
+  it('reads as the approved table has it (2026-10-23): the days before this fortnight, then the call', () => {
+    expect(decisionText(base)).toBe('Methane was last seen up close here 118 days before this fortnight. The agent recommends a new close look.');
+    expect(decisionText(all[2])).toBe('Methane was last seen up close here 67 days before this fortnight. No new close look is needed yet.');
+    expect(decisionText(all[3])).toBe('No close look has confirmed methane here. The agent recommends a new close look.');
+    // With the tip bars on the map the card says whose bars they are; their window is said with them.
+    expect(decisionText(all[3], { bars: true })).toBe(
+      "No close look has confirmed methane here, so the bars are TROPOMI's only. The agent recommends a new close look.");
+    expect(decisionText(all[4])).toBe('Methane was seen up close here during this fortnight. No new close look is needed yet.');
+    expect(decisionText(all[5])).toContain('135 days before this brief.');
+    expect(decisionText({ ...base, daysBetween: 1 })).toContain(' 1 day before');
   });
 
-  it('says "keeps showing up" only with 3 or more confirmed dates', () => {
-    expect(decisionText(all[1]).startsWith('Methane has shown up here before.')).toBe(true);
-    expect(decisionText({ ...base, confirmedDates: 3 }).startsWith('Methane keeps showing up here.')).toBe(true);
+  it('says a clouded-out last look with its date, and never a bar layer\'s date again', () => {
+    expect(decisionText(all[1])).toBe("Methane was last seen up close here 118 days before this fortnight. EMIT's last look, "
+      + 'on 17 Aug 2026, was clouded out. The agent recommends a new close look.');
+    expect(decisionText(base)).not.toMatch(/10 Jun|2026-06-10/);
   });
 
   it('never says now, still, active or leaking, never another look, and has no dashes', () => {

@@ -11,9 +11,10 @@ second per tool instead of fetching from NASA and the Sentinel-5P archive:
   - watch_baseline (the global site clusters)
   - scan_tropomi for each area at the day counts the mission uses (the composite is keyed by its
     end day, so run this the day before AND the morning of the show)
-  - for each area's top EMIT-visible hotspots: check_recent_passes, site_history and
-    carbon_mapper_plumes (Carbon Mapper's public plume catalogue), at the exact coordinates the scan
-    reports (which the agent passes on verbatim)
+  - for each area's top three EMIT-visible hotspots (the cue reads rank 1; the 90-day switch rule's
+    step 2 reads ranks 2 and 3): check_recent_passes, site_history and carbon_mapper_plumes (Carbon
+    Mapper's public plume catalogue, with the newest plume's image cached as cmimage_v1_<plume_id>),
+    at the exact coordinates the scan reports (which the agent passes on verbatim)
   - fixed sites the run sheet names
 
 Reads agents/methane-hunter/.env.dev for the bucket and the Earthdata token (never printed).
@@ -74,7 +75,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--areas", nargs="*", help="watch areas (default: all)")
     parser.add_argument("--days", default="14,7", help="TROPOMI day counts to warm (default 14,7)")
-    parser.add_argument("--hotspots", type=int, default=2, help="EMIT-visible hotspots per area to warm (default 2)")
+    parser.add_argument("--hotspots", type=int, default=3,
+                        help="EMIT-visible hotspots per area to warm (default 3: the cue and the switch rule's step 2)")
+    parser.add_argument("--end-date", help="the TROPOMI board's last day, YYYY-MM-DD (default: the latest processed)")
     parser.add_argument("--env", default=str(AGENT_DIR / ".env.dev"))
     args = parser.parse_args()
 
@@ -134,7 +137,8 @@ def main() -> int:
         print(f"         {s['detections']} detections, {s['sites']} sites, {s['repeat_sites']} repeat sites")
 
     for area in areas:
-        scans = [run(f"scan_tropomi {area} {d}d", w.scan_tropomi(area=area, days=d)) for d in day_counts]
+        scans = [run(f"scan_tropomi {area} {d}d", w.scan_tropomi(area=area, days=d, end_date=args.end_date))
+                 for d in day_counts]
         visible = [h for h in (scans[0].get("hotspots") or []) if h.get("emit_can_look")][: args.hotspots]
         for h in visible:
             where = f"{area} hotspot {h['rank']} ({h['lat']}, {h['lon']}, +{h['anomaly_ppb']} ppb)"
@@ -148,7 +152,9 @@ def main() -> int:
             cm = run(f"carbon_mapper_plumes {where}", w.carbon_mapper_plumes(h["lat"], h["lon"]))
             if "summary" in cm:
                 s = cm["summary"]
-                print(f"         Carbon Mapper: {s['count']} plumes, latest {s['latest_date']} ({s['source']})")
+                image = cm.get("latest_image") or {}
+                drawn = f", image {image['pixels']} px" if image.get("pixels") else (", no image" if image else "")
+                print(f"         Carbon Mapper: {s['count']} plumes, latest {s['latest_date']} ({s['source']}){drawn}")
             # The ground-record checks: inside a watch area the Overture read comes from the extract
             # above, and the VIIRS pull is quick but cached per day too.
             run(f"nearby_infrastructure {where}", w.nearby_infrastructure(h["lat"], h["lon"]))

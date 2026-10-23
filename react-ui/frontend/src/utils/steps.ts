@@ -35,6 +35,8 @@ const GROUP_NAMES: Record<string, (n: number) => string> = {
   scan_tropomi: (n) => (n > 1 ? `Scan ${n} watch areas` : 'Scan a watch area'),
   check_recent_passes: (n) => (n > 1 ? `Cue EMIT on ${n} sites` : 'Cue EMIT'),
   carbon_mapper_plumes: (n) => (n > 1 ? `Check Carbon Mapper on ${n} sites` : 'Check Carbon Mapper'),
+  // The 90-day rule's choice, checked by the tool (a refused call and its retry read as one step).
+  follow_site: () => 'Follow one site',
   site_history: (n) => (n > 1 ? `Check ${n} site histories` : 'Check the site history'),
   inspect_image: (n) => (n > 1 ? `Look at ${n} images` : 'Look at the image'),
   display_visual: (n) => (n > 1 ? `Put ${n} layers on the map` : 'Put it on the map'),
@@ -385,6 +387,8 @@ const STAGE_OF: Record<string, number> = {
   site_history: 2,
   // Carbon Mapper is part of choosing where to look (the plan's "3 cue EMIT and check Carbon Mapper").
   carbon_mapper_plumes: 2,
+  // Choosing which spot to follow is the end of the cue.
+  follow_site: 2,
   thermal_anomalies: 3,
   nearby_infrastructure: 3,
   registry_lookup: 3,

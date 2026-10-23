@@ -70,9 +70,11 @@ function hypothesisLines(card: BriefCard, mark: (s: string) => string): string {
     .join('\n');
 }
 
-/** The ground record as bullets, then the gaps and the next look. */
+/** The ground record as bullets, then Carbon Mapper's independent detections (the card's line, with the
+ *  source its licence asks for: briefCard keeps it only with that), then the gaps and the next look. */
 function groundRecordLines(card: BriefCard, mark: (s: string) => string): string {
   const checks = card.checks.length > 0 ? card.checks.map((c) => `• ${mark(c)}`) : ['• No ground-record checks were run.'];
+  if (card.independent) checks.push(`• Independent detections: ${mark(card.independent)}`);
   const gaps = card.gaps.length > 0 ? ['Gaps:', ...card.gaps.map((g) => `• ${mark(g)}`)] : [];
   const next = card.nextCollection ? [`Next look: ${mark(card.nextCollection)}`] : [];
   return [...checks, ...gaps, ...next].join('\n');

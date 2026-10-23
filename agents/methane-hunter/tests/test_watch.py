@@ -224,9 +224,17 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     assert tip["area"] == "south caspian" and tip["emit_can_look"] is True and tip["top"]["anomaly_ppb"] == 50.0
     assert set(tip["top"]) == {"lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look"}
     assert (tip["start"], tip["end"]) == ("2026-09-10", "2026-09-10")      # the window's first and last day
-    # The composite is cached under a versioned key only: the stable runtime's keys are never written.
+    assert [h["rank"] for h in tip["hotspots"]] == [1] and tip["hotspots"][0]["anomaly_ppb"] == 50.0
+    # The composite is cached under the v3 key only, with its valid-days band: the stable runtime's
+    # v2 and unversioned keys are never written.
     written = [p["Key"] for p in fake_s3.puts if p["Key"].startswith("methane/cache/")]
-    assert written and all(k.startswith("methane/cache/tropomi_v2_") for k in written)
+    assert written and all(k.startswith("methane/cache/tropomi_v3_") for k in written)
+    assert any(k.endswith("_1d_days.tif") for k in written)
+    # The tip bars: the top hotspot's cells within 15 km, seen on enough days, above the median (ppb only).
+    h = out["hotspots"][0]
+    bars = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tipcolumns_{h['lat']:.4f}_{h['lon']:.4f}.geojson"])
+    assert [f["properties"] for f in bars["features"]] == [{"ppb": 50.0}]
+    assert "tip_columns" not in out
     # Warm: same answer from the shared cache, nothing read from TROPOMI, a fresh session copy.
     monkeypatch.setattr(watch, "read_tropomi_window", lambda *a, **k: pytest.fail("should come from the cache"))
     monkeypatch.setenv("AGENT_SESSION_ID", "another-session-0002")
@@ -234,8 +242,10 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     assert again["summary"]["source"] == "cache" and again["hotspots"] == out["hotspots"]
     assert "/session_data/another-session-0002/methane/" in again["anomaly_s3_url"]
     assert "session_data/another-session-0002/methane/tip_south_caspian.json" in fake_s3.objects   # the cache path writes it too
+    assert f"session_data/another-session-0002/methane/tipcolumns_{h['lat']:.4f}_{h['lon']:.4f}.geojson" in fake_s3.objects
+    assert "tip_columns" not in again
     # A composite cached under an older style comes back in today's style (ice, zoom cap).
-    key = next(k for k in fake_s3.objects if k.endswith("_1d.json") and k.startswith("methane/cache/tropomi_"))
+    key = next(k for k in fake_s3.objects if k.endswith("_1d.json") and k.startswith("methane/cache/tropomi_v3_"))
     stale = json.loads(fake_s3.objects[key])
     stale["render"] = {"kind": "raster", "colormap": "magma", "rescale": [0, 60]}
     fake_s3.objects[key] = json.dumps(stale).encode()
@@ -245,8 +255,10 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
 
 
 def test_scan_tropomi_reads_an_unversioned_composite_and_never_writes_one(watch, fake_s3, monkeypatch):
-    """A composite the stable runtime cached (unversioned key) is read as it is; nothing is written there."""
+    """A composite the stable runtime cached (unversioned key) is read as it is, when TROPOMI itself
+    cannot be read (it has no days band, so no tip bars); nothing is written there."""
     monkeypatch.setattr(watch, "read_tropomi_window", lambda *a, **k: pytest.fail("should come from the cache"))
+    monkeypatch.setattr(watch, "tropomi_s3", lambda: type("Empty", (), {"list_objects_v2": lambda self, **k: {}})())
     box = watch.WATCH_AREAS["south caspian"]["bbox"]
     sig = "_".join(f"{v:.2f}" for v in box).replace("-", "m")
     legacy = f"methane/cache/tropomi_south_caspian_turkmenistan_{sig}_2026-09-10_14d"
@@ -264,6 +276,42 @@ def test_scan_tropomi_reads_an_unversioned_composite_and_never_writes_one(watch,
     assert not [k for k in fake_s3.objects if k.startswith("methane/cache/") and k not in before]
     tip = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_south_caspian.json"])
     assert (tip["start"], tip["end"], tip["days"]) == ("2026-08-27", "2026-09-10", 14)
+    assert not [k for k in fake_s3.objects if "tipcolumns_" in k]
+
+
+def test_tip_columns_crop_filter_and_render():
+    """±15 km of the hotspot only, cells seen on 3 days or more and above the area's median."""
+    import numpy as np
+    from rasterio.transform import from_origin
+    a = np.full((40, 40), 10.0)
+    days = np.full((40, 40), 5)
+    a[20, 20] = 120.0
+    a[20, 21] = -5.0            # below the median: no bar
+    days[19, 20] = 2            # seen on 2 days: no bar
+    tr = from_origin(52.0, 39.0, 0.035, 0.035)
+    lon, lat = tr * (20.5, 20.5)
+    fc = watch_mod().tip_columns_geojson(a, days, tr, lat, lon)
+    ppbs = sorted(f["properties"]["ppb"] for f in fc["features"])
+    assert ppbs[-1] == 120.0 and -5.0 not in ppbs and all(set(f["properties"]) == {"ppb"} for f in fc["features"])
+    # 30 km across is about 9 x 8 cells at 0.035 degrees (3.1 x 3.9 km); the far corner is outside.
+    assert 60 <= len(fc["features"]) <= 90
+    xs = [pt[0] for f in fc["features"] for pt in f["geometry"]["coordinates"][0]]
+    assert max(xs) - min(xs) < 0.45
+    r = watch_mod().tip_columns_render(122.6)
+    assert r["rescale"] == [0, 140] and r["height_scale"] == watch_mod().TIP_METRES_PER_PPB and r["ramp"] == "ice"
+    assert watch_mod().tip_columns_render(12)["rescale"] == [0, 60] and watch_mod().tip_columns_render(900)["rescale"] == [0, 200]
+    # A cached collection is cleaned field by field: a stray property or a bad ring is dropped.
+    dirty = {"features": [{"geometry": {"coordinates": [[[1, 2], [3, 2], [3, 4], [1, 4], [1, 2]]]},
+                           "properties": {"ppb": 5, "note": "<b>"}},
+                          {"geometry": {"coordinates": [[["x", 2]]]}, "properties": {"ppb": 1}}]}
+    assert watch_mod().clean_tip_columns(dirty)["features"] == [
+        {"type": "Feature", "properties": {"ppb": 5.0},
+         "geometry": {"type": "Polygon", "coordinates": [[[1.0, 2.0], [3.0, 2.0], [3.0, 4.0], [1.0, 4.0], [1.0, 2.0]]]}}]
+
+
+def watch_mod():
+    import watch_tools
+    return watch_tools
 
 
 # --- 9.4 EMIT recent passes -------------------------------------------------------------------------
@@ -578,3 +626,32 @@ def test_baseline_carries_unlabelled_watch_area_outlines(watch, fake_s3, monkeyp
     areas = [f for f in feats if f["properties"]["tier"] == "watch_area"]
     assert len(areas) == len(watch.WATCH_AREAS) and all(set(f["properties"]) == {"tier", "emit"} for f in areas)
     assert out["summary"]["sites"] == 1 and out["repeat_sites"][0]["repeat_dates"] == 6
+
+
+def test_the_window_ends_on_the_last_day_read_and_an_incomplete_composite_is_read_again(watch, fake_s3, monkeypatch):
+    """Oct 23: the composite asked for 21 October had no orbit that day (27 orbits, as for 20 October),
+    yet said "to 21 October". The window is the days read; a composite missing the day asked for is
+    served for six hours, then built again (that day's orbits may have landed)."""
+    listing = {"Contents": [{"Key": f"COGT/OFFL/L2__CH4___/2026/09/10/{STEM}_PRODUCT_methane_mixing_ratio_4326.tif"}]}
+
+    class FakeS5P:
+        def list_objects_v2(self, Bucket, Prefix):
+            return listing if Prefix.endswith("2026/09/10/") else {}
+    monkeypatch.setattr(watch, "tropomi_s3", lambda: FakeS5P())
+    a = np.full((20, 30), 1940.0)
+    a[10, 15] = 1990.0
+    reads = []
+    monkeypatch.setattr(watch, "read_tropomi_window", lambda stem, box: reads.append(stem) or (a.copy(), from_origin(52, 41.5, 0.35, 0.25)))
+    out = json.loads(_run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-11")))
+    assert (out["summary"]["start"], out["summary"]["end"], out["summary"]["requested_end"]) == ("2026-09-10", "2026-09-10", "2026-09-11")
+    tip = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_south_caspian.json"])
+    assert tip["end"] == "2026-09-10"
+    _run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-11"))
+    assert len(reads) == 1                                                   # served from the cache
+    key = next(k for k in fake_s3.objects if k.endswith("_2026-09-11_1d.json") and "tropomi_v3_" in k)
+    old = json.loads(fake_s3.objects[key])
+    old["built_at"] -= 7 * 3600
+    fake_s3.objects[key] = json.dumps(old).encode()
+    _run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-11"))
+    assert len(reads) == 2                                                   # built again after six hours
+    assert not watch.cache_current({"summary": {"end": "2026-09-11"}}, watch.date(2026, 9, 11))   # no requested_end: an early v3

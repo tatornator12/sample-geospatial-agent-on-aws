@@ -633,3 +633,71 @@ none at the <other> site either." and the ground checks at the tip. W6 asks for 
   shaped: one formatter and one months function, the recommendation attributed to the agent, the
   strip's words line stepping aside, colour by source and shape by verdict. The polish after
   raised the card's subheads and the board's values to 15 px.
+
+## Act 2 v5: the bars and the 90-day switch rule (approved 2026-10-23; branch `methane-bars`)
+
+Requirements 17 to 21. Research and numbers: `.agents/tasks/methane-options/report.md` (sections B,
+C, D and "Recommendation for Nov 9"); build report `.agents/tasks/methane-bars/report.md`.
+
+### The beat, as the room sees it
+
+1. The tip board and the cue as before (W1 to W4).
+2. **Follow one site.** `follow_site` accepts the agent's choice under the 90-day rule; the step's line
+   says the decision in the stage's words (from `follow.json`). Step 2's extra checks show as
+   "Check N more spots with EMIT" and "Check Carbon Mapper on N more spots", without filmstrips.
+3. **Show the tip in 3D.** This fortnight's TROPOMI cells around the followed spot (±15 km, 40 m per
+   ppb, ice ramp, tilted 55°, zoom up to 11). Plate line with the window; legend row "TROPOMI, 7 to
+   20 Oct 2026".
+4. **Show the latest close look in 3D**, when there is a confirmation: EMIT's significant pixels
+   (zoom up to 13) or Carbon Mapper's plume image (zoom up to 14.5). The same-kind rule on the map
+   removes the tip bars. Plate line with its date and its days before the fortnight; legend row with
+   the date (and Carbon Mapper's source line).
+5. The ground (Sentinel-2) lands under the bars; tip bars still on the map drop to 0.45 opacity.
+6. The brief card: the days before this fortnight and the call.
+
+### Tools
+
+| Tool | Change |
+|---|---|
+| `scan_tropomi` | v3 cache with `_days.tif`; `tipcolumns_<lat>_<lon>.geojson` for the top three hotspots (in the v3 JSON as `tip_columns`, cleaned field by field when read back); `summary.end` = last day read, `requested_end`; incomplete composites rebuilt after 6 h; tip manifest carries `hotspots` (top three). |
+| `check_recent_passes` | manifest passes carry `scene_id`; `latest_candidate` with its own columns file. |
+| `carbon_mapper_plumes` | image bars (`plume_image`, `fetch_image`, `image_columns`, `cmimage_v1_` cache); `latest_image`; `latest_confirmed.days_before_tip`, top-level `within_90_days` and `ninety_day_note`; sector codes; honest UA; streamed caps; plume-list cache `carbonmapper_v3_`. |
+| `follow_site` (new, `follow_tools.py`) | reads the session's tip, pass and Carbon Mapper records; runs `follow_rule.follow_rule`; refuses with the fact; writes `follow.json`; returns `say`, the tip bars and the record bars (EMIT columns built from the cached `_sig.tif` when needed). |
+| `draft_brief` | `find_tip` matches any of the tip's top three hotspots. |
+
+`follow_rule.py` is pure (no AWS, no network): the rule, the manifest parsing, `rule_from_files`. The
+tool, `scripts/eval.py` (`follow_check`) and `tests/test_follow.py` (the 20 boards) run the same code.
+
+### follow.json
+
+```json
+{"reason": "top_spot_stale_switched", "basis": "newest_confirmation", "gap_days": 90,
+ "tip": {"start": "2026-10-06", "end": "2026-10-19"},
+ "step1": {"area": "shanxi coal basin", "rank": 1, "lat": 37.8938, "lon": 113.5625, "anomaly_ppb": 124.7,
+           "latest": {"date": "2026-06-10", "by": "carbon_mapper"}, "days_before_tip": 118},
+ "followed": {"area": "shanxi coal basin", "rank": 2, "...": "..."},
+ "checked": 4, "tip_bars": {"file": "tipcolumns_35.5488_112.5125.geojson"},
+ "record_bars": {"by": "emit", "date": "2026-09-26", "file": "columns_EMIT_L2B_CH4ENH_003_….geojson", "days_before_tip": 10}}
+```
+
+The stage parses it field by field (`utils/follow.ts`): known area keys, ranks 1 to 3, real ISO days,
+integer days, file names matching the tools' patterns. Anything malformed and the stage says nothing.
+
+### Security
+
+- Carbon Mapper's image: allowlisted host and plume-id path, https, no redirects, 20 s timeout, 2 MB
+  streamed cap, one float32 band, at most 1,000 × 1,000 px, projected grid, cells within 20 km of the
+  plume, numbers only out; the signed link never logged, returned or stored.
+- No new backend route or S3 prefix: the new files are session data and replay-case files read
+  through the existing `/api/geometry` allowlist.
+- Every stage sentence is code-written from enums, dates and numbers.
+
+### Replay and eval
+
+- `build_replay_case.py --case watch` defaults to the new id `methane-watch-bars`; it copies
+  `follow.json`, holds the record bars 6 s (`delay_ms`, now honoured for GeoJSON layers), records the
+  board's window in `config.dates.tip_window`, and rejects a take without the tip bars, with a
+  confirmation and no record bars, or with the bars out of order.
+- `golden_prompts.json`: the three watch cases require `follow_site` with a reason enum, a ppb
+  columns display, and `follow_check` (the rule recomputed on the mission's own records; record bars
+  required after the tip bars when the follow has a confirmation within 90 days).

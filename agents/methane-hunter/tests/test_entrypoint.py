@@ -100,7 +100,13 @@ def test_the_watch_reads_its_dates_from_the_tools_and_says_when_emit_last_looked
     # Mapper plume within 5 km) wins; a tie goes to more EMIT candidates, then the higher peak.
     assert "latest confirmed detection is the most recent" in p
     assert "on a tie, the site with MORE EMIT candidate passes; then the higher peak ppm·m" in p
-    assert "its latest confirmed detection is a Carbon Mapper plume on 2026-06-20, against an EMIT candidate pass" in p
+    # The 90-day switch rule (approved 2026-10-23): step 2 only when step 1's follow is stale; the
+    # decision goes through follow_site's guard, and its sentence is said word for word.
+    assert "the 90-day switch rule only (follow_site checks your choice" in p
+    assert "Check the extra hotspots ONLY in step 2." in p and "hotspots ranked 2 and 3 in each cued area" in p
+    for reason in ("newest_confirmation", "top_spot_stale_switched", "top_spot_stale_no_fresher", "stronger_tip"):
+        assert f'"{reason}"' in p
+    assert "say its `say` sentence word for word" in p
     assert "EMIT last looked here on" in p and "last_look" in p
     # Oct 22 (task 25): the closer is a template, word for word ("with EMIT last looking on" failed
     # 3 of 4 mission runs on dev v44).
@@ -130,11 +136,14 @@ def test_the_mission_checks_carbon_mapper_and_puts_the_candidate_on_the_map_as_i
     p = " ".join(methane_config.build_prompt("2026-10-22").split())
     assert "3 cue EMIT and check Carbon Mapper" in p
     assert "carbon_mapper_plumes(lat, lon) for BOTH cued sites" in p
-    assert "display_visual(strongest_candidate.columns_s3_url, render=<render_columns>)" in p
-    assert "this is its only display, never display the flat window" in p
+    # Oct 23 (the bars): the tip bars, then the record bars, each its own display; never a flat window.
+    assert "display_visual(tip_columns_s3_url, render=<render_tip_columns>)" in p
+    assert "display_visual(record_columns_s3_url, render=<render_record_columns>)" in p
+    assert "they replace the tip bars; never display a flat pass window" in p
     assert "display_visual(that window_s3_url" not in p
-    assert "its sector label is never a cause" in p and "Carbon Mapper's estimate" in p
-    assert "carbon_mapper_plumes" in [getattr(t, "__name__", "") for t in methane_hunter.LOCAL_TOOLS]
+    assert "its sector code is never a cause" in p and "Carbon Mapper's estimate" in p
+    names = [getattr(t, "__name__", "") for t in methane_hunter.LOCAL_TOOLS]
+    assert "carbon_mapper_plumes" in names and names.index("follow_site") > names.index("carbon_mapper_plumes")
 
 
 # --- replay cases (scenario_id) -------------------------------------------------------------------

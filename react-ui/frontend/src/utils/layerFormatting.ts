@@ -7,6 +7,7 @@ import { isTerrainLayer } from './archaeoLayers.ts';
 import { isVesselLayer } from './vesselLayers.ts';
 import { WATCH_SITES_ROW, methaneGeometryHint } from './methaneLayers.ts';
 import { stagePunctuation } from './caption.ts';
+import { BAR_ROWS, barKind } from './follow.ts';
 
 export interface LayerMetadata {
   id: string;
@@ -165,7 +166,7 @@ export function isMethaneLayer(layer: LayerMetadata): boolean {
   if (layer.type === 'raster' && /^ch4plm_.+\.tiff?$/.test(basename)) return true;
   if (!url.includes('/methane/') && !url.includes('/use-cases/methane-')) return false;
   if (layer.type === 'raster') return /^(tropomi_anomaly|pass)_.+\.tiff?$/.test(basename);
-  return /^(plumes|watch_sites|columns|cmplumes)_.+\.geojson$/.test(basename);
+  return /^(plumes|watch_sites|columns|tipcolumns|cmcolumns|cmplumes)_.+\.geojson$/.test(basename);
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -288,6 +289,12 @@ function rowLabel(layer: LayerMetadata): string {
   if (layer.type === 'geometry') {
     const hint = methaneGeometryHint(layer.render, layer.url);
     if (hint?.group === 'watch' && hint.kind === 'points') return WATCH_SITES_ROW;
+    // The bar layers too, by the tools' file names: what they are, never the model's title (their
+    // dates are said once, in their legend rows).
+    if (hint?.kind === 'columns') {
+      const bar = barKind(layer.url);
+      if (bar) return BAR_ROWS[bar];
+    }
   }
   if (isMethaneLayer(layer)) return layer.name;
   // The archaeologist's terrain keeps the tool's title ("Great Circle, LiDAR hillshade"); the

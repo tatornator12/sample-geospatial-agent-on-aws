@@ -45,6 +45,8 @@ export interface RenderHint {
   max_zoom?: number;
   /** Raster: the DEM a hillshade was lit from (an s3:// COG in the session or a replay case), so the stage can light it live. */
   dem?: string;
+  /** Columns: metres of column per unit of `property` (the tip bars' ppb cells are ~4 km across). Default: ppm·m's 0.25. */
+  height_scale?: number;
 }
 
 // The DEM rides in the session's terrain folder (show_terrain's copy) or flat in a replay case;
@@ -143,6 +145,11 @@ export function parseRenderHint(input: unknown): RenderHint | null {
   if (r.dem !== undefined) {
     if (typeof r.dem !== 'string' || !DEM_URL.test(r.dem)) return null;
     hint.dem = r.dem;
+  }
+  if (r.height_scale !== undefined) {
+    // A columns layer's own vertical scale: finite, above 0, at most 5 km per unit.
+    if (typeof r.height_scale !== 'number' || !Number.isFinite(r.height_scale) || r.height_scale <= 0 || r.height_scale > 5000) return null;
+    hint.height_scale = r.height_scale;
   }
   return hint;
 }

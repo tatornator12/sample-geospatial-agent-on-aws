@@ -92,18 +92,21 @@ const scenarios: Scenario[] = [
     agent: 'methane',
   },
   {
-    // The record take (Oct 23, methane_hunter_dev v49; the case ships only at a promotion, the live
-    // gallery keeps methane-watch-mission until then): 9 areas scanned, Shanxi (near Jincheng) and
-    // the south Caspian cued; every EMIT look since 2025 read, 0 candidates at either; Carbon Mapper
-    // lists no plume within 7 km of either; the agent follows the stronger tip, Shanxi, and
-    // recommends a new fine-scale look because no fine-scale confirmation is on record.
-    id: 'methane-watch-record',
+    // The bars take (Oct 23, methane_hunter_dev v52, build_replay_case.py --case watch; the case ships
+    // only at a promotion, the live gallery keeps methane-watch-mission until then). Recorded on the
+    // TROPOMI fortnight 5 to 18 October 2026, EMIT and Carbon Mapper read on 23 October: Shanxi and
+    // the south Caspian cued; Shanxi's top spot was last seen up close 117 days before the fortnight
+    // (Carbon Mapper, 10 June), so the 90-day rule checked the next four spots and followed the south
+    // Caspian's third, near Krasnovodsk (Carbon Mapper, 26 August, 40 days before): tip bars, then
+    // Carbon Mapper's image of that plume as bars, and no new close look needed yet.
+    id: 'methane-watch-bars',
     name: 'Methane Watch brief',
-    description: "One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, a Carbon Mapper cross-check, the site's record since 2025 and the agent's recommendation in a draft brief for the analyst",
+    description:
+      "The fortnight of 5 to 18 October 2026: TROPOMI tips over nine watch areas, EMIT and Carbon Mapper checked at six spots, and the agent's 90-day rule picks the spot it follows, shown as bars, in a draft brief for the analyst",
     icon: '/methane_watch.png',
     metrics: [
-      { label: 'Watch Areas', value: '9 scanned, 2 cued' },
-      { label: 'Recommendation', value: 'A new fine-scale look at Shanxi' },
+      { label: 'Followed', value: 'Near Krasnovodsk, third spot' },
+      { label: 'Last Seen Up Close', value: '26 Aug 2026, Carbon Mapper' },
     ],
     status: 'available',
     agent: 'methane',

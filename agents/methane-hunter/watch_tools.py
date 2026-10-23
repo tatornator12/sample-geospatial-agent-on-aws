@@ -79,10 +79,24 @@ TROPOMI_MAX_DAYS = 14
 TROPOMI_LATENCY_DAYS = 2              # OFFL lags ~2 days
 TROPOMI_MAX_AREA_DEG2 = 400.0         # e.g. 20 x 20 degrees
 TROPOMI_ORBIT_RE = re.compile(r"^S5P_OFFL_L2__CH4____(\d{8}T\d{6})_(\d{8}T\d{6})_(\d{5})_\d{2}_\d{6}_\d{8}T\d{6}$")
-TROPOMI_CACHE_VERSION = "v2"           # composites this code writes; the unversioned ones are read only
-TROPOMI_NEXT_STEPS = ("display_visual(anomaly_s3_url, render=render); then cue EMIT on the strongest hotspot with "
-                      "emit_can_look: check_recent_passes(lat, lon). If EMIT cannot look, say so: confidence stays low.")
+# Composites this code writes. v3 (Oct 23) adds the valid-days band (`_days.tif`) and the tip bars
+# around the top hotspots; v2 (the stable runtime's) and the unversioned ones are read only, and only
+# when TROPOMI itself cannot be read (they carry no days band, so no tip bars).
+TROPOMI_CACHE_VERSION = "v3"
+TROPOMI_READ_ONLY_VERSIONS = ("v2", None)
+TROPOMI_NEXT_STEPS = ("Cue EMIT on the strongest hotspot with emit_can_look: check_recent_passes(lat, lon). If EMIT "
+                      "cannot look, say so: confidence stays low. In a Methane Watch the followed site's bars come "
+                      "from follow_site; outside one, display_visual(anomaly_s3_url, render=render) shows the composite.")
 HOTSPOT_MIN_DAYS = 3
+# The tip bars (approved 2026-10-23): this fortnight's cells within ±15 km of a top hotspot, from the
+# same composite as the tip, as 3D bars. Never a whole area: the anomaly is against the area's median,
+# so a box over two landscapes (Shanxi's plateau and the North China Plain) would raise a wall on the
+# plain that reads as a source.
+TIP_COLUMNS_KM = 15.0
+TIP_COLUMNS_HOTSPOTS = 3             # the follow rule's step 2 can land on any of the top three
+TIP_METRES_PER_PPB = 40.0            # 120 ppb stands ~4.8 km over a ~3.5 km cell: ~15% of the 30 km frame
+RENDER_TIP_COLUMNS = {"kind": "columns", "property": "ppb", "ramp": "ice", "units": "ppb", "group": "methane",
+                      "legend": "CH4 anomaly"}
 HOTSPOT_SEPARATION_KM = 40.0
 MAX_PARALLEL_READS = 12
 
@@ -528,26 +542,117 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     box_sig = "_".join(f"{v:.2f}" for v in box).replace("-", "m")
     slug = mt._slugify(label) if bbox is None else f"bbox_{box_sig}"
     stem = f"{slug}_{box_sig}_{end.isoformat()}_{days}d"
-    # Written under a versioned key only; the unversioned key (composites the stable runtime wrote,
-    # the same numbers) is read as a fallback and never written, so its reads stay as they are.
+    # Written under the v3 key only (with its days band and tip bars). The v2 and unversioned keys
+    # (composites the stable runtime wrote, the same numbers, no days band) are read only, and only
+    # when TROPOMI cannot be read, so their reads stay as they are.
     cache_base = f"methane/cache/tropomi_{TROPOMI_CACHE_VERSION}_{stem}"
     session_key = f"{mt.session_prefix()}tropomi_anomaly_{slug}_{end.isoformat()}_{days}d.tif"
     s3 = mt._s3()
-    for base in (cache_base, f"methane/cache/tropomi_{stem}"):
+
+    def from_cache(base: str, fresh_only: bool = False) -> str | None:
         try:
-            cached = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.json")["Body"].read(1_000_000))
+            cached = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.json")["Body"].read(5_000_000))
+        except s3.exceptions.NoSuchKey:
+            return None
+        if fresh_only and not cache_current(cached, end):
+            return None
+        try:
             tif = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.tif")["Body"].read(50_000_000)
         except s3.exceptions.NoSuchKey:
-            continue
+            return None
         url = _put_bytes(session_key, tif, "image/tiff")
         cached["summary"].update(source="cache", seconds=round(time.time() - started, 1))
         # The styling and the instructions are today's, not the cache's: a composite cached before a
         # render change (magma, no zoom cap) must not bring the old look back.
         cached["render"] = {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]}
         cached["next_steps"] = TROPOMI_NEXT_STEPS
+        bars = cached.pop("tip_columns", None)
+        if emit is not False:
+            write_tip_columns(bars if isinstance(bars, dict) else {})
         write_tip(area_key, cached["summary"], cached.get("hotspots", []))
         return json.dumps({**cached, "anomaly_s3_url": url})
 
+    def write_tip_columns(bars: dict) -> None:
+        """The session's tip bars, one file per top hotspot (the stage and follow_site read them)."""
+        for key, fc in list(bars.items())[:TIP_COLUMNS_HOTSPOTS]:
+            m = re.fullmatch(r"(-?\d+\.\d{4})_(-?\d+\.\d{4})", key) if isinstance(key, str) else None
+            if m and isinstance(fc, dict) and isinstance(fc.get("features"), list):
+                try:
+                    mt._put_json(tip_columns_key(float(m[1]), float(m[2])), clean_tip_columns(fc))
+                except Exception as e:  # the bars are decoration: never fail the scan for them
+                    logger.warning("tip columns failed: %s", type(e).__name__)
+
+    hit = from_cache(cache_base, fresh_only=True)
+    if hit:
+        return hit
+    computed = compute_composite(box, end, days)
+    if isinstance(computed, str):
+        # TROPOMI could not be read: an older composite of the same numbers, without its tip bars.
+        for version in TROPOMI_READ_ONLY_VERSIONS:
+            hit = from_cache(f"methane/cache/tropomi_{version + '_' if version else ''}{stem}")
+            if hit:
+                return hit
+        return json.dumps({"error": computed})
+    med, valid_days, transform, stems, days_read = computed
+    if not np.isfinite(med).any():
+        return json.dumps({"summary": {"area": label, "orbits": len(stems), "valid_pixels": 0},
+                           "hotspots": [], "say": f"TROPOMI saw no cloud-free methane retrievals over {label} in that window."})
+    background = float(np.nanmedian(med))
+    anomaly = med - background
+    # A hotspot must persist: seen on HOTSPOT_MIN_DAYS days, or on every day of a shorter scan.
+    min_days = min(HOTSPOT_MIN_DAYS, max(days_read, 1))
+    hotspots = find_hotspots(anomaly, valid_days, transform, min_days=min_days)
+    cog = _cog_bytes(anomaly, transform.c, transform.f, transform.a, -transform.e)
+    days_cog = _days_cog_bytes(valid_days, transform)
+    url = _put_bytes(session_key, cog, "image/tiff")
+    read_days = sorted({s.split('/')[3] + '-' + s.split('/')[4] + '-' + s.split('/')[5] for s in stems})
+    # The window is the days TROPOMI was read on: its last day can be before the day asked for, when
+    # that day's orbits are not published yet (the stage says the window's own dates).
+    summary = {"area": label, "bbox": list(box), "start": read_days[0], "end": read_days[-1],
+               "requested_end": end.isoformat(),
+               "days_requested": days, "orbits": len(stems), "background_ppb": round(background, 1),
+               "valid_pixel_fraction": round(float(np.isfinite(med).mean()), 3),
+               "emit_can_look": emit, "seconds": round(time.time() - started, 1),
+               "definitions": (f"anomaly_ppb: the {days}-day median column CH4 at a ~4 km pixel minus the area's "
+                               f"median, quality ≥ {TROPOMI_QA_MIN}/100. A tip, not a detection: cue EMIT.")}
+    logger.info("TROPOMI: %s %d orbits → %d hotspots in %.1fs", label, len(stems), len(hotspots), summary["seconds"])
+    result = {
+        "summary": {**summary, "source": "meeo-s5p"}, "hotspots": hotspots, "built_at": int(time.time()),
+        "render": {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]},
+        "next_steps": TROPOMI_NEXT_STEPS,
+    }
+    # The bars keep the hotspots' own rule: cells seen on as many days as a hotspot must be.
+    bars = {f"{h['lat']:.4f}_{h['lon']:.4f}": tip_columns_geojson(anomaly, valid_days, transform, h["lat"], h["lon"],
+                                                                  min_days=min_days)
+            for h in hotspots[:TIP_COLUMNS_HOTSPOTS]}
+    if end <= today - timedelta(days=TROPOMI_LATENCY_DAYS):   # only complete days are cached
+        s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.tif", Body=cog, ContentType="image/tiff")
+        s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}_days.tif", Body=days_cog, ContentType="image/tiff")
+        s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.json", ContentType="application/json",
+                      Body=json.dumps({**result, "tip_columns": bars}).encode())
+    if emit is not False:
+        write_tip_columns(bars)
+    write_tip(area_key, result["summary"], hotspots)
+    return json.dumps({**result, "anomaly_s3_url": url})
+
+
+TROPOMI_INCOMPLETE_TTL_S = 6 * 3600     # a composite missing the day asked for is read again after this
+
+
+def cache_current(cached: dict, end: date) -> bool:
+    """Whether a v3 composite may be served for `end`: complete (its last day read is the day asked
+    for), or incomplete and built less than six hours ago (that day's orbits may land since)."""
+    summary = cached.get("summary") if isinstance(cached, dict) else None
+    if not isinstance(summary, dict) or summary.get("requested_end") != end.isoformat():
+        return False
+    if summary.get("end") == end.isoformat():
+        return True
+    built = cached.get("built_at")
+    return isinstance(built, (int, float)) and time.time() - built < TROPOMI_INCOMPLETE_TTL_S
+
+
+def compute_composite(box, end: date, days: int):
+    """(median, valid days, transform, orbit stems, days read) from Sentinel-5P, or an error sentence."""
     lon_c = (box[0] + box[2]) / 2
     s3p = tropomi_s3()
 
@@ -556,8 +661,12 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
         return overpass_orbits([o["Key"] for o in listing.get("Contents", [])], day, lon_c)
 
     candidates = [end - timedelta(days=i) for i in range(days + 7)]   # a week of slack for gaps
-    with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
-        listed = list(pool.map(orbits_on, candidates))                  # newest first
+    try:
+        with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
+            listed = list(pool.map(orbits_on, candidates))                  # newest first
+    except Exception as e:
+        logger.warning("TROPOMI listing failed: %s", type(e).__name__)
+        return "TROPOMI's archive could not be listed; try again shortly."
     stems: list[str] = []
     days_read = 0
     for orbits in listed:
@@ -565,7 +674,7 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
             stems += orbits
             days_read += 1
     if not stems:
-        return json.dumps({"error": "No TROPOMI orbits were found for that window; try an earlier end_date."})
+        return "No TROPOMI orbits were found for that window; try an earlier end_date."
 
     def read(stem):
         try:
@@ -575,41 +684,80 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
             return None
 
     with ThreadPoolExecutor(max_workers=MAX_PARALLEL_READS) as pool:
-        results = [r for r in pool.map(read, stems) if r is not None]
+        results = [(stem, r) for stem, r in zip(stems, pool.map(read, stems)) if r is not None]
     if not results:
-        return json.dumps({"error": "TROPOMI could not be read for that window (all orbits failed)."})
-    shape = results[0][0].shape
-    stacks = [a for a, _ in results if a.shape == shape]
-    transform = results[0][1]
-    med, valid_days = composite(stacks)
-    if not np.isfinite(med).any():
-        return json.dumps({"summary": {"area": label, "orbits": len(stacks), "valid_pixels": 0},
-                           "hotspots": [], "say": f"TROPOMI saw no cloud-free methane retrievals over {label} in that window."})
-    background = float(np.nanmedian(med))
-    anomaly = med - background
-    # A hotspot must persist: seen on HOTSPOT_MIN_DAYS days, or on every day of a shorter scan.
-    hotspots = find_hotspots(anomaly, valid_days, transform, min_days=min(HOTSPOT_MIN_DAYS, max(days_read, 1)))
-    cog = _cog_bytes(anomaly, transform.c, transform.f, transform.a, -transform.e)
-    url = _put_bytes(session_key, cog, "image/tiff")
-    first_day = min(s.split('/')[3] + '-' + s.split('/')[4] + '-' + s.split('/')[5] for s in stems)
-    summary = {"area": label, "bbox": list(box), "start": first_day, "end": end.isoformat(),
-               "days_requested": days, "orbits": len(stacks), "background_ppb": round(background, 1),
-               "valid_pixel_fraction": round(float(np.isfinite(med).mean()), 3),
-               "emit_can_look": emit, "seconds": round(time.time() - started, 1),
-               "definitions": (f"anomaly_ppb: the {days}-day median column CH4 at a ~4 km pixel minus the area's "
-                               f"median, quality ≥ {TROPOMI_QA_MIN}/100. A tip, not a detection: cue EMIT.")}
-    logger.info("TROPOMI: %s %d orbits → %d hotspots in %.1fs", label, len(stacks), len(hotspots), summary["seconds"])
-    result = {
-        "summary": {**summary, "source": "meeo-s5p"}, "hotspots": hotspots,
-        "render": {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]},
-        "next_steps": TROPOMI_NEXT_STEPS,
-    }
-    if end <= today - timedelta(days=TROPOMI_LATENCY_DAYS):   # only complete days are cached
-        s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.tif", Body=cog, ContentType="image/tiff")
-        s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.json", Body=json.dumps(result).encode(),
-                      ContentType="application/json")
-    write_tip(area_key, result["summary"], hotspots)
-    return json.dumps({**result, "anomaly_s3_url": url})
+        return "TROPOMI could not be read for that window (all orbits failed)."
+    shape = results[0][1][0].shape
+    kept = [(stem, r) for stem, r in results if r[0].shape == shape]
+    med, valid_days = composite([r[0] for _, r in kept])
+    return med, valid_days, results[0][1][1], [stem for stem, _ in kept], days_read
+
+
+def _days_cog_bytes(valid_days: np.ndarray, transform) -> bytes:
+    """The valid-days band (uint8): how many days each cell was seen on, beside the composite."""
+    data = np.clip(valid_days, 0, 255).astype(np.uint8)
+    with MemoryFile() as mem:
+        with mem.open(driver="GTiff", width=data.shape[1], height=data.shape[0], count=1, dtype="uint8",
+                      crs="EPSG:4326", transform=transform, tiled=True, blockxsize=256, blockysize=256,
+                      compress="deflate") as ds:
+            ds.write(data, 1)
+        return mem.read()
+
+
+def tip_columns_key(lat: float, lon: float) -> str:
+    return f"{mt.session_prefix()}tipcolumns_{lat:.4f}_{lon:.4f}.geojson"
+
+
+def tip_columns_render(peak_ppb: float) -> dict:
+    """The tip bars' hint: the ice ramp up to the next 20 ppb above the peak (60 to 200), and their
+    own height scale (metres per ppb) for the stage."""
+    hi = min(200, max(60, int(math.ceil(max(peak_ppb, 0) / 20.0)) * 20))
+    return {**RENDER_TIP_COLUMNS, "rescale": [0, hi], "height_scale": TIP_METRES_PER_PPB}
+
+
+def tip_columns_geojson(anomaly: np.ndarray, valid_days: np.ndarray, transform, lat: float, lon: float,
+                        km: float = TIP_COLUMNS_KM, min_days: int = HOTSPOT_MIN_DAYS) -> dict:
+    """The composite's cells whose centre lies within ±km of a hotspot, seen on at least `min_days`
+    days and above the area's median, each a square with its anomaly in ppb (numbers only)."""
+    w, s, e, n = box_around(lat, lon, km)
+    inv = ~transform
+    c0, r0 = (int(math.floor(v)) for v in inv * (w, n))
+    c1, r1 = (int(math.ceil(v)) for v in inv * (e, s))
+    rows, cols = anomaly.shape
+    feats = []
+    for r in range(max(r0, 0), min(r1, rows)):
+        for c in range(max(c0, 0), min(c1, cols)):
+            v = anomaly[r, c]
+            if not np.isfinite(v) or v <= 0 or valid_days[r, c] < min_days:
+                continue
+            cx, cy = transform * (c + 0.5, r + 0.5)
+            if not (w <= cx <= e and s <= cy <= n):     # the cell's centre inside the ±km box
+                continue
+            west, north = transform * (c, r)
+            east, south = transform * (c + 1, r + 1)
+            ring = [[round(x, 5), round(y, 5)] for x, y in ((west, south), (east, south), (east, north), (west, north), (west, south))]
+            feats.append({"type": "Feature", "properties": {"ppb": round(float(v), 1)},
+                          "geometry": {"type": "Polygon", "coordinates": [ring]}})
+    return {"type": "FeatureCollection", "features": feats}
+
+
+def clean_tip_columns(fc: dict, cap: int = 2000) -> dict:
+    """A cached tip-bars collection again, field by field: polygons of finite numbers and `ppb` only."""
+    out = []
+    for f in (fc.get("features") or [])[:cap]:
+        try:
+            ring = f["geometry"]["coordinates"][0]
+            ppb = f["properties"]["ppb"]
+        except (KeyError, IndexError, TypeError):
+            continue
+        if isinstance(ppb, bool) or not isinstance(ppb, (int, float)) or not math.isfinite(ppb) or not isinstance(ring, list):
+            continue
+        pts = [[float(x), float(y)] for x, y in ring[:6]
+               if isinstance(x, (int, float)) and isinstance(y, (int, float)) and abs(x) <= 180 and abs(y) <= 90]
+        if len(pts) == 5:
+            out.append({"type": "Feature", "properties": {"ppb": round(float(ppb), 1)},
+                        "geometry": {"type": "Polygon", "coordinates": [pts]}})
+    return {"type": "FeatureCollection", "features": out}
 
 
 def write_tip(area_key: str | None, summary: dict, hotspots: list) -> None:
@@ -633,6 +781,9 @@ def write_tip(area_key: str | None, summary: dict, hotspots: list) -> None:
         "emit_can_look": bool(summary.get("emit_can_look")),
         "orbits": summary.get("orbits"),
         "top": top and {k: top.get(k) for k in ("lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look")},
+        # The scan's top three hotspots: the follow rule's step 2 may check (and follow) any of them.
+        "hotspots": [{k: h.get(k) for k in ("rank", "lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look")}
+                     for h in (hotspots or [])[:TIP_COLUMNS_HOTSPOTS] if isinstance(h, dict)],
     }
     try:
         mt._put_json(f"{mt.session_prefix()}tip_{area_key.replace(' ', '_')}.json", tip)
@@ -952,19 +1103,27 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
     # Every look read, newest first, with its product: the record timeline draws one mark per look.
     manifest = {"lat": round(lat, 4), "lon": round(lon, 4), "since": since_d.isoformat(), "looks": looks,
                 "passes": [{"date": p.get("date"), "product": p.get("product"), "verdict": p["verdict"],
+                            "scene_id": p.get("scene_id"),
                             "short": p.get("short", "error"), "reason": p.get("reason"), "peak_ppm_m": p.get("peak_ppm_m"),
                             "chip": p["chip_s3_url"].rsplit("/", 1)[1] if p.get("chip_s3_url") else None}
                            for p in passes]}
     mt._put_json(f"{mt.session_prefix()}passes_{lat:.4f}_{lon:.4f}.json", manifest)
-    columns_url = None
-    if best:
+    # The newest candidate is the site's latest EMIT confirmation (its record bars when it is the
+    # latest confirmation of all, follow_tools); the strongest is the one the model looks at.
+    newest = max(cands, key=lambda p: p.get("date") or "", default=None)
+
+    def columns_for(cand) -> str | None:
         try:
             # The candidate's significant pixels only (beyond 3x their own uncertainty), never noise.
             win = s3.get_object(Bucket=config.S3_BUCKET_NAME,
-                                Key=f"{pass_cache_base(best['scene_id'], lat, lon)}_sig.tif")["Body"].read(SCENE_CAP_BYTES)
-            columns_url = mt._put_json(f"{mt.session_prefix()}columns_{best['scene_id']}.geojson", columns_geojson(win))
+                                Key=f"{pass_cache_base(cand['scene_id'], lat, lon)}_sig.tif")["Body"].read(SCENE_CAP_BYTES)
+            return mt._put_json(f"{mt.session_prefix()}columns_{cand['scene_id']}.geojson", columns_geojson(win))
         except Exception as e:
             logger.warning("columns failed: %s", type(e).__name__)
+            return None
+
+    columns_url = columns_for(best) if best else None
+    newest_url = (columns_url if newest is best else columns_for(newest)) if newest else None
     summary = {"lat": lat, "lon": lon, "since": since_d.isoformat(), "looks": looks, "read": len(passes),
                "candidates": len(cands), "rejected": sum(p["verdict"] == "rejected" for p in passes),
                "errors": sum(p["verdict"] == "error" for p in passes),
@@ -980,6 +1139,8 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
         "summary": summary, "passes": passes,
         "strongest_candidate": best and {**{k: best[k] for k in ("scene_id", "date", "peak_ppm_m", "pixels_ge_1000",
                                                                 "window_s3_url")}, "columns_s3_url": columns_url},
+        "latest_candidate": newest and {**{k: newest[k] for k in ("scene_id", "date", "peak_ppm_m", "window_s3_url")},
+                                        "columns_s3_url": newest_url},
         # The window and its columns share one ramp, fitted to the strongest candidate's peak.
         "render": {**mt.scaled(RENDER_PASS, best and best.get("peak_ppm_m")),
                    "bounds": [round(v, 5) for v in box_around(lat, lon, WINDOW_KM / 2)]},

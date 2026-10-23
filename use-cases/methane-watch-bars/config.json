@@ -1,0 +1,528 @@
+{
+  "name": "Methane Watch brief",
+  "description": "One prompt, the whole mission: a global baseline, a TROPOMI tip, EMIT cued on recent passes, a self-check, and a draft brief for the analyst. Recorded on the TROPOMI fortnight 5 to 18 October 2026, with the EMIT and Carbon Mapper records as read on 23 October 2026",
+  "location": "Methane watch areas",
+  "user_question": "Brief me on the watch areas where methane keeps showing up, and how confident you are. Use the TROPOMI fortnight ending 18 October 2026.",
+  "agent": "methane",
+  "dates": {
+    "tip_window": "2026-10-05/2026-10-18"
+  },
+  "scenario_version": "1.1",
+  "recorded_from": "methane_hunter_dev",
+  "tool_calls": [
+    {
+      "name": "watch_baseline",
+      "params": {},
+      "result": "Baseline built from NASA's plume record"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-bars/watch_sites_v002.geojson",
+        "title": "EMIT Methane Repeat Sites, Global Baseline",
+        "description": "24 sites seen on 5 or more separate dates, 1686 total detections",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "permian basin",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "south caspian",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "amu darya basin",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "zagros foreland",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "shanxi coal basin",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "orenburg and lower volga",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "west siberia and yamal",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "hassi messaoud",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "amman",
+        "days": 14,
+        "end_date": "2026-10-18"
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 37.8927,
+        "lon": 113.5628
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 39.0173,
+        "lon": 53.8207
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 37.8927,
+        "lon": 113.5628
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 39.0173,
+        "lon": 53.8207
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 113.5628,
+        "y": 37.8927
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 53.8207,
+        "y": 39.0173
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 37.8927,
+        "lon": 113.5628
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 39.0173,
+        "lon": 53.8207
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 35.5477,
+        "lon": 112.6528
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 35.8627,
+        "lon": 114.4028
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 39.4723,
+        "lon": 53.4707
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 38.3873,
+        "lon": 53.9607
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 35.5477,
+        "lon": 112.6528
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 35.8627,
+        "lon": 114.4028
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 39.4723,
+        "lon": 53.4707
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 38.3873,
+        "lon": 53.9607
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "follow_site",
+      "params": {
+        "lat": 38.3873,
+        "lon": 53.9607,
+        "reason": "top_spot_stale_switched"
+      },
+      "result": "Site followed by the 90-day rule"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-bars/tipcolumns_38.3873_53.9607.geojson",
+        "title": "TROPOMI tip columns, south Caspian (Turkmenistan), fortnight ending 2026-10-18",
+        "description": "14-day TROPOMI CH4 anomaly cells around the followed site, rank 3 hotspot at 38.3873, 53.9607",
+        "render": {
+          "kind": "columns",
+          "property": "ppb",
+          "ramp": "ice",
+          "units": "ppb",
+          "group": "methane",
+          "legend": "CH4 anomaly",
+          "rescale": [
+            0,
+            80
+          ],
+          "height_scale": 40.0
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[53.9607,38.3873]}",
+        "location": "south Caspian watch site",
+        "radius_meters": 3000
+      },
+      "result": "3 km frame around the site"
+    },
+    {
+      "name": "thermal_anomalies",
+      "params": {
+        "lat": 38.3873,
+        "lon": 53.9607
+      },
+      "result": "VIIRS heat checked"
+    },
+    {
+      "name": "nearby_infrastructure",
+      "params": {
+        "lat": 38.3873,
+        "lon": 53.9607
+      },
+      "result": "Overture Maps checked, by type"
+    },
+    {
+      "name": "registry_lookup",
+      "params": {
+        "lat": 38.3873,
+        "lon": 53.9607
+      },
+      "result": "Public registry checked"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 38.3873,
+        "lon": 53.9607
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 53.9607,
+        "y": 38.3873
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-bars/cmcolumns_tan20260826t084806c27s4001-I.geojson",
+        "title": "Carbon Mapper plume record, Krasnovodsk, Turkmenistan, 2026-08-26",
+        "description": "Latest confirmed detection: Tanager-1, 2026-08-26, ~980 kg/h",
+        "render": {
+          "group": "methane",
+          "kind": "columns",
+          "legend": "Carbon Mapper plume",
+          "property": "ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "get_rasters",
+      "params": {
+        "location": "south Caspian watch site",
+        "geometry_s3_url": "s3://bucket/use-cases/methane-watch-bars/plumes_detected.geojson",
+        "current_date_str": "2026-08-26"
+      },
+      "result": "Sentinel-2 scene fetched"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-bars/tci_clipped_south_caspian_watch_site_2026-08-23.tif",
+        "title": "Sentinel-2 true colour, Krasnovodsk, Turkmenistan, 2026-08-23",
+        "question": "What infrastructure and land cover is visible?"
+      },
+      "result": "Looked at the image",
+      "saw": "Arid, sandy terrain with rocky outcrops and faint linear tracks visible; no cloud, no obvious built infrastructure in the 6 km window, consistent with a remote desert setting near the Caspian coast."
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-bars/tci_clipped_south_caspian_watch_site_2026-08-23.tif",
+        "title": "Sentinel-2 true colour, Krasnovodsk, Turkmenistan, 2026-08-23",
+        "description": "Arid desert terrain, faint tracks, no cloud; 0.3% cloud cover"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "draft_brief",
+      "params": {
+        "place": "Krasnovodsk, Turkmenistan",
+        "lat": 38.3873,
+        "lon": 53.9607,
+        "watch_area": "south caspian",
+        "observations": [
+          "TROPOMI showed a 14-day anomaly of 61.6 ppb above background at this site in the fortnight ending 2026-10-18.",
+          "EMIT looked 29 times (2023-06-09 to 2026-08-19) and NASA outlined no plumes here; the plume product is nearly empty after 2025-09-22.",
+          "EMIT's 17 raw passes since 2025-01-01 produced 0 candidates; all were rejected as too weak or within noise.",
+          "Carbon Mapper lists 16 plumes within 7 km since 2025-01-01, the latest on 2026-08-26 (Tanager-1, about 980 kg/h)."
+        ],
+        "looks": 29,
+        "candidates": 0,
+        "passes_read": 17,
+        "explanations": [
+          {
+            "id": "routine_venting",
+            "assessment": "possible",
+            "next_check": "Repeated EMIT candidates on new dates with no heat would support continuous venting."
+          },
+          {
+            "id": "equipment_failure_or_leak",
+            "assessment": "possible",
+            "next_check": "A new EMIT or Tanager-1 pass with a candidate would indicate a persistent unresolved issue."
+          },
+          {
+            "id": "unlit_flare",
+            "assessment": "cannot assess",
+            "next_check": "VIIRS heat on multiple nights would support a flare; no heat and no mapped flare stack means this cannot be assessed."
+          },
+          {
+            "id": "non_oil_gas_source",
+            "assessment": "cannot assess",
+            "next_check": "Overture Maps has nothing mapped within 2 km; ground inspection would clarify the source type."
+          }
+        ],
+        "confidence": "low",
+        "gaps": [
+          "NASA's plume product is nearly empty after 2025-09-22; passes since then have not been checked for outlined plumes.",
+          "EMIT only sees this site on its passes; gaps between passes leave the record incomplete.",
+          "Overture Maps has nothing mapped within 2 km, which is a mapping gap and not evidence of empty ground.",
+          "Carbon Mapper publishes about 30 days after detection; plumes from the last month may not yet appear."
+        ],
+        "next_collection": "A new EMIT or Tanager-1 pass over this site to determine whether methane recurs after the 2026-08-26 Carbon Mapper detection.",
+        "recommendation": "recommend_new_look",
+        "recommendation_reason": "confirmation_older_than_90_days"
+      },
+      "result": "Brief drafted (not filed)"
+    },
+    {
+      "name": "draft_brief",
+      "params": {
+        "candidates": 0,
+        "confidence": "low",
+        "explanations": [
+          {
+            "assessment": "possible",
+            "id": "routine_venting",
+            "next_check": "Repeated EMIT candidates on new dates with no heat would support continuous venting."
+          },
+          {
+            "assessment": "possible",
+            "id": "equipment_failure_or_leak",
+            "next_check": "A new EMIT or Tanager-1 pass with a candidate would indicate a persistent unresolved issue."
+          },
+          {
+            "assessment": "cannot assess",
+            "id": "unlit_flare",
+            "next_check": "VIIRS heat on multiple nights would support a flare; no heat and no mapped flare stack means this cannot be assessed."
+          },
+          {
+            "assessment": "cannot assess",
+            "id": "non_oil_gas_source",
+            "next_check": "Overture Maps has nothing mapped within 2 km; ground inspection would clarify the source type."
+          }
+        ],
+        "gaps": [
+          "NASA's plume product is nearly empty after 2025-09-22; passes since then have not been checked for outlined plumes.",
+          "EMIT only sees this site on its passes; gaps between passes leave the record incomplete.",
+          "Overture Maps has nothing mapped within 2 km, which is a mapping gap and not evidence of empty ground.",
+          "Carbon Mapper publishes about 30 days after detection; plumes from the last month may not yet appear."
+        ],
+        "lat": 38.3873,
+        "lon": 53.9607,
+        "looks": 29,
+        "next_collection": "A new EMIT or Tanager-1 pass over this site to determine whether methane recurs after the 2026-08-26 Carbon Mapper detection.",
+        "observations": [
+          "TROPOMI showed a 14-day anomaly of 61.6 ppb above background at this site in the fortnight ending 2026-10-18.",
+          "EMIT looked 29 times (2023-06-09 to 2026-08-19) and NASA outlined no plumes here; the plume product is nearly empty after 2025-09-22.",
+          "EMIT's 17 raw passes since 2025-01-01 produced 0 candidates; all were rejected as too weak or within noise.",
+          "Carbon Mapper lists 16 plumes within 7 km since 2025-01-01, the latest on 2026-08-26 (Tanager-1, about 980 kg/h)."
+        ],
+        "passes_read": 17,
+        "place": "Krasnovodsk, Turkmenistan",
+        "recommendation": "no_new_look_needed",
+        "recommendation_reason": "confirmed_within_90_days",
+        "watch_area": "south caspian"
+      },
+      "result": "Brief drafted (not filed)"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "watch_sites_v002.geojson",
+        "title": "EMIT Methane Repeat Sites, Global Baseline",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      {
+        "file": "tipcolumns_38.3873_53.9607.geojson",
+        "title": "TROPOMI tip columns, south Caspian (Turkmenistan), fortnight ending 2026-10-18",
+        "render": {
+          "kind": "columns",
+          "property": "ppb",
+          "ramp": "ice",
+          "units": "ppb",
+          "group": "methane",
+          "legend": "CH4 anomaly",
+          "rescale": [
+            0,
+            80
+          ],
+          "height_scale": 40.0
+        }
+      },
+      {
+        "file": "cmcolumns_tan20260826t084806c27s4001-I.geojson",
+        "title": "Carbon Mapper plume record, Krasnovodsk, Turkmenistan, 2026-08-26",
+        "render": {
+          "group": "methane",
+          "kind": "columns",
+          "legend": "Carbon Mapper plume",
+          "property": "ppm_m",
+          "ramp": "plasma",
+          "rescale": [
+            0,
+            1500
+          ],
+          "units": "ppm·m"
+        },
+        "delay_ms": 6000
+      },
+      {
+        "file": "tci_clipped_south_caspian_watch_site_2026-08-23.tif",
+        "title": "Sentinel-2 true colour, Krasnovodsk, Turkmenistan, 2026-08-23"
+      }
+    ]
+  }
+}

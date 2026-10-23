@@ -18,6 +18,7 @@ import { Icon } from './Icons.tsx';
 import { extractEvidence, type EvidenceItem } from '../utils/evidence.ts';
 import { groupSteps, methaneDirFrom, parseTip, tipManifestUrl, type Tip } from '../utils/steps.ts';
 import { archaeologyDirFrom } from '../utils/survey.ts';
+import { followUrl, parseFollow, type Follow } from '../utils/follow.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 import { useReplayReveal } from '../hooks/useReplayReveal.ts';
 import { currentBriefId, groundChecks } from '../utils/brief.ts';
@@ -126,6 +127,8 @@ interface ChatSidebarProps {
   onWorkingChange?: (working: boolean) => void;
   /** The TROPOMI tips as they load, for the globe. */
   onTipsUpdate?: (tips: Tip[]) => void;
+  /** Methane Watch: the followed site's decision (follow.json) once it loads, for the map's legend rows. */
+  onFollowUpdate?: (follow: Follow | null) => void;
   /** Dark Vessels: told how many taskings the finished turns drafted (the map's tasking plate loads the newest). */
   onTaskingDrafted?: (count: number) => void;
   /** A prompt the stage sends on the presenter's behalf (the officer filed the tasking), once. */
@@ -155,6 +158,7 @@ export function ChatSidebar({
   onDrawnGeometryMessageSent,
   onWorkingChange,
   onTipsUpdate,
+  onFollowUpdate,
   onTaskingDrafted,
   autoPrompt,
   onAutoPromptSent,
@@ -724,6 +728,14 @@ export function ChatSidebar({
   useEffect(() => {
     onTipsUpdate?.(tips);
   }, [tips, onTipsUpdate]);
+  // The follow decision (follow_site's follow.json): the step column words the decision and the bars'
+  // plate lines from it, the map dates the bar layers' legend rows, the card words its line.
+  const followFileUrl = followUrl(methaneDir, [...stepTools, ...messages.flatMap((m) => m.tools ?? [])]);
+  const followFiles = useStageFiles<Follow>(followFileUrl ? [followFileUrl] : [], (raw) => parseFollow(raw));
+  const follow = followFileUrl ? followFiles[followFileUrl] ?? null : null;
+  useEffect(() => {
+    onFollowUpdate?.(follow);
+  }, [follow, onFollowUpdate]);
   // The brief card's last look (EMIT's newest pass at the site, the TROPOMI tip over it): the cues
   // and tips of the whole session, so the card reads the same through the analyst's decision turn.
   // The tips are the ones already loaded (useStageFiles keeps every file it read this session).
@@ -896,6 +908,7 @@ export function ChatSidebar({
                   methaneDir={methaneDir}
                   archaeologyDir={archaeologyDir}
                   tips={tips}
+                  follow={follow}
                   compact={showBrief && draftedBrief}
                   profiles={profiles}
                   vessel={agentId === 'vessels'
@@ -920,6 +933,7 @@ export function ChatSidebar({
                   methaneDir={methaneDir}
                   cues={briefCues}
                   tips={briefTips}
+                  follow={follow}
                   checks={groundChecks(sessionTools)}
                 />
               )}

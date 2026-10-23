@@ -26,7 +26,7 @@ import {
   DETECTIONS_COLOUR,
   DETECTIONS_ROW,
   METHANE_RASTER,
-  detectionPopupRows,
+  detectionPopupHtml,
   footprintFrame,
   globeCentre,
   labelPointOutside,
@@ -45,6 +45,7 @@ import {
   type StackLegend,
   type StackPlace,
 } from '../utils/layerStack.ts';
+import { barKind, type BarKind, type Follow } from '../utils/follow.ts';
 import {
   FRAME_MAX_ZOOM,
   GROUND_BEARING,
@@ -185,6 +186,10 @@ const LIT_RANKS = 3;
 const GLOBE_DEG_PER_S_WORKING = 4;
 const GLOBE_DEG_PER_S_RESTING = 1.5;
 const COLUMNS_PITCH = 55;
+/** How close the camera comes when a bar layer lands, by kind (see the columns branch). */
+const COLUMNS_MAX_ZOOM: Record<BarKind, number> = { tip: 11, emit: 13, carbon_mapper: 14.5 };
+/** The tip bars' opacity once the ground scene is under them (0.9 before). */
+const TIP_BARS_GROUND_OPACITY = 0.45;
 // A coarse raster (TROPOMI) is dimmer than the finding so the EMIT candidate reads through it.
 const COARSE_RASTER_OPACITY = 0.75;
 
@@ -241,6 +246,8 @@ interface MapViewProps {
   onCandidatesRevealed?: (passId: string, count: number) => void;
   /** A raster is on the map (its URL): a replay's held layer waits for the scene before it. */
   onRasterLanded?: (url: string) => void;
+  /** Methane Watch: the followed site's decision (follow.json); it dates the bar layers' legend rows. */
+  follow?: Follow | null;
 }
 
 /** A sea file on the stage: its kind and pass (by its name), its data and its map ids. */
@@ -279,7 +286,7 @@ function onStyle(m: maplibregl.Map, fn: () => void) {
   m.once('idle', run);
 }
 
-export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, working = false, tips = [], vesselRest = null, tasking, onCandidatesRevealed, onRasterLanded }: MapViewProps) {
+export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, working = false, tips = [], vesselRest = null, tasking, onCandidatesRevealed, onRasterLanded, follow = null }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
@@ -2134,12 +2141,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             // escaped by construction (detectionPopupRows returns only those), with the source.
             currentMap.on('click', fillLayerId, (e: maplibregl.MapLayerMouseEvent) => {
               const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
-              const rows = detectionPopupRows(p);
-              const html =
-                `<strong>Carbon Mapper plume, ${rows.date}</strong>` +
-                `<div class="similar-popup__row"><span>Seen by</span><code>${rows.instrument}</code></div>` +
-                `<div class="similar-popup__row"><span>Carbon Mapper's estimate</span><code>${rows.rate}</code></div>` +
-                `<div class="similar-popup__row"><span>${CARBON_MAPPER_SOURCE}</span></div>`;
+              const html = detectionPopupHtml(p);
               new maplibregl.Popup({ className: 'similar-popup' }).setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
             });
             currentMap.on('mouseenter', fillLayerId, () => {
@@ -2162,7 +2164,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               source: geometryId,
               paint: {
                 'fill-extrusion-color': ramp,
-                'fill-extrusion-height': ['*', ['to-number', ['get', property], 0], COLUMN_METRES_PER_PPM_M],
+                // A hint may carry its own metres per unit (the tip bars' ppb); never below the ground.
+                'fill-extrusion-height': ['max', 0, ['*', ['to-number', ['get', property], 0], methaneHint.height_scale ?? COLUMN_METRES_PER_PPM_M]],
                 'fill-extrusion-base': 0,
                 'fill-extrusion-opacity': 0.9,
               },
@@ -2641,7 +2644,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             plumeFramed.current = true;
             currentMap.easeTo({
               ...(cam?.center ? { center: cam.center } : {}),
-              zoom: Math.min(cam?.zoom ?? 12, 13),
+              // The tip bars span ±15 km, so they are read from further out; Carbon Mapper's 30 m plume
+              // image is about 1.5 km across, so it is read closer in; EMIT's 60 m columns in between.
+              zoom: Math.min(cam?.zoom ?? 12, COLUMNS_MAX_ZOOM[barKind(geometry.sourceUrl) ?? 'emit']),
               pitch: COLUMNS_PITCH,
               bearing: -20,
               padding: NO_PADDING,
@@ -3472,6 +3477,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             });
           }
 
+          // The ground beat: the tip bars (kilometres tall, over ~4 km cells) step back so the scene under
+          // them reads; they stay on the map, as the card says. The record bars are 30 to 60 m cells and
+          // stand on the scene as they are.
+          if (!isMethaneRaster && !isTerrainRaster && !seaRadar) {
+            allLayersRef.current
+              .filter((l) => l.type === 'geometry' && barKind(l.url) === 'tip' && mapInstance.getLayer(l.id))
+              .forEach((l) => mapInstance.setPaintProperty(l.id, 'fill-extrusion-opacity', TIP_BARS_GROUND_OPACITY));
+          }
+
           console.log(`✅ [${i}] Raster successfully added to map:`, raster.name, `Layer ID: ${layerId}`, `Visible: ${isVisible}`);
 
           // Tile errors are logged; a raster that draws no tile at all says so in its row and its
@@ -3579,7 +3593,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   const legends = stackLegends(stackLayers, (id) => {
     const layer = stackLayers.find((l) => l.id === id);
     return !!layer && isDrawn(layer) && !failedLayers.has(id);
-  });
+  }, follow);
 
   // A row's own controls: visibility, the name (click to fly there; a ramp strip under a measured
   // layer ties the row to its legend; a coarse raster the map hides this close in says so),
@@ -3589,7 +3603,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     // A raster whose tiles all failed says so (the presenter must not describe what is not there).
     const failed = failedLayers.has(layer.id);
     const hiddenByZoom = isVisible && !failed && outOfRange(layer, zoom);
-    const legend = layerLegend(layer);
+    const legend = layerLegend(layer, follow);
     const strip = legend && 'ramp' in legend ? rampGradient(legend.ramp) : null;
     const noteId = failed ? `${layer.id}-failed` : hiddenByZoom ? `${layer.id}-range` : undefined;
     return (
@@ -3690,6 +3704,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             </span>
           </div>
           {lg.note && <span className="map-legend__label">{lg.note}</span>}
+          {lg.source && <span className="map-legend__label map-legend__source">{lg.source}</span>}
         </div>
       );
     }

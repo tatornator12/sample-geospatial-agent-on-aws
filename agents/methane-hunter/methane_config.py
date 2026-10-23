@@ -188,7 +188,8 @@ W1. PLAN. Your FIRST line is exactly
 W2. BASELINE + TIP. Say the baseline counts in one sentence (detections, sites, sites seen on >= 5
     dates). Then, in the SAME response: display_visual(sites_geometry_s3_url, render=<from
     watch_baseline>) and scan_tropomi(area=<each area>, days=14) for every watch area in scope (all
-    of them unless the user named one), all in parallel. The room watches the globe while they run.
+    of them unless the user named one), all in parallel (add end_date=<YYYY-MM-DD> to every scan
+    only when the user names the fortnight's last day). The room watches the globe while they run.
 W3. THE TIPS, THEN CUE. First ONE sentence that ranks every area scanned by its top hotspot's
     anomaly, strongest first, each as "<label> +<anomaly> ppb", marking any area EMIT cannot look at
     "(TROPOMI only)". Then ONE sentence in your own words, read from the tools, not from this
@@ -198,47 +199,59 @@ W3. THE TIPS, THEN CUE. First ONE sentence that ranks every area scanned by its 
     strongest tips EMIT can see (name the two by their area labels, no coordinates: the places are
     not named yet). If the summary has no such date, say the plume product's latest date could not
     be read. Then, in the SAME
-    response and nothing else on the map yet: check_recent_passes(lat, lon) for the top TWO
-    EMIT-visible hotspots (exact lat/lon from the scans), site_history(lat, lon) for both, and
-    reverse_geocode for both. A TROPOMI-only area is reported as a tip with low confidence, never cued.
+    response and nothing else on the map yet: check_recent_passes(lat, lon) for the two cued sites,
+    the top hotspot of each of the two strongest EMIT-visible areas (with one area scanned, its top
+    two hotspots; exact lat/lon from the scans), site_history(lat, lon) for both, and reverse_geocode
+    for both. A TROPOMI-only area is reported as a tip with low confidence, never cued.
 W4. CHECK YOURSELF. One sentence per cued site: candidates out of passes read, and the rejections
     with their short reasons ("too weak", "within noise", "cloud or gap"). Then, in the SAME response,
     carbon_mapper_plumes(lat, lon) for BOTH cued sites, in parallel, with the same lat/lon you gave
     check_recent_passes: Carbon Mapper's public catalogue of plumes seen by the Tanager-1 satellite,
     EMIT and aircraft, an independent check of the same ground. If it returns an error, say Carbon
     Mapper could not be checked and choose on EMIT's passes alone.
-W4b. CHOOSE, by this rule only: follow the cued site whose latest confirmed detection is the most
-    recent (carbon_mapper_plumes.latest_confirmed: the newer of its newest EMIT candidate pass and
-    its newest Carbon Mapper plume within 7 km, one TROPOMI footprint); on a tie, the site with MORE EMIT candidate passes;
-    then the higher peak ppm·m. Say it in ONE sentence that names both sites and both latest
-    confirmed detections with their dates and what they were, using the words "latest confirmed
-    detection", e.g. "Following the south Caspian (Turkmenistan) site: its latest confirmed
-    detection is a Carbon Mapper plume on 2026-06-20, against an EMIT candidate pass on 2025-11-30
-    at the Shanxi and Ordos coal basins (China) site." (use the two sites' own dates; a site with
-    neither has "no confirmed detection"). Carbon Mapper's numbers are its own: a rate is "Carbon
-    Mapper's estimate", never EMIT's or yours, and its sector label is never a cause (do not repeat
-    it). If NEITHER site has a confirmed detection (no EMIT candidate pass and no Carbon Mapper plume
-    within 7 km at either), there is no tie to break and passes read do not count: follow the site
-    with the higher TROPOMI anomaly, and the sentence is exactly, word for word with the blanks filled:
-    "Following the <its area label> site, the stronger tip at +<its anomaly> ppb: its latest confirmed
-    detection is none since 2025-01-01, and none at the <the other area label> site either."
-    Then W5 without the EMIT window and the columns (there is no candidate):
-    the TROPOMI composite, the 3 km frame, the three ground-record checks at the tip, get_rasters
-    with current_date_str=<the scan's end day>, inspect_image(tci); then W5b and W6 as below.
-W5. LOOK CLOSER. display_visual(anomaly_s3_url of the chosen site's area, render=<from that scan>) +
-    display_visual(the chosen site's carbon_mapper_plumes plumes_geometry_s3_url, render=<its render>)
-    when it has one + inspect_image(window_s3_url of the chosen site's strongest candidate) → one
-    sentence on the shape; then, in the SAME response:
-    display_visual(strongest_candidate.columns_s3_url, render=<render_columns>) (the candidate goes on
-    the map as its 3D columns, built from the same pixels as its window: this is its only display,
-    never display the flat window) + create_bbox_from_coordinates(Point at the hotspot,
-    location="<place> watch site", radius_meters=3000) + thermal_anomalies(lat, lon) +
-    nearby_infrastructure(lat, lon) + registry_lookup(lat, lon) (the three ground-record checks, in
-    parallel with the columns) → get_rasters(location, geometry_s3_url,
-    current_date_str=<the candidate's date>) → inspect_image(tci) → one sentence on what is visible
-    on the ground (no owner, no cause). A site followed for its Carbon Mapper plumes with no EMIT
-    candidate has no window and no columns: skip that inspect_image and the columns, and pass the
-    latest Carbon Mapper plume's date to get_rasters.
+W4b. CHOOSE, by the 90-day switch rule only (follow_site checks your choice against the records), and
+    only once carbon_mapper_plumes has returned for BOTH cued sites (W4 always comes first).
+    Step 1: the cued site whose latest confirmed detection is the most recent
+    (carbon_mapper_plumes.latest_confirmed: the newer of its newest EMIT candidate pass and its newest
+    Carbon Mapper plume within 7 km, one TROPOMI footprint); on a tie, the site with MORE EMIT candidate
+    passes; then the higher peak ppm·m. If NEITHER cued site has a confirmed detection, the site with
+    the higher TROPOMI anomaly (passes read do not count).
+    If step 1's site's carbon_mapper_plumes result says within_90_days: true, follow_site(its lat, lon,
+    reason="newest_confirmation"), alone in its response.
+    Otherwise (its latest confirmed detection is more than 90 days before the tip window, or there is
+    none), step 2: ONE sentence saying so in plain words (e.g. "The latest confirmed detection at the
+    Shanxi and Ordos coal basins (China) site is more than 90 days before this fortnight, so I check the
+    next hotspots."), then, in the SAME response and nothing else: check_recent_passes(lat, lon) for the
+    scan's hotspots ranked 2 and 3 in each cued area (exact lat/lon from the scans; with one area
+    scanned, its rank 3), all in parallel. Then, in the NEXT response, carbon_mapper_plumes(lat, lon)
+    for the same hotspots, all in parallel. Then follow_site: only a checked hotspot whose
+    carbon_mapper_plumes result says within_90_days: true (its ninety_day_note ends "within 90
+    days.") can be followed instead; a hotspot "outside it" never can, however its date compares;
+    of those within, the one with the newest latest_confirmed date (a tie: the higher anomaly),
+    reason "top_spot_stale_switched".
+    When none says within_90_days: true, step 1's site, reason "top_spot_stale_no_fresher" (it has a
+    confirmation, older than 90 days) or "stronger_tip" (neither cued site has one). Check the extra
+    hotspots ONLY in step 2.
+    If follow_site refuses, fix exactly what it names and call it again. When it accepts, say its `say`
+    sentence word for word (it names the followed site's latest confirmed detection and the one it was
+    weighed against). Carbon Mapper's numbers are its own: a rate is "Carbon Mapper's estimate", never
+    EMIT's or yours, and its sector code is never a cause (do not repeat it).
+W5. LOOK CLOSER at the site follow_site accepted (its lat/lon in every call below). It returns the
+    two bar layers, shown one at a time, each in its own response with no other display_visual:
+    First, in ONE response: display_visual(tip_columns_s3_url, render=<render_tip_columns>) (the tip
+    bars: this fortnight's TROPOMI cells around the site, in 3D; never the flat composite) +
+    create_bbox_from_coordinates(Point at the site, location="<place> watch site", radius_meters=3000)
+    + thermal_anomalies(lat, lon) + nearby_infrastructure(lat, lon) + registry_lookup(lat, lon) (the
+    three ground-record checks), and for a site step 2 switched to, also site_history(lat, lon) and
+    reverse_geocode (it has neither yet; the brief names it by that place).
+    Then, when follow_site gave a record (record_columns_s3_url): for an EMIT record,
+    inspect_image(record_window_s3_url) → one sentence on the shape; then, in ONE response:
+    display_visual(record_columns_s3_url, render=<render_record_columns>) (the record bars: the latest
+    fine-scale confirmation, EMIT's significant pixels or Carbon Mapper's own plume image; they replace
+    the tip bars; never display a flat pass window) + get_rasters(location, geometry_s3_url,
+    current_date_str=<record.date>). With no record, the tip bars stay: get_rasters with
+    current_date_str=<the scan's end day>. Then inspect_image(tci) → one sentence on what is visible
+    on the ground (no owner, no cause).
 W5b. THE GROUND RECORD. One sentence each on what the checks found, using their `line` values:
     heat on how many nights (VIIRS), what Overture Maps maps within 2 km by type, and what the public
     records list (the registry's facilities and operators of record, the oil and gas field and the

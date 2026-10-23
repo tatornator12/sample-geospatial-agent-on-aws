@@ -85,31 +85,35 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 
 ## 3. Methane Watch (about 6 minutes)
 
-**What it shows:** one question, a whole mission on live satellite data: a wide daily scan, a sharper check, a second opinion, the ground record, and a draft brief for a person to file.
+**What it shows:** one question, a whole mission on live satellite data: a wide scan over two weeks, a sharper check, a second opinion, the ground record, and a draft brief for a person to file. From the next release the methane stands on the map as bars: first the fortnight's wide view around the spot it follows, then its latest close look.
 
-**What's agentic here:** it plans the mission and says the plan out loud. It judges each EMIT pass against that pass's own noise and rejects the weak ones; they dim on screen. It picks which site to follow by a stated rule, the newest confirmed detection (the stronger tip when neither site has one), and keeps both sites' tallies on the board so the room can see the choice. Then it makes one call for the analyst: does this site need a new fine-scale look, and why. It picks from fixed answers, and the tool turns down a call the record contradicts. When a check can't see, because of cloud or no coverage, it says "cannot assess" rather than guessing.
+**What's agentic here:** it plans the mission and says the plan out loud. It judges each EMIT pass against that pass's own noise and rejects the weak ones; they dim on screen. It chooses which spot to follow by a stated rule: the spot seen up close most recently. If that close look is more than 90 days before the fortnight, it checks the next spots the scan ranked and switches to one seen up close within 90 days, then says why in one line. The tool turns down a choice the record contradicts. Then it makes one call for the analyst: does this spot need a new close look. When a check can't see, because of cloud or no coverage, it says "cannot assess" rather than guessing.
 
 **Why it matters:** methane traps about 80 times as much heat as carbon dioxide over its first 20 years, so finding the big sources and fixing them pays off quickly. A daily global scan only says "somewhere around here"; this turns it into a named site, its record, and a brief someone can act on.
 
 **The data, and where it comes from**
 - A wide, coarse view of methane every day: TROPOMI on the European Space Agency's Sentinel-5P, read from AWS Open Data.
 - A sharp view, a few times a year at any one place: NASA's EMIT instrument on the International Space Station, from NASA's data archive.
-- A second opinion: Carbon Mapper's public catalogue of methane plumes, seen by the Tanager-1 satellite and by EMIT, from data.carbonmapper.org (about a month behind; the stage shows its source wherever its numbers are).
+- A second opinion: Carbon Mapper's public catalogue of methane plumes, seen by the Tanager-1 satellite and by EMIT, from data.carbonmapper.org (about a month behind; the stage shows its source wherever its numbers or its plume image are).
 - The ground record: fires from NASA FIRMS, mapped buildings and pipelines from Overture Maps, and public facility registries (OGIM and Global Energy Monitor).
 - Prepared ahead: the scans and pass checks are warmed the day before and on the morning; anything missing is fetched live.
 
-**Beats**
+**Beats** (the screen from the next release)
 1. **Click "Methane Watch brief".** "It states a plan. First a wide satellite scans nine areas over the last two weeks: that's a tip, not a finding."
 2. "Then it checks EMIT's record over the two strongest tips, pass by pass, and rejects the weak ones." Point at the dimmed frames.
-3. "Then a second opinion: Carbon Mapper's plumes near both sites." Point at the "Carbon Mapper:" line under each tally.
-4. "It follows the site with the newest confirmed detection, an EMIT candidate pass or a Carbon Mapper plume, and says both dates. If neither site has one, it follows the stronger tip." Point at "following". Under that site's filmstrip, a timeline lines up its record since January 2025: the tip, every EMIT look, Carbon Mapper's plumes within 7 km. "On the EMIT row, a filled dot is methane seen, a ring is a pass too faint or within noise, a grey tick is cloud." Then the 3D columns, when there is a candidate pass.
-5. "Then the ground record, and a draft brief. It lists what's on the ground without naming a cause. And it makes one call: does this site need a new fine-scale look." Point at the card's line, for example "No fine-scale confirmation is on record here. The agent recommends a new fine-scale look."
+3. "Then a second opinion: Carbon Mapper's plumes near both spots." Point at the "Carbon Mapper:" line under each tally.
+4. "Now it chooses which spot to follow, by one rule." Read the line under "Follow one site". In the replay: "Methane was last seen up close at the top spot in Shanxi 117 days before this fortnight, so the agent is following the third spot in the south Caspian, last seen up close 40 days before."
+5. The tip bars rise. "This is the fortnight around that spot. Taller bars mean more methane in the air than usual for this area." The step's line and the legend give the dates.
+6. The record bars replace them. "And this is the latest close look." In the replay: "Carbon Mapper's image of this plume, 26 August 2026. That is 40 days before this fortnight began." With no close look on record, the tip bars stay and the card says so.
+7. "Then the ground record, and a draft brief. It lists what's on the ground without naming a cause. And it makes one call: does this spot need a new close look." Point at the card's line, in the replay "Methane was last seen up close here 40 days before this fortnight. No new close look is needed yet."
 
-*Say it honestly:* the tip is the last two weeks; EMIT's confirmations and Carbon Mapper's plumes are records since 2025, with dates on the timeline and the card, and the newest date decides which site it follows. Any rate is Carbon Mapper's estimate, not EMIT's. Use the card's words: "methane keeps showing up here" only when it says so (confirmed on three or more dates), "methane has shown up here before" with fewer, and "no fine-scale confirmation is on record" with none. Never "now", "still", "active" or "leaking".
+*Say it honestly:* the tip bars are this fortnight; the record bars are an older close look, and the screen says how much older. Say each date once, as the screen does. The rule keeps that gap under 90 days when the record allows; when it can't, the agent says so and recommends a new close look. Any rate is Carbon Mapper's estimate, not EMIT's. Never "now", "still", "active" or "leaking".
 
-*When the site has a confirmation:* the timeline draws one bracket from the latest one to the tip, with the gap in words ("30 Nov 2025 to the tip: about 10 months"), and the card says the same gap. Over 90 days, the agent recommends a new fine-scale look. If someone asks why the gap: "EMIT rides on the Space Station and can't be pointed, so it sees any one place only now and then. Carbon Mapper publishes about a month after it sees a plume. The tip is fresh; the confirmation is the record, and the bracket shows how old it is."
+*The live day decides:* on 23 October no spot had a close look within 90 days, so it followed the stronger tip in Shanxi with the tip bars alone and recommended a new close look. The replay is the fortnight of 5 to 18 October, which shows the switch. Don't promise a place.
 
-*Technical:* TROPOMI 14-day composites; EMIT V002 passes to 31 August 2026 and NASA's V003 after; each pass judged against its own noise and its mirror (methane counts only if pixels well above the background outnumber those as far below it three to one); Carbon Mapper plumes within 7 km since 2025; VIIRS, Overture, OGIM. The call is one of two fixed answers with one of four reasons, checked against the records by the tool, which writes the card's line itself.
+*If someone asks why the gap:* "EMIT rides on the Space Station and can't be pointed, so it sees any one place only now and then. Carbon Mapper publishes about a month after it sees a plume. The tip is fresh; the close look is the record, and the screen dates it."
+
+*Technical:* TROPOMI 14-day composites; the tip bars are its cells within 15 km of the spot, seen on 3 or more days. EMIT V002 passes to 31 August 2026 and NASA's V003 after, each judged against its own noise and its mirror. Carbon Mapper plumes within 7 km since 2025, and its plume image drawn as bars (pixels from 500 ppm·m). The follow is one of four fixed reasons and the call one of two fixed answers, both checked against the records by the tool, which writes the screen's lines itself.
 
 **The decision:** you, as the analyst. "It's a draft. Nothing is filed until I approve it." Press "Approve and file".
 

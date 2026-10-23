@@ -17,6 +17,16 @@ export const METHANE_SITES: RenderHint = { kind: 'points', group: 'watch', prope
 export const METHANE_COLUMNS: RenderHint = {
   kind: 'columns', property: 'ppm_m', ramp: 'plasma', rescale: [0, 1500], units: 'ppm·m', group: 'methane', legend: 'CH4 enhancement',
 };
+/** The tip bars (follow_site's tipcolumns_<lat>_<lon>.geojson): this fortnight's TROPOMI cells around the
+ *  followed site, ppb on the ice ramp, 40 m of bar per ppb (watch_tools.TIP_METRES_PER_PPB). */
+export const METHANE_TIP_COLUMNS: RenderHint = {
+  kind: 'columns', property: 'ppb', ramp: 'ice', rescale: [0, 140], units: 'ppb', group: 'methane', legend: 'CH4 anomaly',
+  height_scale: 40,
+};
+/** The record bars from Carbon Mapper's own plume image (cmcolumns_<plume_id>.geojson), ppm·m like EMIT's. */
+export const METHANE_CM_COLUMNS: RenderHint = {
+  kind: 'columns', property: 'ppm_m', ramp: 'plasma', rescale: [0, 1500], units: 'ppm·m', group: 'methane', legend: 'Carbon Mapper plume',
+};
 /** Carbon Mapper's plumes near the followed site (carbon_mapper_plumes' cmplumes_<lat>_<lon>.geojson). */
 export const METHANE_DETECTIONS: RenderHint = {
   kind: 'detections', group: 'methane', property: 'rate_kg_h', units: 'kg/h', legend: 'Carbon Mapper plumes',
@@ -78,6 +88,8 @@ export function methaneGeometryHint(render: RenderHint | undefined, url: string 
   if (name.startsWith('plumes_')) return METHANE_VECTOR;
   if (name.startsWith('watch_sites_')) return METHANE_SITES;
   if (name.startsWith('columns_')) return METHANE_COLUMNS;
+  if (name.startsWith('tipcolumns_')) return METHANE_TIP_COLUMNS;
+  if (name.startsWith('cmcolumns_')) return METHANE_CM_COLUMNS;
   if (name.startsWith('cmplumes_')) return METHANE_DETECTIONS;
   return null;
 }
@@ -104,6 +116,8 @@ export const EMIT_RAMP_LABEL = 'EMIT methane above background';
 export const WATCH_SITES_ROW = 'NASA EMIT plume sites, 2022 to 2025';
 /** The legend's line under the ramp while the 3D columns are on the stage. */
 export const COLUMNS_NOTE = 'taller column, more methane';
+/** The tip bars' line in the legend: their height is TROPOMI's anomaly over the area's median. */
+export const TIP_COLUMNS_NOTE = 'taller bar, more methane in the air than usual';
 
 /**
  * A methane ramp's name, by its units, never the tools' shorthand ("CH4 enhancement", "CH4
@@ -262,6 +276,21 @@ export const CM_INSTRUMENT_WORDS: Record<string, string> = {
 /** A rate as the room hears it: to the nearest 10 kg/h, with thousands separators. */
 export function aboutKgH(value: number): string {
   return (Math.round(value / 10) * 10).toLocaleString('en-US');
+}
+
+/**
+ * The popup a Carbon Mapper ring opens (MapView's detections layer): built only from
+ * detectionPopupRows' date, fixed word and rate, and the source line, so nothing from the feature
+ * reaches the HTML as written.
+ */
+export function detectionPopupHtml(p: Record<string, unknown>): string {
+  const rows = detectionPopupRows(p);
+  return (
+    `<strong>Carbon Mapper plume, ${rows.date}</strong>` +
+    `<div class="similar-popup__row"><span>Seen by</span><code>${rows.instrument}</code></div>` +
+    `<div class="similar-popup__row"><span>Carbon Mapper's estimate</span><code>${rows.rate}</code></div>` +
+    `<div class="similar-popup__row"><span>${CARBON_MAPPER_SOURCE}</span></div>`
+  );
 }
 
 /** A Carbon Mapper plume's popup, from its feature's properties: only a date, a rate and a fixed word. */

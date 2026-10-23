@@ -13,11 +13,19 @@ Jan 2026): non-commercial use, attribution "Source: Carbon Mapper (data.carbonma
 share-alike. The user cleared its use for this demo on 2026-10-22 (.kiro/specs/methane-hunter).
 
 Security, as in the other methane tools: the URL is built here from validated numbers only; one
-host, a timeout, a size cap, at most a few pages; every field is validated and mapped to a fixed
-vocabulary (dates, numbers, instrument and sector words), so no free text from the catalogue
-reaches the model, the brief or the stage. The catalogue's signed image URLs are never kept.
-Read-through cache in the bucket (methane/cache/), with the cached record as the fallback when
-the API is down.
+host, a timeout, a size cap enforced while the body streams, at most a few pages; every field is
+validated and mapped to a fixed vocabulary (dates, numbers, instrument and sector codes), so no free
+text from the catalogue reaches the model, the brief or the stage. Read-through cache in the bucket
+(methane/cache/), with the cached record as the fallback when the API is down.
+
+The plume image (approved 2026-10-23): the newest plume within 7 km is drawn as 3D columns from
+Carbon Mapper's own concentration raster (`con_tif`: one float32 band, 30 m, UTM, NaN outside their
+analyst's mask, ppm·m). Its URL is a signed CloudFront link that expires 60 minutes after the API
+answer, so it is fetched in the same call and never logged, returned or stored: https only, host
+catalog.carbonmapper.org, a path naming that plume id, no redirects, streamed with a 2 MB cap, one
+float32 band of at most 1,000 x 1,000 pixels, each pixel at 500 ppm·m or more reprojected cell by
+cell to WGS84; the GeoJSON carries numbers only and is cached by plume id
+(methane/cache/cmimage_v1_<plume_id>.geojson), so an outage still draws a plume already seen.
 """
 from __future__ import annotations
 
@@ -31,6 +39,7 @@ from typing import Any
 
 import _paths  # noqa: F401
 import httpx
+import numpy as np
 from strands import tool
 
 import config
@@ -46,9 +55,9 @@ CM_TIMEOUT_S = 15.0
 CM_PAGE_LIMIT = 1000
 CM_MAX_PAGES = 3                      # a 5 km box holds tens of plumes; three pages is a hard stop
 CM_CAP_BYTES = 6_000_000              # one page of 1,000 items is ~4.5 MB
-# The catalogue answers browsers; the suffix says who is asking.
-CM_USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
-                 "Chrome/130.0 Safari/537.36 agentic-earth-methane-watch/1.0")
+# An honest agent: checked 2026-10-23, the catalogue and its image host answer the same 200 to this,
+# to no User-Agent and to a browser's, so the browser string the first build sent is not needed.
+CM_USER_AGENT = "agentic-earth-methane-watch/1.0 (+https://github.com/aws-samples/sample-geospatial-agent-on-aws)"
 CM_SINCE = date(2025, 1, 1)
 # One native TROPOMI footprint (5.5 x 7 km), measured from the hotspot cell's centre, the same for every
 # site: the tip cannot place methane better than that. Approved 2026-10-23, chosen after seeing the
@@ -60,7 +69,9 @@ CM_LIST_MAX = 10                      # plumes returned to the model
 CM_MAP_MAX = 200                      # plumes on the map layer
 CM_DATES_MAX = 60                     # plumes on the stage's record timeline (numbers and codes only)
 CM_CACHE_TTL_S = 12 * 3600
-CM_CACHE_VERSION = "v2"               # v1 keys (5 km) belong to the stable runtime: read by it, never written here
+# v1 keys (5 km) belong to the stable runtime and v2 to the Oct 23 build (sector words): read by them,
+# never written here. v3 rows carry sector codes and whether the plume has an image.
+CM_CACHE_VERSION = "v3"
 CM_LAG_DAYS = 30
 EMIT_SITE_KM = 2.0                    # the session's pass record for this site: the nearest within 2 km
 
@@ -71,9 +82,26 @@ ATTRIBUTION = "Source: Carbon Mapper (data.carbonmapper.org)"
 INSTRUMENT_CODES = {"tan": "tanager", "emi": "emit", "av3": "airborne", "ang": "airborne", "gao": "airborne",
                     "avn": "airborne"}
 INSTRUMENT_WORDS = {"tanager": "Tanager-1", "emit": "EMIT", "airborne": "airborne", "other": "another instrument"}
-# IPCC sector codes as Carbon Mapper labels them -> words. A label, not a cause: the prompt says so.
-SECTOR_WORDS = {"1B1a": "coal mining", "1B2": "oil and gas", "6A": "solid waste", "6B": "wastewater",
-                "4B": "manure management", "4A": "livestock", "1A1": "power generation", "3C": "agriculture"}
+# IPCC sector codes as Carbon Mapper labels them -> our fixed codes (the model sees a code, never the
+# catalogue's text). A label, not a cause: the prompt says so.
+SECTOR_CODES = {"1B1a": "coal_mining", "1B2": "oil_gas", "6A": "solid_waste", "6B": "wastewater",
+                "4B": "manure", "4A": "livestock", "1A1": "power", "3C": "agriculture"}
+# The words cached v2 rows carry, mapped to the same codes.
+_LEGACY_SECTOR = {"coal mining": "coal_mining", "oil and gas": "oil_gas", "solid waste": "solid_waste",
+                  "wastewater": "wastewater", "manure management": "manure", "livestock": "livestock",
+                  "power generation": "power", "agriculture": "agriculture", "other": "other"}
+
+# The plume image: Carbon Mapper's own concentration raster, drawn as 3D columns.
+CM_IMAGE_HOST = "catalog.carbonmapper.org"
+CM_IMAGE_CAP_BYTES = 2_000_000        # the ones seen are 10 to 60 KB
+CM_IMAGE_MAX_PX = 1000
+CM_IMAGE_TIMEOUT_S = 20.0
+CM_IMAGE_FLOOR_PPM_M = 500.0          # the same floor as EMIT's display window and columns
+CM_IMAGE_CELLS_MAX = 3000
+CM_IMAGE_NEAR_KM = 20.0               # the image's pixels must lie near the plume Carbon Mapper placed
+CM_IMAGE_CACHE_VERSION = "v1"
+RENDER_IMAGE = {"kind": "columns", "property": "ppm_m", "ramp": "plasma", "rescale": [0, 1500], "units": "ppm·m",
+                "group": "methane", "legend": "Carbon Mapper plume"}
 
 RENDER_DETECTIONS = {"kind": "detections", "group": "methane", "property": "rate_kg_h", "units": "kg/h",
                      "legend": "Carbon Mapper plumes"}
@@ -146,12 +174,12 @@ def parse_item(item: Any, lat: float, lon: float, radius_km: float, since: date,
     rate = None if item.get("hide_emission") is True else _rate(item.get("emission_auto"))
     unc = _rate(item.get("emission_uncertainty_auto")) if rate is not None else None
     sector = item.get("sector")
-    sector_word = (SECTOR_WORDS.get(sector, "other") if isinstance(sector, str) and _SECTOR.fullmatch(sector) else None)
+    sector_code = (SECTOR_CODES.get(sector, "other") if isinstance(sector, str) and _SECTOR.fullmatch(sector) else None)
     return {"id": pid, "date": day.isoformat(), "lat": round(plat, 5), "lon": round(plon, 5),
             "distance_km": round(dist, 2), "instrument": instrument,
             "rate_kg_h": round(rate, 1) if rate is not None else None,
             "uncertainty_kg_h": round(unc, 1) if unc is not None else None,
-            "sector": sector_word}
+            "sector": sector_code, "has_image": image_url_ok(item.get("con_tif"), pid)}
 
 
 def catalogue_url(box: tuple[float, float, float, float], offset: int) -> tuple[str, list[tuple[str, str]]]:
@@ -162,15 +190,28 @@ def catalogue_url(box: tuple[float, float, float, float], offset: int) -> tuple[
     return f"https://{CM_HOST}{CM_PATH}", params
 
 
+def read_capped(r: httpx.Response, cap: int, code: str) -> bytes:
+    """A streamed body, read only up to `cap` bytes (a longer one is refused, not downloaded)."""
+    length = r.headers.get("content-length")
+    if length and length.isdigit() and int(length) > cap:
+        raise CatalogueError(code)
+    buf = bytearray()
+    for chunk in r.iter_bytes():
+        buf += chunk
+        if len(buf) > cap:
+            raise CatalogueError(code)
+    return bytes(buf)
+
+
 def fetch_page(client: httpx.Client, box, offset: int) -> dict:
     url, params = catalogue_url(box, offset)
-    r = client.get(url, params=params, headers={"User-Agent": CM_USER_AGENT, "Accept": "application/json"})
-    if r.status_code != 200:
-        raise CatalogueError(f"carbon_mapper_http_{r.status_code}")
-    if len(r.content) > CM_CAP_BYTES:
-        raise CatalogueError("carbon_mapper_too_large")
+    with client.stream("GET", url, params=params,
+                       headers={"User-Agent": CM_USER_AGENT, "Accept": "application/json"}) as r:
+        if r.status_code != 200:
+            raise CatalogueError(f"carbon_mapper_http_{r.status_code}")
+        raw = read_capped(r, CM_CAP_BYTES, "carbon_mapper_too_large")
     try:
-        body = r.json()
+        body = json.loads(raw)
     except ValueError:
         raise CatalogueError("carbon_mapper_not_json")
     if not isinstance(body, dict) or not isinstance(body.get("items"), list):
@@ -178,10 +219,12 @@ def fetch_page(client: httpx.Client, box, offset: int) -> dict:
     return body
 
 
-def fetch_plumes(lat: float, lon: float, radius_km: float, since: date, today: date) -> list[dict]:
-    """Every validated CH4 plume within the radius since `since`, from one to CM_MAX_PAGES pages."""
+def fetch_plumes(lat: float, lon: float, radius_km: float, since: date, today: date) -> tuple[list[dict], dict[str, str]]:
+    """Every validated CH4 plume within the radius since `since`, from one to CM_MAX_PAGES pages, and
+    the allowlisted image URL of each plume that has one (held in memory for this call only)."""
     box = box_around(lat, lon, radius_km)
     out: dict[str, dict] = {}
+    urls: dict[str, str] = {}
     with httpx.Client(timeout=CM_TIMEOUT_S, follow_redirects=False) as client:
         offset = 0
         for _ in range(CM_MAX_PAGES):
@@ -191,11 +234,13 @@ def fetch_plumes(lat: float, lon: float, radius_km: float, since: date, today: d
                 p = parse_item(item, lat, lon, radius_km, since, today)
                 if p and p["id"] not in out:
                     out[p["id"]] = p
+                    if p["has_image"]:
+                        urls[p["id"]] = item["con_tif"]
             total = body.get("bbox_count")
             offset += CM_PAGE_LIMIT
             if len(items) < CM_PAGE_LIMIT or not isinstance(total, int) or offset >= total:
                 break
-    return newest_first(list(out.values()))
+    return newest_first(list(out.values())), urls
 
 
 def newest_first(plumes: list[dict]) -> list[dict]:
@@ -207,9 +252,11 @@ def cache_key(lat: float, lon: float, radius_km: float) -> str:
     return f"methane/cache/carbonmapper_{CM_CACHE_VERSION}_{lat:.4f}_{lon:.4f}_{radius_km:g}km.json"
 
 
-def load_plumes(lat: float, lon: float, radius_km: float, since: date, s3, now: datetime | None = None) -> tuple[list[dict], str, str]:
-    """(plumes, source, fetched day): the shared cache when fresh, else the catalogue, else the cached
-    record however old (the API is down). Raises CatalogueError when there is neither."""
+def load_plumes(lat: float, lon: float, radius_km: float, since: date, s3,
+                now: datetime | None = None) -> tuple[list[dict], str, str, dict[str, str]]:
+    """(plumes, source, fetched day, image URLs): the shared cache when fresh, else the catalogue, else
+    the cached record however old (the API is down). Raises CatalogueError when there is neither. The
+    image URLs come only from a fresh answer (they are never cached)."""
     now = now or datetime.now(timezone.utc)
     key = cache_key(lat, lon, radius_km)
     cached = None
@@ -219,20 +266,21 @@ def load_plumes(lat: float, lon: float, radius_km: float, since: date, s3, now: 
         if not isinstance(cached.get("plumes"), list) or cached.get("since") != since.isoformat():
             cached = None
         elif (now - fetched).total_seconds() < CM_CACHE_TTL_S:
-            return revalidate(cached["plumes"], lat, lon, radius_km, since, now.date()), "cache", fetched.date().isoformat()
+            return (revalidate(cached["plumes"], lat, lon, radius_km, since, now.date()), "cache",
+                    fetched.date().isoformat(), {})
     except s3.exceptions.NoSuchKey:
         cached = None
     except Exception as e:  # a malformed cache entry is ignored and refetched
         logger.warning("carbon mapper cache unreadable: %s", type(e).__name__)
         cached = None
     try:
-        plumes = fetch_plumes(lat, lon, radius_km, since, now.date())
+        plumes, urls = fetch_plumes(lat, lon, radius_km, since, now.date())
     except (httpx.HTTPError, CatalogueError) as e:
         code = str(e) if isinstance(e, CatalogueError) else type(e).__name__
         logger.warning("CARBON MAPPER: %.3f,%.3f catalogue unavailable (%s)", lat, lon, code)
         if cached is not None:
             return (revalidate(cached["plumes"], lat, lon, radius_km, since, now.date()), "stale cache",
-                    datetime.fromisoformat(cached["fetched_at"]).date().isoformat())
+                    datetime.fromisoformat(cached["fetched_at"]).date().isoformat(), {})
         raise CatalogueError(code)
     try:
         s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=key, ContentType="application/json",
@@ -240,10 +288,10 @@ def load_plumes(lat: float, lon: float, radius_km: float, since: date, s3, now: 
                                        "radius_km": radius_km, "plumes": plumes}).encode())
     except Exception as e:  # the cache is an optimisation: never fail the check for it
         logger.warning("carbon mapper cache write failed: %s", type(e).__name__)
-    return plumes, "carbon-mapper", now.date().isoformat()
+    return plumes, "carbon-mapper", now.date().isoformat(), urls
 
 
-_SECTOR_VALUES = set(SECTOR_WORDS.values()) | {"other"}
+_SECTOR_VALUES = set(SECTOR_CODES.values()) | {"other"}
 
 
 def revalidate(rows: list, lat: float, lon: float, radius_km: float, since: date, today: date) -> list[dict]:
@@ -267,9 +315,10 @@ def revalidate(rows: list, lat: float, lon: float, radius_km: float, since: date
             continue
         rate = _rate(r.get("rate_kg_h"))
         unc = _rate(r.get("uncertainty_kg_h")) if rate is not None else None
-        sector = r.get("sector") if r.get("sector") in _SECTOR_VALUES else None
+        sector = r.get("sector") if r.get("sector") in _SECTOR_VALUES else _LEGACY_SECTOR.get(r.get("sector"))
         out.append({"id": pid, "date": day, "lat": plat, "lon": plon, "distance_km": round(dist, 2),
-                    "instrument": r["instrument"], "rate_kg_h": rate, "uncertainty_kg_h": unc, "sector": sector})
+                    "instrument": r["instrument"], "rate_kg_h": rate, "uncertainty_kg_h": unc, "sector": sector,
+                    "has_image": r.get("has_image") is True})
     return newest_first(out)
 
 
@@ -326,6 +375,48 @@ def latest_confirmed_code(emit_latest: str | None, cm_latest: str | None) -> dic
     return {"date": cm_latest, "by": "carbon_mapper"}
 
 
+def tip_start_at(lat: float, lon: float, s3) -> str | None:
+    """The first day of this session's TROPOMI window over the watch area holding the point (tip_<area>.json)."""
+    from watch_tools import WATCH_AREAS
+    for key, spec in WATCH_AREAS.items():
+        w, s_, e, n = spec["bbox"]
+        if not (w <= lon <= e and s_ <= lat <= n):
+            continue
+        try:
+            tip = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME,
+                                           Key=f"{mt.session_prefix()}tip_{key.replace(' ', '_')}.json")["Body"].read(50_000))
+        except Exception:
+            continue
+        start = tip.get("start") if isinstance(tip, dict) else None
+        if isinstance(start, str) and _DAY.fullmatch(start):
+            return start
+    return None
+
+
+def with_gap(found: dict | None, tip_start: str | None) -> dict | None:
+    """The latest confirmation with its distance before the tip window (the follow rule's 90 days)."""
+    if not found or not tip_start:
+        return found
+    days = (date.fromisoformat(tip_start) - date.fromisoformat(found["date"])).days
+    return {**found, "days_before_tip": days, "within_90_days": days <= FOLLOW_GAP_DAYS}
+
+
+FOLLOW_GAP_DAYS = 90                  # the follow rule's step 2 and draft_brief's threshold
+
+
+def ninety_day_note(found: dict | None) -> str:
+    """The 90-day test in words, from the numbers (what the follow rule reads; the choice stays the model's)."""
+    if not found:
+        return "No confirmed detection here since 2025-01-01: outside 90 days."
+    days = found.get("days_before_tip")
+    if not isinstance(days, int):
+        return "The tip window is not known yet: the 90-day test cannot be read."
+    if days <= 0:
+        return f"Latest confirmed detection {found['date']}, inside the tip window: within 90 days."
+    return (f"Latest confirmed detection {found['date']}, {days} days before the tip window: "
+            + ("within 90 days." if days <= FOLLOW_GAP_DAYS else "more than 90 days, outside it."))
+
+
 def latest_confirmed(emit: dict | None, cm_latest: str | None) -> dict | None:
     """The site's newest confirmed detection: an EMIT candidate pass or a Carbon Mapper plume (in words)."""
     found = latest_confirmed_code((emit or {}).get("latest_candidate"), cm_latest)
@@ -358,6 +449,162 @@ def say_line(count: int, radius_km: float, since: str, latest: dict | None) -> s
         rate = f", about {about(latest['rate_kg_h']):,}{unc} kg/h"
     return (f"Carbon Mapper lists {count} methane {noun} {where}; the latest on {latest['date']} "
             f"({INSTRUMENT_WORDS[latest['instrument']]}{rate}).")
+
+
+# --- the plume image as 3D columns ---------------------------------------------------------------
+
+_IMAGE_PATH = r"^/([a-z0-9][a-z0-9-]{{0,39}})/\d{{4}}/\d{{2}}/\d{{2}}/{pid}/{pid}_\1_(?:ime-cmf-)?concentrations\.tif$"
+
+
+def image_url_ok(url: Any, plume_id: str) -> bool:
+    """Whether a catalogue image URL is one we fetch: https, Carbon Mapper's image host on the default
+    port, no credentials in it, and a path naming this plume id (as the catalogue builds them, e.g.
+    /l3a-ime-ch4-mfa-v3d/2026/06/20/<id>/<id>_l3a-ime-ch4-mfa-v3d_ime-cmf-concentrations.tif). The
+    signed query is kept for the request and never logged."""
+    if not isinstance(url, str) or len(url) > 4000 or not isinstance(plume_id, str) or not _PLUME_ID.fullmatch(plume_id):
+        return False
+    try:
+        u = httpx.URL(url)
+    except Exception:
+        return False
+    if u.scheme != "https" or u.host != CM_IMAGE_HOST or u.port not in (None, 443) or u.userinfo:
+        return False
+    return re.fullmatch(_IMAGE_PATH.format(pid=re.escape(plume_id)), u.path) is not None
+
+
+def fetch_image(url: str, plume_id: str) -> bytes:
+    """The plume's concentration raster: allowlisted, no redirects, streamed with the size cap.
+    Errors are our own short codes (an expired link answers 403); the URL never reaches a log."""
+    if not image_url_ok(url, plume_id):
+        raise CatalogueError("cm_image_url_not_allowed")
+    try:
+        with httpx.Client(timeout=CM_IMAGE_TIMEOUT_S, follow_redirects=False) as client:
+            with client.stream("GET", url, headers={"User-Agent": CM_USER_AGENT}) as r:
+                if r.status_code != 200:
+                    raise CatalogueError(f"cm_image_http_{r.status_code}")
+                return read_capped(r, CM_IMAGE_CAP_BYTES, "cm_image_too_large")
+    except httpx.HTTPError as e:
+        raise CatalogueError(f"cm_image_{type(e).__name__}")
+
+
+def image_columns(data: bytes, plat: float, plon: float) -> dict:
+    """The raster's pixels at or above the floor as WGS84 cells with their ppm·m, strongest first: each
+    pixel's four corners reprojected from the image's own grid (UTM), numbers only."""
+    from rasterio.errors import RasterioIOError
+    from rasterio.io import MemoryFile
+    from rasterio.warp import transform as reproject_points
+    try:
+        with MemoryFile(data) as mem, mem.open() as ds:
+            if ds.count != 1 or ds.dtypes[0] != "float32":
+                raise CatalogueError("cm_image_not_one_float32_band")
+            if not (1 <= ds.width <= CM_IMAGE_MAX_PX and 1 <= ds.height <= CM_IMAGE_MAX_PX):
+                raise CatalogueError("cm_image_too_many_pixels")
+            if ds.crs is None or not ds.crs.is_projected:
+                raise CatalogueError("cm_image_not_projected")
+            a = ds.read(1).astype(np.float64)
+            if ds.nodata is not None:
+                a[a == ds.nodata] = np.nan
+            tr, crs = ds.transform, ds.crs
+    except (RasterioIOError, ValueError):
+        raise CatalogueError("cm_image_unreadable")
+    rows, cols = np.where(np.isfinite(a) & (a >= CM_IMAGE_FLOOR_PPM_M))
+    order = np.argsort(-a[rows, cols])[:CM_IMAGE_CELLS_MAX]
+    rows, cols = rows[order], cols[order]
+    if rows.size == 0:
+        return {"type": "FeatureCollection", "features": []}
+    corners = [(0, 0), (1, 0), (1, 1), (0, 1)]
+    xs, ys = [], []
+    for r, c in zip(rows, cols):
+        for dc, dr in corners:
+            x, y = tr * (int(c) + dc, int(r) + dr)
+            xs.append(x)
+            ys.append(y)
+    lons, lats = reproject_points(crs, "EPSG:4326", xs, ys)
+    lons, lats = np.asarray(lons), np.asarray(lats)
+    if not (np.isfinite(lons).all() and np.isfinite(lats).all()):
+        raise CatalogueError("cm_image_not_projected")
+    if haversine_km(plat, plon, float(np.mean(lats)), float(np.mean(lons))) > CM_IMAGE_NEAR_KM:
+        raise CatalogueError("cm_image_misplaced")
+    feats = []
+    for i, (r, c) in enumerate(zip(rows, cols)):
+        ring = [[round(float(lons[4 * i + k]), 6), round(float(lats[4 * i + k]), 6)] for k in (0, 1, 2, 3, 0)]
+        feats.append({"type": "Feature", "properties": {"ppm_m": round(float(a[r, c]), 1)},
+                      "geometry": {"type": "Polygon", "coordinates": [ring]}})
+    return {"type": "FeatureCollection", "features": feats}
+
+
+def clean_columns(fc: Any) -> dict:
+    """A cached image collection again, field by field: polygons of finite numbers and `ppm_m` only."""
+    feats = fc.get("features") if isinstance(fc, dict) else None
+    out = []
+    for f in feats[:CM_IMAGE_CELLS_MAX] if isinstance(feats, list) else []:
+        try:
+            ring, v = f["geometry"]["coordinates"][0], f["properties"]["ppm_m"]
+        except (KeyError, IndexError, TypeError):
+            continue
+        if _number(v, 0, 1_000_000) is None or not isinstance(ring, list) or len(ring) != 5:
+            continue
+        if not all(isinstance(pt, list) and len(pt) == 2 for pt in ring):
+            continue
+        pts = [[_number(x, -180, 180), _number(y, -90, 90)] for x, y in ring]
+        if all(x is not None and y is not None for x, y in pts):
+            out.append({"type": "Feature", "properties": {"ppm_m": float(v)},
+                        "geometry": {"type": "Polygon", "coordinates": [pts]}})
+    return {"type": "FeatureCollection", "features": out}
+
+
+def image_cache_key(plume_id: str) -> str:
+    return f"methane/cache/cmimage_{CM_IMAGE_CACHE_VERSION}_{plume_id}.geojson"
+
+
+def image_plume(plumes: list[dict]) -> dict | None:
+    """The plume to draw: the newest within the follow radius (one TROPOMI footprint), the nearest on that day."""
+    near = [p for p in plumes if p["distance_km"] <= CM_RADIUS_KM]
+    if not near:
+        return None
+    day = max(p["date"] for p in near)
+    return min((p for p in near if p["date"] == day), key=lambda p: p["distance_km"])
+
+
+def plume_image(target: dict, urls: dict[str, str], refetch, s3) -> dict:
+    """The newest plume's columns in this session (cmcolumns_<plume_id>.geojson), from the shared cache
+    or fetched now, as a record entry: numbers, a date, a code and the file name; or why not."""
+    pid = target["id"]
+    base = {"plume_id": pid, "date": target["date"], "distance_km": target["distance_km"],
+            "instrument": target["instrument"]}
+    fc = None
+    try:
+        fc = clean_columns(json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=image_cache_key(pid))["Body"]
+                                      .read(CM_IMAGE_CAP_BYTES * 4)))
+    except s3.exceptions.NoSuchKey:
+        fc = None
+    except Exception as e:
+        logger.warning("carbon mapper image cache unreadable: %s", type(e).__name__)
+        fc = None
+    if fc is None:
+        url = urls.get(pid)
+        if url is None and target.get("has_image"):
+            try:   # the plume list came from the cache: a fresh answer carries a fresh link
+                url = refetch().get(pid)
+            except (httpx.HTTPError, CatalogueError) as e:
+                logger.warning("CARBON MAPPER image link unavailable (%s)", type(e).__name__)
+        if url is None:
+            return {**base, "status": "unavailable", "code": "cm_image_no_link"}
+        try:
+            fc = image_columns(fetch_image(url, pid), target["lat"], target["lon"])
+        except CatalogueError as e:
+            logger.warning("CARBON MAPPER image %s: %s", pid, e)
+            return {**base, "status": "unavailable", "code": str(e)}
+        try:
+            mt._put_json(image_cache_key(pid), fc)
+        except Exception as e:  # the cache is an optimisation
+            logger.warning("carbon mapper image cache write failed: %s", type(e).__name__)
+    if not fc["features"]:
+        return {**base, "status": "unavailable", "code": "cm_image_below_floor"}
+    name = f"cmcolumns_{pid}.geojson"
+    mt._put_json(f"{mt.session_prefix()}{name}", fc)
+    peak = max(f["properties"]["ppm_m"] for f in fc["features"])
+    return {**base, "status": "ok", "pixels": len(fc["features"]), "peak_ppm_m": round(peak, 1), "file": name}
 
 
 def stage_key(lat: float, lon: float, ext: str) -> str:
@@ -393,7 +640,7 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
     s3 = mt._s3()
     since = CM_SINCE
     try:
-        plumes, source, fetched = load_plumes(lat, lon, radius_km, since, s3)
+        plumes, source, fetched, urls = load_plumes(lat, lon, radius_km, since, s3)
     except CatalogueError:
         emit = emit_record(lat, lon, s3)
         try:   # the board says the check could not be made, rather than going quiet
@@ -424,12 +671,24 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
     cm_follow = next((p["date"] for p in plumes if p["distance_km"] <= CM_RADIUS_KM), None)
     confirmed = latest_confirmed_code((emit or {}).get("latest_candidate"), cm_follow)
     # The stage's record: numbers, dates and codes only (the tip board, the record timeline and the brief read it).
+    # The newest plume within one footprint as its own image's columns (fetched in this call: the
+    # catalogue's link expires within the hour), cached by plume id.
+    target = image_plume(plumes)
+    image = None
+    if target:
+        try:
+            image = plume_image(target, urls, lambda: fetch_plumes(lat, lon, radius_km, since,
+                                                                   datetime.now(timezone.utc).date())[1], s3)
+        except Exception as e:  # the bars are an addition: never fail the check for them
+            logger.warning("carbon mapper image failed: %s", type(e).__name__)
+            image = {"plume_id": target["id"], "date": target["date"], "status": "unavailable", "code": "cm_image_error"}
     record = {"lat": round(lat, 4), "lon": round(lon, 4), "radius_km": radius_km, "since": since.isoformat(),
               "count": len(plumes), "latest": summary["latest_date"],
               "rate_kg_h": latest["rate_kg_h"] if latest else None,
               "uncertainty_kg_h": latest["uncertainty_kg_h"] if latest else None,
               "instrument": latest["instrument"] if latest else None, "source": source,
-              "follow_radius_km": CM_RADIUS_KM, "dates": record_dates(plumes), "latest_confirmed": confirmed}
+              "follow_radius_km": CM_RADIUS_KM, "dates": record_dates(plumes), "latest_confirmed": confirmed,
+              "image": image}
     geometry_url = None
     try:
         mt._put_json(stage_key(lat, lon, "json"), record)
@@ -441,6 +700,7 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
     except Exception as e:  # the board is decoration: never fail the check for it
         logger.warning("carbon mapper record failed: %s", type(e).__name__)
     summary["seconds"] = round(time.time() - started, 1)
+    confirmed_gap = with_gap(latest_confirmed(emit, cm_follow), tip_start_at(lat, lon, s3))
     logger.info("CARBON MAPPER: %.3f,%.3f %d plumes, latest %s (%s, %.1fs)", lat, lon, len(plumes),
                 summary["latest_date"], source, summary["seconds"])
     out = {
@@ -449,13 +709,18 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
                     "uncertainty_kg_h": p["uncertainty_kg_h"], "distance_km": p["distance_km"], "sector": p["sector"]}
                    for p in plumes[:CM_LIST_MAX]],
         "emit": emit,
-        "latest_confirmed": latest_confirmed(emit, cm_follow),
+        "latest_confirmed": confirmed_gap,
+        # The follow rule's test, said plainly: is this site's latest confirmed detection within 90 days
+        # of the tip window (false with none)? Only such a site can be the 90-day rule's switch.
+        "within_90_days": bool(confirmed_gap and confirmed_gap.get("within_90_days")),
+        "ninety_day_note": ninety_day_note(confirmed_gap),
+        "latest_image": image and ({k: image[k] for k in ("date", "pixels", "peak_ppm_m")} if image.get("status") == "ok"
+                                   else {"date": image["date"], "status": "unavailable"}),
         "say": say_line(len(plumes), radius_km, since.isoformat(), latest),
         "attribution": ATTRIBUTION,
-        "next_steps": ("Compare the two cued sites' latest_confirmed dates (the follow rule). A rate is Carbon "
-                       "Mapper's estimate, never EMIT's or yours; sector is Carbon Mapper's label for the area, never "
-                       "a cause: do not repeat it. If you follow this site, display_visual(plumes_geometry_s3_url, "
-                       "render=render) with the TROPOMI composite."),
+        "next_steps": ("Compare the cued sites' latest_confirmed dates and within_90_days (the follow rule, then "
+                       "follow_site). A rate is Carbon Mapper's estimate, never EMIT's or yours; sector is a code for "
+                       "Carbon Mapper's label for the area, never a cause: do not repeat it."),
     }
     if source == "stale cache":
         out["note"] = (f"Carbon Mapper could not be reached; this is its record as fetched on {fetched}.")
