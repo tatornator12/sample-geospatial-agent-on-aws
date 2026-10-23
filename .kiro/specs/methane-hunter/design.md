@@ -562,3 +562,74 @@ have none), so the mission followed Shanxi on its EMIT candidate of 2025-11-30. 
 Caspian tip lands near Krasnovodsk (39.44, 53.57), Carbon Mapper lists 45 Tanager-1 plumes there
 since 2025, the latest on 2026-06-20, newer than Shanxi's newest EMIT candidate (2025-11-30): the
 agent would follow the south Caspian, and the rings would show.
+
+## Act 2 v4: the record and the agent's decision (approved 2026-10-23; branch `methane-record`)
+
+Requirements 15 and 16. Source of the design: `.agents/tasks/methane-coincidence/report.md`
+(sections 4 and 6, "Option 1 design"); this run's record: `.agents/tasks/methane-record/report.md`.
+
+**Decisions (approved 2026-10-23).** EMIT V003 is read after V002's end; the mirror test at 3x
+(our diagnostic, not a published EMIT rule); Carbon Mapper within 7 km, one TROPOMI footprint,
+for the record and the follow rule alike (chosen after seeing the Shanxi case, see Requirement 15);
+a 90-day threshold (about twice the best the sources allow: 14 days of tip plus Carbon Mapper's 30
+days); the stage says "a new fine-scale look", so the agent's recommendation is never confused with
+the analyst's "Request another look" button.
+
+### The record (agent)
+
+- `watch_tools.emit_looks`: CMR by `short_name` and `version`, V002 to 2026-08-31T01:26:00Z and
+  V003 from one second later, so V003's reprocessing of 2022 to 2024 (same timestamps as V002's
+  scenes) is never a second look. `SCENE_RE` takes both id forms; `scene_url` uses the product's
+  folder; each pass carries `product`. `check_recent_passes` reads every look since 2025 (24, max
+  36); "Request another look" reads `since="2023-01-01", max_scenes=36`.
+- `judge_window`: significant above (≥ 500 ppm·m and > 3σ) and its mirror below (≤ -500 and
+  |enh| > 3σ). A candidate also needs above ≥ 3 × below; else "within noise" with both counts.
+  The candidate's significant pixels are cached as `_sig.tif` and the columns are drawn from them.
+- Cache keys: `passwin_rule2_<scene>_…` (verdict, window, `_sig`, chip), `tropomi_v2_…` (the
+  unversioned composites are read only, `next_steps` always today's), `carbonmapper_v2_…_7km`.
+  The fixed `watch_sites_v002.geojson` is rewritten only when it differs. Unchanged tools (Overture,
+  GEM, the registry, NASA plume caches, FIRMS without a key) write what the develop runtime writes,
+  only on a miss.
+- `carbon_mapper_plumes`: radius 7 km; the record adds `follow_radius_km`, `dates[]` (≤ 60:
+  date, instrument code, rate, distance) and `latest_confirmed` {date, by}.
+- `write_tip`: `start` (the window's first day with an orbit read).
+
+### The decision (agent)
+
+`draft_brief(…, recommendation, recommendation_reason)`. The tool reads the session's tip (nearest
+`tip_*.json` top within 2 km), passes (newest candidate day, last look and result) and Carbon
+Mapper record (plume days within 7 km), computes `record` = {tip_start, tip_end, reference,
+latest_confirmed, days_between, last_look, confirmed_dates}, and refuses a reason the facts
+contradict: the error names the fact ("the latest fine-scale confirmation is a Carbon Mapper plume
+on 2026-06-10, 118 days before the tip's first day (2026-10-06)") and lists the reasons the record
+supports. Days ≤ 90 is within; 91 is older. Two code-written markdown lines follow "Looks:":
+
+    Record: TROPOMI tipped this site from 2026-10-06 to 2026-10-20; the latest fine-scale confirmation is a Carbon Mapper plume on 2026-06-10, 118 days earlier; EMIT last looked on 2026-08-17 (clouded out).
+    Recommendation: a new fine-scale look, because the latest confirmation is more than 90 days older than the tip.
+
+W4b: with no confirmed detection at either cued site, the fixed sentence "Following the <label>
+site, the stronger tip at +<ppb> ppb: its latest confirmed detection is none since 2025-01-01, and
+none at the <other> site either." and the ground checks at the tip. W6 asks for the enums.
+
+### The stage
+
+- `RecordTimeline` (StepColumn, above the followed site's filmstrip, whenever its strip is shown
+  in full): rows TROPOMI (band, pale ice, ≥ 8 px), EMIT (filled plasma orange: methane seen; ring:
+  too faint or within noise; grey tick: clouded out; one mark per look day), Carbon Mapper (mint
+  ring per plume day within 7 km), a fog bracket from the latest confirmation to the tip's first
+  day, and a foot line "Jan 2025 … 10 Jun 2026 to the tip: about 4 months" (or "No fine-scale
+  confirmation on record"). Each row's label on its own 15 px line over a full-width track, dates
+  in mono, no amber, one bracket drawn once (reduced motion: none). The followed site's filmstrip
+  keeps its newest 8 frames and drops its words line (the timeline says it).
+- Brief card: `lastLookLine` is gone; `DecisionText` writes one line from `card.decision`
+  (backend `briefDecision` whitelist: enums that agree, ISO dates, integers, fixed codes). The
+  months come from `gapWords`, the same function as the bracket. The recommendation is the
+  agent's ("The agent recommends a new fine-scale look.") beside "Decision: analyst's." The line
+  sits inline at the end of the count paragraph (`span.brief-card__decision`), so the call stays
+  on the first screen at 1280x720; a paragraph of its own pushed it below the fold there.
+- `chosenCue` also finds a site followed for its tip alone (the ground checks' point), and
+  recognises V003 scene ids.
+- The critique before (`.impeccable/critique/2026-10-23T15-33-41Z__…stepcolumn-tsx.md`, 25/40)
+  shaped: one formatter and one months function, the recommendation attributed to the agent, the
+  strip's words line stepping aside, colour by source and shape by verdict. The polish after
+  raised the card's subheads and the board's values to 15 px.

@@ -418,3 +418,69 @@ chooses a site, so that the room sees the choice rest on the newest evidence fro
 1. WHEN the agent has looked at the followed site's strongest EMIT candidate THEN it SHALL put
    that candidate on the map as its 3D columns (`display_visual` with `render.kind` "columns"),
    and the golden mission cases SHALL check it.
+
+## Act 2 v4: the site's record and the agent's decision (approved 2026-10-23)
+
+The 23 October coincidence check (`.agents/tasks/methane-coincidence/report.md`) found that nothing
+fine-scale coincides in time with a 14-day TROPOMI tip, and with today's sources nothing can:
+Carbon Mapper publishes 30 days after a scene, and EMIT looks at any one place only now and then.
+The presenter approved option 1 on 23 October: put the site's record on the stage, make the gap
+the agent's finding, and let the agent decide whether the site needs a new fine-scale look. Three
+problems with the record come first: EMIT V002 ended on 2026-08-31 and later passes (V003) were
+not read; the candidate rule passes two-sided noise at high-uncertainty sites; and the 5 km
+Carbon Mapper radius left out a recurring source in the TROPOMI cell next to the tip's.
+
+**Decisions approved 2026-10-23:** read V003 after V002's end; the mirror test (3x); Carbon Mapper
+within 7 km, one TROPOMI footprint, the same for every site. **The 7 km radius was chosen after
+seeing the Shanxi case** (seven coal-mine plumes 5.11 to 5.15 km from the tip's cell centre, one
+source in the diagonal neighbour cell), so it is a principled radius picked with that case in view,
+not a blind one. The 90-day threshold, the recommendation enums and the stage wording "a new
+fine-scale look" (never confused with the analyst's "Request another look").
+
+### Requirement 15: The record, read honestly
+
+1. WHEN `check_recent_passes` reads a site THEN it SHALL read EMIT's V002 scenes up to the V002
+   collection's end (2026-08-31T01:26Z) and V003 scenes after it (ids `EMIT_L2B_CH4ENH_003_<stamp>`,
+   folder `EMITL2BCH4ENH.003`), never counting a V003 reprocessing of an older scene as a second
+   look; every pass SHALL carry its `product` (V002 or V003); it SHALL read every look since
+   2025-01-01 (24 by default, at most 36). `site_history` SHALL count looks the same way.
+2. WHEN a pass has enough strong and significant pixels THEN it SHALL be a candidate only if its
+   significant pixels above zero are at least 3 times those as far below zero in the same window
+   (the mirror test); otherwise it is rejected "within noise" with both counts. The 3D columns
+   SHALL be drawn from the candidate's significant pixels only.
+3. WHEN the shared cache is written THEN the keys SHALL be new and versioned (`passwin_rule2_`,
+   `tropomi_v2_`, `carbonmapper_v2_`); the stable runtime's keys SHALL never be overwritten or
+   deleted (unversioned TROPOMI composites are read only; the baseline globe is rewritten only
+   when it changed).
+4. WHEN `carbon_mapper_plumes` runs THEN its default radius and the follow rule SHALL be 7 km,
+   and its record SHALL carry `dates[]` (date, instrument code, rate, distance; numbers and
+   fixed codes only, at most 60) and `latest_confirmed` {date, by: emit | carbon_mapper | both}.
+5. WHEN a scan writes its tip manifest THEN it SHALL carry the window's first day (`start`).
+
+### Requirement 16: The agent's decision, checked against the record
+
+1. WHEN the agent drafts a brief THEN `draft_brief` SHALL take `recommendation`
+   (`recommend_new_look` | `no_new_look_needed`) and `recommendation_reason`
+   (`confirmation_older_than_90_days` | `no_confirmation_on_record` | `last_look_clouded_out` lead
+   to `recommend_new_look`; `confirmed_within_90_days` leads to `no_new_look_needed`), refuse any
+   other value or a pairing that disagrees, and compute the facts from the session's records: the
+   tip's window, the latest fine-scale confirmation (EMIT candidate or Carbon Mapper plume within
+   7 km), the days from it to the tip's first day, EMIT's last look and its result.
+2. WHEN the chosen reason contradicts the facts THEN the tool SHALL refuse, name the fact and list
+   the reasons the record supports, and write nothing. When more than one holds, the model's pick
+   SHALL be the brief's.
+3. WHEN the brief is written THEN its markdown SHALL carry two code-written lines, "Record: …" and
+   "Recommendation: …", and its record SHALL keep the enums and the facts (numbers, dates, codes).
+4. WHEN the stage shows the decision THEN the brief card SHALL show one code-written line in place
+   of the last-look line, worded by the stage from the enums and dates ("Methane keeps showing up
+   here." only with 3 or more confirmed dates, otherwise "Methane has shown up here before.";
+   "about N months" or "N days" under 60; "The agent recommends a new fine-scale look."), never
+   "now", "still", "active" or "leaking", at least 15 px, no dashes, British spelling. The backend
+   SHALL pass only validated enums, dates and counts.
+5. WHEN the agent follows a site THEN the step column SHALL show a record timeline above that
+   site's filmstrip: TROPOMI's window as a band, one EMIT mark per look day (methane seen / too
+   faint or within noise / clouded out), one Carbon Mapper mark per plume day within 7 km, and one
+   bracket from the latest confirmation to the tip, worded by the same function as the card. No
+   model text reaches the timeline or the card line.
+6. WHEN the golden `watch-mission` runs THEN it SHALL require "Recommendation:" in the record and
+   a `draft_brief` call whose enums are valid (`expected_inputs`).
