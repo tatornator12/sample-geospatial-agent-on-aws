@@ -36,14 +36,18 @@ import {
   replayWindow,
   sweepRows,
   wakes,
+  aisMoves,
+  tierOfType,
   type AisLook,
   type CoverageQuiet,
   type PreparedTrack,
+  type SeaTier,
   type VesselKind,
   type VesselRest,
 } from '../utils/vesselLayers.ts';
 
 type M = maplibregl.Map;
+type AddLayer = Parameters<M['addLayer']>[0];
 type Expr = maplibregl.ExpressionSpecification;
 type Filter = maplibregl.FilterSpecification;
 type Feature = { type: 'Feature'; properties: Record<string, unknown>; geometry: { type: string; coordinates: unknown } | null };
@@ -158,8 +162,71 @@ const F = {
   islands: 'sea-islands',
 };
 const FS = { wakes: 'sea-wakes', trail: 'sea-trail', heads: 'sea-heads', reserve: 'sea-reserve', harbours: 'sea-harbours', islands: 'sea-islands' };
-/** Above the stack (the stack's ceiling is the lowest of them), under the presenter's drawn shapes. */
+/**
+ * Every furniture layer. The reserve, the harbours and the islands draw above the stack, under the
+ * presenter's drawn shapes; the ships (AIS_IDS) draw inside it, over the sea files' areas and under
+ * their marks (settleAis).
+ */
 export const SEA_FURNITURE_IDS = Object.values(F);
+/** The ships' AIS, bottom first: what the matching heard, never a target. */
+export const AIS_IDS = [F.wakesFaint, F.wakes, F.trail, F.heads];
+/** The furniture over the stack: at rest the ships sit directly beneath it. */
+const REST_IDS = [F.reserve, F.harbours, F.harbourNames, F.islands];
+
+/** A sea file's layer carries its tier (under the ships or over them) in its metadata. */
+export const SEA_TIER_KEY = 'sea:tier';
+
+/**
+ * A layer's tier: a sea file's from its metadata; a raster's (the radar's tiles and sweep, which
+ * MapView and sweepRadar add) is an area too, so a drag in the layers plate never takes the ships
+ * under the radar. Every other layer (the basemap, the presenter's shapes) has none and stays put.
+ */
+function tierOfLayer(map: M, id: string): SeaTier | undefined {
+  const layer = map.getLayer(id);
+  const tier = (layer?.metadata as Record<string, unknown> | undefined)?.[SEA_TIER_KEY];
+  if (tier === 'under' || tier === 'over') return tier;
+  return layer?.type === 'raster' ? 'under' : undefined;
+}
+
+/**
+ * The ships to their place (aisMoves): directly beneath the lowest sea mark, every sea area under
+ * them. Nothing moves when they are already there.
+ */
+export function settleAis(map: M): void {
+  if (!map.getLayer(F.heads)) return;
+  for (const [id, before] of aisMoves(map.getLayersOrder(), (id) => tierOfLayer(map, id), AIS_IDS, REST_IDS)) {
+    map.moveLayer(id, before);
+  }
+}
+
+/**
+ * The stack restacks every listed layer directly beneath its ceiling (MapView's applyLayerOrder,
+ * on every layer that lands and every reorder), and the ships, listed nowhere, are that ceiling. So
+ * they settle again on each style change: MapLibre fires `styledata` in the frame's style update,
+ * before that frame is placed and painted, so a restack never reaches the screen with the ships
+ * over the rings. One listener per map, while the furniture is on.
+ */
+const settlers = new WeakMap<M, () => void>();
+
+function holdAis(map: M): void {
+  if (settlers.has(map)) return;
+  const settle = () => {
+    try {
+      settleAis(map);
+    } catch {
+      // The style is between loads: the next style change settles the ships.
+    }
+  };
+  settlers.set(map, settle);
+  map.on('styledata', settle);
+}
+
+function releaseAis(map: M): void {
+  const settle = settlers.get(map);
+  if (!settle) return;
+  map.off('styledata', settle);
+  settlers.delete(map);
+}
 
 function pointsOf(rows: ReadonlyArray<{ label: string; coordinates: [number, number] }>): FC {
   return {
@@ -169,8 +236,13 @@ function pointsOf(rows: ReadonlyArray<{ label: string; coordinates: [number, num
 }
 
 export function furnitureOn(map: M, rest: VesselRest, prepared: readonly PreparedTrack[]): void {
-  if (map.getLayer(F.islands)) return;
-  // Under the presenter's drawn shapes, which stay on top of everything.
+  if (map.getLayer(F.islands)) {
+    holdAis(map);
+    settleAis(map);
+    return;
+  }
+  // Under the presenter's drawn shapes, which stay on top of everything (the ships then settle
+  // under any sea file already on the map, below).
   const before = map.getLayersOrder().find((id) => id.startsWith('gl-draw'));
   // The wakes are the loop's own hours (the 36 to the pass, as the clock says), not the file's 72.
   map.addSource(FS.wakes, { type: 'geojson', data: wakes(prepared, 3, replayWindow(rest)) as GeoJSON.FeatureCollection });
@@ -250,9 +322,12 @@ export function furnitureOn(map: M, rest: VesselRest, prepared: readonly Prepare
     },
     paint: { 'text-color': LABEL, 'text-halo-color': HALO, 'text-halo-width': 2.5 },
   }, before);
+  holdAis(map);
+  settleAis(map);
 }
 
 export function furnitureOff(map: M): void {
+  releaseAis(map);
   [...SEA_FURNITURE_IDS].reverse().forEach((id) => map.getLayer(id) && map.removeLayer(id));
   Object.values(FS).forEach((id) => map.getSource(id) && map.removeSource(id));
 }
@@ -430,16 +505,19 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
   const fade = ctx.reduced ? { duration: 0, delay: 0 } : { duration: 900, delay: 0 };
   map.addSource(source, { type: 'geojson', data: data as GeoJSON.FeatureCollection });
   const addPoints = (fc: FC) => map.addSource(points, { type: 'geojson', data: fc as GeoJSON.FeatureCollection });
+  // Each layer carries its tier (an area under the ships, a mark over them), read by settleAis.
+  const add = (layer: AddLayer, tier: SeaTier = tierOfType(layer.type)) =>
+    map.addLayer({ ...layer, metadata: { [SEA_TIER_KEY]: tier } } as AddLayer);
 
   if (kind === 'targets') {
     addPoints(claimParts(data.features) as FC);
     // A dome halo under the candidates' rings, so orchid reads on the radar's speckle.
-    map.addLayer({
+    add({
       id: c('-halo'), type: 'circle', source, filter: ['==', ['get', 'status'], 'candidate'], layout: vis,
       paint: { 'circle-radius': 16, 'circle-color': DOME, 'circle-blur': 0.6, 'circle-opacity': 0, 'circle-opacity-transition': fade, 'circle-pitch-alignment': 'map' },
     });
     // A ring is something the radar saw: grey until something explains it.
-    map.addLayer({
+    add({
       id: fill, type: 'circle', source, filter: greyFilter(false, []), layout: vis,
       paint: {
         'circle-radius': ['case', ['==', ['get', 'status'], 'seen_once'], 5, 8],
@@ -452,22 +530,22 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
     });
     // The claim: a broadcast accounts for it (a fog ring; tied by a hairline to the AIS dot only
     // where that dot decided, claimParts).
-    map.addLayer({
+    add({
       id: c('-outline'), type: 'circle', source, filter: ['==', shown, 'claimed'], layout: vis,
       paint: {
         'circle-radius': 7.5, 'circle-color': 'rgba(0, 0, 0, 0)', 'circle-stroke-color': FOG, 'circle-stroke-width': 1.6,
         'circle-stroke-opacity': 0, 'circle-stroke-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 400 }, 'circle-pitch-alignment': 'map',
       },
     });
-    map.addLayer({
+    add({
       id: c('-ports'), type: 'symbol', minzoom: NEAR, source, filter: ['==', shown, 'port'],
       layout: { ...vis, 'icon-image': 'sea-port', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
     });
-    map.addLayer({
+    add({
       id: c('-ties'), type: 'line', source: points, filter: ['==', ['get', 'part'], 'tie'], layout: { ...vis, 'line-cap': 'round' },
       paint: { 'line-color': FOG, 'line-width': 1.2, 'line-opacity': 0, 'line-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 700 } },
     });
-    map.addLayer({
+    add({
       id: c('-heads'), type: 'circle', source: points, filter: ['==', ['get', 'part'], 'head'], layout: vis,
       paint: {
         'circle-radius': 3.6, 'circle-color': FOG, 'circle-stroke-color': AIS, 'circle-stroke-width': 1.4,
@@ -476,14 +554,14 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
       },
     });
     // The candidates: hidden rings until the reveal turns them orchid and grows them.
-    map.addLayer({
+    add({
       id: c('-cand'), type: 'circle', source, filter: candidateFilter([]), layout: vis,
       paint: {
         'circle-radius': 8, 'circle-color': 'rgba(0, 0, 0, 0)', 'circle-stroke-color': ORCHID, 'circle-stroke-width': 2.5, 'circle-stroke-opacity': 0,
         'circle-radius-transition': fade, 'circle-stroke-opacity-transition': fade, 'circle-pitch-alignment': 'map',
       },
     });
-    map.addLayer({
+    add({
       id: c('-labels'), type: 'symbol', minzoom: NEAR, source, filter: candidateFilter([]),
       layout: {
         ...vis,
@@ -497,7 +575,7 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
       paint: { 'text-color': ORCHID, 'text-halo-color': HALO, 'text-halo-width': 2.5, 'text-opacity': 0, 'text-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 300 } },
     });
     // A target where reception is unknown says so; a candidate the officer left out says that.
-    map.addLayer({
+    add({
       id: c('-notes'), type: 'symbol', minzoom: NEAR, source, filter: notesFilter([]),
       layout: {
         ...vis,
@@ -515,21 +593,22 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
     const words = kind === 'heard' ? 'AIS received' : 'reception unknown';
     addPoints({ type: 'FeatureCollection', features: labelPoint(words, regionLabelPoint(geom as never, ctx.view, ctx.avoid)) });
     if (kind === 'heard') {
-      map.addLayer({
+      add({
         id: fill, type: 'fill', source, layout: vis,
         paint: { 'fill-color': FOG, 'fill-opacity': 0, 'fill-opacity-transition': fade },
       });
-      map.addLayer({
+      // The area's edge is part of its wash: under the ships with the fill.
+      add({
         id: c('-outline'), type: 'line', source, layout: vis,
         paint: { 'line-color': FOG, 'line-width': 1, 'line-opacity': 0, 'line-opacity-transition': fade },
-      });
+      }, 'under');
     } else {
-      map.addLayer({
+      add({
         id: fill, type: 'fill', source, layout: vis,
         paint: { 'fill-pattern': 'sea-hatch', 'fill-opacity': 0, 'fill-opacity-transition': fade },
       });
     }
-    map.addLayer({
+    add({
       id: c('-labels'), type: 'symbol', minzoom: NEAR, source: points,
       layout: { ...vis, 'text-field': ['get', 'label'], 'text-font': MONO, 'text-size': 15, 'text-max-width': 60, 'text-allow-overlap': true },
       paint: {
@@ -543,7 +622,7 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
   if (kind === 'heat' || kind === 'fleet') {
     const heat = kind === 'heat';
     addPoints(heat ? EMPTY : (fleetPlaces(data.features, ctx.url) as FC));
-    map.addLayer({
+    add({
       id: fill, type: 'heatmap', source, layout: vis,
       paint: heat
         ? {
@@ -567,7 +646,7 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
           },
     });
     if (!heat) {
-      map.addLayer({
+      add({
         id: c('-labels'), type: 'symbol', source: points,
         layout: { ...vis, 'text-field': ['get', 'label'], 'text-font': SANS, 'text-size': 16, 'text-letter-spacing': 0.04, 'text-allow-overlap': true },
         paint: {
@@ -582,20 +661,20 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
   if (kind === 'boxes') {
     addPoints(boxLabelPoints(data.features) as FC);
     // The officer's selection: a fog wash and a heavier line (never amber: amber is the Approve button's).
-    map.addLayer({
+    add({
       id: c('-wash'), type: 'fill', source, filter: ['==', ['get', 'box'], -1], layout: vis,
       paint: { 'fill-color': FOG, 'fill-opacity': 0.07 },
     });
-    map.addLayer({ id: c('-hit'), type: 'fill', source, layout: vis, paint: { 'fill-color': FOG, 'fill-opacity': 0 } });
-    map.addLayer({
+    add({ id: c('-hit'), type: 'fill', source, layout: vis, paint: { 'fill-color': FOG, 'fill-opacity': 0 } });
+    add({
       id: fill, type: 'line', source, layout: vis,
       paint: { 'line-color': FOG, 'line-width': 1.6, 'line-opacity': 0, 'line-opacity-transition': fade },
     });
-    map.addLayer({
+    add({
       id: c('-outline'), type: 'line', source, filter: ['==', ['get', 'box'], -1], layout: vis,
       paint: { 'line-color': FOG, 'line-width': 3 },
     });
-    map.addLayer({
+    add({
       id: c('-labels'), type: 'symbol', minzoom: NEAR, source: points,
       layout: {
         ...vis,
@@ -618,15 +697,15 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
     const f = data.features.find((x) => x.geometry && /Polygon$/.test(x.geometry.type));
     const words = String(f?.properties?.label ?? 'next look');
     addPoints({ type: 'FeatureCollection', features: labelPoint(words, regionLabelPoint(f?.geometry as never, ctx.view, ctx.avoid)) });
-    map.addLayer({
+    add({
       id: fill, type: 'fill', source, layout: vis,
       paint: { 'fill-color': FOG, 'fill-opacity': 0, 'fill-opacity-transition': fade },
     });
-    map.addLayer({
+    add({
       id: c('-outline'), type: 'line', source, layout: vis,
       paint: { 'line-color': LABEL, 'line-width': 1.2, 'line-dasharray': [3, 3], 'line-opacity': 0, 'line-opacity-transition': fade },
     });
-    map.addLayer({
+    add({
       id: c('-labels'), type: 'symbol', minzoom: NEAR, source: points,
       layout: { ...vis, 'text-field': ['get', 'label'], 'text-font': MONO, 'text-size': 16, 'text-max-width': 60, 'text-allow-overlap': true },
       paint: { 'text-color': LABEL, 'text-halo-color': HALO, 'text-halo-width': 2.5, 'text-opacity': 0, 'text-opacity-transition': fade },
@@ -647,26 +726,26 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
   addPoints({ type: 'FeatureCollection', features: labels });
   const slow = { duration: ctx.reduced ? 0 : 2400, delay: 0 };
   const late = { duration: ctx.reduced ? 0 : 900, delay: 0 };
-  map.addLayer({
+  add({
     id: fill, type: 'fill', source, filter: isPoly, layout: vis,
     paint: { 'fill-color': FOG, 'fill-opacity': 0, 'fill-opacity-transition': slow },
   });
-  map.addLayer({
+  add({
     id: c('-outline'), type: 'line', source, filter: isPoly, layout: vis,
     paint: { 'line-color': FOG, 'line-width': 1.2, 'line-opacity': 0, 'line-opacity-transition': slow },
   });
-  map.addLayer({
+  add({
     id: c('-cand'), type: 'circle', source, filter: kindIs('target'), layout: vis,
     paint: {
       'circle-radius': 9, 'circle-color': 'rgba(0, 0, 0, 0)', 'circle-stroke-color': FOG, 'circle-stroke-width': 2,
       'circle-stroke-opacity': 0, 'circle-stroke-opacity-transition': { ...slow, delay: ctx.reduced ? 0 : 1200 }, 'circle-pitch-alignment': 'map',
     },
   });
-  map.addLayer({
+  add({
     id: c('-heads'), type: 'circle', source, filter: kindIs('off'), layout: vis,
     paint: { 'circle-radius': 4.5, 'circle-color': FOG, 'circle-stroke-color': AIS, 'circle-stroke-width': 1.6 },
   });
-  map.addLayer({
+  add({
     id: c('-labels'), type: 'symbol', minzoom: NEAR, source: points,
     layout: {
       ...vis, 'text-field': ['get', 'label'], 'text-font': MONO, 'text-size': 16, 'text-max-width': 40,
@@ -674,14 +753,14 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
     },
     paint: { 'text-color': ['case', ['==', ['get', 'kind'], 'off'], AIS, FOG], 'text-halo-color': HALO, 'text-halo-width': 2.5 },
   });
-  map.addLayer({
+  add({
     id: c('-notes'), type: 'circle', source, filter: kindIs('on'), layout: vis,
     paint: {
       'circle-radius': 4.5, 'circle-color': FOG, 'circle-stroke-color': AIS, 'circle-stroke-width': 1.6,
       'circle-opacity': 0, 'circle-stroke-opacity': 0, 'circle-opacity-transition': late, 'circle-stroke-opacity-transition': late,
     },
   });
-  map.addLayer({
+  add({
     id: c('-wash'), type: 'symbol', minzoom: NEAR, source, filter: kindIs('on'),
     layout: { ...vis, 'text-field': ['get', 'label'], 'text-font': MONO, 'text-size': 16, 'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 1, 'text-allow-overlap': true },
     paint: { 'text-color': AIS, 'text-halo-color': HALO, 'text-halo-width': 2.5, 'text-opacity': 0, 'text-opacity-transition': late },

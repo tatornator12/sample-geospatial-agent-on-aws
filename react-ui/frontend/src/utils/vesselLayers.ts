@@ -937,6 +937,50 @@ export function aisLook(beat: SeaBeat, earlierPass = false): AisLook {
   return { shown: true, wakes: 0.13, faintWakes: 0.05, trail: 1, heads: 1, headStroke: 0.6, radar: 0.8, quietCoverage };
 }
 
+// --- where the ships draw -------------------------------------------------------------------------------------
+
+/**
+ * Where a sea file's map layer draws against the ships' AIS (the dots, their tails and wakes):
+ * 'under' for an area (the coverage, the heat, the fleet's lights, a box's, the next look's or the
+ * reach's faint fill), 'over' for a mark (every ring, halo, hairline, line and word).
+ */
+export type SeaTier = 'under' | 'over';
+
+/** A layer's tier by its MapLibre type: fills and heatmaps are areas, everything else marks. */
+export function tierOfType(type: string): SeaTier {
+  return type === 'fill' || type === 'heatmap' ? 'under' : 'over';
+}
+
+/**
+ * The moveLayer calls that put the ships between the sea files' areas and their marks, so a dot
+ * a few kilometres from a candidate draws under its ring, its halo and its words, never on them,
+ * and no area washes over a dot. `order` is the map's style order (bottom first); `ais` the
+ * ships' layers, bottom first; `rest` the furniture over the stack (the reserve, the harbours, the
+ * islands). The ships go directly beneath the lowest mark, else the lowest furniture layer (at
+ * rest, where they were added); any area above that point comes down under them, in its order.
+ * Marks and every other layer keep their order, so the stack's own order holds within each tier.
+ * Empty when the order already holds, so it settles whatever was added first and however often it
+ * runs.
+ */
+export function aisMoves(
+  order: readonly string[],
+  tierOf: (id: string) => SeaTier | undefined,
+  ais: readonly string[],
+  rest: readonly string[],
+): Array<[string, string]> {
+  const ships = ais.filter((id) => order.includes(id));
+  if (!ships.length) return [];
+  const at = order.findIndex((id) => tierOf(id) === 'over' || rest.includes(id));
+  if (at < 0) return [];
+  const anchor = order[at];
+  const lowered = order.slice(at).filter((id) => tierOf(id) === 'under');
+  const moving = new Set([...lowered, ...ships]);
+  const stays = (id: string) => !moving.has(id);
+  const want = [...order.slice(0, at).filter(stays), ...lowered, ...ships, ...order.slice(at).filter(stays)];
+  if (want.every((id, i) => id === order[i])) return [];
+  return [...lowered, ...ships].map((id) => [id, anchor]);
+}
+
 /** The stage's frame for the sea: the usual plates, and room at the top for the clock plate's two lines. */
 export function seaPadding(base: { top: number; bottom: number; left: number; right: number }) {
   return { ...base, top: Math.max(base.top, 140) };
