@@ -423,6 +423,148 @@
   line-height: 1.3;
   color: var(--fog);
 }
+/* The followed site's record (the following beat): a row per source on one date axis, January 2025
+   to the tip, and one bracket from the latest fine-scale confirmation to the tip. Each row's label
+   has its own line over a full-width track, so the track keeps the column's width at 1280 too.
+   Colour says the source, shape says what a look found. No amber: the decision owns it. */
+.record-timeline {
+  margin: 10px 0 2px;
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+.record-timeline__row + .record-timeline__row {
+  margin-top: 4px;
+}
+.record-timeline__label,
+.record-timeline__gap-words,
+.record-timeline__axis {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.record-timeline__label {
+  color: var(--fog);
+}
+.record-timeline__note {
+  color: var(--label);
+}
+.record-timeline__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.record-timeline__keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  column-gap: 10px;
+}
+.record-timeline__keys > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+/* The track: a hairline through the middle, the marks centred on it. */
+.record-timeline__track {
+  position: relative;
+  height: 16px;
+  margin: 2px 0 0;
+}
+.record-timeline__track::before {
+  content: '';
+  position: absolute;
+  inset: 7.5px 0 auto;
+  height: 1px;
+  background: var(--hairline-strong);
+}
+.record-timeline__mark,
+.record-timeline__key {
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.record-timeline__mark {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+}
+.record-timeline__key {
+  display: inline-block;
+  flex: none;
+}
+/* EMIT: plasma orange, the bright end of the EMIT ramp (its dark end dies on the plate). */
+.record-timeline__mark--seen,
+.record-timeline__key--seen {
+  background: #f89540;
+}
+.record-timeline__mark--faint,
+.record-timeline__key--faint {
+  border: 2px solid #f89540;
+  background: var(--plate);
+}
+.record-timeline__mark--clouded,
+.record-timeline__key--clouded {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--label);
+}
+.record-timeline__mark--clouded {
+  top: 2px;
+  height: 12px;
+}
+/* Carbon Mapper: the map's detection ring, smaller. */
+.record-timeline__mark--plume {
+  border: 2px solid #6fe0b8;
+  background: rgba(111, 224, 184, 0.2);
+}
+/* TROPOMI: the tip's window as a band at the axis's end, pale ice, never narrower than 8 px. */
+.record-timeline__band {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1px solid #79bdd0;
+  border-radius: 2px;
+  background: rgba(121, 189, 208, 0.35);
+}
+/* The gap: a fog bracket with ticks at both ends, drawn once as the beat lands. */
+.record-timeline__gap {
+  position: relative;
+  height: 9px;
+  margin-top: 4px;
+}
+.record-timeline__bracket {
+  position: absolute;
+  top: 0;
+  height: 7px;
+  box-sizing: border-box;
+  border: 1px solid var(--fog);
+  border-top: none;
+  transform-origin: right center;
+  animation: record-bracket 600ms var(--ease-out) 200ms both;
+}
+@keyframes record-bracket {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.record-timeline__gap-words {
+  margin-top: 2px;
+  text-align: right;
+  color: var(--fog);
+}
+.record-timeline__axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--label);
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-timeline,
+  .record-timeline__bracket {
+    animation: none;
+  }
+}
 /* The brief card: the mission's end frame, under the steps, and the analyst's decision. */
 .brief-card {
   scroll-margin-top: 52px; /* lands under the step column's sticky head */
@@ -502,8 +644,12 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-/* The last look's dates ("Aug 20 2025") never break across lines. */
-.brief-card__look .brief-card__num {
+/* The gap, said once: its own paragraph under the counts, its date and its months never broken. */
+.brief-card__decision {
+  margin-top: 6px;
+}
+.brief-card__decision .brief-card__num,
+.brief-card__gap {
   white-space: nowrap;
 }
 /* The verdict: the two lines the room restates, the values at the size it reads from the back. */

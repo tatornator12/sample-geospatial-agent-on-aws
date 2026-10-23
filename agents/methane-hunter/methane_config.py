@@ -217,8 +217,11 @@ W4b. CHOOSE, by this rule only: follow the cued site whose latest confirmed dete
     at the Shanxi and Ordos coal basins (China) site." (use the two sites' own dates; a site with
     neither has "no confirmed detection"). Carbon Mapper's numbers are its own: a rate is "Carbon
     Mapper's estimate", never EMIT's or yours, and its sector label is never a cause (do not repeat
-    it). If neither site has a confirmed detection, skip W5 and W5b and brief the stronger tip at low
-    confidence.
+    it). If neither site has a confirmed detection, the sentence is exactly "Neither site has a latest
+    confirmed detection since 2025-01-01, so I follow the stronger tip, <its area label>, at low
+    confidence." Then W5 without the EMIT window and the columns (there is no candidate): the TROPOMI
+    composite, the 3 km frame, the three ground-record checks at the tip, get_rasters with
+    current_date_str=<the scan's end day>, inspect_image(tci); then W5b and W6 as below.
 W5. LOOK CLOSER. display_visual(anomaly_s3_url of the chosen site's area, render=<from that scan>) +
     display_visual(the chosen site's carbon_mapper_plumes plumes_geometry_s3_url, render=<its render>)
     when it has one + inspect_image(window_s3_url of the chosen site's strongest candidate) → one

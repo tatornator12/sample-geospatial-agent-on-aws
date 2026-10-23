@@ -1,6 +1,7 @@
 /**
- * The cue step's filmstrip: every recent EMIT pass the agent read over the site, newest first,
- * as a small frame of the window it judged. Candidates stand at full strength; rejected passes
+ * The cue step's filmstrip: the newest EMIT passes the agent read over the site (FILM_FRAMES of
+ * them; the record timeline above the followed site draws every look), newest first, as a small
+ * frame of the window it judged. Candidates stand at full strength; rejected passes
  * are dimmed, and the line under the frames says why in words ("2 candidates · 1 too weak").
  *
  * Tool outputs never reach the UI, so check_recent_passes writes a manifest beside its chips;
@@ -10,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { getPresignedUrl } from '../services/api.ts';
 import type { EvidenceItem } from '../utils/evidence.ts';
-import { filmstripSummary, type PassFrame } from '../utils/steps.ts';
+import { FILM_FRAMES, filmstripSummary, type PassFrame } from '../utils/steps.ts';
 
 interface PassFilmstripProps {
   toolId: string;
@@ -18,10 +19,14 @@ interface PassFilmstripProps {
   onOpen?: (item: EvidenceItem, imageUrl: string) => void;
   /** Only the line in words (the end frame keeps the site the agent did not follow this way): no frames, no chip loads. */
   summaryOnly?: boolean;
+  /** The frames without their line in words: the record timeline above says it (the followed site). */
+  noSummary?: boolean;
 }
 
-export function PassFilmstrip({ toolId, frames, onOpen, summaryOnly = false }: PassFilmstripProps) {
+export function PassFilmstrip({ toolId, frames: all, onOpen, summaryOnly = false, noSummary = false }: PassFilmstripProps) {
   const [images, setImages] = useState<Record<string, string>>({});
+  // The newest frames are the evidence one press away; the line in words counts every pass read.
+  const frames = all.slice(0, FILM_FRAMES);
 
   useEffect(() => {
     if (summaryOnly) return;
@@ -37,15 +42,15 @@ export function PassFilmstrip({ toolId, frames, onOpen, summaryOnly = false }: P
       });
     });
     return () => { cancelled = true; };
-    // `frames` is the identity to watch; `images` is only read to skip work already done.
+    // `all` is the identity to watch; `images` is only read to skip work already done.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frames, summaryOnly]);
+  }, [all, summaryOnly]);
 
-  if (frames.length === 0) return null;
+  if (all.length === 0) return null;
   if (summaryOnly) {
     return (
       <div className="pass-film">
-        <p className="pass-film__summary">{filmstripSummary(frames)}</p>
+        <p className="pass-film__summary">{filmstripSummary(all)}</p>
       </div>
     );
   }
@@ -68,7 +73,7 @@ export function PassFilmstrip({ toolId, frames, onOpen, summaryOnly = false }: P
 
   return (
     <div className="pass-film">
-      <ul className="pass-film__frames" aria-label="Recent EMIT passes, newest first">
+      <ul className="pass-film__frames" aria-label={all.length > frames.length ? `The newest ${frames.length} of ${all.length} EMIT passes read, newest first` : 'Recent EMIT passes, newest first'}>
         {frames.map((f, i) => {
           const label = `${f.date}: ${f.short}`;
           const imageUrl = f.chipUrl ? images[f.chipUrl] : undefined;
@@ -91,7 +96,7 @@ export function PassFilmstrip({ toolId, frames, onOpen, summaryOnly = false }: P
           );
         })}
       </ul>
-      <p className="pass-film__summary">{filmstripSummary(frames)}</p>
+      {!noSummary && <p className="pass-film__summary">{filmstripSummary(all)}</p>}
     </div>
   );
 }

@@ -4,7 +4,6 @@
  * which reads the draft from S3, so nothing model-written in the answer reaches the card.
  */
 import type { Message, ToolCall } from '../types.ts';
-import { formatDate } from './layerFormatting.ts';
 import { cueTally, type PassFrame, type Tip } from './steps.ts';
 
 const DRAFT_ID = /draft `(brief-\d{8}T\d{6}-[0-9a-f]{6})`/g;
@@ -37,25 +36,6 @@ export function siteCue(cues: ToolCall[], lat: number, lon: number): ToolCall | 
 /** The TROPOMI tip whose top hotspot is the card's site, or null. */
 export function siteTip(tips: Tip[], lat: number, lon: number): Tip | null {
   return tips.find((t) => t.point && sameSite(t.point[1], t.point[0], lat, lon)) ?? null;
-}
-
-export interface LastLook {
-  /** The newest EMIT pass in the site's manifest, as the stage writes dates ("Aug 20 2025"). */
-  lastLook: string;
-  /** The TROPOMI tip over the site: its window in days and its last day ("Oct 10 2026"). */
-  tropomi: { days: number; end: string } | null;
-}
-
-/**
- * The card's last-look line, from the tools' own records only (the pass manifest and the tip
- * manifest, never the draft's model-written observations). Null without a pass to date.
- */
-export function lastLookLine(frames: PassFrame[] | null | undefined, tip?: Tip | null): LastLook | null {
-  const dates = (frames ?? []).map((f) => f.date).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
-  const newest = dates[dates.length - 1];
-  if (!newest) return null;
-  const tropomi = tip && tip.days !== null && tip.end ? { days: tip.days, end: formatDate(tip.end) } : null;
-  return { lastLook: formatDate(newest), tropomi };
 }
 
 /** The ground checks a mission can run before it drafts (the plan's Check stage). */

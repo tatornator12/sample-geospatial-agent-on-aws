@@ -1,9 +1,10 @@
 /**
- * The brief card says when EMIT last looked at the site, and the latest sign over it (A2 P0-2): from
- * the cue's pass manifest and the TROPOMI tip on the card's site, never from the draft's words.
+ * The brief card says the gap once (approved 2026-10-23): the latest fine-scale confirmation, how long
+ * before the tip, and the agent's recommendation, worded by the stage from the draft's validated enums
+ * and dates, never from the draft's words. The chain still reads the cue's pass manifest and the tip.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ToolCall } from '../types.ts';
 vi.mock('../services/api.ts', () => ({
   getBrief: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock('../services/api.ts', () => ({
 import { BriefCard } from './BriefCard.tsx';
 import { getBrief, loadGeometry, type BriefState } from '../services/api.ts';
 import { parseTip, type Tip } from '../utils/steps.ts';
+import type { BriefDecision } from '../utils/record.ts';
 
 const ID = 'brief-20261012T164527-99f772';
 const DIR = 's3://bucket/use-cases/methane-watch-mission/';
@@ -71,42 +73,50 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe('BriefCard last look', () => {
-  it("puts EMIT's last look and the TROPOMI sign after the count, above the verdict", async () => {
+// Shanxi on the Oct 21 board: Carbon Mapper on 2026-06-10, 118 days before the tip's first day.
+const DECISION: BriefDecision = {
+  recommendation: 'recommend_new_look', reason: 'confirmation_older_than_90_days',
+  latestConfirmed: { date: '2026-06-10', by: 'carbon_mapper' }, daysBetween: 118, reference: 'tip',
+  lastLook: { date: '2026-08-17', result: 'clouded_out' }, confirmedDates: 9,
+};
+const withDecision = (decision: BriefDecision | undefined) =>
+  vi.mocked(getBrief).mockResolvedValue({ ...STATE, card: { ...STATE.card, ...(decision ? { decision } : {}) } });
+
+describe('BriefCard decision line', () => {
+  it('says the gap once, in its own line under the count, above the verdict', async () => {
+    withDecision(DECISION);
     card();
-    const look = await screen.findByText(/Last EMIT look/);
-    expect(look.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Last EMIT look Aug 20 2025. Latest sign: TROPOMI, 14 days to Oct 10 2026 (about 4 km cells).'
+    const line = await screen.findByText(/latest fine-scale confirmation/);
+    expect(line.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Methane keeps showing up here. The latest fine-scale confirmation is a Carbon Mapper plume on 10 Jun 2026, ' +
+        'about 4 months before the tip. The agent recommends a new fine-scale look.'
     );
-    // Dates and numbers in the mono register, as the count has them.
-    expect(Array.from(look.querySelectorAll('.brief-card__num')).map((s) => s.textContent)).toEqual(['Aug 20 2025', '14', 'Oct 10 2026', '4']);
-    // It runs on in the count's paragraph (one line fewer, so the decision stays on the first screen).
-    expect(lineText()[0]).toBe(
-      '2 of 4 passes read since 2025-01-01 are candidates; EMIT looked 23 times in all. ' +
-        'Last EMIT look Aug 20 2025. Latest sign: TROPOMI, 14 days to Oct 10 2026 (about 4 km cells).'
-    );
-    expect(look.compareDocumentPosition(document.querySelector('.brief-card__verdict')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(vi.mocked(loadGeometry)).toHaveBeenCalledWith(MANIFEST);
+    expect(line.className).toContain('brief-card__decision');
+    expect(Array.from(line.querySelectorAll('.brief-card__num')).map((s) => s.textContent)).toEqual(['10 Jun 2026']);
+    // The count's paragraph no longer carries a last look (the gap is said once, here).
+    expect(lineText()[0]).toBe('2 of 4 passes read since 2025-01-01 are candidates; EMIT looked 23 times in all.');
+    expect(screen.queryByText(/Last EMIT look/)).toBeNull();
+    expect(line.compareDocumentPosition(document.querySelector('.brief-card__verdict')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Never confused with the analyst's "Request another look": the stage says "a new fine-scale look".
+    expect(line.textContent).not.toMatch(/another look/);
   });
 
-  it('says the last look alone when no tip is over the site', async () => {
-    card({ tips: [] });
-    const look = await screen.findByText(/Last EMIT look/);
-    expect(look.textContent?.replace(/\s+/g, ' ').trim()).toBe('Last EMIT look Aug 20 2025.');
+  it('words each reason from the enums, and "has shown up here before" under 3 confirmed dates', async () => {
+    withDecision({ ...DECISION, reason: 'last_look_clouded_out', confirmedDates: 2 });
+    card();
+    const line = await screen.findByText(/latest fine-scale confirmation/);
+    expect(line.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Methane has shown up here before. The latest fine-scale confirmation is a Carbon Mapper plume on 10 Jun 2026, ' +
+        "about 4 months before the tip. EMIT's last look, on 17 Aug 2026, was clouded out. The agent recommends a new fine-scale look."
+    );
   });
 
-  it('has no line when no cue is on the site, or its manifest is not there', async () => {
-    card({ cues: [cue('c2', 35.5528, 112.6889)] });
+  it('has no line on a draft without a decision (drafts made before it)', async () => {
+    withDecision(undefined);
+    card();
     await screen.findByText(/Recurring methane near Krasnovodsk/);
     await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByText(/Last EMIT look/)).toBeNull();
-    expect(vi.mocked(loadGeometry)).not.toHaveBeenCalled();
-    cleanup();
-
-    card({ methaneDir: null });
-    await screen.findByText(/Recurring methane near Krasnovodsk/);
-    await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByText(/Last EMIT look/)).toBeNull();
+    expect(document.querySelector('.brief-card__decision')).toBeNull();
   });
 });
 
@@ -115,7 +125,7 @@ describe('BriefCard chain (B15, A2 P1-2)', () => {
 
   it('opens the card with tip, cue, check and brief, from the records', async () => {
     card({ checks: 3 });
-    await screen.findByText(/Last EMIT look/);
+    await waitFor(() => expect(chainText()).toContain('Cue'));
     const section = document.querySelector('.brief-card')!;
     expect(section.firstElementChild?.className).toBe('brief-card__chain');
     expect(chainText()).toBe('Tip South Caspian, Turkmenistan +108.8 ppb → Cue 2 of 4 passes → Check 3 records → Brief');
@@ -124,7 +134,7 @@ describe('BriefCard chain (B15, A2 P1-2)', () => {
 
   it('leaves out a part with no record', async () => {
     render(<BriefCard briefId={ID} sessionId="s" caseId="methane-watch-mission" busy={false} onDecision={() => {}} methaneDir={DIR} cues={CUES} tips={[]} />);
-    await screen.findByText(/Last EMIT look/);
+    await waitFor(() => expect(chainText()).toContain('Cue'));
     expect(chainText()).toBe('Cue 2 of 4 passes → Brief');
   });
 });
@@ -141,7 +151,7 @@ describe('BriefCard independent detections', () => {
 
   it('shows no heading when the draft carries no line', async () => {
     card();
-    await screen.findByText(/Last EMIT look/);
+    await screen.findByText(/Recurring methane near Krasnovodsk/);
     expect(screen.queryByText('Independent detections')).toBeNull();
   });
 });

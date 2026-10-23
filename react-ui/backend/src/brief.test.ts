@@ -160,6 +160,47 @@ describe('briefCard independent detections', () => {
   });
 });
 
+describe('briefCard decision (approved 2026-10-23)', () => {
+  const record = {
+    tip_start: '2026-10-06', tip_end: '2026-10-20', reference: 'tip',
+    latest_confirmed: { date: '2026-06-10', by: 'carbon_mapper' }, days_between: 118,
+    last_look: { date: '2026-08-17', result: 'clouded_out' }, confirmed_dates: 9,
+  };
+  const withDecision = (b: Record<string, unknown>) => briefCard(draft({}, b), BID, SID);
+
+  it('carries the validated enums, dates and counts only', () => {
+    const card = withDecision({ recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days', record });
+    assert.deepEqual(card?.decision, {
+      recommendation: 'recommend_new_look', reason: 'confirmation_older_than_90_days',
+      latestConfirmed: { date: '2026-06-10', by: 'carbon_mapper' }, daysBetween: 118, reference: 'tip',
+      lastLook: { date: '2026-08-17', result: 'clouded_out' }, confirmedDates: 9,
+    });
+    const none = withDecision({ recommendation: 'recommend_new_look', recommendation_reason: 'no_confirmation_on_record',
+      record: { ...record, latest_confirmed: null, days_between: null, last_look: null, confirmed_dates: 0 } });
+    assert.equal(none?.decision?.latestConfirmed, null);
+    assert.equal(none?.decision?.lastLook, null);
+  });
+
+  it('drops a decision whose enums disagree or whose record is malformed, and keeps the card', () => {
+    const bad: Array<Record<string, unknown>> = [
+      { recommendation: 'no_new_look_needed', recommendation_reason: 'confirmation_older_than_90_days', record },
+      { recommendation: 'maybe', recommendation_reason: 'confirmation_older_than_90_days', record },
+      { recommendation: 'recommend_new_look', recommendation_reason: '<b>old</b>', record },
+      { recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days' },
+      { recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days', record: { ...record, latest_confirmed: { date: 'June', by: 'carbon_mapper' } } },
+      { recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days', record: { ...record, latest_confirmed: { date: '2026-06-10', by: 'a satellite' } } },
+      { recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days', record: { ...record, days_between: 'many' } },
+      { recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days', record: { ...record, last_look: { date: '2026-08-17', result: 'leaking' } } },
+      { recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days', record: { ...record, reference: 'now' } },
+    ];
+    for (const b of bad) {
+      const card = withDecision(b);
+      assert.ok(card, 'the card itself still shows');
+      assert.equal(card?.decision, undefined);
+    }
+  });
+});
+
 describe('fileRefusal', () => {
   it('files only a draft of this session', () => {
     assert.equal(fileRefusal(draft(), BID, SID), null);

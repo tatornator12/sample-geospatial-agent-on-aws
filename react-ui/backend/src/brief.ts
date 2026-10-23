@@ -70,6 +70,72 @@ export interface BriefCard {
   nextCollection?: string;
   /** Carbon Mapper's independent detections at the site: the tool's sentence, with its source. */
   independent?: string;
+  /** The agent's decision on a new fine-scale look and the record's facts behind it: validated enums,
+   *  dates and counts only (the stage words them; no model text). Absent on drafts made before it. */
+  decision?: BriefDecision;
+}
+
+const RECOMMENDS: Record<string, 'recommend_new_look' | 'no_new_look_needed'> = {
+  confirmation_older_than_90_days: 'recommend_new_look',
+  no_confirmation_on_record: 'recommend_new_look',
+  last_look_clouded_out: 'recommend_new_look',
+  confirmed_within_90_days: 'no_new_look_needed',
+};
+const CONFIRMED_BY = ['emit', 'carbon_mapper', 'both'] as const;
+const LOOK_RESULTS = ['methane_seen', 'too_faint', 'within_noise', 'clouded_out', 'not_read'] as const;
+
+export interface BriefDecision {
+  recommendation: 'recommend_new_look' | 'no_new_look_needed';
+  reason: 'confirmation_older_than_90_days' | 'no_confirmation_on_record' | 'last_look_clouded_out' | 'confirmed_within_90_days';
+  latestConfirmed: { date: string; by: (typeof CONFIRMED_BY)[number] } | null;
+  daysBetween: number | null;
+  reference: 'tip' | 'brief';
+  lastLook: { date: string; result: (typeof LOOK_RESULTS)[number] } | null;
+  confirmedDates: number;
+}
+
+function isoDay(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d ? value : null;
+}
+
+/** The draft's decision, field by field; null when any part is malformed or the two enums disagree. */
+export function briefDecision(b: Record<string, unknown>): BriefDecision | null {
+  const recommendation = b.recommendation;
+  const reason = b.recommendation_reason;
+  if (typeof reason !== 'string' || !(reason in RECOMMENDS) || RECOMMENDS[reason] !== recommendation) return null;
+  const r = b.record;
+  if (!r || typeof r !== 'object') return null;
+  const rec = r as Record<string, unknown>;
+  const reference = rec.reference === 'tip' || rec.reference === 'brief' ? rec.reference : null;
+  const confirmedDates = count(rec.confirmed_dates);
+  if (!reference || confirmedDates === null || confirmedDates > 1000) return null;
+  let latestConfirmed: BriefDecision['latestConfirmed'] = null;
+  let daysBetween: number | null = null;
+  if (rec.latest_confirmed !== null && rec.latest_confirmed !== undefined) {
+    const lc = rec.latest_confirmed as Record<string, unknown>;
+    const date = isoDay(lc?.date);
+    const by = (CONFIRMED_BY as readonly unknown[]).includes(lc?.by) ? (lc.by as (typeof CONFIRMED_BY)[number]) : null;
+    const days = rec.days_between;
+    if (!date || !by || typeof days !== 'number' || !Number.isInteger(days) || Math.abs(days) > 100_000) return null;
+    latestConfirmed = { date, by };
+    daysBetween = days;
+  }
+  let lastLook: BriefDecision['lastLook'] = null;
+  if (rec.last_look !== null && rec.last_look !== undefined) {
+    const ll = rec.last_look as Record<string, unknown>;
+    const date = isoDay(ll?.date);
+    const result = (LOOK_RESULTS as readonly unknown[]).includes(ll?.result) ? (ll.result as (typeof LOOK_RESULTS)[number]) : null;
+    if (!date || !result) return null;
+    lastLook = { date, result };
+  }
+  return {
+    recommendation: recommendation as BriefDecision['recommendation'],
+    reason: reason as BriefDecision['reason'],
+    latestConfirmed, daysBetween, reference, lastLook, confirmedDates,
+  };
 }
 
 /** Carbon Mapper's licence asks for its source wherever its data shows: a line without it is not shown. */
@@ -137,6 +203,7 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
   const cm = ((b.checks ?? {}) as Record<string, unknown>).carbon_mapper as { line?: unknown } | undefined;
   const cmLine = checkLine(cm?.line);
   const independent = cmLine && cmLine.startsWith('Carbon Mapper ') && cmLine.endsWith(`${CARBON_MAPPER_SOURCE}.`) ? cmLine : null;
+  const decision = briefDecision(b as Record<string, unknown>);
   return {
     briefId,
     title,
@@ -166,6 +233,7 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     gaps,
     ...(nextCollection ? { nextCollection } : {}),
     ...(independent ? { independent } : {}),
+    ...(decision ? { decision } : {}),
   };
 }
 
