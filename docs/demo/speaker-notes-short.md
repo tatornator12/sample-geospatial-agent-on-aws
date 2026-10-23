@@ -132,11 +132,11 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 
 **Beats**
 1. **Click "Who is there without broadcasting, and where next?".** Point at the board: "It chose the radar pass, and told us why."
-2. When the route lines fade and the dots stop moving: "These dots are the ships' broadcasts, each placed where that ship was at the minute the radar passed. Those are what it compares with the radar."
+2. When the route lines fade and the dots stop moving: "These dots are the ships' broadcasts, each placed where that ship was at the minute the radar passed. Those are what it compares with the radar." The dots stay on the map to the end, fainter once the forecast is up, and the key on the right names each mark.
 3. "First it checks where broadcasts could be received at all. Silence only means something there." Point at "can check 19%".
 4. "These four are radar targets in water where broadcasts were being received, but with no broadcast of their own: a reason to look."
 5. "Where to look next: its forecast has a measured record, and the satellite's next pass over each box." Point at the boxes.
-6. **As the officer:** "The agent drafts; it never files." Choose the box, press "Approve the tasking", and point at the Slack post on the second screen.
+6. **As the officer:** "The agent drafts; it never files." The plate opens under the key, so the room can still read what each ring is. Choose the box, press "Approve the tasking", and point at the Slack post on the second screen.
 
 *If someone asks how the broadcasts line up with the radar:* "The radar is one snapshot, 00:18 UTC on 12 October. Broadcasts come from Global Fishing Watch as one position per ship per hour. For each ship the agent takes the position before and after, and places it where it would have been at 00:18. Where Global Fishing Watch's own radar also saw the ship, its match against the full broadcast record decides whether that ship was broadcasting; for targets only our detector saw, a dot within a kilometre decides. The 'can check' figure counts water where at least two ships were picked up within 30 kilometres in an hour, in the three hours either side of the pass. The limit is speed: at ten knots a ship covers about 18 kilometres an hour, so a dot can be a few kilometres out." Short version for the room: "lined up to the minute of the radar pass; a dot can be a few kilometres out, so it leans on Global Fishing Watch's own match."
 

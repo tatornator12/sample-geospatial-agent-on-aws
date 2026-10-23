@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, useMemo } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../utils/maplibreWorker.ts';
@@ -89,10 +90,12 @@ import {
 import {
   ATTRIBUTION as SEA_ATTRIBUTION,
   FLEET_VIEW,
+  aisKeyRow,
   aisLook,
   beatFor,
   boxCheckOf,
   coverageFacts,
+  coverageKeyRows,
   featureBounds,
   filedFacts,
   forecastPass,
@@ -111,19 +114,31 @@ import {
   revealBeat,
   seaPadding,
   targetCounts,
+  targetKeyRows,
   toggled,
   vesselGeometryHint,
   vesselKind,
   vesselRasterHint,
   type SeaBeat,
   type SeaFacts,
+  type SeaKeyRow,
   type VesselKind,
   type VesselRest,
 } from '../utils/vesselLayers.ts';
 import * as sea from './seaStage.ts';
 import { SeaClock } from './SeaClock.tsx';
 import { TaskingPlate } from './TaskingPlate.tsx';
-import { globeZoom, stagePadding } from '../utils/stageLayout.ts';
+import {
+  TASKING_GAP,
+  TASKING_MIN_BODY,
+  TASKING_PLATE_WIDTH,
+  globeZoom,
+  stagePadding,
+  taskingLeftOverhang,
+  taskingPlateWidth,
+  taskingSlot,
+  type TaskingSlot,
+} from '../utils/stageLayout.ts';
 import { cameraForStage, fitStage, NO_PADDING, pointBox, releasePadding } from '../utils/stageCamera.ts';
 import { fitPitched, labelPerspective, sizeAtLeast, type Camera } from '../utils/restCamera.ts';
 import { cursorWords, heightAt, nearestAlong, pointAlong, profileFromFeatures, type ProfileData } from '../utils/profileSection.ts';
@@ -556,6 +571,14 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   const [taskExcluded, setTaskExcluded] = useState<string[]>([]);
   const [taskingDismissed, setTaskingDismissed] = useState(0);
   const taskingOn = seaOn && !!tasking && tasking.key > 0 && taskingDismissed !== tasking.key;
+  // Where the tasking plate stands (measured: under the map key on the right, or over the finished
+  // steps on the left), and what it is measured against. It renders in the stage's overlay, the
+  // layer above the step column, so it can stand in the column's slot where the right is too short.
+  const frameRef = useRef<HTMLDivElement>(null);
+  const layersRef = useRef<HTMLElement>(null);
+  const taskingRef = useRef<HTMLElement>(null);
+  const [overlayEl, setOverlayEl] = useState<HTMLElement | null>(null);
+  const [taskingPlace, setTaskingPlace] = useState<TaskingSlot | null>(null);
 
   const seaLater = (fn: () => void, ms: number) => {
     seaTimers.current.push(setTimeout(fn, ms));
@@ -983,8 +1006,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     });
   }, [seaBeat, stagePass, vesselRest, seaOn, mapLive]);
 
-  // The tasking: the draft loaded (the beat, the officer's starting choice), the plate replaces the
-  // layers plate's body while it is up.
+  // The tasking: the draft loaded (the beat, the officer's starting choice). The layers plate folds
+  // its list while the plate is up; its map key stays, and the plate stands under it.
   const onTaskingLoaded = (state: TaskingState) => {
     recordedDraft.current = state.status === 'replay';
     setTaskingState(state);
@@ -1023,8 +1046,13 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     ];
     const b = featureBounds(feats);
     // A candidate's label runs about 130 px to one side of its ring, either side: room for it on
-    // both, so no label ends under the step column or the plate.
-    if (b) seaFit(m, b, { maxZoom: 9, extra: { left: 130, right: 140 } });
+    // both, so no label ends under the step column or the plate. On a screen where the plate may
+    // stand over the step column, the frame also clears the plate's reach past the column.
+    // On a wide screen the right column widens while the plate is up (taskingPlateWidth): the frame
+    // keeps that much more clear on the right too.
+    const vw = typeof window === 'undefined' ? 1920 : window.innerWidth;
+    const wider = taskingPlateWidth(vw) - TASKING_PLATE_WIDTH;
+    if (b) seaFit(m, b, { maxZoom: 9, extra: { left: 130 + taskingLeftOverhang(vw), right: 140 + wider } });
   };
   // The latest render's framer, for the effect below (it reads the sea files, which live in refs).
   const frameTaskingRef = useRef(frameTasking);
@@ -1042,6 +1070,88 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     setTaskingState(null);
     setTaskExcluded([]);
   }, [tasking?.key]);
+
+  // The plate's place in the stage's overlay (the layer the step column and the console live in):
+  // its own first child, so the plate comes before the steps and the console in the tab order.
+  useEffect(() => {
+    const overlay = frameRef.current?.closest('.stage')?.querySelector<HTMLElement>('.stage__overlay');
+    if (!overlay) return;
+    const slot = document.createElement('div');
+    slot.className = 'stage__tasking';
+    overlay.prepend(slot);
+    setOverlayEl(slot);
+    return () => {
+      slot.remove();
+      setOverlayEl(null);
+    };
+  }, []);
+
+  // Over the step column the plate takes the column's place: the finished steps under it are hidden
+  // and out of the tab order and the reading order (inert) until the plate moves or goes.
+  useEffect(() => {
+    const steps = document.querySelector<HTMLElement>('.stage-steps');
+    if (!steps || !taskingOn || taskingPlace?.side !== 'left') return;
+    steps.inert = true;
+    steps.style.visibility = 'hidden';
+    return () => {
+      steps.inert = false;
+      steps.style.visibility = '';
+    };
+  }, [taskingOn, taskingPlace?.side]);
+
+  // The plate's place, measured whenever the plate, the key or the stage changes size: under the
+  // key on the right where it is usable there, else in the step column's slot (stageLayout.taskingSlot).
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!taskingOn || !frame) {
+      setTaskingPlace(null);
+      return;
+    }
+    // A part's height and its own margins; the foot's top margin is left out (on the left it is
+    // `auto`, the slot's free space, which is not something the plate needs).
+    const outer = (el: Element) => {
+      const cs = getComputedStyle(el);
+      const top = el.classList.contains('tasking-plate__foot') ? 0 : parseFloat(cs.marginTop || '0');
+      return (el as HTMLElement).offsetHeight + top + parseFloat(cs.marginBottom || '0');
+    };
+    const place = () => {
+      const plate = taskingRef.current;
+      if (!plate) return;
+      const f = frame.getBoundingClientRect();
+      const body = plate.querySelector<HTMLElement>('.tasking-plate__body');
+      const cs = getComputedStyle(plate);
+      const chrome = [cs.paddingTop, cs.paddingBottom, cs.borderTopWidth, cs.borderBottomWidth].reduce((s, v) => s + (parseFloat(v) || 0), 0);
+      // The head and the foot never scroll; the choices between them do.
+      const fixed = chrome + [...plate.children].filter((c) => c !== body).reduce((s, c) => s + outer(c), 0);
+      const need = fixed + (body ? body.scrollHeight : 0);
+      const min = fixed + (body ? Math.min(TASKING_MIN_BODY, body.scrollHeight) : 0);
+      const layers = layersRef.current?.getBoundingClientRect();
+      const docent = document.querySelector('.stage-docent')?.getBoundingClientRect();
+      const basemap = frame.querySelector('.map-basemap')?.getBoundingClientRect();
+      const rail = frame.querySelector('.map-rail')?.getBoundingClientRect();
+      const width = plate.offsetWidth;
+      // The console stands under a column when the two overlap side to side (narrow screens).
+      const under = (x0: number, x1: number) =>
+        !!docent && docent.height > 0 && docent.left - f.left < x1 + 16 && docent.right - f.left > x0 - 16;
+      const consoleFloor = docent ? docent.top - f.top - 16 : Infinity;
+      const rightFloor = Math.min(
+        basemap && basemap.height > 0 ? basemap.top - f.top - TASKING_GAP : f.height - 76,
+        under(f.width - 16 - width, f.width - 16) ? consoleFloor : Infinity,
+      );
+      const leftFloor = Math.min(rail && rail.height > 0 ? rail.top - f.top - 16 : f.height - 16, under(16, 16 + width) ? consoleFloor : Infinity);
+      const slot = taskingSlot({ keyBottom: layers ? layers.bottom - f.top : 0, rightFloor, leftFloor, need, min });
+      setTaskingPlace((p) => (p && slot && p.side === slot.side && p.top === slot.top && p.maxHeight === slot.maxHeight && p.scrolls === slot.scrolls ? p : slot));
+    };
+    place();
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
+    [frame, layersRef.current, taskingRef.current, taskingRef.current?.querySelector('.tasking-plate__body')]
+      .forEach((el) => el && ro?.observe(el));
+    window.addEventListener('resize', place);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', place);
+    };
+  }, [taskingOn, tasking?.key, taskingState, isLayerControlOpen, overlayEl, allLayers.length]);
 
   // The officer's choice on the map.
   useEffect(() => {
@@ -3536,6 +3646,21 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     ice: 'dark navy to pale cyan',
     viridis: 'dark violet to yellow-green',
   };
+  // Dark Vessels' keys: one row per mark, its icon drawn as the map draws it (stage.css .sea-key--*).
+  const seaKeyList = (key: string, label: string, rows: readonly SeaKeyRow[]) => (
+    <ul key={key} className="map-legend map-legend--key" aria-label={label}>
+      {rows.map((r) => (
+        <li key={r.icon}>
+          <span className={`sea-key ${r.icon}`} aria-hidden="true" />
+          <span className="map-legend__label">{r.words}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  // The ships' dots in the key while the dots held at the radar minute are on the map (the same
+  // rule as their paint: no row over the replay's loop, another pass or the spares).
+  const earlierPassOnStage = !!stagePass && !!vesselRest && stagePass !== vesselRest.pass.pass_id;
+  const aisRow = seaOn ? aisKeyRow(seaBeat, earlierPassOnStage) : null;
   const renderLegend = (lg: StackLegend) => {
     if (lg.kind === 'index') {
       return (
@@ -3630,31 +3755,17 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       );
     }
     if (lg.kind === 'vessels') {
-      // Dark Vessels' targets by shape and words, never by colour alone. "Candidate" joins the key
-      // only once the stage has called one: nothing is called dark before the coverage check.
-      return (
-        <ul key={lg.key} className="map-legend map-legend--key" aria-label="Radar targets key">
-          <li><span className="sea-key sea-key--ring" aria-hidden="true" /><span className="map-legend__label">{candidatesShown ? 'set aside: reception unknown, or one detector only' : 'radar target, not yet explained'}</span></li>
-          <li><span className="sea-key sea-key--claimed" aria-hidden="true" /><span className="map-legend__label">matched to a ship's AIS</span></li>
-          <li><span className="sea-key sea-key--port" aria-hidden="true" /><span className="map-legend__label">at or near a port</span></li>
-          {candidatesShown && (
-            <li><span className="sea-key sea-key--candidate" aria-hidden="true" /><span className="map-legend__label">candidate: no AIS where AIS was received</span></li>
-          )}
-        </ul>
-      );
+      // Dark Vessels' targets by shape and words, never by colour alone, each icon the mark the map
+      // draws (vesselLayers.targetKeyRows). The ships' dots lead it while they are on the map.
+      // "Candidate" joins the key only once the stage has called one: nothing is called dark before
+      // the coverage check.
+      const rows = targetKeyRows({ revealed: candidatesShown, seenOnce: (seaFacts.counts?.seenOnce ?? 0) > 0, tied: (seaFacts.counts?.tied ?? 0) > 0 });
+      return seaKeyList(lg.key, aisRow ? 'Ships and radar targets key' : 'Radar targets key', aisRow ? [aisRow, ...rows] : rows);
     }
     if (lg.kind === 'coverage') {
-      return (
-        <ul key={lg.key} className="map-legend map-legend--key" aria-label="AIS coverage key">
-          <li><span className="sea-key sea-key--heard" aria-hidden="true" /><span className="map-legend__label">AIS received: other ships came through here in the three hours either side of the pass</span></li>
-          <li><span className="sea-key sea-key--unproven" aria-hidden="true" /><span className="map-legend__label">reception unknown: no AIS here proves nothing</span></li>
-          {/* Both areas lie inside the radar when the coverage carries what the pass can check, so
-              reserve water outside the swath is plain sea, and the key says why (review L6). */}
-          {seaFacts.checkable !== undefined && (
-            <li><span className="sea-key sea-key--outside" aria-hidden="true" /><span className="map-legend__label">outside the radar: not imaged</span></li>
-          )}
-        </ul>
-      );
+      // Both areas lie inside the radar when the coverage carries what the pass can check, so
+      // reserve water outside the swath is plain sea, and the key says why (review L6).
+      return seaKeyList(lg.key, 'AIS coverage key', coverageKeyRows({ outside: seaFacts.checkable !== undefined }));
     }
     if (lg.kind === 'seaheat') {
       return (
@@ -3662,7 +3773,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           <span className="map-legend__name">{lg.label}</span>
           <div className="map-legend__bar" role="img" aria-label={`${lg.label}: from clear, ${lg.low}, to bright, ${lg.high}`}>
             <span className="map-legend__label">{lg.low}</span>
-            <span className="map-legend__ramp" style={{ background: `linear-gradient(90deg, transparent 0%, ${lg.colour} 70%, #e9eef3 100%)` }} aria-hidden="true" />
+            <span className="map-legend__ramp" style={{ background: `linear-gradient(90deg, transparent 0%, ${lg.colour} 70%, ${lg.end} 100%)` }} aria-hidden="true" />
             <span className="map-legend__label">{lg.high}</span>
           </div>
         </div>
@@ -3700,11 +3811,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   };
 
   // The legends: at the plate's foot, outside the scrolling rows, so a short screen never clips a
-  // ramp or its ends (A2 P1-8). Dark Vessels keeps them under its rows, as its act was built.
-  const legendsAtFoot = !vesselOnStage;
-  const legendsBlock = (atFoot: boolean) =>
-    legends.length > 0 || groundOn || restOn ? (
-      <div className={`map-layers__legends${atFoot ? ' map-layers__legends--foot' : ''}`}>
+  // ramp or its ends (A2 P1-8), and Dark Vessels' key is never scrolled away (the list scrolls).
+  // While the tasking plate is up the list folds and the key stays, with the plate under it.
+  const keyStays = taskingOn && vesselOnStage;
+  const aisAlone = !!aisRow && !legends.some((lg) => lg.kind === 'vessels');
+  const legendsBlock = () =>
+    legends.length > 0 || groundOn || restOn || aisAlone ? (
+      <div className="map-layers__legends map-layers__legends--foot">
+        {/* The ships' dots before the radar's targets are on the map (the radar beat). */}
+        {aisRow && aisAlone && seaKeyList('ais', 'Ships key', [aisRow])}
         {legends.map(renderLegend)}
         {restOn && (
           // The rest view says what it is: the continent's relief stood up, lit at dusk.
@@ -3727,7 +3842,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     ) : null;
 
   return (
-    <div className={`map-frame${lightCount > 0 ? ' map-frame--light' : ''}${restOn ? ' map-frame--dusk' : ''}${seaOn ? ' map-frame--sea' : ''}${taskingOn ? ' map-frame--tasking' : ''}`}>
+    <div ref={frameRef} className={`map-frame${lightCount > 0 ? ' map-frame--light' : ''}${restOn ? ' map-frame--dusk' : ''}${seaOn ? ' map-frame--sea' : ''}${taskingOn ? ' map-frame--tasking' : ''}`}>
       {/* Compare overlay */}
       {compareMode && (
         <CompareView
@@ -3753,31 +3868,40 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         </div>
       )}
 
-      {/* Bottom right, Dark Vessels: the officer's decision, in the light plate's slot. */}
-      {taskingOn && tasking && (
-        <TaskingPlate
-          key={tasking.key}
-          sessionId={tasking.sessionId}
-          caseId={tasking.caseId}
-          draftKey={tasking.key}
-          busy={working}
-          box={taskBox}
-          excluded={taskExcluded}
-          onLoaded={onTaskingLoaded}
-          onBox={setTaskBox}
-          onToggle={(id) => setTaskExcluded((x) => toggled(x, id))}
-          // No onFiled: the officer's approval ends the act on the plate's filed line, and the
-          // stage sends no follow-up turn (U4, R6.8).
-          onDismiss={() => {
-            setTaskingDismissed(tasking.key);
-            setSeaBeat('boxes');
-          }}
-        />
-      )}
+      {/* Dark Vessels: the officer's decision, under the map key on the right, or over the finished
+          steps where the right is too short (taskingPlace). It lives in the stage's overlay, above the
+          step column; without one (no stage around the map) it stays in the frame. */}
+      {taskingOn && tasking && (() => {
+        const plate = (
+          <TaskingPlate
+            key={tasking.key}
+            sessionId={tasking.sessionId}
+            caseId={tasking.caseId}
+            draftKey={tasking.key}
+            busy={working}
+            box={taskBox}
+            excluded={taskExcluded}
+            onLoaded={onTaskingLoaded}
+            onBox={setTaskBox}
+            onToggle={(id) => setTaskExcluded((x) => toggled(x, id))}
+            // No onFiled: the officer's approval ends the act on the plate's filed line, and the
+            // stage sends no follow-up turn (U4, R6.8).
+            onDismiss={() => {
+              setTaskingDismissed(tasking.key);
+              setSeaBeat('boxes');
+              // The plate folded the layer list; with the plate gone, the list comes back with its key.
+              setIsLayerControlOpen(true);
+            }}
+            place={taskingPlace}
+            sectionRef={taskingRef}
+          />
+        );
+        return overlayEl ? createPortal(plate, overlayEl) : plate;
+      })()}
 
       {/* Top right: the layers plate */}
       {allLayers.length > 0 && (
-        <section className="map-plate map-layers" aria-label="Map layers">
+        <section ref={layersRef} className="map-plate map-layers" aria-label="Map layers">
           <div className={`map-layers__head${isLayerControlOpen ? ' map-layers__head--open' : ''}`}>
             <button
               type="button"
@@ -3822,7 +3946,6 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
                 </div>
               )}
 
-              {!legendsAtFoot && legendsBlock(false)}
               {comparePair && (
                 <button type="button" className="stage-btn map-group__action" onClick={openCompare}>
                   <Icon name="compare" size={16} />
@@ -3831,9 +3954,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               )}
             </div>
           )}
-          {isLayerControlOpen && legendsAtFoot && legendsBlock(true)}
+          {(isLayerControlOpen || keyStays) && legendsBlock()}
 
-          {isLayerControlOpen && vesselOnStage && (
+          {(isLayerControlOpen || keyStays) && vesselOnStage && (
             // Global Fishing Watch's data (the detections, the AIS, the fleet) is on the map. Its
             // attribution is the plate's foot, outside the scroll, so it stays in view at 720p too.
             <div className="map-layers__foot">
