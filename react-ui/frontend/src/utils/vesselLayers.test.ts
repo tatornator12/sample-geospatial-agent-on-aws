@@ -65,8 +65,11 @@ import {
   vesselKind,
   vesselRasterHint,
   wakes,
+  aisMoves,
+  tierOfType,
   type ReplayTrack,
   type SeaBeat,
+  type SeaTier,
 } from './vesselLayers.ts';
 
 const S = 's3://bucket/session_data/0b6c9a0e-1111-4222-8333-444455556666/vessels/';
@@ -749,6 +752,59 @@ describe('the beats\' paint', () => {
     expect(desc.edge).toBeLessThan(desc.to);
     // Ease out: more than half drawn at half time.
     expect(1000 - asc.from).toBeGreaterThan(500);
+  });
+});
+
+describe('where the ships draw', () => {
+  const SHIPS = ['sea-wakes-faint', 'sea-wakes', 'sea-trail', 'sea-heads'];
+  const REST = ['sea-reserve', 'sea-harbours', 'sea-harbour-names', 'sea-islands'];
+  const TIERS: Record<string, SeaTier> = {
+    't-halo': 'over', 't-fill': 'over', 't-cand': 'over', 't-labels': 'over',
+    'cov-fill': 'under', 'cov-labels': 'over', 'heat-fill': 'under', 'box-wash': 'under', 'box-fill': 'over', 'box-labels': 'over',
+  };
+  const tierOf = (id: string) => TIERS[id];
+  /** The moves as MapLibre's moveLayer makes them: out of the order, in directly beneath `before`. */
+  const apply = (order: readonly string[], moves: Array<[string, string]>) => moves.reduce((o, [id, before]) => {
+    const next = o.filter((x) => x !== id);
+    next.splice(next.indexOf(before), 0, id);
+    return next;
+  }, [...order]);
+
+  it('calls fills and heatmaps areas (under the ships) and every ring, line and word a mark (over them)', () => {
+    expect(tierOfType('fill')).toBe('under');
+    expect(tierOfType('heatmap')).toBe('under');
+    for (const type of ['circle', 'line', 'symbol']) expect(tierOfType(type), type).toBe('over');
+  });
+
+  it('leaves the ships where they were added at rest, directly beneath the furniture over the stack', () => {
+    const rest = ['base', 'sea-seabed', ...SHIPS, ...REST, 'gl-draw'];
+    expect(aisMoves(rest, tierOf, SHIPS, REST)).toEqual([]);
+    expect(aisMoves(['base', 'radar', ...SHIPS, ...REST], tierOf, SHIPS, REST)).toEqual([]);
+    expect(aisMoves(['base', ...REST], tierOf, SHIPS, REST)).toEqual([]);
+  });
+
+  it('takes the ships under every target mark and the areas under the ships, keeping each tier in its order', () => {
+    // As the stack puts it: every file's layers beneath its ceiling, the ships.
+    const stacked = ['base', 'radar', 't-halo', 't-fill', 't-cand', 't-labels', 'cov-fill', 'cov-labels', 'heat-fill',
+      'box-wash', 'box-fill', 'box-labels', ...SHIPS, ...REST, 'gl-draw'];
+    const moves = aisMoves(stacked, tierOf, SHIPS, REST);
+    expect(moves.every(([, before]) => before === 't-halo')).toBe(true);
+    const settled = apply(stacked, moves);
+    expect(settled).toEqual(['base', 'radar', 'cov-fill', 'heat-fill', 'box-wash', ...SHIPS,
+      't-halo', 't-fill', 't-cand', 't-labels', 'cov-labels', 'box-fill', 'box-labels', ...REST, 'gl-draw']);
+    // Settled: nothing more moves, however often it runs.
+    expect(aisMoves(settled, tierOf, SHIPS, REST)).toEqual([]);
+  });
+
+  it('lifts the ships over an area or the radar they sit under, whatever was added first', () => {
+    const under = ['base', ...SHIPS, 'radar', 'cov-fill', 't-halo', 't-cand', ...REST];
+    expect(apply(under, aisMoves(under, tierOf, SHIPS, REST))).toEqual(['base', 'radar', 'cov-fill', ...SHIPS, 't-halo', 't-cand', ...REST]);
+    // A file just added over everything (before the stack takes it in) never takes the ships over the furniture.
+    const fresh = ['base', 'radar', ...SHIPS, ...REST, 'gl-draw', 't-halo', 't-cand'];
+    const settled = apply(fresh, aisMoves(fresh, tierOf, SHIPS, REST));
+    expect(settled.indexOf('sea-heads')).toBeLessThan(settled.indexOf('sea-reserve'));
+    expect(settled.indexOf('sea-heads')).toBeLessThan(settled.indexOf('t-halo'));
+    expect(aisMoves(['base', 't-halo', ...REST], tierOf, SHIPS, REST)).toEqual([]);
   });
 });
 
