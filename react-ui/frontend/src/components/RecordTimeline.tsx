@@ -90,18 +90,18 @@ export function RecordTimeline({ model }: { model: RecordTimelineModel }) {
           <span className="record-timeline__bracket" style={{ left: pct(bracket.from), width: pct(bracket.to - bracket.from) }} />
         </div>
       )}
-      <p className={`record-timeline__gap-words${bracket ? '' : ' record-timeline__gap-words--open'}`}>
-        {latest && bracket ? (
-          <><span className="record-timeline__num">{dayMonthYear(latest.date)}</span> to the tip: {latest.words}</>
-        ) : latest ? (
-          <><span className="record-timeline__num">{dayMonthYear(latest.date)}</span>, inside the tip's window</>
-        ) : (
-          <>No fine-scale confirmation on record</>
-        )}
-      </p>
-      <p className="record-timeline__axis" aria-hidden="true">
-        <span className="record-timeline__num">Jan 2025</span>{' '}
-        <span className="record-timeline__num">{dayMonthYear(model.axisEnd)}</span>
+      {/* The foot: where the axis starts, and the gap in words (the window's end is the band's own). */}
+      <p className="record-timeline__foot">
+        <span className="record-timeline__num record-timeline__start" aria-hidden="true">Jan 2025</span>{' '}
+        <span className="record-timeline__gap-words">
+          {latest && bracket ? (
+            <><span className="record-timeline__num">{dayMonthYear(latest.date)}</span> to the tip: {latest.words}</>
+          ) : latest ? (
+            <><span className="record-timeline__num">{dayMonthYear(latest.date)}</span>, inside the tip's window</>
+          ) : (
+            <>No fine-scale confirmation on record</>
+          )}
+        </span>
       </p>
     </section>
   );

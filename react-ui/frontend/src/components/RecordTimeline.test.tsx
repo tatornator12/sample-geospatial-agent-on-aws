@@ -37,7 +37,7 @@ describe('RecordTimeline', () => {
       'record-timeline__mark--seen', 'record-timeline__mark--seen', 'record-timeline__mark--faint', 'record-timeline__mark--clouded']);
     expect(document.querySelectorAll('.record-timeline__bracket')).toHaveLength(1);
     expect(words(document.querySelector('.record-timeline__gap-words'))).toBe('10 Jun 2026 to the tip: about 4 months');
-    expect(words(document.querySelector('.record-timeline__axis'))).toBe('Jan 2025 21 Oct 2026');
+    expect(words(document.querySelector('.record-timeline__foot'))).toBe('Jan 2025 10 Jun 2026 to the tip: about 4 months');
     // The tracks say it in words for a screen reader.
     expect(rows[1].querySelector('[role="img"]')?.getAttribute('aria-label')).toBe(
       'EMIT looked on 4 days: methane seen on 2, too faint or within noise on 1, clouded out on 1');
