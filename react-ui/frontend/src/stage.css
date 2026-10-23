@@ -451,6 +451,9 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.record-timeline__keep {
+  white-space: nowrap;
+}
 .record-timeline__keys {
   display: inline-flex;
   flex-wrap: wrap;
@@ -562,6 +565,12 @@
   text-align: right;
   color: var(--fog);
 }
+/* Without a bracket the words take their own line, from the left, so nothing is left hanging. */
+.record-timeline__gap-words--open {
+  flex-basis: 100%;
+  margin-left: 0;
+  text-align: left;
+}
 @media (prefers-reduced-motion: reduce) {
   .record-timeline,
   .record-timeline__bracket {
@@ -647,10 +656,7 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-/* The gap, said once: its own paragraph under the counts, its date and its months never broken. */
-.brief-card__decision {
-  margin-top: 6px;
-}
+/* The gap, said once, on in the count's paragraph: its date and its months never broken. */
 .brief-card__decision .brief-card__num,
 .brief-card__gap {
   white-space: nowrap;

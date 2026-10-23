@@ -93,8 +93,11 @@ describe('BriefCard decision line', () => {
     );
     expect(line.className).toContain('brief-card__decision');
     expect(Array.from(line.querySelectorAll('.brief-card__num')).map((s) => s.textContent)).toEqual(['10 Jun 2026']);
-    // The count's paragraph no longer carries a last look (the gap is said once, here).
-    expect(lineText()[0]).toBe('2 of 4 passes read since 2025-01-01 are candidates; EMIT looked 23 times in all.');
+    // It runs on in the count's paragraph (no last look any more: the gap is said once, here), which
+    // keeps the decision on the column's first screen at 720p.
+    expect(lineText()[0]).toBe('2 of 4 passes read since 2025-01-01 are candidates; EMIT looked 23 times in all. ' +
+      'Methane keeps showing up here. The latest fine-scale confirmation is a Carbon Mapper plume on 10 Jun 2026, ' +
+      'about 4 months before the tip. The agent recommends a new fine-scale look.');
     expect(screen.queryByText(/Last EMIT look/)).toBeNull();
     expect(line.compareDocumentPosition(document.querySelector('.brief-card__verdict')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Never confused with the analyst's "Request another look": the stage says "a new fine-scale look".

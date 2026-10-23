@@ -61,7 +61,8 @@ function DecisionText({ decision }: { decision: BriefDecision }) {
   const line = decisionLine(decision);
   const c = line.confirmation;
   return (
-    <p className="brief-card__line brief-card__decision">
+    <span className="brief-card__decision">
+      {' '}
       {line.lead && <>{line.lead} </>}
       {c && (
         <>
@@ -71,7 +72,7 @@ function DecisionText({ decision }: { decision: BriefDecision }) {
         </>
       )}
       {line.recommendation}
-    </p>
+    </span>
   );
 }
 
@@ -248,10 +249,12 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
         <span className="brief-card__num">{card.candidates}</span> of <span className="brief-card__num">{card.passesRead}</span>{' '}
         passes read{card.passesSince ? <> since <span className="brief-card__num">{card.passesSince}</span></> : null} are candidates;
         EMIT looked <span className="brief-card__num">{card.looks}</span> times in all.
+        {/* The gap, said once: the latest fine-scale confirmation, how long before the tip, and what the
+            agent recommends. Worded here from the draft's validated enums and dates, never model text.
+            It runs on in the count's paragraph, which keeps the decision on the column's first screen
+            at 720p too. */}
+        {card.decision && <DecisionText decision={card.decision} />}
       </p>
-      {/* The gap, said once: the latest fine-scale confirmation, how long before the tip, and what the
-          agent recommends. Worded here from the draft's validated enums and dates, never model text. */}
-      {card.decision && <DecisionText decision={card.decision} />}
       {/* The two lines the room restates, at the size it reads from the back. */}
       <dl className="brief-card__verdict">
         <div>

@@ -1,0 +1,36 @@
+**Methane Watch brief: Unconfirmed methane tip near Jincheng City, Shanxi Province, China** (draft `brief-20261023T160345-1836c4`, not filed)
+
+Site: near Jincheng City, Shanxi Province, China (35.5493, 112.8982); tipped by the Shanxi and Ordos coal basins (China) watch area.
+Looks: 0 of 4 passes read since 2025-01-01 are candidates; EMIT looked 11 times in all.
+Record: TROPOMI tipped this site from 2026-10-07 to 2026-10-21; no fine-scale confirmation is on record; EMIT last looked on 2026-04-25 (within noise).
+Recommendation: a new fine-scale look, because no fine-scale confirmation is on record here.
+
+- TROPOMI recorded a 14-day median anomaly of +122.6 ppb above background at this site (2026-10-07 to 2026-10-21), the highest of all nine watch areas scanned.
+- EMIT looked 11 times (2024-02-17 to 2026-04-25); NASA outlined no plume here in the plume product.
+- 4 raw EMIT passes were read since 2025-01-01: 2 rejected within noise (peak 3,501.9 and 2,049.3 ppm·m), 1 too weak (peak 735.6 ppm·m), 1 cloud or gap.
+- Sentinel-2 on 2026-04-04 shows dense urban and industrial fabric with large warehouse-scale structures and bare reddish terrain consistent with the coal-bearing landscape.
+- Check: VIIRS saw no heat source within 1 km over the last 30 nights; flaring was not observed (small or brief flares can be missed).
+- Check: Overture Maps shows within 2 km: 1 pipeline (at the site), 13 industrial areas (0.5 km); nothing mapped for mining, waste, wetland.
+- Check: The public registry (OGIM v3.0) lists no oil and gas facility within 2 km; a registry gap is not evidence of an empty site.
+- Check: The nearest coal mine on Global Energy Monitor's record is Shanxi Changdu Coal Mine (operating), 8.2 km away; owners of record Shanxi Jinmei Group Zezhou Tian'an Changdu Coal Industry Co Ltd (100%); 1 other mine on its record within 10 km.
+- Independent detections: Carbon Mapper lists no methane plume within 7 km since 2025-01-01. Source: Carbon Mapper (data.carbonmapper.org).
+
+| Hypothesis (unconfirmed) | Assessment | What would confirm or rule it out |
+|---|---|---|
+| Routine venting | possible | A confirmed EMIT plume on a new pass with no concurrent heat would support venting as a hypothesis. |
+| Equipment failure or leak | possible | A new EMIT pass with a confirmed plume and no prior heat would be consistent with an undetected leak. |
+| Unlit or malfunctioning flare | cannot assess | VIIRS saw no heat over 30 nights; a mapped flare stack nearby would be needed to assess this hypothesis. |
+| Non-oil-and-gas source (landfill, coal, agriculture) | possible | A new EMIT pass coinciding with coal mine ventilation schedules would help distinguish coal from pipeline sources. |
+| Maintenance blowdown | possible | A short-duration EMIT plume on a single date with no repeat would be consistent with a blowdown. |
+
+Confidence that methane recurs at this site: low. Confidence in any single explanation: low without a ground or aircraft check.
+Gaps: NASA's plume product is nearly empty after 2025-09-22; passes after that date have not been checked for outlined plumes. EMIT only sees this site on its orbital passes; gaps between passes leave days to weeks unobserved. The public registry lists no oil and gas facility within 2 km; a registry gap is not evidence of an empty site. Carbon Mapper lists no plume within 7 km since 2025-01-01, but its publication lag is about 30 days.
+Next collection: A new targeted EMIT pass or Tanager-1 overpass over this site would determine whether the TROPOMI anomaly corresponds to a point-source plume.
+
+Status: DRAFT, awaiting the analyst's decision.
+
+EMIT detects methane enhancement above background; it does not identify the source, and I cannot confirm an emitter from this data alone.
+
+Decision: analyst's.
+
+Near Jincheng City, Shanxi Province, China: methane on 0 of 4 EMIT passes read since 2025-01-01; EMIT last looked here on 2026-04-25. EMIT sees the methane, not its source.

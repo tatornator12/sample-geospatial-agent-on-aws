@@ -69,7 +69,10 @@ export function RecordTimeline({ model }: { model: RecordTimelineModel }) {
 
       <div className="record-timeline__row" data-row="carbon_mapper">
         <p className="record-timeline__label">
-          Carbon Mapper <span className="record-timeline__note">plumes within <span className="record-timeline__num">7</span> km</span>
+          Carbon Mapper{' '}
+          <span className="record-timeline__note">
+            plumes within <span className="record-timeline__keep"><span className="record-timeline__num">7</span> km</span>
+          </span>
         </p>
         <div
           className="record-timeline__track"
@@ -93,7 +96,7 @@ export function RecordTimeline({ model }: { model: RecordTimelineModel }) {
       {/* The foot: where the axis starts, and the gap in words (the window's end is the band's own). */}
       <p className="record-timeline__foot">
         <span className="record-timeline__num record-timeline__start" aria-hidden="true">Jan 2025</span>{' '}
-        <span className="record-timeline__gap-words">
+        <span className={`record-timeline__gap-words${bracket ? '' : ' record-timeline__gap-words--open'}`}>
           {latest && bracket ? (
             <><span className="record-timeline__num">{dayMonthYear(latest.date)}</span> to the tip: {latest.words}</>
           ) : latest ? (

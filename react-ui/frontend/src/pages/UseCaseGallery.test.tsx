@@ -92,7 +92,7 @@ describe('UseCaseGallery', () => {
   it('still opens the other acts\u2019 cases on their own act', () => {
     expect(open('Permian Basin Methane')).toBe('/?scenario=methane-permian-2024&agent=methane');
     cleanup();
-    expect(open('Methane Watch brief')).toBe('/?scenario=methane-watch-mission&agent=methane');
+    expect(open('Methane Watch brief')).toBe('/?scenario=methane-watch-record&agent=methane');
     cleanup();
     expect(open('Newark Earthworks')).toBe('/?scenario=archaeologist-newark&agent=archaeologist');
     cleanup();
