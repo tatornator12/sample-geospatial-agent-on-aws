@@ -13,7 +13,8 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { approveBrief, getBrief, type BriefState } from '../services/api.ts';
 import type { ToolCall } from '../types.ts';
 import { SNAPSHOT_MAX_CHARS, mapSnapshot } from '../utils/snapshot.ts';
-import { anotherLookMessage, approvedMessage, lastLookLine, missionChain, siteCue, siteTip, type MissionChain } from '../utils/brief.ts';
+import { anotherLookMessage, approvedMessage, missionChain, siteCue, siteTip, type MissionChain } from '../utils/brief.ts';
+import { decisionLine, type BriefDecision } from '../utils/record.ts';
 import { parseManifest, passManifestUrl, type PassFrame, type Tip } from '../utils/steps.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 
@@ -51,6 +52,28 @@ function causeWords(singleExplanation: string): string {
   return singleExplanation === 'low without a ground or aircraft check'
     ? 'unconfirmed until a ground or aircraft check'
     : singleExplanation;
+}
+
+/** The card's line about the gap: "Methane keeps showing up here. The latest fine-scale confirmation is a
+ *  Carbon Mapper plume on 10 Jun 2026, about 4 months before the tip. The agent recommends a new
+ *  fine-scale look." Dates in mono; the months come from the same function as the timeline's bracket. */
+function DecisionText({ decision }: { decision: BriefDecision }) {
+  const line = decisionLine(decision);
+  const c = line.confirmation;
+  return (
+    <span className="brief-card__decision">
+      {' '}
+      {line.lead && <>{line.lead} </>}
+      {c && (
+        <>
+          {c.before}<span className="brief-card__num">{c.date}</span>
+          {c.gap && <>, <span className="brief-card__gap">{c.gap}</span></>}
+          {c.after}{' '}
+        </>
+      )}
+      {line.recommendation}
+    </span>
+  );
 }
 
 /** "Tip … → Cue … → Check … → Brief": the mission in one line, numbers in mono, no part without a record. */
@@ -118,13 +141,12 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
   const [showGaps, setShowGaps] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
 
-  // EMIT's last look at the site and the latest sign over it (P0-2): the pass manifest of the cue
-  // on the card's site and the tip over it, the tools' own records; no line without a manifest.
+  // The pass manifest of the cue on the card's site and the tip over it (the chain's Tip and Cue),
+  // the tools' own records; the gap to the tip is the draft's decision line (DecisionLine below).
   const site = state?.card ?? null;
   const cue = site ? siteCue(cues, site.lat, site.lon) : null;
   const manifestUrl = cue ? passManifestUrl(methaneDir, cue) : null;
   const manifests = useStageFiles<PassFrame[]>(manifestUrl ? [manifestUrl] : [], (raw) => (methaneDir ? parseManifest(raw, methaneDir) : null));
-  const look = site && manifestUrl ? lastLookLine(manifests[manifestUrl], siteTip(tips, site.lat, site.lon)) : null;
   // The chain tip, cue, check, brief (A2 P1-2), from the same records.
   const chain = site
     ? missionChain({ tip: siteTip(tips, site.lat, site.lon), frames: manifestUrl ? manifests[manifestUrl] : null, checks })
@@ -227,19 +249,11 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
         <span className="brief-card__num">{card.candidates}</span> of <span className="brief-card__num">{card.passesRead}</span>{' '}
         passes read{card.passesSince ? <> since <span className="brief-card__num">{card.passesSince}</span></> : null} are candidates;
         EMIT looked <span className="brief-card__num">{card.looks}</span> times in all.
-        {/* When it last looked, so a recurring site is not read as active today. It runs on in the
-            count's paragraph, which keeps the decision on the column's first screen at 720p too. */}
-        {look && (
-          <span className="brief-card__look">
-            {' '}Last EMIT look <span className="brief-card__num">{look.lastLook}</span>.
-            {look.tropomi && (
-              <>
-                {' '}Latest sign: TROPOMI, <span className="brief-card__num">{look.tropomi.days}</span> days to{' '}
-                <span className="brief-card__num">{look.tropomi.end}</span> (about <span className="brief-card__num">4</span> km cells).
-              </>
-            )}
-          </span>
-        )}
+        {/* The gap, said once: the latest fine-scale confirmation, how long before the tip, and what the
+            agent recommends. Worded here from the draft's validated enums and dates, never model text.
+            It runs on in the count's paragraph, which keeps the decision on the column's first screen
+            at 720p too. */}
+        {card.decision && <DecisionText decision={card.decision} />}
       </p>
       {/* The two lines the room restates, at the size it reads from the back. */}
       <dl className="brief-card__verdict">

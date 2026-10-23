@@ -107,6 +107,8 @@ export interface Tip {
   emit: boolean;
   /** The top hotspot, where EMIT is cued. */
   point: [number, number] | null;
+  /** The window's first day with an orbit read (YYYY-MM-DD); null in a manifest written before it was kept. */
+  start: string | null;
   end: string | null;
   days: number | null;
 }
@@ -130,6 +132,7 @@ export function parseTip(raw: unknown, areaName: string): Tip | null {
     validDays: top ? num(top.valid_days, 0, 60) : null,
     emit: r.emit_can_look === true,
     point: lat !== null && lon !== null ? [lon, lat] : null,
+    start: isoDay(r.start),
     end: typeof r.end === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.end) ? r.end : null,
     days: num(r.days, 1, 60),
   };
@@ -147,7 +150,8 @@ export function tipCued(tip: Tip, cues: ToolCall[]): boolean {
   return cues.some((c) => coord(c.params?.lat, 2) === lat.toFixed(2) && coord(c.params?.lon, 2) === lon.toFixed(2));
 }
 
-const SCENE_IN_URL = /(EMIT_L2B_CH4ENH_002_\d{8}T\d{6}_\d{7}_\d{3})/;
+// V002 ids carry the orbit and scene; V003's (EMIT's passes after 2026-08-31) the timestamp only.
+const SCENE_IN_URL = /(EMIT_L2B_CH4ENH_(?:002_\d{8}T\d{6}_\d{7}_\d{3}|003_\d{8}T\d{6}(?![_\d])))/;
 const CM_POINT_IN_URL = /\/cmplumes_(-?\d{1,3}\.\d{4})_(-?\d{1,3}\.\d{4})\.geojson$/;
 
 /**
@@ -173,8 +177,20 @@ export function chosenCue(cues: ToolCall[], framesByCue: Array<PassFrame[] | nul
     const lon = coord(cues[i].params?.lon, 2);
     if (points.some((m) => coord(m[1], 2) === lat && coord(m[2], 2) === lon)) return i;
   }
+  if (points.length > 0) return null;
+  // A site with neither an EMIT candidate nor a Carbon Mapper plume has nothing to put on the map:
+  // the agent follows the stronger tip, and the ground-record checks (and the brief) run at its point only.
+  const at = later.filter((t) => FOLLOW_CHECKS.includes(t.name));
+  for (let i = 0; i < cues.length; i++) {
+    const lat = coord(cues[i].params?.lat, 2);
+    const lon = coord(cues[i].params?.lon, 2);
+    if (at.some((t) => coord(t.params?.lat, 2) === lat && coord(t.params?.lon, 2) === lon)) return i;
+  }
   return null;
 }
+
+/** The calls the agent makes at the followed site only (methane_config W5, W6). */
+const FOLLOW_CHECKS = ['thermal_anomalies', 'nearby_infrastructure', 'registry_lookup', 'draft_brief'];
 
 function coord(value: unknown, digits: number): string | null {
   const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
@@ -296,7 +312,8 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
   }
   if (group.name === 'carbon_mapper_plumes') {
     const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 10);
-    return { text: `Carbon Mapper's public plumes, within ${typeof r === 'number' ? r : 5} km since 2025` };
+    // The tool's default since Oct 23: one TROPOMI footprint (carbon_mapper.CM_RADIUS_KM).
+    return { text: `Carbon Mapper's public plumes, within ${typeof r === 'number' ? r : 7} km since 2025` };
   }
   if (group.name === 'thermal_anomalies') {
     const nights = group.calls.map((c) => c.params?.nights).find((n) => typeof n === 'number' && n >= 1 && n <= 60);
@@ -443,6 +460,33 @@ export interface CmPlumes {
   instrument: CmInstrument | null;
   /** The catalogue could not be read and nothing was cached: the board says so (no numbers, no source). */
   unavailable: boolean;
+  /** Every plume in the record (newest first, at most 60): the record timeline's marks. */
+  dates: CmDate[];
+  /** The follow rule's radius (one TROPOMI footprint); the timeline marks plumes within it. */
+  followRadiusKm: number | null;
+}
+
+export interface CmDate {
+  date: string;
+  instrument: CmInstrument;
+  rateKgH: number | null;
+  distanceKm: number;
+}
+
+/** The record's plumes, field by field: numbers and fixed codes only; a malformed one is dropped. */
+function parseCmDates(raw: unknown): CmDate[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CmDate[] = [];
+  for (const d of raw.slice(0, 60)) {
+    if (!d || typeof d !== 'object') continue;
+    const r = d as Record<string, unknown>;
+    const date = isoDay(r.date);
+    const distanceKm = num(r.distance_km, 0, 10);
+    const instrument = (CM_INSTRUMENTS as readonly unknown[]).includes(r.instrument) ? (r.instrument as CmInstrument) : null;
+    if (!date || distanceKm === null || !instrument) continue;
+    out.push({ date, instrument, rateKgH: num(r.rate_kg_h, 0, 1_000_000), distanceKm });
+  }
+  return out;
 }
 
 /** The record, field by field; null when it is not one (a count or a radius out of range, a bad date). */
@@ -455,7 +499,10 @@ export function parseCmPlumes(raw: unknown): CmPlumes | null {
   const since = isoDay(r.since);
   if (lat === null || lon === null || radiusKm === null || !since) return null;
   if (r.status === 'unavailable') {
-    return { point: [lon, lat], radiusKm, since, count: 0, latest: null, rateKgH: null, instrument: null, unavailable: true };
+    return {
+      point: [lon, lat], radiusKm, since, count: 0, latest: null, rateKgH: null, instrument: null, unavailable: true,
+      dates: [], followRadiusKm: null,
+    };
   }
   const count = typeof r.count === 'number' && Number.isInteger(r.count) && r.count >= 0 && r.count <= 10_000 ? r.count : null;
   if (count === null) return null;
@@ -464,11 +511,11 @@ export function parseCmPlumes(raw: unknown): CmPlumes | null {
   const instrument = (CM_INSTRUMENTS as readonly unknown[]).includes(r.instrument) ? (r.instrument as CmInstrument) : null;
   return {
     point: [lon, lat], radiusKm, since, count, latest, rateKgH: count > 0 ? num(r.rate_kg_h, 0, 1_000_000) : null, instrument,
-    unavailable: false,
+    unavailable: false, dates: parseCmDates(r.dates), followRadiusKm: num(r.follow_radius_km, 0.5, 10),
   };
 }
 
-/** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h"; "Carbon Mapper: no plumes within 5 km". */
+/** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h"; "Carbon Mapper: no plumes within 7 km" (the record's radius). */
 export function cmLineText(c: CmPlumes): string {
   if (c.unavailable) return 'Carbon Mapper: could not be checked';
   if (c.count === 0) return `Carbon Mapper: no plumes within ${c.radiusKm} km`;
@@ -481,6 +528,8 @@ const SHORTS: readonly PassShort[] = ['candidate', 'too weak', 'within noise', '
 
 export interface PassFrame {
   date: string;
+  /** NASA's product version of the scene (EMIT's V002 ended 2026-08-31; later passes are V003). */
+  product?: 'V002' | 'V003' | null;
   verdict: 'candidate' | 'rejected' | 'error';
   short: PassShort;
   reason: string | null;
@@ -489,12 +538,16 @@ export interface PassFrame {
 }
 
 const CHIP = /^passchip_[A-Za-z0-9_.-]{1,120}\.png$/;
+/** check_recent_passes reads every look since 2025 (24 by default, at most 36). */
+export const MAX_PASSES = 36;
+/** The filmstrip shows the newest frames; the record timeline above it draws every look. */
+export const FILM_FRAMES = 8;
 
-/** The manifest's passes, validated field by field (at most 12); null when it is not a manifest. */
+/** The manifest's passes, validated field by field (at most MAX_PASSES); null when it is not a manifest. */
 export function parseManifest(raw: unknown, dir: string): PassFrame[] | null {
   if (!raw || typeof raw !== 'object' || !Array.isArray((raw as { passes?: unknown }).passes)) return null;
   const frames: PassFrame[] = [];
-  for (const p of (raw as { passes: unknown[] }).passes.slice(0, 12)) {
+  for (const p of (raw as { passes: unknown[] }).passes.slice(0, MAX_PASSES)) {
     if (!p || typeof p !== 'object') continue;
     const r = p as Record<string, unknown>;
     const date = typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null;
@@ -504,7 +557,8 @@ export function parseManifest(raw: unknown, dir: string): PassFrame[] | null {
     const reason = typeof r.reason === 'string' && r.reason.length <= 200 ? r.reason : null;
     const peak = typeof r.peak_ppm_m === 'number' && Number.isFinite(r.peak_ppm_m) ? r.peak_ppm_m : null;
     const chipUrl = typeof r.chip === 'string' && CHIP.test(r.chip) ? `${dir}${r.chip}` : null;
-    frames.push({ date, verdict, short, reason, peak, chipUrl });
+    const product = r.product === 'V002' || r.product === 'V003' ? r.product : null;
+    frames.push({ date, product, verdict, short, reason, peak, chipUrl });
   }
   return frames;
 }

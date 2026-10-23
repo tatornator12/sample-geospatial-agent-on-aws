@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Message, ToolCall } from '../types.ts';
-import { anotherLookMessage, approvedMessage, currentBriefId, draftBriefId, groundChecks, lastLookLine, missionChain, siteCue, siteTip } from './brief.ts';
+import { anotherLookMessage, approvedMessage, currentBriefId, draftBriefId, groundChecks, missionChain, siteCue, siteTip } from './brief.ts';
 import { parseManifest, parseTip } from './steps.ts';
 
 const ID = 'brief-20260925T201500-a1b2c3';
@@ -54,18 +54,13 @@ const PASSES = {
 const TIP = { area: 'south caspian', end: '2026-10-10', days: 14, emit_can_look: true, top: { lat: 39.4379, lon: 53.573, anomaly_ppb: 108.8, valid_days: 5 } };
 const cue = (id: string, lat: number, lon: number): ToolCall => ({ id, name: 'check_recent_passes', params: { lat, lon }, status: 'completed' });
 
-describe('lastLookLine', () => {
-  it("dates EMIT's last look from the newest pass and the latest sign from the tip over the site", () => {
-    const frames = parseManifest(PASSES, DIR);
+describe('the tip manifest', () => {
+  it("keeps the window's first day when the manifest has it (the record timeline's band)", () => {
     const tip = parseTip(TIP, 'south caspian');
     expect(tip?.point).toEqual([53.573, 39.4379]);
-    expect(lastLookLine(frames, tip)).toEqual({ lastLook: 'Aug 20 2025', tropomi: { days: 14, end: 'Oct 10 2026' } });
-  });
-
-  it('gives the last look alone without a tip, and nothing without a pass', () => {
-    expect(lastLookLine(parseManifest(PASSES, DIR), null)).toEqual({ lastLook: 'Aug 20 2025', tropomi: null });
-    expect(lastLookLine([], parseTip(TIP, 'south caspian'))).toBeNull();
-    expect(lastLookLine(null)).toBeNull();
+    expect(parseTip({ ...TIP, start: '2026-09-27' }, 'south caspian')?.start).toBe('2026-09-27');
+    expect(parseTip({ ...TIP, start: 'yesterday' }, 'south caspian')?.start).toBeNull();
+    expect(parseManifest(PASSES, DIR)?.length).toBeGreaterThan(0);
   });
 });
 

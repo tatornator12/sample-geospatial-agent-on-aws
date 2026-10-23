@@ -44,16 +44,33 @@ logger = logging.getLogger("methane_tools")
 # --- constants ------------------------------------------------------------------------------
 
 ENH_SHORT_NAME = "EMITL2BCH4ENH"
-ENH_PATH = "EMITL2BCH4ENH.002"
-SCENE_RE = re.compile(r"^EMIT_L2B_CH4ENH_002_(\d{8}T\d{6})_(\d{7})_(\d{3})$")
+# NASA ended CH4ENH V002 on 2026-08-31 (CMR: the collection's last scene starts 01:25:20); every later
+# pass is V003. V002 ids carry the orbit and scene (EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019),
+# V003 ids the timestamp only (EMIT_L2B_CH4ENH_003_20261017T184631). V003 is also reprocessing the
+# older years under the same timestamps; those are V002's looks already, so a look is read from V002
+# up to V002_LAST and from V003 after it, never twice.
+ENH_PATHS = {"V002": "EMITL2BCH4ENH.002", "V003": "EMITL2BCH4ENH.003"}
+SCENE_RE = re.compile(r"^EMIT_L2B_CH4ENH_(?:002_(\d{8}T\d{6})_\d{7}_\d{3}|003_(\d{8}T\d{6}))$")
+V002_LAST = datetime(2026, 8, 31, 1, 26, 0, tzinfo=timezone.utc)
 EMIT_MAX_LAT = 52.0                   # the ISS orbit: EMIT never looks further north (or south)
 SCENE_CAP_BYTES = 25_000_000          # raw scenes are 8-14 MB
 SCENE_TIMEOUT_S = 45.0
-MAX_SCENES = 12
+DEFAULT_SCENES = 24                   # every look since 2025 at the sites watched so far (Shanxi has 19)
+MAX_SCENES = 36
 WINDOW_KM = 6.0                        # site centres are approximate (footprint centroids)
 CANDIDATE_PPM_M = 1000.0
 CANDIDATE_MIN_PIXELS = 5
 UNCERT_SIGMA = 3.0
+SIGNIFICANT_PPM_M = 500.0             # a significant pixel: at least this far from zero AND beyond 3x its uncertainty
+# The mirror test (approved 2026-10-23): a plume is one-sided, noise is not. A candidate also needs
+# MIRROR_RATIO times as many significant pixels above zero as below it in the same window. Noise at a
+# high-uncertainty site (Shanxi, 500-870 ppm·m) passes the floors on both sides (2025-09-25: 190
+# significant above, 264 below); Krasnovodsk's plume (103 against 2) and the Permian's (6-15 against
+# 0-1) are one-sided. Our diagnostic, not a published EMIT rule.
+MIRROR_RATIO = 3.0
+# Shared cache verdicts are versioned by rule: a verdict judged before the mirror test must never be
+# read as one judged with it (and the stable runtime's keys stay as they are).
+PASS_CACHE_VERSION = "rule2"
 
 TROPOMI_BUCKET_HOST = "meeo-s5p.s3.eu-central-1.amazonaws.com"
 TROPOMI_PREFIX = "COGT/OFFL/L2__CH4___"
@@ -62,6 +79,9 @@ TROPOMI_MAX_DAYS = 14
 TROPOMI_LATENCY_DAYS = 2              # OFFL lags ~2 days
 TROPOMI_MAX_AREA_DEG2 = 400.0         # e.g. 20 x 20 degrees
 TROPOMI_ORBIT_RE = re.compile(r"^S5P_OFFL_L2__CH4____(\d{8}T\d{6})_(\d{8}T\d{6})_(\d{5})_\d{2}_\d{6}_\d{8}T\d{6}$")
+TROPOMI_CACHE_VERSION = "v2"           # composites this code writes; the unversioned ones are read only
+TROPOMI_NEXT_STEPS = ("display_visual(anomaly_s3_url, render=render); then cue EMIT on the strongest hotspot with "
+                      "emit_can_look: check_recent_passes(lat, lon). If EMIT cannot look, say so: confidence stays low.")
 HOTSPOT_MIN_DAYS = 3
 HOTSPOT_SEPARATION_KM = 40.0
 MAX_PARALLEL_READS = 12
@@ -143,13 +163,50 @@ def validate_scene_id(value: Any) -> str:
     return value
 
 
+def scene_product(scene_id: str) -> str:
+    """"V002" or "V003", from a validated id."""
+    return "V003" if validate_scene_id(scene_id).startswith("EMIT_L2B_CH4ENH_003_") else "V002"
+
+
+def scene_date(scene_id: str) -> str:
+    """The pass's day, YYYY-MM-DD, from a validated id."""
+    m = SCENE_RE.fullmatch(validate_scene_id(scene_id))
+    stamp = m[1] or m[2]
+    return f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:8]}"
+
+
 def scene_url(scene_id: str, layer: str) -> str:
-    """LP DAAC URL of a raw scene layer (CH4ENH | CH4UNCERT), built from a validated id."""
+    """LP DAAC URL of a raw scene layer (CH4ENH | CH4UNCERT), built from a validated id: the
+    product's own folder, the layer's name in the id's place (both versions name them alike)."""
     sid = validate_scene_id(scene_id)
     if layer not in ("CH4ENH", "CH4UNCERT"):
         raise MethaneError("layer must be CH4ENH or CH4UNCERT")
     name = sid.replace("_CH4ENH_", f"_{layer}_")
-    return f"https://{mt.LPDAAC_HOST}/lp-prod-protected/{ENH_PATH}/{sid}/{name}.tif"
+    return f"https://{mt.LPDAAC_HOST}/lp-prod-protected/{ENH_PATHS[scene_product(sid)]}/{sid}/{name}.tif"
+
+
+def _cmr_time(t: datetime) -> str:
+    return t.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def emit_looks(client: httpx.Client, lat: float, lon: float, start: datetime, end: datetime,
+               limit: int, sort_key: str = "-start_date") -> tuple[list[dict], int]:
+    """EMIT's raw scenes over a point between two instants (CMR entries, at most `limit`) and how
+    many there are: V002 up to V002_LAST, V003 after it, so a reprocessed scene is never a second
+    look. Newest first by default (V003's entries are all newer than V002's)."""
+    point = f"{lon:.6f},{lat:.6f}"
+    parts: list[tuple[list[dict], int]] = []
+    v3_start = max(start, V002_LAST + timedelta(seconds=1))
+    spans = [("003", v3_start, end), ("002", start, min(end, V002_LAST))]
+    if sort_key == "start_date":
+        spans.reverse()
+    for version, a, b in spans:
+        if a > b:
+            continue
+        parts.append(_cmr_entries(client, {"short_name": ENH_SHORT_NAME, "version": version, "point": point,
+                                           "sort_key": sort_key, "temporal": f"{_cmr_time(a)},{_cmr_time(b)}"}, limit))
+    entries = [e for found, _ in parts for e in found]
+    return entries[:limit], sum(n for _, n in parts)
 
 
 def _cmr_entries(client: httpx.Client, params: dict, limit: int) -> tuple[list[dict], int]:
@@ -264,8 +321,17 @@ async def watch_baseline(min_repeat_dates: int = 5) -> str:
     url = mt._put_json(f"{mt.session_prefix()}watch_sites_v002.geojson", collection)
     # The same collection at a fixed key: the stage shows this globe the moment the Methane Hunter is
     # chosen (GET /api/methane/baseline), before any prompt, so the baseline is where the act starts.
+    # Written only when it differs: every runtime (dev and stable) reads and writes this one key, and
+    # a mission that would write the same globe again leaves it alone.
     try:
-        mt._put_json(WATCH_SITES_CACHE_KEY, collection)
+        s3 = mt._s3()
+        try:
+            same = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=WATCH_SITES_CACHE_KEY)["Body"]
+                              .read(mt.GEOJSON_READ_CAP_BYTES + 1)) == collection
+        except s3.exceptions.NoSuchKey:
+            same = False
+        if not same:
+            mt._put_json(WATCH_SITES_CACHE_KEY, collection)
     except Exception as e:  # the idle globe is decoration for the stage; never fail the tool for it
         logger.warning("watch sites cache write failed: %s", type(e).__name__)
     firsts = [f["properties"]["first"] for f in feats]
@@ -309,9 +375,11 @@ async def site_history(lat: float, lon: float, radius_km: float = 2.0) -> str:
             box = box_around(lat, lon, radius_km + 3)
             plm, _ = _cmr_entries(client, {"short_name": mt.SHORT_NAME,
                                            "bounding_box": ",".join(f"{v:.6f}" for v in box), "sort_key": "start_date"}, 200)
-            point = f"{lon:.6f},{lat:.6f}"
-            first, looks = _cmr_entries(client, {"short_name": ENH_SHORT_NAME, "point": point, "sort_key": "start_date"}, 1)
-            last, _ = _cmr_entries(client, {"short_name": ENH_SHORT_NAME, "point": point, "sort_key": "-start_date"}, 1)
+            # Every look EMIT made here, V002 then V003 (a reprocessed scene is one look, not two).
+            ever = datetime(2022, 7, 1, tzinfo=timezone.utc)
+            until = datetime.now(timezone.utc) + timedelta(days=1)
+            first, looks = emit_looks(client, lat, lon, ever, until, 1, sort_key="start_date")
+            last, _ = emit_looks(client, lat, lon, ever, until, 1)
             latest = mt.archive_latest(client)
     except MethaneError as e:
         return json.dumps({"error": str(e)})
@@ -459,21 +527,26 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     # The cache key carries the box itself, so widening a watch area can never serve the old one.
     box_sig = "_".join(f"{v:.2f}" for v in box).replace("-", "m")
     slug = mt._slugify(label) if bbox is None else f"bbox_{box_sig}"
-    cache_base = f"methane/cache/tropomi_{slug}_{box_sig}_{end.isoformat()}_{days}d"
+    stem = f"{slug}_{box_sig}_{end.isoformat()}_{days}d"
+    # Written under a versioned key only; the unversioned key (composites the stable runtime wrote,
+    # the same numbers) is read as a fallback and never written, so its reads stay as they are.
+    cache_base = f"methane/cache/tropomi_{TROPOMI_CACHE_VERSION}_{stem}"
     session_key = f"{mt.session_prefix()}tropomi_anomaly_{slug}_{end.isoformat()}_{days}d.tif"
     s3 = mt._s3()
-    try:
-        cached = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.json")["Body"].read(1_000_000))
-        tif = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.tif")["Body"].read(50_000_000)
+    for base in (cache_base, f"methane/cache/tropomi_{stem}"):
+        try:
+            cached = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.json")["Body"].read(1_000_000))
+            tif = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.tif")["Body"].read(50_000_000)
+        except s3.exceptions.NoSuchKey:
+            continue
         url = _put_bytes(session_key, tif, "image/tiff")
         cached["summary"].update(source="cache", seconds=round(time.time() - started, 1))
-        # The styling is today's, not the cache's: a composite cached before a render change
-        # (magma, no zoom cap) must not bring the old look back.
+        # The styling and the instructions are today's, not the cache's: a composite cached before a
+        # render change (magma, no zoom cap) must not bring the old look back.
         cached["render"] = {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]}
+        cached["next_steps"] = TROPOMI_NEXT_STEPS
         write_tip(area_key, cached["summary"], cached.get("hotspots", []))
         return json.dumps({**cached, "anomaly_s3_url": url})
-    except s3.exceptions.NoSuchKey:
-        pass
 
     lon_c = (box[0] + box[2]) / 2
     s3p = tropomi_s3()
@@ -529,8 +602,7 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     result = {
         "summary": {**summary, "source": "meeo-s5p"}, "hotspots": hotspots,
         "render": {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]},
-        "next_steps": ("display_visual(anomaly_s3_url, render=render); then cue EMIT on the strongest hotspot with "
-                       "emit_can_look: check_recent_passes(lat, lon). If EMIT cannot look, say so: confidence stays low."),
+        "next_steps": TROPOMI_NEXT_STEPS,
     }
     if end <= today - timedelta(days=TROPOMI_LATENCY_DAYS):   # only complete days are cached
         s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{cache_base}.tif", Body=cog, ContentType="image/tiff")
@@ -550,8 +622,11 @@ def write_tip(area_key: str | None, summary: dict, hotspots: list) -> None:
     if not area_key:
         return
     top = hotspots[0] if hotspots else None
+    start = summary.get("start")
     tip = {
         "area": area_key,
+        # The window's first day with an orbit read (the record timeline's band starts here).
+        "start": start if isinstance(start, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", start) else None,
         "end": summary.get("end"),
         "days": summary.get("days_requested"),
         "background_ppb": summary.get("background_ppb"),
@@ -644,18 +719,32 @@ def read_scene_window(scene_id: str, layer: str, token: str, box) -> tuple[np.nd
         raise mt.PlumeFetchError("unreadable_scene")
 
 
+def significant_masks(enh: np.ndarray, unc: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(above, below): pixels at least SIGNIFICANT_PPM_M above zero and beyond UNCERT_SIGMA times
+    their own uncertainty, and the same test mirrored below zero. A missing or non-positive
+    uncertainty is never significant."""
+    if unc.shape != enh.shape:
+        unc = np.full(enh.shape, np.nan)
+    unc = np.where((unc > 0) & np.isfinite(unc), unc, np.nan)
+    with np.errstate(invalid="ignore"):
+        above = (enh >= SIGNIFICANT_PPM_M) & (enh > UNCERT_SIGMA * unc)
+        below = (enh <= -SIGNIFICANT_PPM_M) & (-enh > UNCERT_SIGMA * unc)
+    return above, below
+
+
 def judge_window(enh: np.ndarray, unc: np.ndarray | None) -> dict:
-    """The verdict for one pass. `unc` is None when the enhancement alone already rejects it."""
+    """The verdict for one pass. `unc` is None when the enhancement alone already rejects it.
+
+    A candidate needs CANDIDATE_MIN_PIXELS pixels ≥ CANDIDATE_PPM_M, CANDIDATE_MIN_PIXELS significant
+    pixels above zero, and MIRROR_RATIO times as many significant pixels above zero as below it (the
+    mirror test: noise is two-sided, a plume is not)."""
     valid = int(np.isfinite(enh).sum())
     strong = int(np.nansum(enh >= CANDIDATE_PPM_M))
     peak = float(np.nanmax(enh)) if valid else None
-    significant = None
+    significant = negative = None
     if unc is not None:
-        if unc.shape != enh.shape:
-            unc = np.full(enh.shape, np.nan)
-        unc = np.where((unc > 0) & np.isfinite(unc), unc, np.nan)
-        with np.errstate(invalid="ignore"):
-            significant = int(np.nansum((enh >= 500) & (enh > UNCERT_SIGMA * unc)))
+        above, below = significant_masks(enh, unc)
+        significant, negative = int(above.sum()), int(below.sum())
     if valid == 0:
         verdict, reason, short = "rejected", "no valid pixels at the site (cloud, water or outside the swath)", "no_valid"
     elif strong < CANDIDATE_MIN_PIXELS:
@@ -665,12 +754,15 @@ def judge_window(enh: np.ndarray, unc: np.ndarray | None) -> dict:
         raise ValueError("uncertainty is needed to judge a pass with enough strong pixels")
     elif significant < CANDIDATE_MIN_PIXELS:
         verdict, reason, short = "rejected", f"only {significant} pixels above {UNCERT_SIGMA:g}× their uncertainty", "noise"
+    elif significant < MIRROR_RATIO * negative:
+        verdict, reason, short = ("rejected", f"{significant} pixels above {UNCERT_SIGMA:g}× their uncertainty but {negative} "
+                                  f"as far below zero (a plume needs {MIRROR_RATIO:g}× as many above as below)", "noise")
     else:
         verdict, reason, short = ("candidate", f"{strong} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m, {significant} above "
-                                  f"{UNCERT_SIGMA:g}× uncertainty", "candidate")
+                                  f"{UNCERT_SIGMA:g}× uncertainty against {negative} below zero", "candidate")
     return {"valid_pixels": valid, "peak_ppm_m": round(peak, 1) if peak is not None else None,
-            "pixels_ge_1000": strong, "pixels_significant": significant, "verdict": verdict, "reason": reason,
-            "short": SHORT_REASON[short]}
+            "pixels_ge_1000": strong, "pixels_significant": significant, "pixels_significant_negative": negative,
+            "verdict": verdict, "reason": reason, "short": SHORT_REASON[short]}
 
 
 def needs_uncertainty(enh: np.ndarray) -> bool:
@@ -690,8 +782,11 @@ def window_stats(enh_bytes: bytes, unc_bytes: bytes, lat: float, lon: float, km:
 
 
 def pass_cache_base(scene_id: str, lat: float, lon: float) -> str:
-    """Shared across sessions: a scene never changes, so its verdict at a site is computed once."""
-    return f"methane/cache/passwin_{validate_scene_id(scene_id)}_{lat:.4f}_{lon:.4f}_{WINDOW_KM:g}km"
+    """Shared across sessions: a scene never changes, so its verdict at a site is computed once per
+    rule (PASS_CACHE_VERSION): .json the verdict, .tif the window, _sig.tif a candidate's significant
+    pixels (its 3D columns), .png the filmstrip chip."""
+    return (f"methane/cache/passwin_{PASS_CACHE_VERSION}_{validate_scene_id(scene_id)}_{lat:.4f}_{lon:.4f}_"
+            f"{WINDOW_KM:g}km")
 
 
 def check_one_pass(scene_id: str, lat: float, lon: float, token: str, s3) -> dict:
@@ -711,6 +806,11 @@ def check_one_pass(scene_id: str, lat: float, lon: float, token: str, s3) -> dic
         window = _cog_bytes(enh, tr.c, tr.f, xres, yres) if stats["valid_pixels"] else None
         if window:
             s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.tif", Body=window, ContentType="image/tiff")
+        if stats["verdict"] == "candidate" and unc is not None:
+            # The columns are drawn from these pixels only: each one beyond 3x its own uncertainty.
+            above, _ = significant_masks(enh, unc)
+            s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}_sig.tif", ContentType="image/tiff",
+                          Body=_cog_bytes(np.where(above, enh, np.nan), tr.c, tr.f, xres, yres))
         s3.put_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.json", Body=json.dumps(stats).encode(),
                       ContentType="application/json")
         source = "lpdaac"
@@ -725,8 +825,7 @@ def check_one_pass(scene_id: str, lat: float, lon: float, token: str, s3) -> dic
         chip = chip_png(window, s3, f"{base}.png")
         if chip:
             chip_url = _put_bytes(f"{mt.session_prefix()}passchip_{scene_id}.png", chip, "image/png")
-    m = SCENE_RE.fullmatch(scene_id)
-    return {"scene_id": scene_id, "date": f"{m[1][:4]}-{m[1][4:6]}-{m[1][6:8]}", **stats,
+    return {"scene_id": scene_id, "date": scene_date(scene_id), "product": scene_product(scene_id), **stats,
             "window_s3_url": url, "chip_s3_url": chip_url, "source": source}
 
 
@@ -785,22 +884,24 @@ def columns_geojson(window_cog: bytes, floor: float = DISPLAY_FLOOR_PPM_M, cap: 
 
 @tool
 @mt.offload
-async def check_recent_passes(lat: float, lon: float, since: str = None, max_scenes: int = 8) -> str:
-    """Cue: read EMIT's recent raw methane scenes over a site, where NASA outlines no plumes yet.
+async def check_recent_passes(lat: float, lon: float, since: str = None, max_scenes: int = DEFAULT_SCENES) -> str:
+    """Cue: read EMIT's raw methane scenes over a site since 2025, where NASA outlines no plumes yet.
 
     Each pass is judged in a 6 km window: a candidate needs ≥ 5 pixels ≥ 1,000 ppm·m AND ≥ 5 pixels
-    whose enhancement exceeds 3× the scene's own per-pixel uncertainty; otherwise it is rejected
-    with the reason. Candidates are candidates, never confirmed plumes.
+    whose enhancement exceeds 3× the scene's own per-pixel uncertainty AND 3× as many such pixels
+    above zero as below it (noise is two-sided, a plume is not); otherwise it is rejected with the
+    reason. Candidates are candidates, never confirmed plumes. Reads NASA's V002 scenes (to
+    2026-08-31) and V003 scenes (after it); each pass says which.
 
     Args:
         lat, lon: The site in degrees (EMIT only sees between ~52°S and ~52°N).
         since: Optional YYYY-MM-DD; default 2025-01-01 (NASA's plume product is dense through 2024
             and nearly empty after).
-        max_scenes: Newest passes to read (default 8, max 12).
+        max_scenes: Newest passes to read (default 24, every look since 2025 at the watch sites; max 36).
 
-    Returns: JSON with summary (looks found, read, candidates, rejected), passes[] (date,
-    peak_ppm_m, pixels_ge_1000, pixels_significant, verdict, reason, window_s3_url), render,
-    next_steps.
+    Returns: JSON with summary (looks found, read, candidates, rejected), passes[] (date, product,
+    peak_ppm_m, pixels_ge_1000, pixels_significant, pixels_significant_negative, verdict, reason,
+    window_s3_url), render, next_steps.
     """
     started = time.time()
     try:
@@ -814,15 +915,17 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
         with httpx.Client(timeout=mt.CMR_TIMEOUT_S) as client:
             latest = mt.archive_latest(client)
             since_d = parse_day(since, "since") if since else PLUME_PRODUCT_DENSE_END + timedelta(days=1)
-            entries, looks = _cmr_entries(client, {
-                "short_name": ENH_SHORT_NAME, "point": f"{lon:.6f},{lat:.6f}", "sort_key": "-start_date",
-                "temporal": f"{since_d.isoformat()}T00:00:00Z,{datetime.now(timezone.utc).date().isoformat()}T23:59:59Z",
-            }, max_scenes)
+            today = datetime.now(timezone.utc).date()
+            entries, looks = emit_looks(client, lat, lon,
+                                        datetime(since_d.year, since_d.month, since_d.day, tzinfo=timezone.utc),
+                                        datetime(today.year, today.month, today.day, 23, 59, 59, tzinfo=timezone.utc),
+                                        max_scenes)
     except MethaneError as e:
         return json.dumps({"error": str(e)})
     except httpx.HTTPError as e:
         return json.dumps({"error": f"The NASA CMR catalogue could not be reached ({type(e).__name__})."})
-    scene_ids = [e.get("title") for e in entries if isinstance(e.get("title"), str) and SCENE_RE.fullmatch(e["title"])]
+    scene_ids = list(dict.fromkeys(e.get("title") for e in entries
+                                   if isinstance(e.get("title"), str) and SCENE_RE.fullmatch(e["title"])))
     if not scene_ids:
         return json.dumps({"summary": {"looks": looks, "read": 0, "candidates": 0, "since": since_d.isoformat()},
                            "passes": [], "say": f"EMIT has not looked at this site since {since_d.isoformat()}."})
@@ -830,12 +933,13 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
     s3 = mt._s3()
 
     def one(sid):
+        dated = {"scene_id": sid, "date": scene_date(sid), "product": scene_product(sid), "verdict": "error"}
         try:
             return check_one_pass(sid, lat, lon, token, s3)
         except mt.PlumeFetchError as e:
-            return {"scene_id": sid, "verdict": "error", "reason": e.reason}
+            return {**dated, "reason": e.reason}
         except Exception as e:
-            return {"scene_id": sid, "verdict": "error", "reason": type(e).__name__}
+            return {**dated, "reason": type(e).__name__}
 
     with ThreadPoolExecutor(max_workers=min(mt.MAX_PARALLEL, len(scene_ids))) as pool:
         passes = list(pool.map(one, scene_ids))
@@ -845,17 +949,19 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
     best = max(cands, key=lambda p: p["peak_ppm_m"] or 0, default=None)
     # The filmstrip's manifest: the UI derives its key from this call's lat/lon (4 decimals) and reads
     # it through the backend; chips are named relative to it (a replay case copies them flat).
+    # Every look read, newest first, with its product: the record timeline draws one mark per look.
     manifest = {"lat": round(lat, 4), "lon": round(lon, 4), "since": since_d.isoformat(), "looks": looks,
-                "passes": [{"date": p.get("date"), "verdict": p["verdict"], "short": p.get("short", "error"),
-                            "reason": p.get("reason"), "peak_ppm_m": p.get("peak_ppm_m"),
+                "passes": [{"date": p.get("date"), "product": p.get("product"), "verdict": p["verdict"],
+                            "short": p.get("short", "error"), "reason": p.get("reason"), "peak_ppm_m": p.get("peak_ppm_m"),
                             "chip": p["chip_s3_url"].rsplit("/", 1)[1] if p.get("chip_s3_url") else None}
                            for p in passes]}
     mt._put_json(f"{mt.session_prefix()}passes_{lat:.4f}_{lon:.4f}.json", manifest)
     columns_url = None
     if best:
         try:
+            # The candidate's significant pixels only (beyond 3x their own uncertainty), never noise.
             win = s3.get_object(Bucket=config.S3_BUCKET_NAME,
-                                Key=f"{pass_cache_base(best['scene_id'], lat, lon)}.tif")["Body"].read(SCENE_CAP_BYTES)
+                                Key=f"{pass_cache_base(best['scene_id'], lat, lon)}_sig.tif")["Body"].read(SCENE_CAP_BYTES)
             columns_url = mt._put_json(f"{mt.session_prefix()}columns_{best['scene_id']}.geojson", columns_geojson(win))
         except Exception as e:
             logger.warning("columns failed: %s", type(e).__name__)
@@ -864,8 +970,10 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
                "errors": sum(p["verdict"] == "error" for p in passes),
                "from_cache": sum(p.get("source") == "cache" for p in passes),
                "plume_product_latest": latest.isoformat() if latest else None,
-               "rule": (f"candidate: ≥ {CANDIDATE_MIN_PIXELS} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m and ≥ "
-                        f"{CANDIDATE_MIN_PIXELS} above {UNCERT_SIGMA:g}× uncertainty in a {WINDOW_KM:g} km window"),
+               "products": sorted({p["product"] for p in passes if p.get("product")}),
+               "rule": (f"candidate: ≥ {CANDIDATE_MIN_PIXELS} pixels ≥ {CANDIDATE_PPM_M:g} ppm·m, ≥ "
+                        f"{CANDIDATE_MIN_PIXELS} above {UNCERT_SIGMA:g}× uncertainty and {MIRROR_RATIO:g}× as many "
+                        f"of those above zero as below it, in a {WINDOW_KM:g} km window"),
                "seconds": round(time.time() - started, 1)}
     logger.info("PASSES: %.3f,%.3f %d read, %d candidates in %.1fs", lat, lon, len(passes), len(cands), summary["seconds"])
     return json.dumps({

@@ -87,7 +87,7 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 
 **What it shows:** one question, a whole mission on live satellite data: a wide daily scan, a sharper check, a second opinion, the ground record, and a draft brief for a person to file.
 
-**What's agentic here:** it plans the mission and says the plan out loud. It judges each EMIT pass against that pass's own noise and rejects the weak ones; they dim on screen. It picks which site to follow by a stated rule, the newest confirmed detection, and keeps both sites' tallies on the board so the room can see the choice. When a check can't see, because of cloud or no coverage, it says "cannot assess" rather than guessing.
+**What's agentic here:** it plans the mission and says the plan out loud. It judges each EMIT pass against that pass's own noise and rejects the weak ones; they dim on screen. It picks which site to follow by a stated rule, the newest confirmed detection (the stronger tip when neither site has one), and keeps both sites' tallies on the board so the room can see the choice. Then it makes one call for the analyst: does this site need a new fine-scale look, and why. It picks from fixed answers, and the tool turns down a call the record contradicts. When a check can't see, because of cloud or no coverage, it says "cannot assess" rather than guessing.
 
 **Why it matters:** methane traps about 80 times as much heat as carbon dioxide over its first 20 years, so finding the big sources and fixing them pays off quickly. A daily global scan only says "somewhere around here"; this turns it into a named site, its record, and a brief someone can act on.
 
@@ -102,14 +102,14 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 1. **Click "Methane Watch brief".** "It states a plan. First a wide satellite scans nine areas over the last two weeks: that's a tip, not a finding."
 2. "Then it checks EMIT's record over the two strongest tips, pass by pass, and rejects the weak ones." Point at the dimmed frames.
 3. "Then a second opinion: Carbon Mapper's plumes near both sites." Point at the "Carbon Mapper:" line under each tally.
-4. "It follows the site with the newest confirmed detection, an EMIT candidate pass or a Carbon Mapper plume, and says both dates." Point at "following", then the 3D columns.
-5. "Then the ground record, and a draft brief. It lists what's on the ground without naming a cause."
+4. "It follows the site with the newest confirmed detection, an EMIT candidate pass or a Carbon Mapper plume, and says both dates. If neither site has one, it follows the stronger tip." Point at "following". Under that site's filmstrip, a timeline lines up its record since January 2025: the tip, every EMIT look, Carbon Mapper's plumes within 7 km. "On the EMIT row, a filled dot is methane seen, a ring is a pass too faint or within noise, a grey tick is cloud." Then the 3D columns, when there is a candidate pass.
+5. "Then the ground record, and a draft brief. It lists what's on the ground without naming a cause. And it makes one call: does this site need a new fine-scale look." Point at the card's line, for example "No fine-scale confirmation is on record here. The agent recommends a new fine-scale look."
 
-*Say it honestly:* the tip is the last two weeks; EMIT's confirmations and Carbon Mapper's plumes are records since 2025, with dates on the board and the card, and the newest date decides which site it follows. Any rate is Carbon Mapper's estimate, not EMIT's. Say "methane keeps showing up here", never "it's leaking now".
+*Say it honestly:* the tip is the last two weeks; EMIT's confirmations and Carbon Mapper's plumes are records since 2025, with dates on the timeline and the card, and the newest date decides which site it follows. Any rate is Carbon Mapper's estimate, not EMIT's. Use the card's words: "methane keeps showing up here" only when it says so (confirmed on three or more dates), "methane has shown up here before" with fewer, and "no fine-scale confirmation is on record" with none. Never "now", "still", "active" or "leaking".
 
-*If someone asks why the confirmation is older than the tip:* "EMIT rides on the Space Station and can't be pointed, so it sees any one place only now and then. Carbon Mapper publishes about a month after it sees a plume. The tip is fresh; the confirmation is the record." *(A record timeline that shows this gap on screen is being built. Update this page if it ships.)*
+*When the site has a confirmation:* the timeline draws one bracket from the latest one to the tip, with the gap in words ("30 Nov 2025 to the tip: about 10 months"), and the card says the same gap. Over 90 days, the agent recommends a new fine-scale look. If someone asks why the gap: "EMIT rides on the Space Station and can't be pointed, so it sees any one place only now and then. Carbon Mapper publishes about a month after it sees a plume. The tip is fresh; the confirmation is the record, and the bracket shows how old it is."
 
-*Technical:* TROPOMI 14-day composites; EMIT raw passes judged against their own noise; Carbon Mapper plumes within 5 km since 2025; VIIRS, Overture, OGIM.
+*Technical:* TROPOMI 14-day composites; EMIT V002 passes to 31 August 2026 and NASA's V003 after; each pass judged against its own noise and its mirror (methane counts only if pixels well above the background outnumber those as far below it three to one); Carbon Mapper plumes within 7 km since 2025; VIIRS, Overture, OGIM. The call is one of two fixed answers with one of four reasons, checked against the records by the tool, which writes the card's line itself.
 
 **The decision:** you, as the analyst. "It's a draft. Nothing is filed until I approve it." Press "Approve and file".
 

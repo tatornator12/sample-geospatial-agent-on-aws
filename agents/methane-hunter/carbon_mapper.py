@@ -50,12 +50,17 @@ CM_CAP_BYTES = 6_000_000              # one page of 1,000 items is ~4.5 MB
 CM_USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
                  "Chrome/130.0 Safari/537.36 agentic-earth-methane-watch/1.0")
 CM_SINCE = date(2025, 1, 1)
-CM_RADIUS_KM = 5.0
+# One native TROPOMI footprint (5.5 x 7 km), measured from the hotspot cell's centre, the same for every
+# site: the tip cannot place methane better than that. Approved 2026-10-23, chosen after seeing the
+# Shanxi case (a recurring coal source 5.1 km from the site point, in the diagonal neighbour cell),
+# so it is said as such in the spec. The record and the follow rule (methane_config W4b) both use it.
+CM_RADIUS_KM = 7.0
 CM_MAX_RADIUS_KM = 10.0
 CM_LIST_MAX = 10                      # plumes returned to the model
 CM_MAP_MAX = 200                      # plumes on the map layer
+CM_DATES_MAX = 60                     # plumes on the stage's record timeline (numbers and codes only)
 CM_CACHE_TTL_S = 12 * 3600
-CM_CACHE_VERSION = "v1"
+CM_CACHE_VERSION = "v2"               # v1 keys (5 km) belong to the stable runtime: read by it, never written here
 CM_LAG_DAYS = 30
 EMIT_SITE_KM = 2.0                    # the session's pass record for this site: the nearest within 2 km
 
@@ -306,16 +311,32 @@ def emit_record(lat: float, lon: float, s3) -> dict | None:
         return None
 
 
-def latest_confirmed(emit: dict | None, cm_latest: str | None) -> dict | None:
-    """The site's newest confirmed detection: an EMIT candidate pass or a Carbon Mapper plume."""
-    e = (emit or {}).get("latest_candidate")
-    if not e and not cm_latest:
+CONFIRMED_WORDS = {"emit": "an EMIT candidate pass", "carbon_mapper": "a Carbon Mapper plume",
+                   "both": "an EMIT candidate pass and a Carbon Mapper plume"}
+
+
+def latest_confirmed_code(emit_latest: str | None, cm_latest: str | None) -> dict | None:
+    """The site's newest confirmed detection as data: {date, by: emit | carbon_mapper | both}."""
+    if not emit_latest and not cm_latest:
         return None
-    if e and cm_latest and e == cm_latest:
-        return {"date": e, "by": "an EMIT candidate pass and a Carbon Mapper plume"}
-    if e and (not cm_latest or e > cm_latest):
-        return {"date": e, "by": "an EMIT candidate pass"}
-    return {"date": cm_latest, "by": "a Carbon Mapper plume"}
+    if emit_latest and cm_latest and emit_latest == cm_latest:
+        return {"date": emit_latest, "by": "both"}
+    if emit_latest and (not cm_latest or emit_latest > cm_latest):
+        return {"date": emit_latest, "by": "emit"}
+    return {"date": cm_latest, "by": "carbon_mapper"}
+
+
+def latest_confirmed(emit: dict | None, cm_latest: str | None) -> dict | None:
+    """The site's newest confirmed detection: an EMIT candidate pass or a Carbon Mapper plume (in words)."""
+    found = latest_confirmed_code((emit or {}).get("latest_candidate"), cm_latest)
+    return found and {"date": found["date"], "by": CONFIRMED_WORDS[found["by"]]}
+
+
+def record_dates(plumes: list[dict]) -> list[dict]:
+    """The record timeline's plumes: date, instrument code, rate and distance, newest first, at most
+    CM_DATES_MAX. Numbers and fixed codes only (the same posture as the rest of the record)."""
+    return [{"date": p["date"], "instrument": p["instrument"], "rate_kg_h": p["rate_kg_h"],
+             "distance_km": p["distance_km"]} for p in plumes[:CM_DATES_MAX]]
 
 
 def about(value: float | None) -> int | None:
@@ -354,7 +375,7 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
 
     Args:
         lat, lon: The cued site in degrees (the TROPOMI hotspot EMIT was cued on).
-        radius_km: Search radius (default 5 km, max 10).
+        radius_km: Search radius (default 7 km, one TROPOMI footprint; max 10). Leave it at the default.
 
     Returns: JSON with summary (count, latest_date, latest_rate_kg_h, latest_uncertainty_kg_h,
     latest_instrument, radius_km, since, source), plumes[] (newest first, at most 10: date,
@@ -399,12 +420,16 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
         "source": source, "fetched": fetched, "publication_lag_days": CM_LAG_DAYS,
     }
     emit = emit_record(lat, lon, s3)
-    # The stage's record: numbers, dates and codes only (the tip board and the brief read it).
+    # The follow rule counts Carbon Mapper plumes within one TROPOMI footprint, whatever radius was asked for.
+    cm_follow = next((p["date"] for p in plumes if p["distance_km"] <= CM_RADIUS_KM), None)
+    confirmed = latest_confirmed_code((emit or {}).get("latest_candidate"), cm_follow)
+    # The stage's record: numbers, dates and codes only (the tip board, the record timeline and the brief read it).
     record = {"lat": round(lat, 4), "lon": round(lon, 4), "radius_km": radius_km, "since": since.isoformat(),
               "count": len(plumes), "latest": summary["latest_date"],
               "rate_kg_h": latest["rate_kg_h"] if latest else None,
               "uncertainty_kg_h": latest["uncertainty_kg_h"] if latest else None,
-              "instrument": latest["instrument"] if latest else None, "source": source}
+              "instrument": latest["instrument"] if latest else None, "source": source,
+              "follow_radius_km": CM_RADIUS_KM, "dates": record_dates(plumes), "latest_confirmed": confirmed}
     geometry_url = None
     try:
         mt._put_json(stage_key(lat, lon, "json"), record)
@@ -424,8 +449,7 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
                     "uncertainty_kg_h": p["uncertainty_kg_h"], "distance_km": p["distance_km"], "sector": p["sector"]}
                    for p in plumes[:CM_LIST_MAX]],
         "emit": emit,
-        # The follow rule counts Carbon Mapper plumes within 5 km, whatever radius was asked for.
-        "latest_confirmed": latest_confirmed(emit, next((p["date"] for p in plumes if p["distance_km"] <= CM_RADIUS_KM), None)),
+        "latest_confirmed": latest_confirmed(emit, cm_follow),
         "say": say_line(len(plumes), radius_km, since.isoformat(), latest),
         "attribution": ATTRIBUTION,
         "next_steps": ("Compare the two cued sites' latest_confirmed dates (the follow rule). A rate is Carbon "

@@ -111,7 +111,10 @@ def test_the_watch_reads_its_dates_from_the_tools_and_says_when_emit_last_looked
     assert 'never write "only oil and gas"' in p and "one plain sentence with a verb" in p
     # The checks' own lines reach the record once, as the tool's "- Check:" lines (dev v42 eval run 1:
     # a model that copied them into observations dropped the "Check:" lines from the pasted record).
-    assert "never copy a check's line" in p and "the \"- Check:\" and \"- Independent detections:\" lines included" in p
+    assert "never copy a check's line" in p and "\"- Check:\" and \"- Independent detections:\" lines included" in p
+    # The agent's decision (approved 2026-10-23): two enums in draft_brief, the brief's own lines pasted.
+    assert '"Recommendation:", "- Check:"' in p and '"Record:",' in p and "YOUR decision on whether this site needs a new fine-scale" in p
+    assert "within 7 km, one TROPOMI footprint" in p and "within 5 km" not in p
     assert 'ONLY when the user\'s own words include "super-emitter"' in p
     # The mission still starts on the old plate's words (a replay case and old notes use them).
     assert '"super-emitters", "still active"' in p

@@ -18,7 +18,7 @@ import logging
 import math
 import re
 import secrets
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 import _paths  # noqa: F401
@@ -223,7 +223,8 @@ _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 def find_passes(lat: float, lon: float) -> dict | None:
     """The newest pass record check_recent_passes wrote for this site this session (nearest within
-    2 km): its window start and the passes read and judged candidates. None when there is none."""
+    2 km): its window start, the passes read and judged candidates, the candidates' dates and EMIT's
+    last look with its result. None when there is none."""
     s3 = mt._s3()
     best = None
     try:
@@ -243,10 +244,53 @@ def find_passes(lat: float, lon: float) -> dict | None:
         if not passes or not isinstance(since, str) or not _DAY.fullmatch(since):
             return None
         cands = [p for p in passes if p.get("verdict") == "candidate"]
+        days = sorted({p["date"] for p in cands if isinstance(p.get("date"), str) and _DAY.fullmatch(p["date"])})
+        dated = [p for p in passes if isinstance(p.get("date"), str) and _DAY.fullmatch(p["date"])]
+        last = max(dated, key=lambda p: p["date"], default=None)
         return {"since": since, "read": len(passes), "candidates": len(cands),
-                "candidate_dates": len({p.get("date") for p in cands if p.get("date")})}
+                "candidate_dates": len(days), "candidate_days": days,
+                "last_look": last and {"date": last["date"], "result": look_result(last)}}
     except Exception as e:  # an addition to the brief, never a reason to fail it
         logger.warning("passes lookup failed: %s", type(e).__name__)
+        return None
+
+
+# EMIT's verdict on a look, as a code the brief and the stage word themselves.
+LOOK_RESULTS = {"candidate": "methane_seen", "too weak": "too_faint", "within noise": "within_noise",
+                "cloud or gap": "clouded_out", "error": "not_read"}
+LOOK_WORDS = {"methane_seen": "methane seen", "too_faint": "too faint", "within_noise": "within noise",
+              "clouded_out": "clouded out", "not_read": "not read"}
+
+
+def look_result(p: dict) -> str:
+    if p.get("verdict") == "candidate":
+        return "methane_seen"
+    return LOOK_RESULTS.get(p.get("short"), "not_read")
+
+
+def find_tip(lat: float, lon: float) -> dict | None:
+    """The TROPOMI tip over this site this session (scan_tropomi's tip_<area>.json whose top hotspot is
+    the site, within 2 km): its window's first and last day. None when there is none."""
+    s3 = mt._s3()
+    best = None
+    try:
+        listing = s3.list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=f"{mt.session_prefix()}tip_")
+        for obj in listing.get("Contents", []):
+            if not re.fullmatch(r"tip_[a-z_]{3,40}\.json", obj["Key"].rsplit("/", 1)[-1]):
+                continue
+            tip = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=obj["Key"])["Body"].read(50_000))
+            top = tip.get("top") if isinstance(tip, dict) else None
+            tlat = _num((top or {}).get("lat"), -90, 90)
+            tlon = _num((top or {}).get("lon"), -180, 180)
+            start, end = tip.get("start"), tip.get("end")
+            if tlat is None or tlon is None or not all(isinstance(d, str) and _DAY.fullmatch(d) for d in (start, end)):
+                continue
+            d = math.hypot((tlat - lat) * 110.574, (tlon - lon) * 111.320 * math.cos(math.radians(lat)))
+            if d <= CHECK_RADIUS_KM and (best is None or d < best[0]):
+                best = (d, {"start": start, "end": end})
+        return best[1] if best else None
+    except Exception as e:  # an addition to the brief, never a reason to fail it
+        logger.warning("tip lookup failed: %s", type(e).__name__)
         return None
 
 
@@ -306,6 +350,8 @@ def find_checks(lat: float, lon: float) -> dict:
 
 _CM_KEY = re.compile(r"^cmplumes_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
 CM_ATTRIBUTION = "Source: Carbon Mapper (data.carbonmapper.org)"
+CM_FOLLOW_KM = 7.0          # one TROPOMI footprint: carbon_mapper.CM_RADIUS_KM (the follow rule's radius)
+CM_DATES_MAX = 60
 CM_INSTRUMENT_WORDS = {"tanager": "Tanager-1", "emit": "EMIT", "airborne": "airborne", "other": "another instrument"}
 
 
@@ -362,11 +408,141 @@ def find_carbon_mapper(lat: float, lon: float) -> dict | None:
         line = carbon_mapper_line(rec) if isinstance(rec, dict) else None
         if not line:
             return None
+        # The plume days within one TROPOMI footprint (the follow rule's radius), field by field.
+        days = sorted({d["date"] for d in (rec.get("dates") or [])[:CM_DATES_MAX]
+                       if isinstance(d, dict) and isinstance(d.get("date"), str) and _DAY.fullmatch(d["date"])
+                       and (_num(d.get("distance_km"), 0, CM_FOLLOW_KM) is not None)})
         return {k: rec.get(k) for k in ("count", "latest", "rate_kg_h", "uncertainty_kg_h", "instrument",
-                                        "radius_km", "since")} | {"line": line}
+                                        "radius_km", "since")} | {"line": line, "follow_days": days}
     except Exception as e:  # an addition to the brief, never a reason to fail it
         logger.warning("carbon mapper lookup failed: %s", type(e).__name__)
         return None
+
+
+# --- the agent's decision: a new fine-scale look, or not (approved 2026-10-23) ----------------------
+#
+# The model chooses; the tool computes the facts from the session's own records (the tip's window,
+# the latest fine-scale confirmation, EMIT's last look) and refuses a choice they contradict, naming
+# the fact. The brief's two lines about it are written here, from the enums and the dates: no model
+# text reaches the record line, the recommendation line or the stage.
+
+RECOMMENDATIONS = ("recommend_new_look", "no_new_look_needed")
+# Each reason and the one recommendation it leads to.
+REASONS = {
+    "confirmation_older_than_90_days": "recommend_new_look",
+    "no_confirmation_on_record": "recommend_new_look",
+    "last_look_clouded_out": "recommend_new_look",
+    "confirmed_within_90_days": "no_new_look_needed",
+}
+# About twice the best the sources allow: a 14-day TROPOMI window plus Carbon Mapper's 30-day lag.
+GAP_DAYS = 90
+CONFIRMED_BY_WORDS = {"emit": "an EMIT candidate pass", "carbon_mapper": "a Carbon Mapper plume",
+                      "both": "an EMIT candidate pass and a Carbon Mapper plume"}
+
+
+def record_facts(passes: dict | None, cm: dict | None, tip: dict | None, today: str) -> dict:
+    """The site's record as facts: the tip's window, the latest fine-scale confirmation (the newer of
+    the newest EMIT candidate pass and the newest Carbon Mapper plume within 7 km), the days from it
+    to the tip's first day (to the brief's day when there is no tip), EMIT's last look and its result,
+    and how many separate days the site was confirmed on."""
+    emit_days = list((passes or {}).get("candidate_days") or [])
+    cm_days = list((cm or {}).get("follow_days") or [])
+    e, c = (emit_days[-1] if emit_days else None), (cm_days[-1] if cm_days else None)
+    if not e and not c:
+        latest = None
+    elif e and c and e == c:
+        latest = {"date": e, "by": "both"}
+    elif e and (not c or e > c):
+        latest = {"date": e, "by": "emit"}
+    else:
+        latest = {"date": c, "by": "carbon_mapper"}
+    reference = tip["start"] if tip else today
+    days = (date.fromisoformat(reference) - date.fromisoformat(latest["date"])).days if latest else None
+    return {"tip_start": tip["start"] if tip else None, "tip_end": tip["end"] if tip else None,
+            "reference": "tip" if tip else "brief", "latest_confirmed": latest, "days_between": days,
+            "last_look": (passes or {}).get("last_look"), "confirmed_dates": len(set(emit_days) | set(cm_days))}
+
+
+def reasons_true(facts: dict) -> dict[str, bool]:
+    latest, days, last = facts["latest_confirmed"], facts["days_between"], facts["last_look"]
+    return {
+        "confirmation_older_than_90_days": latest is not None and days > GAP_DAYS,
+        "no_confirmation_on_record": latest is None,
+        "last_look_clouded_out": bool(last) and last.get("result") == "clouded_out",
+        "confirmed_within_90_days": latest is not None and days <= GAP_DAYS,
+    }
+
+
+def _against(facts: dict) -> str:
+    return "the tip's first day" if facts["reference"] == "tip" else "this brief"
+
+
+def confirmation_words(facts: dict) -> str:
+    latest = facts["latest_confirmed"]
+    if not latest:
+        return "no fine-scale confirmation is on record for this site"
+    return (f"the latest fine-scale confirmation is {CONFIRMED_BY_WORDS[latest['by']]} on {latest['date']}, "
+            f"{facts['days_between']} days before {_against(facts)}"
+            + (f" ({facts['tip_start']})" if facts["reference"] == "tip" else ""))
+
+
+def decision_problem(recommendation: str, reason: str, facts: dict) -> str | None:
+    """Why the model's choice does not fit the record (None: it fits), naming the fact."""
+    truth = reasons_true(facts)
+    supported = "; ".join(f"{r} ({REASONS[r]})" for r, ok in truth.items() if ok)
+    if truth[reason]:
+        return None
+    if reason in ("confirmation_older_than_90_days", "confirmed_within_90_days", "no_confirmation_on_record"):
+        fact = confirmation_words(facts)
+    else:
+        last = facts["last_look"]
+        fact = (f"EMIT's last look here, on {last['date']}, was {LOOK_WORDS[last['result']]}, not clouded out" if last
+                else "EMIT's passes were not read for this site")
+    return (f"recommendation_reason '{reason}' does not fit the record: {fact}. The record supports: {supported}. "
+            "Choose one of these and call draft_brief again with everything else unchanged.")
+
+
+def validate_decision(recommendation: Any, reason: Any) -> tuple[str, str]:
+    if recommendation not in RECOMMENDATIONS:
+        raise MethaneError(f"recommendation must be one of: {', '.join(RECOMMENDATIONS)}")
+    if reason not in REASONS:
+        raise MethaneError(f"recommendation_reason must be one of: {', '.join(REASONS)}")
+    if REASONS[reason] != recommendation:
+        raise MethaneError(f"recommendation_reason '{reason}' leads to '{REASONS[reason]}', not '{recommendation}'")
+    return recommendation, reason
+
+
+def record_line(facts: dict) -> str:
+    """The brief's "Record:" line, from the facts alone."""
+    parts = []
+    if facts["tip_start"]:
+        parts.append(f"TROPOMI tipped this site from {facts['tip_start']} to {facts['tip_end']}")
+    latest, days = facts["latest_confirmed"], facts["days_between"]
+    if latest:
+        if days <= 0:
+            when = "inside the tip's window" if facts["reference"] == "tip" else "on the day of this brief"
+        else:
+            when = f"{days} day{'' if days == 1 else 's'} {'earlier' if facts['reference'] == 'tip' else 'before this brief'}"
+        parts.append(f"the latest fine-scale confirmation is {CONFIRMED_BY_WORDS[latest['by']]} on {latest['date']}, {when}")
+    else:
+        parts.append("no fine-scale confirmation is on record")
+    last = facts["last_look"]
+    parts.append(f"EMIT last looked on {last['date']} ({LOOK_WORDS[last['result']]})" if last
+                 else "EMIT's passes here were not read")
+    return "Record: " + "; ".join(parts) + "."
+
+
+def recommendation_line(recommendation: str, reason: str, facts: dict) -> str:
+    """The brief's "Recommendation:" line, from the enums alone."""
+    against = "the tip" if facts["reference"] == "tip" else "this brief"
+    because = {
+        "confirmation_older_than_90_days": f"the latest confirmation is more than {GAP_DAYS} days older than {against}",
+        "no_confirmation_on_record": "no fine-scale confirmation is on record here",
+        "last_look_clouded_out": "EMIT's last look here was clouded out",
+        "confirmed_within_90_days": f"the latest confirmation is within {GAP_DAYS} days of {against}",
+    }[reason]
+    lead = "a new fine-scale look" if recommendation == "recommend_new_look" else "no new fine-scale look needed"
+    return f"Recommendation: {lead}, because {because}."
 
 
 # The registry check's sentences, in the order the brief and the card print them.
@@ -450,6 +626,9 @@ def render_markdown(brief: dict, brief_id: str) -> str:
         f"Site: near {brief['place']} ({brief['lat']:.4f}, {brief['lon']:.4f}){area}.",
         f"Looks: {brief['candidates']} of {brief['passes_read']} passes read{since} are candidates; "
         f"EMIT looked {brief['looks']} times in all.",
+        *([record_line(brief["record"]),
+           recommendation_line(brief["recommendation"], brief["recommendation_reason"], brief["record"])]
+          if brief.get("record") else []),
         "",
         *[f"- {o}" for o in brief["observations"]],
         *check_lines,
@@ -476,7 +655,8 @@ def new_brief_id(now: datetime | None = None) -> str:
 @tool
 async def draft_brief(place: str, lat: float, lon: float, observations: list,
                       looks: int, candidates: int, passes_read: int, explanations: list,
-                      confidence: str, gaps: list, next_collection: str, watch_area: str = None) -> str:
+                      confidence: str, gaps: list, next_collection: str, recommendation: str,
+                      recommendation_reason: str, watch_area: str = None) -> str:
     """Draft the Methane Watch brief for one site. A DRAFT only: nothing is filed until the analyst decides.
 
     Every text field is ONE short sentence of at most 220 characters (place 64); no markdown, pipes
@@ -502,15 +682,25 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
         gaps: 1-4 things the data cannot show (coverage, the plume product's gap after its latest
             plume date, ...).
         next_collection: The recommended next look (another EMIT pass, aircraft, ground inspection).
+        recommendation: YOUR decision for this site: "recommend_new_look" (a new fine-scale look: a
+            new EMIT pass, Tanager or aircraft) or "no_new_look_needed".
+        recommendation_reason: Why, one of: "confirmation_older_than_90_days" (the latest confirmed
+            detection is more than 90 days before the tip's first day), "no_confirmation_on_record",
+            "last_look_clouded_out" (EMIT's newest pass here was clouded out): these three lead to
+            recommend_new_look; "confirmed_within_90_days" leads to no_new_look_needed. The tool checks
+            your choice against the session's records (the tip's window, the latest confirmation, EMIT's
+            last look) and refuses one they contradict, naming the fact; when more than one reason
+            holds, give the one you lead with.
         watch_area: The watch area whose scan tipped this site (its key, e.g. "shanxi coal basin").
 
     Returns: JSON with brief_id, status "draft", markdown (paste it as the record, verbatim),
-    draft_s3_url, next_steps. If the text breaks the brief's rules, an error naming the parts to
-    rewrite: fix them and call again.
+    draft_s3_url, next_steps. If the text breaks the brief's rules, or the recommendation does not
+    fit the record, an error naming what to fix: fix exactly that and call again.
     """
     try:
         brief = validate_brief(place, lat, lon, watch_area, observations, looks, candidates, passes_read,
                                explanations, confidence, gaps, next_collection)
+        recommendation, recommendation_reason = validate_decision(recommendation, recommendation_reason)
     except MethaneError as e:
         return json.dumps({"error": str(e)})
     brief_id = new_brief_id()
@@ -521,10 +711,16 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
     brief["checks"] = find_checks(brief["lat"], brief["lon"])
     cm = find_carbon_mapper(brief["lat"], brief["lon"])
     if cm:   # Carbon Mapper's independent detections, in the tool's own sentence (with its attribution)
-        brief["checks"]["carbon_mapper"] = cm
+        brief["checks"]["carbon_mapper"] = {k: v for k, v in cm.items() if k != "follow_days"}
     named = check_record_names(brief, record_names(brief["checks"])) + check_only_oil_gas(brief, brief["checks"])
     if named:   # nothing is written: the model rewrites its fields and calls again
         return json.dumps({"error": "Rewrite these parts of the brief: " + "; ".join(named[:8])})
+    # The decision is the model's; the facts are the records'. A choice they contradict is refused.
+    facts = record_facts(passes, cm, find_tip(brief["lat"], brief["lon"]), datetime.now(timezone.utc).date().isoformat())
+    problem = decision_problem(recommendation, recommendation_reason, facts)
+    if problem:
+        return json.dumps({"error": problem})
+    brief.update(recommendation=recommendation, recommendation_reason=recommendation_reason, record=facts)
     markdown = render_markdown(brief, brief_id)
     record = {"brief_id": brief_id, "status": "draft", "created": datetime.now(timezone.utc).isoformat(),
               "session_id": mt._session_id(), "brief": brief, "markdown": markdown}

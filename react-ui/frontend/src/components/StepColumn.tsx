@@ -12,6 +12,8 @@ import { theme } from '../theme';
 import type { EvidenceItem } from '../utils/evidence.ts';
 import { EvidenceChip } from './EvidenceChip.tsx';
 import { PassFilmstrip } from './PassFilmstrip.tsx';
+import { RecordTimeline } from './RecordTimeline.tsx';
+import { recordTimeline } from '../utils/record.ts';
 import { ProfileSection } from './ProfileSection.tsx';
 import { SurveyRow } from './SurveyRow.tsx';
 import { TipBoard } from './TipBoard.tsx';
@@ -326,6 +328,11 @@ export function StepColumn({
               {films.map(({ call, frames, summaryOnly }) => {
                 const j = group.calls.indexOf(call);
                 const site = tips.find((t) => tipCued(t, [call]));
+                // The following beat: the site the agent followed gets its record above its frames
+                // (every look since 2025, Carbon Mapper's plumes, the gap to the tip).
+                const record = !summaryOnly && chosen !== null && call === cues[chosen] && site
+                  ? recordTimeline({ tip: site, frames, cm: cm[site.area.name] })
+                  : null;
                 return (
                   <div key={call.id || String(j)} style={{ gridColumn: '2 / -1' }}>
                     {(films.length > 1 || collapsed) && (
@@ -333,7 +340,9 @@ export function StepColumn({
                         {site ? site.area.label : detail?.points?.[j] ?? ''}
                       </span>
                     )}
-                    <PassFilmstrip toolId={call.id} frames={frames!} onOpen={onOpenEvidence} summaryOnly={summaryOnly} />
+                    {record && <RecordTimeline model={record} />}
+                    <PassFilmstrip toolId={call.id} frames={frames!} onOpen={onOpenEvidence} summaryOnly={summaryOnly}
+                      noSummary={record !== null} />
                   </div>
                 );
               })}

@@ -1,5 +1,6 @@
 import type { GeometryData, StreamEvent } from '../types.ts';
 import type { VesselRest } from '../utils/vesselLayers.ts';
+import type { BriefDecision } from '../utils/record.ts';
 import { validBucket } from '../utils/vesselSteps.ts';
 import { getIdToken } from '../utils/auth';
 
@@ -472,6 +473,8 @@ export interface BriefCardData {
   nextCollection?: string;
   /** Carbon Mapper's independent detections at the site, the tool's own sentence with its source. */
   independent?: string;
+  /** The agent's decision on a new fine-scale look, with the record's facts (validated enums and dates). */
+  decision?: BriefDecision;
 }
 
 export interface BriefState {

@@ -404,17 +404,41 @@ def test_a_dotted_match_reads_a_nested_field_and_the_mission_must_show_its_colum
     cols = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}columns_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.geojson",
                                                              "render": {"kind": "columns", "property": "ppm_m"}})}
     as_text = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}columns_x.geojson", "render": '{"kind": "columns"}'})}
-    assert ev.input_problems(mission, [window, cols]) == []
-    assert ev.input_problems(mission, [window, as_text]) == []
+    # The mission's brief carries the agent's decision (checked on its own below).
+    ok = {"name": "draft_brief", "input": _json.dumps({"recommendation": "recommend_new_look",
+                                                       "recommendation_reason": "confirmation_older_than_90_days"})}
+    assert ev.input_problems(mission, [window, cols, ok]) == []
+    assert ev.input_problems(mission, [window, as_text, ok]) == []
     assert ev.input_problems(mission, [cols, window]) != []          # the columns must follow the look
     problems = ev.input_problems(mission, [window, flat])            # the Oct 22 stable mission
     assert any("render.kind=columns" in p for p in problems)
-    assert ev.input_problems(mission, []) == []                      # no candidate looked at: nothing to show
+    assert ev.input_problems(mission, [ok]) == []                    # no candidate looked at: nothing to show
     shown_flat = ev.input_problems(mission, [window, flat, cols])     # the flat window is never shown
     assert any("forbidden input display_visual" in p for p in shown_flat)
     assert ev.dotted({"render": {"kind": "columns"}}, "render.kind") == "columns"
     assert ev.dotted({"render": "not json"}, "render.kind") is None and ev.dotted({}, "a.b") is None
     assert ev.case_problems(mission) == []
+
+
+def test_the_mission_must_carry_the_agents_decision_as_validated_enums():
+    """Oct 23 (the record and the decision, approved 2026-10-23): draft_brief's recommendation and
+    recommendation_reason are one of the enums, and the record keeps the tool's 'Recommendation:' line."""
+    import json as _json
+    from pathlib import Path
+    cases = _json.loads((Path(ev.REPO_ROOT) / "agents" / "methane-hunter" / "golden_prompts.json").read_text())["prompts"]
+    mission = next(c for c in cases if c["name"] == "watch-mission")
+    assert "Recommendation:" in mission["required_text"]
+
+    def brief(**decision):
+        return {"name": "draft_brief", "input": _json.dumps({"place": "Yangquan, Shanxi, China", **decision})}
+    ok = brief(recommendation="recommend_new_look", recommendation_reason="confirmation_older_than_90_days")
+    assert ev.input_problems(mission, [ok]) == []
+    # A refused first call (no enums) and an accepted second one still pass: the decision was made.
+    assert ev.input_problems(mission, [brief(), ok]) == []
+    for bad in (brief(), brief(recommendation="recommend_new_look"),
+                brief(recommendation="yes", recommendation_reason="confirmation_older_than_90_days"),
+                brief(recommendation="no_new_look_needed", recommendation_reason="it is old")):
+        assert any("expected inputs: no draft_brief" in p for p in ev.input_problems(mission, [bad]))
 
 
 # --- the archaeologist's condition survey (decision 10, Oct 22) ----------------------------------------------

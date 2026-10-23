@@ -1,0 +1,354 @@
+{
+  "name": "Methane Watch brief",
+  "description": "One prompt, the whole mission: a global baseline, a TROPOMI tip, EMIT cued on recent passes, a self-check, and a draft brief for the analyst",
+  "location": "Methane watch areas",
+  "user_question": "Brief me on the watch areas where methane keeps showing up, and how confident you are.",
+  "agent": "methane",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "methane_hunter_dev",
+  "tool_calls": [
+    {
+      "name": "watch_baseline",
+      "params": {},
+      "result": "Baseline built from NASA's plume record"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-record/watch_sites_v002.geojson",
+        "title": "Global Methane Watch: Repeat Sites (5+ dates)",
+        "description": "24 repeat sites seen on 5 or more separate dates in the NASA EMIT plume product",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "permian basin",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "south caspian",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "amu darya basin",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "zagros foreland",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "shanxi coal basin",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "orenburg and lower volga",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "west siberia and yamal",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "hassi messaoud",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "scan_tropomi",
+      "params": {
+        "area": "amman",
+        "days": 14
+      },
+      "result": "TROPOMI composite scanned"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 35.5493,
+        "lon": 112.8982
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "check_recent_passes",
+      "params": {
+        "lat": 37.6834,
+        "lon": 53.7827
+      },
+      "result": "Recent EMIT passes judged"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 35.5493,
+        "lon": 112.8982
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "site_history",
+      "params": {
+        "lat": 37.6834,
+        "lon": 53.7827
+      },
+      "result": "Site history read"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 112.8982,
+        "y": 35.5493
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "reverse_geocode",
+      "params": {
+        "x": 53.7827,
+        "y": 37.6834
+      },
+      "result": "Place named"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 35.5493,
+        "lon": 112.8982
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "carbon_mapper_plumes",
+      "params": {
+        "lat": 37.6834,
+        "lon": 53.7827
+      },
+      "result": "Carbon Mapper's public plumes checked"
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-record/tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-21_14d.tif",
+        "title": "TROPOMI CH4 Anomaly: Shanxi and Ordos Coal Basins, 2026-10-07 to 2026-10-21",
+        "description": "14-day composite, top hotspot +122.6 ppb above background near Jincheng City, Shanxi Province",
+        "render": {
+          "kind": "raster",
+          "colormap": "ice",
+          "rescale": [
+            0,
+            60
+          ],
+          "units": "ppb",
+          "group": "methane",
+          "max_zoom": 8,
+          "legend": "CH4 anomaly",
+          "bounds": [
+            108.0,
+            34.5,
+            114.6,
+            40.8
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "create_bbox_from_coordinates",
+      "params": {
+        "geometry_json": "{\"type\":\"Point\",\"coordinates\":[112.8982,35.5493]}",
+        "location": "Jincheng City watch site",
+        "radius_meters": 3000
+      },
+      "result": "3 km frame around the site"
+    },
+    {
+      "name": "thermal_anomalies",
+      "params": {
+        "lat": 35.5493,
+        "lon": 112.8982
+      },
+      "result": "VIIRS heat checked"
+    },
+    {
+      "name": "nearby_infrastructure",
+      "params": {
+        "lat": 35.5493,
+        "lon": 112.8982
+      },
+      "result": "Overture Maps checked, by type"
+    },
+    {
+      "name": "registry_lookup",
+      "params": {
+        "lat": 35.5493,
+        "lon": 112.8982
+      },
+      "result": "Public registry checked"
+    },
+    {
+      "name": "get_rasters",
+      "params": {
+        "location": "Jincheng City watch site",
+        "geometry_s3_url": "s3://bucket/use-cases/methane-watch-record/plumes_detected.geojson",
+        "current_date_str": "2026-04-25"
+      },
+      "result": "Sentinel-2 scene fetched"
+    },
+    {
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-record/tci_clipped_jincheng_city_watch_site_2026-04-04.tif",
+        "title": "Sentinel-2 true colour, Jincheng City watch site, 2026-04-04",
+        "question": "What land cover and structures are visible?"
+      },
+      "result": "Looked at the image",
+      "saw": "Dense urban and industrial fabric is visible: a main road running north-south through the centre, large warehouse-style structures with blue and red roofs, smaller residential blocks, and bare reddish-brown terrain at the edges consistent with the coal-bearing landscape of Shanxi Province. Now drafting the brief."
+    },
+    {
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/methane-watch-record/tci_clipped_jincheng_city_watch_site_2026-04-04.tif",
+        "title": "Sentinel-2 True Colour: Jincheng City Watch Site, 2026-04-04",
+        "description": "Dense urban and industrial area, Shanxi Province, China"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "name": "draft_brief",
+      "params": {
+        "place": "Jincheng City, Shanxi Province, China",
+        "lat": 35.5493,
+        "lon": 112.8982,
+        "watch_area": "shanxi coal basin",
+        "observations": [
+          "TROPOMI recorded a 14-day median anomaly of +122.6 ppb above background at this site (2026-10-07 to 2026-10-21), the highest of all nine watch areas scanned.",
+          "EMIT looked 11 times (2024-02-17 to 2026-04-25); NASA outlined no plume here in the plume product.",
+          "4 raw EMIT passes were read since 2025-01-01: 2 rejected within noise (peak 3,501.9 and 2,049.3 ppm·m), 1 too weak (peak 735.6 ppm·m), 1 cloud or gap.",
+          "Sentinel-2 on 2026-04-04 shows dense urban and industrial fabric with large warehouse-scale structures and bare reddish terrain consistent with the coal-bearing landscape."
+        ],
+        "looks": 11,
+        "candidates": 0,
+        "passes_read": 4,
+        "explanations": [
+          {
+            "id": "routine_venting",
+            "assessment": "possible",
+            "next_check": "A confirmed EMIT plume on a new pass with no concurrent heat would support venting as a hypothesis."
+          },
+          {
+            "id": "equipment_failure_or_leak",
+            "assessment": "possible",
+            "next_check": "A new EMIT pass with a confirmed plume and no prior heat would be consistent with an undetected leak."
+          },
+          {
+            "id": "unlit_flare",
+            "assessment": "cannot assess",
+            "next_check": "VIIRS saw no heat over 30 nights; a mapped flare stack nearby would be needed to assess this hypothesis."
+          },
+          {
+            "id": "non_oil_gas_source",
+            "assessment": "possible",
+            "next_check": "A new EMIT pass coinciding with coal mine ventilation schedules would help distinguish coal from pipeline sources."
+          },
+          {
+            "id": "maintenance_blowdown",
+            "assessment": "possible",
+            "next_check": "A short-duration EMIT plume on a single date with no repeat would be consistent with a blowdown."
+          }
+        ],
+        "confidence": "low",
+        "gaps": [
+          "NASA's plume product is nearly empty after 2025-09-22; passes after that date have not been checked for outlined plumes.",
+          "EMIT only sees this site on its orbital passes; gaps between passes leave days to weeks unobserved.",
+          "The public registry lists no oil and gas facility within 2 km; a registry gap is not evidence of an empty site.",
+          "Carbon Mapper lists no plume within 7 km since 2025-01-01, but its publication lag is about 30 days."
+        ],
+        "next_collection": "A new targeted EMIT pass or Tanager-1 overpass over this site would determine whether the TROPOMI anomaly corresponds to a point-source plume.",
+        "recommendation": "recommend_new_look",
+        "recommendation_reason": "no_confirmation_on_record"
+      },
+      "result": "Brief drafted (not filed)"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "tropomi_anomaly_shanxi_and_ordos_coal_basins_china_2026-10-21_14d.tif",
+        "title": "TROPOMI CH4 Anomaly: Shanxi and Ordos Coal Basins, 2026-10-07 to 2026-10-21",
+        "render": {
+          "kind": "raster",
+          "colormap": "ice",
+          "rescale": [
+            0,
+            60
+          ],
+          "units": "ppb",
+          "group": "methane",
+          "max_zoom": 8,
+          "legend": "CH4 anomaly",
+          "bounds": [
+            108.0,
+            34.5,
+            114.6,
+            40.8
+          ]
+        }
+      },
+      {
+        "file": "watch_sites_v002.geojson",
+        "title": "Global Methane Watch: Repeat Sites (5+ dates)",
+        "render": {
+          "kind": "points",
+          "group": "watch",
+          "property": "repeat_dates",
+          "label": "repeat_dates",
+          "units": "dates"
+        }
+      },
+      {
+        "file": "tci_clipped_jincheng_city_watch_site_2026-04-04.tif",
+        "title": "Sentinel-2 True Colour: Jincheng City Watch Site, 2026-04-04"
+      }
+    ]
+  }
+}

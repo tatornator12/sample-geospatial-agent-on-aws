@@ -92,16 +92,18 @@ const scenarios: Scenario[] = [
     agent: 'methane',
   },
   {
-    id: 'methane-watch-mission',
+    // The record take (Oct 23, methane_hunter_dev v49; the case ships only at a promotion, the live
+    // gallery keeps methane-watch-mission until then): 9 areas scanned, Shanxi (near Jincheng) and
+    // the south Caspian cued; every EMIT look since 2025 read, 0 candidates at either; Carbon Mapper
+    // lists no plume within 7 km of either; the agent follows the stronger tip, Shanxi, and
+    // recommends a new fine-scale look because no fine-scale confirmation is on record.
+    id: 'methane-watch-record',
     name: 'Methane Watch brief',
-    description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, a Carbon Mapper cross-check, three ground-record checks and a draft brief for the analyst',
+    description: "One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, a Carbon Mapper cross-check, the site's record since 2025 and the agent's recommendation in a draft brief for the analyst",
     icon: '/methane_watch.png',
-    // The recorded take (Oct 22, methane_hunter_dev v45): 9 areas scanned, Shanxi and the south
-    // Caspian cued; Carbon Mapper lists no plume within 5 km of either; the brief follows Shanxi
-    // (check_recent_passes: 4 of 8 passes read since 2025-01-01 are candidates, the latest 2025-11-30).
     metrics: [
       { label: 'Watch Areas', value: '9 scanned, 2 cued' },
-      { label: 'Candidate Passes', value: '4 of 8 at Shanxi since 2025' },
+      { label: 'Recommendation', value: 'A new fine-scale look at Shanxi' },
     ],
     status: 'available',
     agent: 'methane',

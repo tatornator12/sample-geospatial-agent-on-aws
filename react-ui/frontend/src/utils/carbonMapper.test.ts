@@ -29,7 +29,17 @@ describe('the Carbon Mapper record', () => {
 
   it('keeps numbers, dates and a code only, and refuses a malformed record', () => {
     expect(parseCmPlumes(KRASNOVODSK)).toEqual({ point: [53.573, 39.4379], radiusKm: 5, since: '2025-01-01', count: 45,
-      latest: '2026-06-20', rateKgH: 273.1, instrument: 'tanager', unavailable: false });
+      latest: '2026-06-20', rateKgH: 273.1, instrument: 'tanager', unavailable: false, dates: [], followRadiusKm: null });
+    // The record timeline's plumes (records since Oct 23): numbers and codes only, a bad row dropped.
+    const dated = parseCmPlumes({ ...KRASNOVODSK, follow_radius_km: 7, dates: [
+      { date: '2026-06-20', instrument: 'tanager', rate_kg_h: null, distance_km: 2 },
+      { date: '2026-06-11', instrument: 'Acme', rate_kg_h: 1, distance_km: 2 },
+      { date: 'June', instrument: 'tanager', rate_kg_h: 1, distance_km: 2 },
+      { date: '2026-05-01', instrument: 'emit', rate_kg_h: 2050, distance_km: 5.1 },
+    ] });
+    expect(dated?.followRadiusKm).toBe(7);
+    expect(dated?.dates).toEqual([{ date: '2026-06-20', instrument: 'tanager', rateKgH: null, distanceKm: 2 },
+      { date: '2026-05-01', instrument: 'emit', rateKgH: 2050, distanceKm: 5.1 }]);
     const none = parseCmPlumes({ ...KRASNOVODSK, count: 0, latest: null, rate_kg_h: null, instrument: null });
     expect(none).toMatchObject({ count: 0, latest: null, rateKgH: null, instrument: null });
     expect(parseCmPlumes({ ...KRASNOVODSK, instrument: '<b>Acme</b>' })?.instrument).toBeNull();
@@ -54,7 +64,7 @@ describe('the step column', () => {
     const steps = [call('carbon_mapper_plumes', { lat: 1, lon: 2 }, 'a'), call('carbon_mapper_plumes', { lat: 3, lon: 4 }, 'b')];
     const [group] = groupSteps(steps);
     expect(groupName(group)).toBe('Check Carbon Mapper on 2 sites');
-    expect(groupDetail(group)).toEqual({ text: "Carbon Mapper's public plumes, within 5 km since 2025" });
+    expect(groupDetail(group)).toEqual({ text: "Carbon Mapper's public plumes, within 7 km since 2025" });
     expect(planStage([call('scan_tropomi', {}), ...steps])).toBe(2);
   });
 
