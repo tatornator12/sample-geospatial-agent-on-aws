@@ -249,7 +249,12 @@
       ],
       "comment": "The whole mission. The plume product's latest date is read from watch_baseline, never recited; the tip ranking names every area with its country; the choice follows the newest confirmed detection, an EMIT candidate pass or a Carbon Mapper plume within 7 km (one TROPOMI footprint) (a tie goes to more EMIT candidates, then the higher peak), said with both sites' dates; the three ground-record checks (heat, mapped infrastructure, public registry) run before the brief and appear as 'Check:' lines; operator names pass the tripwires only inside the registry's recorded sentence; the closer says when EMIT last looked. The brief carries the agent's decision: draft_brief's recommendation and recommendation_reason are one of the validated enums, and the record keeps the tool's 'Recommendation:' line. Oct 23 (the bars, approved 2026-10-23): the follow goes through follow_site by the 90-day switch rule (step 2, the scan's hotspots ranked 2 and 3 in each cued area, only when step 1's follow has no confirmation within 90 days of the tip window); follow_check recomputes the rule on the mission's own records (tip, pass and Carbon Mapper manifests) and requires the agent's accepted follow and reason to match, the tip bars (a ppb columns display of follow.json's tip file) to be shown, and, when the followed site has a confirmation within 90 days, its record bars after them.",
       "warn_text": [
-        "—"
+        "—",
+        "in one response",
+        "bounding box",
+        "tip bars",
+        "record bars",
+        "in parallel"
       ],
       "expected_after": [
         {
@@ -386,7 +391,12 @@
         "still active"
       ],
       "warn_text": [
-        "—"
+        "—",
+        "in one response",
+        "bounding box",
+        "tip bars",
+        "record bars",
+        "in parallel"
       ],
       "expected_after": [
         {
@@ -512,7 +522,12 @@
         "still active"
       ],
       "warn_text": [
-        "—"
+        "—",
+        "in one response",
+        "bounding box",
+        "tip bars",
+        "record bars",
+        "in parallel"
       ],
       "expected_after": [
         {
