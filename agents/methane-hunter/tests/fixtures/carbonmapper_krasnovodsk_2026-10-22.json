@@ -1,0 +1,2492 @@
+{
+ "bbox_count": 69,
+ "total_count": 45488,
+ "limit": 1000,
+ "offset": 0,
+ "items": [
+  {
+   "id": "544cbd2a-1a28-4f5a-b70f-507270c9eef1",
+   "plume_id": "tan20260620t083638c93s4001-AX",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.61704119316016,
+     39.451956024151116
+    ]
+   },
+   "scene_id": "34cea615-78dd-4844-bc2d-9ebd2446ad06",
+   "scene_timestamp": "2026-06-20T08:36:38.930Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 133.8318135204842,
+   "emission_uncertainty_auto": 94.09605206630208,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-20T09:19:14.631Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.59805083234726,
+    39.437817233272426,
+    53.63818291218466,
+    39.469074320605245
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "6791bfe5-0466-46e4-8028-2bc87a8a7355",
+   "plume_id": "tan20260620t083638c93s4001-BD",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62435768369636,
+     39.46294912129969
+    ]
+   },
+   "scene_id": "34cea615-78dd-4844-bc2d-9ebd2446ad06",
+   "scene_timestamp": "2026-06-20T08:36:38.930Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1685.3514230908531,
+   "emission_uncertainty_auto": 1399.7175917342424,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-20T09:19:13.422Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60765543944957,
+    39.45540050509849,
+    53.648146116189174,
+    39.486657124705346
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "b9f7c91d-a323-4a05-893c-873d5797a91f",
+   "plume_id": "tan20260620t083638c93s4001-BI",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.58848431437124,
+     39.45134916754992
+    ]
+   },
+   "scene_id": "34cea615-78dd-4844-bc2d-9ebd2446ad06",
+   "scene_timestamp": "2026-06-20T08:36:38.930Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-20T09:19:13.592Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.570173825580106,
+    39.43728853235436,
+    53.61100213519447,
+    39.46908331462879
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "c98a65a5-845b-4e1c-aebf-40a405a1274f",
+   "plume_id": "tan20260620t083638c93s4001-BJ",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60320370817229,
+     39.455360588809754
+    ]
+   },
+   "scene_id": "34cea615-78dd-4844-bc2d-9ebd2446ad06",
+   "scene_timestamp": "2026-06-20T08:36:38.930Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 273.133617045451,
+   "emission_uncertainty_auto": 260.93593141612536,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-20T09:19:13.932Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.58392732885509,
+    39.44120218179618,
+    53.624758294991466,
+    39.472997245268935
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "5255575d-3d50-40af-bb83-cbaa0234e8e5",
+   "plume_id": "tan20260611t083132c23s4001-CI",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57857777658114,
+     39.446817866231214
+    ]
+   },
+   "scene_id": "9e0a31c0-6487-47d1-8567-187dcffcf4bd",
+   "scene_timestamp": "2026-06-11T08:31:32.230Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1056.2049165751978,
+   "emission_uncertainty_auto": 537.2794961952279,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-11T09:19:21.659Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.562753363318,
+    39.43220642142015,
+    53.603929008685476,
+    39.46373287471842
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "5ddbcd23-6fc1-4e44-a194-e47514617d0b",
+   "plume_id": "tan20260611t083132c23s4001-G",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.56802022574888,
+     39.44423894669495
+    ]
+   },
+   "scene_id": "9e0a31c0-6487-47d1-8567-187dcffcf4bd",
+   "scene_timestamp": "2026-06-11T08:31:32.230Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1513.0988055531773,
+   "emission_uncertainty_auto": 972.7661977997968,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-11T09:19:20.768Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55086564582359,
+    39.433198812465996,
+    53.5913427561153,
+    39.464454927774376
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "b5279301-8f5d-43e2-aa94-3387ff10d135",
+   "plume_id": "tan20260611t083132c23s4001-J",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.588482259546,
+     39.45144053082885
+    ]
+   },
+   "scene_id": "9e0a31c0-6487-47d1-8567-187dcffcf4bd",
+   "scene_timestamp": "2026-06-11T08:31:32.230Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1184.9196749114649,
+   "emission_uncertainty_auto": 918.5300146595895,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-11T09:19:16.169Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.56845880406765,
+    39.436696885617906,
+    53.60963724666703,
+    39.46822344734545
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "0209259b-61bd-40a3-a2bd-ad45baef0448",
+   "plume_id": "tan20260611t083132c23s4001-K",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60163479818817,
+     39.44591507357825
+    ]
+   },
+   "scene_id": "9e0a31c0-6487-47d1-8567-187dcffcf4bd",
+   "scene_timestamp": "2026-06-11T08:31:32.230Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 754.5799595764407,
+   "emission_uncertainty_auto": 280.27009156483103,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-11T09:19:16.261Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.58130948229682,
+    39.4308457625499,
+    53.621786057119,
+    39.462102520416
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "838d3704-c753-498b-ac83-c80d91e62d7e",
+   "plume_id": "tan20260611t083132c23s4001-L",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.617018252373555,
+     39.452181834733466
+    ]
+   },
+   "scene_id": "9e0a31c0-6487-47d1-8567-187dcffcf4bd",
+   "scene_timestamp": "2026-06-11T08:31:32.230Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1304.379644635005,
+   "emission_uncertainty_auto": 213.81642382495156,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-11T09:19:16.081Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.59695378193276,
+    39.438866401341265,
+    53.6370864338396,
+    39.470123463188756
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "72a0e347-97ed-4e85-bf40-6e48396988cc",
+   "plume_id": "tan20260611t083132c23s4001-O",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62431596059682,
+     39.463290392685565
+    ]
+   },
+   "scene_id": "9e0a31c0-6487-47d1-8567-187dcffcf4bd",
+   "scene_timestamp": "2026-06-11T08:31:32.230Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 7408.884536024611,
+   "emission_uncertainty_auto": 1822.8687263097981,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-07-11T09:19:16.529Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60501780970829,
+    39.42983597904816,
+    53.757253529616484,
+    39.54732405269204
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "551d84eb-081a-41b5-a789-8ffd7e205bc5",
+   "plume_id": "tan20260424t082511c52s4001-AB",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.617049347014245,
+     39.45169030952641
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1825.9652644168743,
+   "emission_uncertainty_auto": 402.62900743591905,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:14.015Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.5887302399756,
+    39.4181285822583,
+    53.75421749895309,
+    39.545855634663916
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "66a20822-a9fb-4a47-ab26-2c069ccf53c1",
+   "plume_id": "tan20260424t082511c52s4001-AC",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62412281140422,
+     39.46323293989815
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 10563.697257718753,
+   "emission_uncertainty_auto": 409.13162407748524,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:12.647Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.5890919148951,
+    39.41838785879733,
+    53.75388091552226,
+    39.545575997729586
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "0f44e283-7fa3-49e8-85f7-732040f438cd",
+   "plume_id": "tan20260424t082511c52s4001-AI",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.61374875065587,
+     39.455634883520105
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1510.052073605483,
+   "emission_uncertainty_auto": 157.38080632623246,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:12.854Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.58558070752455,
+    39.41779123938741,
+    53.75176573374396,
+    39.54605697024167
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "b6492feb-a3ab-4400-82d0-dbbb97904765",
+   "plume_id": "tan20260424t082511c52s4001-AJ",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60160580177265,
+     39.44545878329123
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:16.035Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.584269823984755,
+    39.43418497132327,
+    53.6254472239597,
+    39.46571187211425
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "24bc000f-2272-43e7-b604-81217e166918",
+   "plume_id": "tan20260424t082511c52s4001-AK",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60310110422279,
+     39.44805121670731
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 974.1121667019623,
+   "emission_uncertainty_auto": 216.31319260193908,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:13.043Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.58491412835081,
+    39.43528520427062,
+    53.625742405313765,
+    39.466811481942685
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "37367e84-759b-47ac-99f6-60538ac5f4c4",
+   "plume_id": "tan20260424t082511c52s4001-AL",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57527622667135,
+     39.446572779144645
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1641.033088815943,
+   "emission_uncertainty_auto": 223.88844418263187,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:12.755Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55814913782125,
+    39.433952868036855,
+    53.59862688175728,
+    39.46520913412119
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "a5388a07-6d0f-41d3-a2c0-6921e4ddc5e3",
+   "plume_id": "tan20260424t082511c52s4001-AM",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.567728236574794,
+     39.44408327412856
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 482.08146561794365,
+   "emission_uncertainty_auto": 374.37346296364586,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:16.139Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.54885622429,
+    39.43125862016263,
+    53.59003092863998,
+    39.46278478212733
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "a532e68f-1e92-4e79-adee-fc8be672e4f6",
+   "plume_id": "tan20260424t082511c52s4001-AN",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57427564698472,
+     39.440041863947016
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 384.43543687706057,
+   "emission_uncertainty_auto": 339.16761701783525,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:16.238Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55741092746383,
+    39.427456662909286,
+    53.59823389133965,
+    39.45898238205644
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "48d8da61-7ad8-449a-ac1f-691f6bb478ce",
+   "plume_id": "tan20260424t082511c52s4001-AO",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.56734177498333,
+     39.45020834449454
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:16.420Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.54759840681534,
+    39.43554536721486,
+    53.58877559654252,
+    39.46707149123869
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "713e20a1-e58a-46bd-bdeb-db626c7e4712",
+   "plume_id": "tan20260424t082511c52s4001-BT",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62775370957064,
+     39.4600617464551
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:20.002Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.5890919148951,
+    39.41838785879733,
+    53.75388091552226,
+    39.545575997729586
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "aade122e-8334-49bc-88c8-0b92b658d39d",
+   "plume_id": "tan20260424t082511c52s4001-BX",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.58844996210547,
+     39.45134186052266
+    ]
+   },
+   "scene_id": "f993d69c-d0e9-42cd-9466-04d214c12837",
+   "scene_timestamp": "2026-04-24T08:25:11.520Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 843.7679586967764,
+   "emission_uncertainty_auto": 162.55921171664323,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-24T09:19:15.835Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.56661198243073,
+    39.43880479413905,
+    53.607791613686054,
+    39.47033131137277
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "ff220a21-ef8b-41c6-9504-9748117d943b",
+   "plume_id": "tan20260417t082701c11s4001-AN",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.5672353970003,
+     39.44974154863522
+    ]
+   },
+   "scene_id": "c038fbb2-6698-4743-bc32-93a0ad42deb1",
+   "scene_timestamp": "2026-04-17T08:27:01.110Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-17T09:19:13.569Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.54664846717484,
+    39.4336269465555,
+    53.58747399830284,
+    39.465421237218386
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "9ec4c1ef-7443-4801-9d07-1d51813476d1",
+   "plume_id": "tan20260417t082701c11s4001-AO",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.588665964862656,
+     39.44978938283833
+    ]
+   },
+   "scene_id": "c038fbb2-6698-4743-bc32-93a0ad42deb1",
+   "scene_timestamp": "2026-04-17T08:27:01.110Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-17T09:19:13.446Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.56828409623223,
+    39.43317987801992,
+    53.60910995896615,
+    39.46497463096624
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "9b57806c-132b-44cf-a8e9-d0b8c318a8f6",
+   "plume_id": "tan20260417t082701c11s4001-I",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.6136164408793,
+     39.455935746160065
+    ]
+   },
+   "scene_id": "c038fbb2-6698-4743-bc32-93a0ad42deb1",
+   "scene_timestamp": "2026-04-17T08:27:01.110Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 932.9206723062617,
+   "emission_uncertainty_auto": 637.3290975398698,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-17T09:19:15.803Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.59177118670984,
+    39.43790549534159,
+    53.631903149886064,
+    39.469162452215095
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "1f96a066-420e-4e67-85bc-2cfb8ca7c512",
+   "plume_id": "tan20260417t082701c11s4001-J",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.6244965566903,
+     39.46291223641805
+    ]
+   },
+   "scene_id": "c038fbb2-6698-4743-bc32-93a0ad42deb1",
+   "scene_timestamp": "2026-04-17T08:27:01.110Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-17T09:19:15.020Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60327959673434,
+    39.445005226897564,
+    53.643764143418935,
+    39.47626178317854
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "6c0fd936-40f8-46c6-be11-01684de7c6eb",
+   "plume_id": "tan20260417t082701c11s4001-W",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57430956848762,
+     39.44638863309498
+    ]
+   },
+   "scene_id": "c038fbb2-6698-4743-bc32-93a0ad42deb1",
+   "scene_timestamp": "2026-04-17T08:27:01.110Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-17T09:19:16.807Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55433154679693,
+    39.426285481245685,
+    53.59515374384016,
+    39.45781113834467
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "609b4fa6-458d-42fa-8f3e-bc4e26d54f78",
+   "plume_id": "tan20260417t082701c11s4001-X",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.56695459331834,
+     39.44401245697071
+    ]
+   },
+   "scene_id": "c038fbb2-6698-4743-bc32-93a0ad42deb1",
+   "scene_timestamp": "2026-04-17T08:27:01.110Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 688.7837158088485,
+   "emission_uncertainty_auto": 168.3544445658474,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-17T09:19:15.904Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.54694210658028,
+    39.42794917304891,
+    53.5874160765546,
+    39.45920521956708
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "794f3905-be86-43c7-b0de-fae9cb124d86",
+   "plume_id": "tan20260417t082701c11s4001-Y",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60124906629514,
+     39.44523648561935
+    ]
+   },
+   "scene_id": "c038fbb2-6698-4743-bc32-93a0ad42deb1",
+   "scene_timestamp": "2026-04-17T08:27:01.110Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-17T09:19:15.208Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.5288534535338,
+    39.293094805803015,
+    53.786878767976106,
+    39.49276906013581
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "17af0abe-1cb2-44f0-af34-1bc2c6afb643",
+   "plume_id": "tan20260410t082753c95s4001-AD",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62602342746965,
+     39.4635204111066
+    ]
+   },
+   "scene_id": "e2f81c6a-7d22-4134-bc6f-3d59bf8dbe00",
+   "scene_timestamp": "2026-04-10T08:27:53.950Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-10T09:19:17.574Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60699139645013,
+    39.44727450696588,
+    53.647827262899774,
+    39.47880121454099
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "b8c30095-16cf-4d6a-9505-a575eebf0080",
+   "plume_id": "tan20260410t082753c95s4001-AO",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.624002350531555,
+     39.45806682400769
+    ]
+   },
+   "scene_id": "e2f81c6a-7d22-4134-bc6f-3d59bf8dbe00",
+   "scene_timestamp": "2026-04-10T08:27:53.950Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-10T09:19:20.318Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.603745992306,
+    39.4425866034663,
+    53.64422915294617,
+    39.47384317570078
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "b80faf6c-d5d8-4111-b65d-c098033d4dda",
+   "plume_id": "tan20260410t082753c95s4001-C",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.624213903578436,
+     39.46344536909993
+    ]
+   },
+   "scene_id": "e2f81c6a-7d22-4134-bc6f-3d59bf8dbe00",
+   "scene_timestamp": "2026-04-10T08:27:53.950Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-10T09:19:16.178Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60699139645013,
+    39.44727450696588,
+    53.647827262899774,
+    39.47880121454099
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "1cabb09e-1616-48e7-8a54-c1a183615a9b",
+   "plume_id": "tan20260410t082753c95s4001-U",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.61363812181594,
+     39.455996027586934
+    ]
+   },
+   "scene_id": "e2f81c6a-7d22-4134-bc6f-3d59bf8dbe00",
+   "scene_timestamp": "2026-04-10T08:27:53.950Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-10T09:19:15.122Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.566164441286205,
+    39.43075215082128,
+    53.81035823867806,
+    39.619110282424295
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "aa86daaa-dec4-47c1-b190-137528cbe15f",
+   "plume_id": "tan20260410t082753c95s4001-V",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62083127831863,
+     39.4541884089721
+    ]
+   },
+   "scene_id": "e2f81c6a-7d22-4134-bc6f-3d59bf8dbe00",
+   "scene_timestamp": "2026-04-10T08:27:53.950Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-05-10T09:19:17.154Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.599738055687844,
+    39.43868704398209,
+    53.640918525805816,
+    39.47021425660353
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "04c83d65-77dd-4297-aef8-9186aa6de32a",
+   "plume_id": "tan20260125t082153c48s4001-S",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.624243114139176,
+     39.463273108071576
+    ]
+   },
+   "scene_id": "a1c667a0-c2fe-41ee-8e1e-efd15aa638bd",
+   "scene_timestamp": "2026-01-25T08:21:53.480Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 3452.8104778661263,
+   "emission_uncertainty_auto": 2262.850907126954,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-02-24T09:19:13.473Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.571575679603455,
+    39.4220649390336,
+    53.64770156824638,
+    39.48084654488689
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "ba3cebe3-df72-4e6d-9d11-c40cc1b62be4",
+   "plume_id": "tan20260125t082153c48s4001-V",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60138245257153,
+     39.454304895803375
+    ]
+   },
+   "scene_id": "a1c667a0-c2fe-41ee-8e1e-efd15aa638bd",
+   "scene_timestamp": "2026-01-25T08:21:53.480Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-02-24T09:19:13.649Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.57615434217286,
+    39.433848531222665,
+    53.63342769774411,
+    39.47807004708504
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "8ef586c0-ebab-49b4-a742-59b414e2167e",
+   "plume_id": "tan20260125t082153c48s4001-X",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57528183358153,
+     39.4467016859561
+    ]
+   },
+   "scene_id": "a1c667a0-c2fe-41ee-8e1e-efd15aa638bd",
+   "scene_timestamp": "2026-01-25T08:21:53.480Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 3751.263800910093,
+   "emission_uncertainty_auto": 2641.770825288101,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-02-24T09:19:13.849Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.50160013979613,
+    39.40357973444049,
+    53.59203077195119,
+    39.4734199247889
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "5bd13f36-5f2e-4837-8975-dcf215c043ee",
+   "plume_id": "tan20260125t082050c56s4001-B",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.574488240795915,
+     39.447344564727615
+    ]
+   },
+   "scene_id": "72e6a6b2-f87d-431b-b3f3-0cae04ab9127",
+   "scene_timestamp": "2026-01-25T08:20:50.560Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-02-24T09:19:13.179Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.375375133356044,
+    39.33167505275099,
+    53.61379905532414,
+    39.51585025553114
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "dda75dfd-eda2-41cc-873d-8d5446d5d7c4",
+   "plume_id": "tan20260125t082050c56s4001-D",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60108430160881,
+     39.454462278461705
+    ]
+   },
+   "scene_id": "72e6a6b2-f87d-431b-b3f3-0cae04ab9127",
+   "scene_timestamp": "2026-01-25T08:20:50.560Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-02-24T09:19:11.209Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.57030561923175,
+    39.436677002093475,
+    53.61046492448592,
+    39.46768621670218
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "a683bad7-1a45-4aa0-8fa4-c699dc7d6809",
+   "plume_id": "tan20250812t080453c58s4001-B",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.61699366009617,
+     39.45193949578541
+    ]
+   },
+   "scene_id": "49dd6922-8379-414a-b034-42b095f68e7f",
+   "scene_timestamp": "2025-08-12T08:04:53.580Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 467.2023843488811,
+   "emission_uncertainty_auto": 113.94231986317733,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-09-11T08:19:01.527Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.59651552439911,
+    39.43852657338525,
+    53.63702472303968,
+    39.46980506850726
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "83c65602-8ec7-4094-bde1-80243a5a2e61",
+   "plume_id": "tan20250812t080453c58s4001-C",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.59170461991249,
+     39.44769163800524
+    ]
+   },
+   "scene_id": "49dd6922-8379-414a-b034-42b095f68e7f",
+   "scene_timestamp": "2025-08-12T08:04:53.580Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1412.064375856827,
+   "emission_uncertainty_auto": 329.118891423093,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-09-11T08:19:01.618Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.57527085068889,
+    39.438999173648114,
+    53.61543227724003,
+    39.470278581768746
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "2559aef7-7916-42a6-8f40-c8a5007effed",
+   "plume_id": "tan20250812t080453c58s4001-D",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.583802329388476,
+     39.44925934535391
+    ]
+   },
+   "scene_id": "49dd6922-8379-414a-b034-42b095f68e7f",
+   "scene_timestamp": "2025-08-12T08:04:53.580Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 917.5877976859057,
+   "emission_uncertainty_auto": 233.73256992637772,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-09-11T08:19:01.709Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.562922713950606,
+    39.43494893877337,
+    53.6034295479829,
+    39.46595763509564
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "dd0d51e7-d2ff-4754-93a2-dbef90df3194",
+   "plume_id": "tan20250812t080453c58s4001-E",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60182979807482,
+     39.445717152073314
+    ]
+   },
+   "scene_id": "49dd6922-8379-414a-b034-42b095f68e7f",
+   "scene_timestamp": "2025-08-12T08:04:53.580Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1002.3288686449329,
+   "emission_uncertainty_auto": 414.21824843298026,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-09-11T08:19:00.432Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.58276328933283,
+    39.434238806722426,
+    53.623270251968364,
+    39.46551750153178
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "b8aa48dd-1789-484e-b2ef-0d28f433192a",
+   "plume_id": "tan20250812t080453c58s4001-K",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.5659701761935,
+     39.44600171884909
+    ]
+   },
+   "scene_id": "49dd6922-8379-414a-b034-42b095f68e7f",
+   "scene_timestamp": "2025-08-12T08:04:53.580Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 920.2211026507905,
+   "emission_uncertainty_auto": 267.58059914553456,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-12-11T17:15:21.455Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.54609782700358,
+    39.43234599839206,
+    53.58660433339575,
+    39.46362519104253
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "565169bd-c1bc-4ae2-bda5-53d0aedb2004",
+   "plume_id": "tan20250812t080453c58s4001-L",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57141059342777,
+     39.448330713663836
+    ]
+   },
+   "scene_id": "49dd6922-8379-414a-b034-42b095f68e7f",
+   "scene_timestamp": "2025-08-12T08:04:53.580Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 621.9922772997827,
+   "emission_uncertainty_auto": 238.64521361623466,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-12-11T17:15:21.455Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55269481686769,
+    39.43166001048578,
+    53.592852428493416,
+    39.462939744250434
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "32a152fc-70b9-4b58-8db1-627001bbfa98",
+   "plume_id": "tan20250729t080259c55s4001-A",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.617147809359295,
+     39.45184507159186
+    ]
+   },
+   "scene_id": "5105ed0a-9b0b-491b-8ffc-080b59112aef",
+   "scene_timestamp": "2025-07-29T08:02:59.550Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 1089.6999967790612,
+   "emission_uncertainty_auto": 407.34364810911813,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-08-28T08:19:01.545Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.59882290117774,
+    39.43496168764418,
+    53.639329114301326,
+    39.4659699030794
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "f8081372-6b22-4720-9409-52e832108e6b",
+   "plume_id": "tan20250729t080259c55s4001-AK",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60210704902477,
+     39.44473759069834
+    ]
+   },
+   "scene_id": "5105ed0a-9b0b-491b-8ffc-080b59112aef",
+   "scene_timestamp": "2025-07-29T08:02:59.550Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-08-28T08:19:03.444Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.57334847661214,
+    39.40471700031461,
+    53.633392561436075,
+    39.45109650914609
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "c0b4d1a0-769a-4ee6-a72e-a5f4447fdef7",
+   "plume_id": "tan20250729t080259c55s4001-I",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62663865769949,
+     39.463516785733106
+    ]
+   },
+   "scene_id": "5105ed0a-9b0b-491b-8ffc-080b59112aef",
+   "scene_timestamp": "2025-07-29T08:02:59.550Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 8825.763529215918,
+   "emission_uncertainty_auto": 2877.552953057371,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-08-28T08:19:00.830Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60651881231335,
+    39.445058640751704,
+    53.64668228978568,
+    39.4760673433118
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "b623a50e-97d8-41ff-9591-147dc257f922",
+   "plume_id": "tan20250729t080259c55s4001-J",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62451779280474,
+     39.46355207998576
+    ]
+   },
+   "scene_id": "5105ed0a-9b0b-491b-8ffc-080b59112aef",
+   "scene_timestamp": "2025-07-29T08:02:59.550Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-08-28T08:19:02.113Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60651881231335,
+    39.445058640751704,
+    53.64668228978568,
+    39.4760673433118
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "3a4c3167-8501-4b49-b96e-18515db7359a",
+   "plume_id": "tan20250729t080259c55s4001-L",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62944514712558,
+     39.46013327504022
+    ]
+   },
+   "scene_id": "5105ed0a-9b0b-491b-8ffc-080b59112aef",
+   "scene_timestamp": "2025-07-29T08:02:59.550Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 2208.718086175994,
+   "emission_uncertainty_auto": 696.0074511301784,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2026-04-28T21:32:49.292Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60651881231335,
+    39.445058640751704,
+    53.64668228978568,
+    39.4760673433118
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "cb2ee623-b282-4308-98d7-8f5c55cb287d",
+   "plume_id": "tan20250610t075544c12s4001-A",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62434738466976,
+     39.46293833122786
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 2272.9020865758257,
+   "emission_uncertainty_auto": 605.767993930834,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:53.991Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60890647984855,
+    39.44365368449649,
+    53.649069110290675,
+    39.47466235900076
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "8aaaab78-a3ca-4e84-9cbc-fed6fdcc1c60",
+   "plume_id": "tan20250610t075544c12s4001-AC",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57036146167641,
+     39.4432977468081
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 668.193793060879,
+   "emission_uncertainty_auto": 246.85867365348278,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:56.053Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55101613674178,
+    39.42385992666864,
+    53.591516771803285,
+    39.45486881466612
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "7717eef1-b836-4c52-991b-ccd73548c1ea",
+   "plume_id": "tan20250610t075544c12s4001-AG",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.57282396697545,
+     39.447784202140014
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 619.843976719985,
+   "emission_uncertainty_auto": 218.2390467095742,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:56.259Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.5561970665549,
+    39.43212408563593,
+    53.59670327020077,
+    39.46340314421621
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "c517d8db-7fb5-4eba-8969-8781c8b172f7",
+   "plume_id": "tan20250610t075544c12s4001-AP",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.60147272846831,
+     39.45480297414241
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 474.98446877986663,
+   "emission_uncertainty_auto": 196.82345014202212,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:56.952Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.58684239472203,
+    39.43144552182251,
+    53.62734678713742,
+    39.462453909202544
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "8b010826-3bae-454e-b99e-f9c74b3efd90",
+   "plume_id": "tan20250610t075544c12s4001-B",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.61237878457089,
+     39.45787124301921
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 778.7389490923849,
+   "emission_uncertainty_auto": 217.03590461291247,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:54.099Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.593123063639226,
+    39.441034976791194,
+    53.63363288678607,
+    39.472043250644155
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "63ea44b6-dd78-4f41-b17f-07129879bd9e",
+   "plume_id": "tan20250610t075544c12s4001-C",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.61732834270964,
+     39.45189277534075
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 2070.0385930637517,
+   "emission_uncertainty_auto": 631.4559572630426,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:54.198Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.59925144921899,
+    39.43711402540624,
+    53.63975978336601,
+    39.46839248764196
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "2b196a92-4234-4d9f-adc5-ab53da20fb96",
+   "plume_id": "tan20250610t075544c12s4001-G",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.623971957666015,
+     39.4579892592279
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 708.9626043850992,
+   "emission_uncertainty_auto": 232.4698525888872,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:54.657Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.606049646880955,
+    39.441825995979535,
+    53.64621128012027,
+    39.47283471472982
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "a9950119-4e93-4d8b-8db6-75a999b59252",
+   "plume_id": "tan20250610t075544c12s4001-H",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62619345260674,
+     39.46356342213903
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 566.8351852852437,
+   "emission_uncertainty_auto": 252.3628468841117,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:54.759Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.60890647984855,
+    39.44365368449649,
+    53.649069110290675,
+    39.47466235900076
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "601dd510-731b-4533-be5d-b9d26c89ed84",
+   "plume_id": "tan20250610t075544c12s4001-I",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.59558879650314,
+     39.44784942292688
+    ]
+   },
+   "scene_id": "c78f6d37-fb58-4c5c-8798-7e3bf0a14f3d",
+   "scene_timestamp": "2025-06-10T07:55:44.120Z",
+   "instrument": "tan",
+   "mission_phase": "production",
+   "platform": "Planet Tanager 1",
+   "emission_auto": 887.9257769596695,
+   "emission_uncertainty_auto": 253.48213056571444,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2025-07-10T08:21:54.873Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.58471865742942,
+    39.41986943463063,
+    53.64407619473214,
+    39.46597839830641
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "e82aecd4-7c98-4993-a84c-0c752879459c",
+   "plume_id": "emi20240608t122634p08012-B",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.529923896922526,
+     39.47365404342378
+    ]
+   },
+   "scene_id": "8184b33a-bc12-49ba-b038-ca1554740170",
+   "scene_timestamp": "2024-06-08T12:26:34Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 6732.35102434445,
+   "emission_uncertainty_auto": 885.7487647847386,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2024-07-08T16:28:12.623Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.505429448401514,
+    39.44496072824615,
+    53.57715168199643,
+    39.50079814833749
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "771b6c83-32f2-4e67-9285-66b25a44efcf",
+   "plume_id": "emi20240524t114612p08005-A",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.53003255379883,
+     39.47445055566686
+    ]
+   },
+   "scene_id": "51ae5edf-47fb-4b19-9e7f-efa99abf4a27",
+   "scene_timestamp": "2024-05-24T11:46:12Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 7772.282190465873,
+   "emission_uncertainty_auto": 3973.986766721162,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2024-06-17T20:52:54.283Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.504510493383975,
+    39.43821021774521,
+    53.57487052470347,
+    39.49252878322537
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "2e9230f4-97b5-42c6-8256-d6519b0959e5",
+   "plume_id": "emi20231009t060956p04031-A",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62446738089457,
+     39.46382847583115
+    ]
+   },
+   "scene_id": "33ffa7d3-9995-490a-ba9e-a39078013e6a",
+   "scene_timestamp": "2023-10-09T06:09:56Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 3083.4786627783446,
+   "emission_uncertainty_auto": 454.29280754302596,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2024-02-15T20:41:27.363Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.562208594307826,
+    39.451361327507904,
+    53.677710275252906,
+    39.540490466586164
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "86f8e618-48f8-484e-9c86-9d97a99d7f2b",
+   "plume_id": "emi20231009t060956p04031-J",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.595141231219515,
+     39.448149022947604
+    ]
+   },
+   "scene_id": "33ffa7d3-9995-490a-ba9e-a39078013e6a",
+   "scene_timestamp": "2023-10-09T06:09:56Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 2769.5750654097346,
+   "emission_uncertainty_auto": 401.1405938619015,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2024-02-15T20:41:27.649Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55495046223332,
+    39.43700994889701,
+    53.62627848778424,
+    39.491609985815536
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "efd74d99-e334-4f25-acf5-60241d515c3a",
+   "plume_id": "emi20230824t070049p05010-C",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62424032432202,
+     39.46307423942355
+    ]
+   },
+   "scene_id": "74a3b1cd-b8b7-40ed-978f-044711af0678",
+   "scene_timestamp": "2023-08-24T07:00:49Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 2091.77407597007,
+   "emission_uncertainty_auto": 568.8062125954248,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2023-11-21T21:22:44.449Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.574603854638355,
+    39.39921461357465,
+    53.811347280370136,
+    39.58191627214046
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "60f77fba-6caa-438a-876c-677f607f5e0c",
+   "plume_id": "emi20230824t070049p05010-K",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.520325822514735,
+     39.47076503155634
+    ]
+   },
+   "scene_id": "74a3b1cd-b8b7-40ed-978f-044711af0678",
+   "scene_timestamp": "2023-08-24T07:00:49Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 1010.761528025713,
+   "emission_uncertainty_auto": 152.76361767650732,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2023-11-21T21:22:44.749Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.48373695666809,
+    39.44601900244853,
+    53.555241080048354,
+    39.50121427447525
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "f813b9e2-9709-4a35-8ab3-b25729d9631a",
+   "plume_id": "emi20230620t084414p06010-A",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.59746392636748,
+     39.4466108174349
+    ]
+   },
+   "scene_id": "34490ba6-421b-45d5-a3d2-4b28912e3114",
+   "scene_timestamp": "2023-06-20T08:44:14Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 6149.970427386221,
+   "emission_uncertainty_auto": 1151.2787828754474,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2023-08-22T18:44:13.584Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.56112712765005,
+    39.417322872312184,
+    53.63266960667568,
+    39.47257050291177
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "a80aad32-32ae-44cb-b5c4-8dafc5210626",
+   "plume_id": "emi20230620t084414p06010-B",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62803794900424,
+     39.4626984138298
+    ]
+   },
+   "scene_id": "34490ba6-421b-45d5-a3d2-4b28912e3114",
+   "scene_timestamp": "2023-06-20T08:44:14Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2023-08-22T18:47:41.576Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.589454899170626,
+    39.38232144591894,
+    53.70969071581977,
+    39.474717407598774
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "678c73b7-b607-4056-9ece-e82a7856903d",
+   "plume_id": "emi20230605t080026p06045-K",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.59361689302344,
+     39.44830283690865
+    ]
+   },
+   "scene_id": "c6520dca-9e63-4faa-93b7-f61498160508",
+   "scene_timestamp": "2023-06-05T08:00:26Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": 1469.4678128264463,
+   "emission_uncertainty_auto": 353.46700757815387,
+   "hide_emission": false,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2024-08-13T19:46:43.020Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.55665060385497,
+    39.42210482740053,
+    53.628032286306755,
+    39.47675761762771
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "ca8ace2d-1c8c-43f8-bb8e-aaa24237a7d1",
+   "plume_id": "emi20230417t095836p07011-H",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62636546615798,
+     39.46361381075974
+    ]
+   },
+   "scene_id": "825d770e-131d-4456-aae0-cd7e4d406604",
+   "scene_timestamp": "2023-04-17T09:58:36Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2023-08-12T15:40:20.312Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.594626537330825,
+    39.43447756857835,
+    53.66575617635969,
+    39.489392987669696
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  },
+  {
+   "id": "af3dcfbd-3693-49f4-9d02-aa10a1ba0a1f",
+   "plume_id": "emi20220815t105833p07011-R",
+   "gas": "CH4",
+   "geometry_json": {
+    "bbox": null,
+    "type": "Point",
+    "coordinates": [
+     53.62470730522145,
+     39.46403216825422
+    ]
+   },
+   "scene_id": "ea8b1500-e325-4fd7-b526-a7fbffed57d8",
+   "scene_timestamp": "2022-08-15T10:58:33Z",
+   "instrument": "emi",
+   "mission_phase": "production",
+   "platform": "ISS",
+   "emission_auto": null,
+   "emission_uncertainty_auto": null,
+   "hide_emission": true,
+   "sector": "1B2",
+   "status": "published",
+   "published_at": "2024-08-13T20:45:19.152Z",
+   "plume_quality": null,
+   "plume_bounds": [
+    53.5737798986451,
+    39.38609141604426,
+    53.8017427869193,
+    39.56158490706764
+   ],
+   "plume_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "plume_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "con_tif": "https://catalog.carbonmapper.org/redacted-in-fixture",
+   "rgb_png": "https://catalog.carbonmapper.org/redacted-in-fixture"
+  }
+ ]
+}

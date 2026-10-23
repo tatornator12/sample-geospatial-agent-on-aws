@@ -11,8 +11,9 @@ second per tool instead of fetching from NASA and the Sentinel-5P archive:
   - watch_baseline (the global site clusters)
   - scan_tropomi for each area at the day counts the mission uses (the composite is keyed by its
     end day, so run this the day before AND the morning of the show)
-  - for each area's top EMIT-visible hotspots: check_recent_passes and site_history, at the exact
-    coordinates the scan reports (which the agent passes on verbatim)
+  - for each area's top EMIT-visible hotspots: check_recent_passes, site_history and
+    carbon_mapper_plumes (Carbon Mapper's public plume catalogue), at the exact coordinates the scan
+    reports (which the agent passes on verbatim)
   - fixed sites the run sheet names
 
 Reads agents/methane-hunter/.env.dev for the bucket and the Earthdata token (never printed).
@@ -64,6 +65,8 @@ def import_tools():
     watch_tools.thermal_anomalies = ground_tools.thermal_anomalies
     watch_tools.nearby_infrastructure = ground_tools.nearby_infrastructure
     watch_tools.registry_lookup = ground_tools.registry_lookup
+    import carbon_mapper
+    watch_tools.carbon_mapper_plumes = carbon_mapper.carbon_mapper_plumes
     return watch_tools
 
 
@@ -140,6 +143,12 @@ def main() -> int:
                 s = passes["summary"]
                 print(f"         {s['read']} passes: {s['candidates']} candidates, {s['rejected']} rejected")
             run(f"site_history {where}", w.site_history(h["lat"], h["lon"]))
+            # Carbon Mapper's catalogue for the same point (one polite request, cached 12 h; the cache
+            # is also the fallback if the API is down on the day).
+            cm = run(f"carbon_mapper_plumes {where}", w.carbon_mapper_plumes(h["lat"], h["lon"]))
+            if "summary" in cm:
+                s = cm["summary"]
+                print(f"         Carbon Mapper: {s['count']} plumes, latest {s['latest_date']} ({s['source']})")
             # The ground-record checks: inside a watch area the Overture read comes from the extract
             # above, and the VIIRS pull is quick but cached per day too.
             run(f"nearby_infrastructure {where}", w.nearby_infrastructure(h["lat"], h["lon"]))

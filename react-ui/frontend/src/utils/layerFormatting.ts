@@ -155,8 +155,8 @@ export function clickedMatch<F extends { layer?: { id?: string } }>(features: F[
  * hint is absent or was dropped, by the tools' own file names: `ch4plm_<granule>.tif` plume
  * rasters anywhere; under `/methane/` (a session) or `/use-cases/methane-*` (a replay case) the
  * TROPOMI composite `tropomi_anomaly_*.tif`, an EMIT pass window `pass_*.tif`, footprints
- * `plumes_*.geojson`, the watch baseline `watch_sites_*.geojson` and `columns_*.geojson`.
- * Never by the model-written title.
+ * `plumes_*.geojson`, the watch baseline `watch_sites_*.geojson`, `columns_*.geojson` and Carbon
+ * Mapper's plume points `cmplumes_*.geojson`. Never by the model-written title.
  */
 export function isMethaneLayer(layer: LayerMetadata): boolean {
   if (layer.render?.group === 'methane' || layer.render?.group === 'watch') return true;
@@ -165,7 +165,7 @@ export function isMethaneLayer(layer: LayerMetadata): boolean {
   if (layer.type === 'raster' && /^ch4plm_.+\.tiff?$/.test(basename)) return true;
   if (!url.includes('/methane/') && !url.includes('/use-cases/methane-')) return false;
   if (layer.type === 'raster') return /^(tropomi_anomaly|pass)_.+\.tiff?$/.test(basename);
-  return /^(plumes|watch_sites|columns)_.+\.geojson$/.test(basename);
+  return /^(plumes|watch_sites|columns|cmplumes)_.+\.geojson$/.test(basename);
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

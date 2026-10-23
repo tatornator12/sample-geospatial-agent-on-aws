@@ -354,14 +354,31 @@ def input_text(call: dict) -> str:
     return raw if isinstance(raw, str) else json.dumps(raw)
 
 
+def dotted(inp: dict, key: str):
+    """inp[key], where a dotted key reads into nested objects ("render.kind"); None when absent. A
+    nested object the model sent as a JSON string is read too (display_visual's render may be one)."""
+    value = inp
+    for part in key.split("."):
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
 def matches(call: dict, spec: dict) -> bool:
     """The call is the spec's tool, each `match` key equals its value (or is one of its values; an
-    absent key is None), and its raw input contains `contains`."""
+    absent key is None; a dotted key such as "render.kind" reads a nested field), and its raw input
+    contains `contains`."""
     if spec.get("name") and call.get("name") != spec["name"]:
         return False
     inp = tool_input(call)
     for key, want in (spec.get("match") or {}).items():
-        have = inp.get(key)
+        have = dotted(inp, key)
         if isinstance(want, list):
             if have not in want:
                 return False

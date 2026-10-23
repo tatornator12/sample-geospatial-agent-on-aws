@@ -7,8 +7,8 @@
  * latest 2025-08-20"); the one the agent followed is set in fog. Numbers come from the tools' manifests.
  */
 import { rampGradient } from '../utils/render.ts';
-import { TROPOMI_RAMP } from '../utils/methaneLayers.ts';
-import type { CueTally, Tip } from '../utils/steps.ts';
+import { CARBON_MAPPER_SOURCE, TROPOMI_RAMP, aboutKgH } from '../utils/methaneLayers.ts';
+import type { CmPlumes, CueTally, Tip } from '../utils/steps.ts';
 
 const BAR_MAX_PPB = 60;
 
@@ -25,6 +25,11 @@ interface TipBoardProps {
    * its newest candidate (from the cue manifests' numbers), printed under its row.
    */
   tallies?: Record<string, CueTally>;
+  /**
+   * Carbon Mapper's plumes near each cued site, by area name (carbon_mapper_plumes' records): the
+   * independent check the follow rule weighs, printed under the EMIT tally with its source.
+   */
+  cm?: Record<string, CmPlumes>;
   /**
    * The mission's end frame: the strongest `limit` rows and any cued one, then "+N more areas"
    * (A2 P1-2); the full list is one press away ("Show all N steps").
@@ -51,12 +56,50 @@ function CueLine({ tally }: { tally: CueTally }) {
   );
 }
 
-export function TipBoard({ tips, cued, chosen = null, expected, tallies = {}, limit }: TipBoardProps) {
+/** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h" (the words of cmLineText), numbers in mono. */
+function CmLine({ cm }: { cm: CmPlumes }) {
+  if (cm.unavailable) {
+    return (
+      <span role="cell" className="tip-row__cue tip-row__cm">
+        Carbon Mapper: could not be checked
+      </span>
+    );
+  }
+  if (cm.count === 0) {
+    return (
+      <span role="cell" className="tip-row__cue tip-row__cm">
+        Carbon Mapper: no plumes within <span className="tip-row__num">{cm.radiusKm}</span> km
+      </span>
+    );
+  }
+  return (
+    <span role="cell" className="tip-row__cue tip-row__cm">
+      Carbon Mapper: <span className="tip-row__num">{cm.count}</span> {cm.count === 1 ? 'plume' : 'plumes'}
+      {' · '}
+      <span className="tip-row__latest">
+        latest <span className="tip-row__num">{cm.latest}</span>
+      </span>
+      {cm.rateKgH !== null && (
+        <>
+          {' · '}
+          <span className="tip-row__latest">
+            ~<span className="tip-row__num">{aboutKgH(cm.rateKgH)}</span> kg/h
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+export function TipBoard({ tips, cued, chosen = null, expected, tallies = {}, cm = {}, limit }: TipBoardProps) {
   if (tips.length === 0) return null;
   const gradient = rampGradient(TROPOMI_RAMP) ?? undefined;
   const pending = Math.max(0, expected - tips.length);
   const shown = limit === undefined ? tips : tips.filter((tip, i) => i < limit || cued.includes(tip.area.name));
   const more = tips.length - shown.length;
+  const cmFor = (name: string) => (cued.includes(name) && Object.prototype.hasOwnProperty.call(cm, name) ? cm[name] : undefined);
+  // The source line shows only when Carbon Mapper's numbers do (not for "could not be checked").
+  const cmShown = shown.some((tip) => cmFor(tip.area.name)?.unavailable === false);
   return (
     <div className="tip-board" role="table" aria-label="TROPOMI tips by watch area, strongest first">
       {shown.map((tip) => {
@@ -85,9 +128,17 @@ export function TipBoard({ tips, cued, chosen = null, expected, tallies = {}, li
               <span className="tip-row__fill" style={{ transform: `scaleX(${width / 100})`, backgroundImage: gradient }} />
             </span>
             {tally && <CueLine tally={tally} />}
+            {cmFor(tip.area.name) && <CmLine cm={cmFor(tip.area.name)!} />}
           </div>
         );
       })}
+      {cmShown && (
+        // Carbon Mapper's licence: its source wherever its data shows.
+        <div role="row" className="tip-row tip-row--source">
+          <span className="tip-row__mark" aria-hidden="true" />
+          <span role="cell" className="tip-row__label">{CARBON_MAPPER_SOURCE}</span>
+        </div>
+      )}
       {more > 0 && (
         <div role="row" className="tip-row tip-row--more">
           <span className="tip-row__mark" aria-hidden="true" />

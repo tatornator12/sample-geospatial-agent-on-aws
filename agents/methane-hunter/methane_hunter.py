@@ -43,6 +43,7 @@ from methane_tools import search_methane_plumes, show_plume, triage_plumes  # no
 from watch_tools import check_recent_passes, scan_tropomi, site_history, watch_baseline  # noqa: E402
 from brief_tools import brief_status, draft_brief  # noqa: E402
 from ground_tools import nearby_infrastructure, registry_lookup, thermal_anomalies  # noqa: E402
+from carbon_mapper import carbon_mapper_plumes  # noqa: E402
 
 app = BedrockAgentCoreApp()
 
@@ -73,6 +74,8 @@ LOCAL_TOOLS = [
     scan_tropomi,
     check_recent_passes,
     site_history,
+    # Independent detections: Carbon Mapper's public plume catalogue (Tanager-1, EMIT, aircraft).
+    carbon_mapper_plumes,
     # The ground record: two open-data checks that test the brief's hypotheses.
     thermal_anomalies,
     nearby_infrastructure,

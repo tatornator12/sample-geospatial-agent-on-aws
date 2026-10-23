@@ -17,6 +17,16 @@ export const METHANE_SITES: RenderHint = { kind: 'points', group: 'watch', prope
 export const METHANE_COLUMNS: RenderHint = {
   kind: 'columns', property: 'ppm_m', ramp: 'plasma', rescale: [0, 1500], units: 'ppm·m', group: 'methane', legend: 'CH4 enhancement',
 };
+/** Carbon Mapper's plumes near the followed site (carbon_mapper_plumes' cmplumes_<lat>_<lon>.geojson). */
+export const METHANE_DETECTIONS: RenderHint = {
+  kind: 'detections', group: 'methane', property: 'rate_kg_h', units: 'kg/h', legend: 'Carbon Mapper plumes',
+};
+/** Carbon Mapper's licence asks for this wherever its data shows (board, legend, brief card). */
+export const CARBON_MAPPER_SOURCE = 'Source: Carbon Mapper (data.carbonmapper.org)';
+/** The legend's key for Carbon Mapper's plume rings. */
+export const DETECTIONS_ROW = 'Carbon Mapper plume, 2025 on';
+/** The rings' colour: mint, clear of plasma (EMIT), ice (TROPOMI) and fog (NASA's sites). */
+export const DETECTIONS_COLOUR = '#6fe0b8';
 
 /** The TROPOMI ppb ramp: cool (navy to pale cyan), never plasma's dark-purple-to-yellow family. */
 export const TROPOMI_RAMP = 'ice' as const;
@@ -68,6 +78,7 @@ export function methaneGeometryHint(render: RenderHint | undefined, url: string 
   if (name.startsWith('plumes_')) return METHANE_VECTOR;
   if (name.startsWith('watch_sites_')) return METHANE_SITES;
   if (name.startsWith('columns_')) return METHANE_COLUMNS;
+  if (name.startsWith('cmplumes_')) return METHANE_DETECTIONS;
   return null;
 }
 
@@ -121,6 +132,7 @@ export function methaneLegend(hints: Array<RenderHint | undefined>): MethaneLege
       sites = true;
       continue;
     }
+    if (hint.kind === 'detections') continue;   // a key of its own (layerStack), never a ramp
     const ramp = hint.colormap ?? hint.ramp;
     if (!ramp || !hint.rescale) continue;
     const units = hint.units ?? 'ppm·m';
@@ -237,4 +249,28 @@ export function footprintFrame(
 /** An ISO date (YYYY-MM-DD) from a feature property, or "n/a"; popups print nothing else. */
 export function isoDay(value: unknown): string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : 'n/a';
+}
+
+/** Carbon Mapper's instrument codes (carbon_mapper.py INSTRUMENT_WORDS) in the room's words. */
+export const CM_INSTRUMENT_WORDS: Record<string, string> = {
+  tanager: 'Tanager-1',
+  emit: 'EMIT',
+  airborne: 'airborne',
+  other: 'another instrument',
+};
+
+/** A rate as the room hears it: to the nearest 10 kg/h, with thousands separators. */
+export function aboutKgH(value: number): string {
+  return (Math.round(value / 10) * 10).toLocaleString('en-US');
+}
+
+/** A Carbon Mapper plume's popup, from its feature's properties: only a date, a rate and a fixed word. */
+export function detectionPopupRows(p: Record<string, unknown>): { date: string; instrument: string; rate: string } {
+  const rate = typeof p.rate_kg_h === 'number' && Number.isFinite(p.rate_kg_h) && p.rate_kg_h >= 0 ? p.rate_kg_h : null;
+  const code = typeof p.instrument === 'string' && Object.prototype.hasOwnProperty.call(CM_INSTRUMENT_WORDS, p.instrument) ? p.instrument : null;
+  return {
+    date: isoDay(p.date),
+    instrument: code ? CM_INSTRUMENT_WORDS[code] : 'n/a',
+    rate: rate === null ? 'not published' : `about ${aboutKgH(rate)} kg/h`,
+  };
 }

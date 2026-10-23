@@ -20,8 +20,12 @@ import {
 } from '../utils/layerFormatting';
 import { indexLegendFor, rampExpression, rampGradient, tileParamsFor, type RenderHint } from '../utils/render.ts';
 import {
+  CARBON_MAPPER_SOURCE,
   COLUMN_METRES_PER_PPM_M,
+  DETECTIONS_COLOUR,
+  DETECTIONS_ROW,
   METHANE_RASTER,
+  detectionPopupRows,
   footprintFrame,
   globeCentre,
   labelPointOutside,
@@ -1957,6 +1961,59 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             currentMap.on('mouseleave', fillLayerId, () => {
               currentMap.getCanvas().style.cursor = '';
             });
+          } else if (methaneHint?.kind === 'detections') {
+            // Carbon Mapper's plumes near the site: a mint ring on a dark halo each, flat on the
+            // ground under the tilt, a second look from another catalogue (never a ramp: its rate
+            // is in the popup and the board, as Carbon Mapper's estimate).
+            const isPoint: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'Point'];
+            currentMap.addLayer({
+              id: outlineLayerId,
+              type: 'circle',
+              source: geometryId,
+              filter: isPoint,
+              paint: {
+                'circle-opacity': 0,
+                'circle-radius': 7,
+                'circle-stroke-color': '#0f141b',
+                'circle-stroke-width': 5,
+                'circle-stroke-opacity': 0.85,
+                'circle-pitch-alignment': 'map',
+              },
+              layout: { visibility: 'visible' },
+            });
+            currentMap.addLayer({
+              id: fillLayerId,
+              type: 'circle',
+              source: geometryId,
+              filter: isPoint,
+              paint: {
+                'circle-color': DETECTIONS_COLOUR,
+                'circle-opacity': 0.2,
+                'circle-radius': 7,
+                'circle-stroke-color': DETECTIONS_COLOUR,
+                'circle-stroke-width': 2.5,
+                'circle-pitch-alignment': 'map',
+              },
+              layout: { visibility: 'visible' },
+            });
+            // Popup: a date, a rate and an instrument word from the tool's own numbers and codes,
+            // escaped by construction (detectionPopupRows returns only those), with the source.
+            currentMap.on('click', fillLayerId, (e: maplibregl.MapLayerMouseEvent) => {
+              const p: Record<string, unknown> = (e.features && e.features[0] && e.features[0].properties) || {};
+              const rows = detectionPopupRows(p);
+              const html =
+                `<strong>Carbon Mapper plume, ${rows.date}</strong>` +
+                `<div class="similar-popup__row"><span>Seen by</span><code>${rows.instrument}</code></div>` +
+                `<div class="similar-popup__row"><span>Carbon Mapper's estimate</span><code>${rows.rate}</code></div>` +
+                `<div class="similar-popup__row"><span>${CARBON_MAPPER_SOURCE}</span></div>`;
+              new maplibregl.Popup({ className: 'similar-popup' }).setLngLat(e.lngLat).setHTML(html).addTo(currentMap);
+            });
+            currentMap.on('mouseenter', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = 'pointer';
+            });
+            currentMap.on('mouseleave', fillLayerId, () => {
+              currentMap.getCanvas().style.cursor = '';
+            });
           } else if (methaneHint?.kind === 'columns') {
             // The strongest pass in 3D: one column per enhanced pixel, as tall as its ppm·m and
             // coloured on the same plasma ramp as the plume, read at a tilt.
@@ -2440,6 +2497,9 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
                 duration: 2000,
               });
             }
+          } else if (methaneHint.kind === 'detections') {
+            // Carbon Mapper's rings land where the camera already is: the TROPOMI tip or the columns
+            // own the frame, and the rings read when the dive reaches the site.
           } else if (methaneHint.kind === 'columns') {
             // The columns are read at a tilt, over the pass they were built from. Framed with the
             // stage's padding only; any padding the globe left on the map eases out on the way.
@@ -3495,6 +3555,18 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           <span className="map-legend__label">NASA plume site</span>
           <span className="map-legend__ring" aria-hidden="true" />
           <span className="map-legend__label">plumes on 5+ dates</span>
+        </div>
+      );
+    }
+    if (lg.kind === 'detections') {
+      // Carbon Mapper's key, with the source its licence asks for wherever its data shows.
+      return (
+        <div key={lg.key} className="map-legend map-legend--stacked map-legend--detections">
+          <div className="map-legend__bar" role="img" aria-label="A mint ring is a methane plume Carbon Mapper published near the site since 2025">
+            <span className="map-legend__detection" aria-hidden="true" />
+            <span className="map-legend__label">{DETECTIONS_ROW}</span>
+          </div>
+          <span className="map-legend__label map-legend__source">{CARBON_MAPPER_SOURCE}</span>
         </div>
       );
     }

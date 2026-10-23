@@ -94,11 +94,11 @@ const scenarios: Scenario[] = [
   {
     id: 'methane-watch-mission',
     name: 'Methane Watch brief',
-    description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, three ground-record checks and a draft brief for the analyst',
+    description: 'One prompt, the whole mission: a global baseline, TROPOMI tips over nine watch areas, EMIT cued on the two strongest, a Carbon Mapper cross-check, three ground-record checks and a draft brief for the analyst',
     icon: '/methane_watch.png',
-    // The recorded take (Oct 21, methane_hunter_dev v43): 9 areas scanned, Shanxi and the south
-    // Caspian cued; the brief follows Shanxi (check_recent_passes: 4 of 8 passes read since
-    // 2025-01-01 are candidates, the latest 2025-11-30).
+    // The recorded take (Oct 22, methane_hunter_dev v45): 9 areas scanned, Shanxi and the south
+    // Caspian cued; Carbon Mapper lists no plume within 5 km of either; the brief follows Shanxi
+    // (check_recent_passes: 4 of 8 passes read since 2025-01-01 are candidates, the latest 2025-11-30).
     metrics: [
       { label: 'Watch Areas', value: '9 scanned, 2 cued' },
       { label: 'Candidate Passes', value: '4 of 8 at Shanxi since 2025' },

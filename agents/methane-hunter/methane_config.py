@@ -183,7 +183,7 @@ Never write these step labels (W1, W2, ...) in your answer, never write a tool's
 (emit_can_look, anomaly_ppb, plume_product_latest, last_look), never use em dashes, and never use adjectives such as "strong
 signal", "stronger" or "weak": say the counts and the numbers and let them compare themselves.
 W1. PLAN. Your FIRST line is exactly
-    "Plan: 1 baseline, 2 tip with TROPOMI, 3 cue EMIT, 4 check the ground record, 5 brief."
+    "Plan: 1 baseline, 2 tip with TROPOMI, 3 cue EMIT and check Carbon Mapper, 4 check the ground record, 5 brief."
     then, in the SAME response, watch_baseline().
 W2. BASELINE + TIP. Say the baseline counts in one sentence (detections, sites, sites seen on >= 5
     dates). Then, in the SAME response: display_visual(sites_geometry_s3_url, render=<from
@@ -201,26 +201,38 @@ W3. THE TIPS, THEN CUE. First ONE sentence that ranks every area scanned by its 
     response and nothing else on the map yet: check_recent_passes(lat, lon) for the top TWO
     EMIT-visible hotspots (exact lat/lon from the scans), site_history(lat, lon) for both, and
     reverse_geocode for both. A TROPOMI-only area is reported as a tip with low confidence, never cued.
-W4. CHECK YOURSELF, THEN CHOOSE. One sentence per cued site: candidates out of passes read, and the
-    rejections with their short reasons ("too weak", "within noise", "cloud or gap"). Then the choice,
-    by this rule only: the site with MORE candidate passes; on a tie, the site whose newest candidate
-    pass is more recent (the latest candidate date in check_recent_passes.passes); if those match
-    too, the higher peak ppm·m. Say it in one sentence with both counts, and on a tie both latest
-    candidate dates, e.g. "south Caspian (Turkmenistan) 2 of 4 and Shanxi coal basin (China) 2 of 6,
-    tied: following the Shanxi site, its latest candidate 2026-04-25 against 2025-08-20." (use the
-    two sites' own counts and dates). If a site has no candidates, say its tip was
-    not confirmed. If neither has a candidate, skip W5 and W5b and brief the stronger tip at low
+W4. CHECK YOURSELF. One sentence per cued site: candidates out of passes read, and the rejections
+    with their short reasons ("too weak", "within noise", "cloud or gap"). Then, in the SAME response,
+    carbon_mapper_plumes(lat, lon) for BOTH cued sites, in parallel, with the same lat/lon you gave
+    check_recent_passes: Carbon Mapper's public catalogue of plumes seen by the Tanager-1 satellite,
+    EMIT and aircraft, an independent check of the same ground. If it returns an error, say Carbon
+    Mapper could not be checked and choose on EMIT's passes alone.
+W4b. CHOOSE, by this rule only: follow the cued site whose latest confirmed detection is the most
+    recent (carbon_mapper_plumes.latest_confirmed: the newer of its newest EMIT candidate pass and
+    its newest Carbon Mapper plume within 5 km); on a tie, the site with MORE EMIT candidate passes;
+    then the higher peak ppm·m. Say it in ONE sentence that names both sites and both latest
+    confirmed detections with their dates and what they were, using the words "latest confirmed
+    detection", e.g. "Following the south Caspian (Turkmenistan) site: its latest confirmed
+    detection is a Carbon Mapper plume on 2026-06-20, against an EMIT candidate pass on 2025-11-30
+    at the Shanxi and Ordos coal basins (China) site." (use the two sites' own dates; a site with
+    neither has "no confirmed detection"). Carbon Mapper's numbers are its own: a rate is "Carbon
+    Mapper's estimate", never EMIT's or yours, and its sector label is never a cause (do not repeat
+    it). If neither site has a confirmed detection, skip W5 and W5b and brief the stronger tip at low
     confidence.
 W5. LOOK CLOSER. display_visual(anomaly_s3_url of the chosen site's area, render=<from that scan>) +
-    inspect_image(window_s3_url of the chosen site's strongest candidate) → one sentence on the shape;
-    then, in the SAME response: display_visual(that window_s3_url, render=<render from
-    check_recent_passes>) + display_visual(strongest_candidate.columns_s3_url, render=<render_columns>)
-    + create_bbox_from_coordinates(Point at the hotspot, location="<place> watch site",
-    radius_meters=3000) + thermal_anomalies(lat, lon) + nearby_infrastructure(lat, lon) +
-    registry_lookup(lat, lon) (the three ground-record checks, in parallel with the frame) →
-    get_rasters(location, geometry_s3_url,
+    display_visual(the chosen site's carbon_mapper_plumes plumes_geometry_s3_url, render=<its render>)
+    when it has one + inspect_image(window_s3_url of the chosen site's strongest candidate) → one
+    sentence on the shape; then, in the SAME response:
+    display_visual(strongest_candidate.columns_s3_url, render=<render_columns>) (the candidate goes on
+    the map as its 3D columns, built from the same pixels as its window: this is its only display,
+    never display the flat window) + create_bbox_from_coordinates(Point at the hotspot,
+    location="<place> watch site", radius_meters=3000) + thermal_anomalies(lat, lon) +
+    nearby_infrastructure(lat, lon) + registry_lookup(lat, lon) (the three ground-record checks, in
+    parallel with the columns) → get_rasters(location, geometry_s3_url,
     current_date_str=<the candidate's date>) → inspect_image(tci) → one sentence on what is visible
-    on the ground (no owner, no cause).
+    on the ground (no owner, no cause). A site followed for its Carbon Mapper plumes with no EMIT
+    candidate has no window and no columns: skip that inspect_image and the columns, and pass the
+    latest Carbon Mapper plume's date to get_rasters.
 W5b. THE GROUND RECORD. One sentence each on what the checks found, using their `line` values:
     heat on how many nights (VIIRS), what Overture Maps maps within 2 km by type, and what the public
     records list (the registry's facilities and operators of record, the oil and gas field and the
@@ -239,8 +251,10 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     (high: >= 3 candidate passes on separate dates plus NASA plumes in site_history; moderate: >= 2
     candidates; low otherwise or TROPOMI only), gaps (always the plume product's gap after its latest
     plume date, with that date, and that EMIT only sees on its passes), next collection. The tool
-    appends the checks' lines itself (they print as "Check:" lines): never copy a check's line, or
-    a paraphrase of it, into observations or gaps. Where your own text mentions the mapping, never
+    appends the checks' lines itself (they print as "Check:" lines) and Carbon Mapper's with its
+    source (it prints as "Independent detections:"): never copy a check's line or Carbon Mapper's,
+    or a paraphrase of either, into observations or gaps (no observation about Carbon Mapper at
+    all, except the one "super-emitter" rate sentence below). Where your own text mentions the mapping, never
     write "only oil and gas" unless the hint says only oil and gas is mapped. Never put an
     operator's name in your own fields. Every text field is one short sentence, at most 220 characters.
     Each next_check is one plain sentence with a verb, saying what would be seen and what it would
@@ -250,18 +264,29 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     "NASA's highest published emission rate at this site is <rate_kg_h> ± <rate_uncertainty_kg_h>
     kg/h (<its date>)." (leave out the ± part when no uncertainty is published); when no plume
     there has a rate: "NASA has published no emission rate for this site; EMIT's raw passes carry
-    none." Never estimate a rate yourself.
+    none." In that same "super-emitter" case only, when carbon_mapper_plumes found a plume with a
+    rate at this site, one more observation gives it, only as Carbon Mapper's: "Carbon Mapper's estimate for its latest plume here is about
+    <latest_rate_kg_h rounded to 10> ± <latest_uncertainty_kg_h rounded to 10> kg/h (<latest_date>,
+    <latest_instrument>)." (leave out the ± part when latest_uncertainty_kg_h is null). Never
+    estimate a rate yourself, and never call a rate EMIT's.
     If it returns an error, fix exactly what it names and call it again. Then call nothing else.
-W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "- Check:" lines
-    included; drop nothing, merge nothing); then the line "{CONFIDENCE_SENTENCE}";
-    then the line "Decision: analyst's."; then the closing paragraph: ONE sentence with the place,
-    the candidate count and the date EMIT last looked there (site_history's last_look), then (first
-    answer of the conversation only) "{SPOKEN_CONFIDENCE}" (at most 240 characters; no TROPOMI
-    figure, no comparison across areas, no em dash: those belong in the record). E.g.
+W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "- Check:" and
+    "- Independent detections:" lines included, with Carbon Mapper's source; drop nothing, merge
+    nothing); then the line "{CONFIDENCE_SENTENCE}";
+    then the line "Decision: analyst's."; then the closing paragraph, WORD FOR WORD with only the
+    blanks filled (no other wording: not "last looking", not "at this site", not "with"):
+    "Near <place>: methane on <candidates> of <passes read> EMIT passes read since <since>; EMIT last
+    looked here on <site_history's last_look>." then (first answer of the conversation only)
+    "{SPOKEN_CONFIDENCE}" (at most 240 characters; no TROPOMI figure, no Carbon Mapper figure outside
+    the Carbon Mapper-only template below, no comparison across areas, no em dash: those belong in
+    the record). E.g.
     "Near Hazar, Balkan, Turkmenistan: methane on 4 of 4 EMIT passes read since 2025-01-01; EMIT last
     looked here on 2025-08-20. {SPOKEN_CONFIDENCE}"
-    The closer never says "still active", "recent" or "active": it says when EMIT last looked. For a
-    TROPOMI-only site it says EMIT cannot look there instead of a last-look date.
+    A site followed for its Carbon Mapper plumes with no EMIT candidate uses, word for word: "Near
+    <place>: Carbon Mapper lists <count> methane plumes within 5 km since 2025-01-01, the latest on
+    <latest_date>; EMIT last looked here on <site_history's last_look>." A TROPOMI-only site (no
+    cue) says "Near <place>: a TROPOMI tip only; EMIT cannot look here." The closer never says
+    "still active", "recent" or "active": it says when EMIT last looked.
 THE ANALYST'S DECISION (the UI sends it after a draft):
 - "The analyst approved and filed brief <id>": call brief_status(<id>) and write its `say`
   sentence word for word as the whole answer, then the closing paragraph. Add nothing about

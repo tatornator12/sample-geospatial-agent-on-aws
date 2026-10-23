@@ -141,6 +141,25 @@ describe('briefCard', () => {
   });
 });
 
+describe('briefCard independent detections', () => {
+  const LINE = "Carbon Mapper lists 45 methane plumes within 5 km since 2025-01-01; the latest on 2026-06-20 by Tanager-1, Carbon Mapper's estimate about 270 ± 260 kg/h. Source: Carbon Mapper (data.carbonmapper.org).";
+  it("carries Carbon Mapper's own sentence, with its source", () => {
+    const c = briefCard(draft({}, { checks: { carbon_mapper: { count: 45, line: LINE } } }), BID, SID);
+    assert.equal(c?.independent, LINE);
+  });
+  it('drops a line without the source, with markup, or from anywhere else', () => {
+    for (const line of [
+      'Carbon Mapper lists 45 methane plumes within 5 km since 2025-01-01.',
+      `Carbon Mapper lists <b>45</b> plumes. Source: Carbon Mapper (data.carbonmapper.org).`,
+      `Acme Oil says so. Source: Carbon Mapper (data.carbonmapper.org).`,
+      42,
+    ]) {
+      assert.equal(briefCard(draft({}, { checks: { carbon_mapper: { line } } }), BID, SID)?.independent, undefined);
+    }
+    assert.equal(briefCard(draft(), BID, SID)?.independent, undefined);
+  });
+});
+
 describe('fileRefusal', () => {
   it('files only a draft of this session', () => {
     assert.equal(fileRefusal(draft(), BID, SID), null);

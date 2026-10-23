@@ -21,16 +21,19 @@ import type { ProfileData } from '../utils/profileSection.ts';
 import {
   PLAN_STAGES,
   chosenCue,
+  cmPlumesUrl,
   cueTally,
   endFrameFilms,
   groupDetail,
   groupName,
   groupSteps,
+  parseCmPlumes,
   parseManifest,
   passManifestUrl,
   planStage,
   rankTips,
   tipCued,
+  type CmPlumes,
   type CueTally,
   type PassFrame,
   type StepGroup,
@@ -87,6 +90,10 @@ export function StepColumn({
     const url = passManifestUrl(methaneDir, call);
     return url ? manifests[url] ?? null : null;
   };
+  // Carbon Mapper's record per cued site (carbon_mapper_plumes), for the board's independent line.
+  const cmCalls = steps.filter((c) => c.name === 'carbon_mapper_plumes');
+  const cmUrls = cmCalls.map((c) => cmPlumesUrl(methaneDir, c)).filter((u): u is string => !!u);
+  const cmRecords = useStageFiles<CmPlumes>(cmUrls, parseCmPlumes);
 
   if (steps.length === 0) return null;
 
@@ -107,6 +114,14 @@ export function StepColumn({
     const cue = cues.find((c) => tipCued(t, [c]));
     const frames = cue ? framesFor(cue) : null;
     if (frames && frames.length > 0) tallies[t.area.name] = cueTally(frames);
+  });
+  // Carbon Mapper's line under each cued row: the record of the call made at that row's point.
+  const cm: Record<string, CmPlumes> = {};
+  tips.forEach((t) => {
+    const call = cmCalls.find((c) => tipCued(t, [c]));
+    const url = call ? cmPlumesUrl(methaneDir, call) : null;
+    const record = url ? cmRecords[url] : undefined;
+    if (record) cm[t.area.name] = record;
   });
 
   const hasFilm = (g: StepGroup) => g.name === 'check_recent_passes' && manifestUrls.length > 0;
@@ -261,6 +276,7 @@ export function StepColumn({
                     chosen={chosenArea}
                     expected={group.calls.length}
                     tallies={tallies}
+                    cm={cm}
                     limit={collapsed ? 3 : undefined}
                   />
                 </div>

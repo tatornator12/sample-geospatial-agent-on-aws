@@ -331,6 +331,15 @@
 .tip-row--chosen .tip-row__cue {
   color: var(--fog);
 }
+/* Its fourth: Carbon Mapper's independent plumes near the same point, under the EMIT tally. */
+.tip-row__cm {
+  grid-row: 4;
+}
+/* The board's last line while Carbon Mapper's numbers show: its source (the licence asks for it). */
+.tip-row--source {
+  grid-template-rows: auto;
+  margin-top: 4px;
+}
 .tip-row__num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -1394,6 +1403,19 @@
   height: 16px;
   margin-left: 8px;
   border: 2px solid var(--fog);
+}
+/* Carbon Mapper's key: a mint ring on a dark halo, as drawn on the map, then its source. */
+.map-legend__detection {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2.5px solid #6fe0b8;
+  background: rgba(111, 224, 184, 0.2);
+  box-shadow: 0 0 0 2px #0f141b;
+}
+.map-legend__source {
+  white-space: normal;
 }
 /* Numeric legend ends (methane: 0 / 1,500+ ppm·m): the Tabular rule. */
 .map-legend__label--num {

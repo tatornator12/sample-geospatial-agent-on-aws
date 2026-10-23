@@ -284,6 +284,15 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
         </>
       )}
 
+      {card.independent && (
+        // Carbon Mapper's plumes at the site, as the tool wrote them (its source rides in the line).
+        <>
+          <p className="brief-card__subhead">Independent detections</p>
+          <ul className="brief-card__checks">
+            <li>{card.independent}</li>
+          </ul>
+        </>
+      )}
       {(card.checks?.length ?? 0) > 0 && (
         <>
           <p className="brief-card__subhead">Ground record</p>

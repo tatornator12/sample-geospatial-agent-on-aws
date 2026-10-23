@@ -34,6 +34,7 @@ export function groupSteps(steps: ToolCall[]): StepGroup[] {
 const GROUP_NAMES: Record<string, (n: number) => string> = {
   scan_tropomi: (n) => (n > 1 ? `Scan ${n} watch areas` : 'Scan a watch area'),
   check_recent_passes: (n) => (n > 1 ? `Cue EMIT on ${n} sites` : 'Cue EMIT'),
+  carbon_mapper_plumes: (n) => (n > 1 ? `Check Carbon Mapper on ${n} sites` : 'Check Carbon Mapper'),
   site_history: (n) => (n > 1 ? `Check ${n} site histories` : 'Check the site history'),
   inspect_image: (n) => (n > 1 ? `Look at ${n} images` : 'Look at the image'),
   display_visual: (n) => (n > 1 ? `Put ${n} layers on the map` : 'Put it on the map'),
@@ -141,21 +142,30 @@ export function tipCued(tip: Tip, cues: ToolCall[]): boolean {
 }
 
 const SCENE_IN_URL = /(EMIT_L2B_CH4ENH_002_\d{8}T\d{6}_\d{7}_\d{3})/;
+const CM_POINT_IN_URL = /\/cmplumes_(-?\d{1,3}\.\d{4})_(-?\d{1,3}\.\d{4})\.geojson$/;
 
 /**
  * Which cued site the agent followed: the one whose passes include the EMIT scene it then put on the
- * map or looked at (pass_<scene>.tif, columns_<scene>.geojson). Index into `cues`, or null before
- * the agent commits.
+ * map or looked at (pass_<scene>.tif, columns_<scene>.geojson), or, for a site followed for Carbon
+ * Mapper's plumes alone, the one whose Carbon Mapper points it put on the map
+ * (cmplumes_<lat>_<lon>.geojson, the cue's own point). Index into `cues`, or null before the agent
+ * commits.
  */
 export function chosenCue(cues: ToolCall[], framesByCue: Array<PassFrame[] | null>, later: ToolCall[]): number | null {
-  const scenes = later
-    .filter((t) => t.name === 'display_visual' || t.name === 'inspect_image')
-    .map((t) => (typeof t.params?.s3_url === 'string' ? t.params.s3_url.match(SCENE_IN_URL)?.[1] : undefined))
-    .filter((s): s is string => !!s);
-  if (scenes.length === 0) return null;
+  const looked = later.filter((t) => t.name === 'display_visual' || t.name === 'inspect_image');
+  const urls = looked.map((t) => (typeof t.params?.s3_url === 'string' ? t.params.s3_url : '')).filter((u) => !!u);
+  const scenes = urls.map((u) => u.match(SCENE_IN_URL)?.[1]).filter((s): s is string => !!s);
   for (let i = 0; i < cues.length; i++) {
     const frames = framesByCue[i];
-    if (frames?.some((f) => f.chipUrl && scenes.some((s) => f.chipUrl!.includes(s)))) return i;
+    if (scenes.length > 0 && frames?.some((f) => f.chipUrl && scenes.some((s) => f.chipUrl!.includes(s)))) return i;
+  }
+  if (scenes.length > 0) return null;
+  // At 2 decimals, as the board matches a tip to its cue (tipCued).
+  const points = urls.map((u) => u.match(CM_POINT_IN_URL)).filter((m): m is RegExpMatchArray => !!m);
+  for (let i = 0; i < cues.length; i++) {
+    const lat = coord(cues[i].params?.lat, 2);
+    const lon = coord(cues[i].params?.lon, 2);
+    if (points.some((m) => coord(m[1], 2) === lat && coord(m[2], 2) === lon)) return i;
   }
   return null;
 }
@@ -278,6 +288,10 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
     const text = tip ? 'Following the TROPOMI tip' : 'Recent EMIT passes';
     return { text, ...(points.length > 0 ? { mono: points.join(' · '), points } : {}) };
   }
+  if (group.name === 'carbon_mapper_plumes') {
+    const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 10);
+    return { text: `Carbon Mapper's public plumes, within ${typeof r === 'number' ? r : 5} km since 2025` };
+  }
   if (group.name === 'thermal_anomalies') {
     const nights = group.calls.map((c) => c.params?.nights).find((n) => typeof n === 'number' && n >= 1 && n <= 60);
     return { text: `VIIRS night-time heat, last ${typeof nights === 'number' ? nights : 30} nights` };
@@ -344,6 +358,8 @@ const STAGE_OF: Record<string, number> = {
   scan_tropomi: 1,
   check_recent_passes: 2,
   site_history: 2,
+  // Carbon Mapper is part of choosing where to look (the plan's "3 cue EMIT and check Carbon Mapper").
+  carbon_mapper_plumes: 2,
   thermal_anomalies: 3,
   nearby_infrastructure: 3,
   registry_lookup: 3,
@@ -391,6 +407,65 @@ export function passManifestUrl(dir: string | null, call: ToolCall): string | nu
   const lon = coord(call.params?.lon, 4);
   if (lat === null || lon === null) return null;
   return `${dir}passes_${lat}_${lon}.json`;
+}
+
+/** Carbon Mapper's record carbon_mapper_plumes wrote for this call (key from its lat/lon, 4 decimals). */
+export function cmPlumesUrl(dir: string | null, call: ToolCall): string | null {
+  if (!dir || call.name !== 'carbon_mapper_plumes') return null;
+  const lat = coord(call.params?.lat, 4);
+  const lon = coord(call.params?.lon, 4);
+  if (lat === null || lon === null) return null;
+  return `${dir}cmplumes_${lat}_${lon}.json`;
+}
+
+export type CmInstrument = 'tanager' | 'emit' | 'airborne' | 'other';
+const CM_INSTRUMENTS: readonly CmInstrument[] = ['tanager', 'emit', 'airborne', 'other'];
+
+/** Carbon Mapper's plumes near a cued site, as the tool counted them: numbers, dates and a code only. */
+export interface CmPlumes {
+  /** The cued point the record is for, [lon, lat]. */
+  point: [number, number];
+  radiusKm: number;
+  since: string;
+  count: number;
+  /** The newest plume's date, YYYY-MM-DD; null when there is none. */
+  latest: string | null;
+  /** Carbon Mapper's estimate for that plume, kg/h; null when none is published. */
+  rateKgH: number | null;
+  instrument: CmInstrument | null;
+  /** The catalogue could not be read and nothing was cached: the board says so (no numbers, no source). */
+  unavailable: boolean;
+}
+
+/** The record, field by field; null when it is not one (a count or a radius out of range, a bad date). */
+export function parseCmPlumes(raw: unknown): CmPlumes | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const lat = num(r.lat, -90, 90);
+  const lon = num(r.lon, -180, 180);
+  const radiusKm = num(r.radius_km, 0.5, 10);
+  const since = isoDay(r.since);
+  if (lat === null || lon === null || radiusKm === null || !since) return null;
+  if (r.status === 'unavailable') {
+    return { point: [lon, lat], radiusKm, since, count: 0, latest: null, rateKgH: null, instrument: null, unavailable: true };
+  }
+  const count = typeof r.count === 'number' && Number.isInteger(r.count) && r.count >= 0 && r.count <= 10_000 ? r.count : null;
+  if (count === null) return null;
+  const latest = count > 0 ? isoDay(r.latest) : null;
+  if (count > 0 && !latest) return null;
+  const instrument = (CM_INSTRUMENTS as readonly unknown[]).includes(r.instrument) ? (r.instrument as CmInstrument) : null;
+  return {
+    point: [lon, lat], radiusKm, since, count, latest, rateKgH: count > 0 ? num(r.rate_kg_h, 0, 1_000_000) : null, instrument,
+    unavailable: false,
+  };
+}
+
+/** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h"; "Carbon Mapper: no plumes within 5 km". */
+export function cmLineText(c: CmPlumes): string {
+  if (c.unavailable) return 'Carbon Mapper: could not be checked';
+  if (c.count === 0) return `Carbon Mapper: no plumes within ${c.radiusKm} km`;
+  const rate = c.rateKgH !== null ? ` · ~${(Math.round(c.rateKgH / 10) * 10).toLocaleString('en-US')} kg/h` : '';
+  return `Carbon Mapper: ${c.count} ${c.count === 1 ? 'plume' : 'plumes'} · latest ${c.latest}${rate}`;
 }
 
 export type PassShort = 'candidate' | 'too weak' | 'within noise' | 'cloud or gap' | 'error';

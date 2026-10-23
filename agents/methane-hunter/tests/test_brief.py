@@ -281,3 +281,68 @@ def test_record_names_cover_every_party_and_spare_the_place(brief):
          "gaps": [], "explanations": [{"next_check": "Ask Jincheng Energy."}]}
     problems = brief.check_record_names(b, names)
     assert [p.split(":")[0] for p in problems] == ["observations[2]", "explanations[0].next_check"]
+
+
+def _cm_record(fake_s3, lat, lon, **over):
+    rec = {"lat": lat, "lon": lon, "radius_km": 5.0, "since": "2025-01-01", "count": 45, "latest": "2026-06-20",
+           "rate_kg_h": 273.1, "uncertainty_kg_h": 260.9, "instrument": "tanager", "source": "carbon-mapper"}
+    rec.update(over)
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/methane/cmplumes_{lat:.4f}_{lon:.4f}.json",
+                       Body=json.dumps(rec).encode())
+
+
+def test_the_brief_carries_carbon_mappers_independent_detections_from_its_own_record(brief, fake_s3):
+    _cm_record(fake_s3, 39.4745, 53.6440)      # carbon_mapper_plumes ran at the cued point, ~50 m away
+    out = json.loads(_run(brief.draft_brief(**good())))
+    line = ("Carbon Mapper lists 45 methane plumes within 5 km since 2025-01-01; the latest on 2026-06-20 by Tanager-1, "
+            "Carbon Mapper's estimate about 270 ± 260 kg/h. Source: Carbon Mapper (data.carbonmapper.org).")
+    assert f"- Independent detections: {line}" in out["markdown"]
+    record = json.loads(fake_s3.objects[f"session_data/{SESSION}/briefs/{out['brief_id']}.draft.json"])
+    assert record["brief"]["checks"]["carbon_mapper"]["line"] == line
+    assert record["brief"]["checks"]["carbon_mapper"]["count"] == 45
+
+
+@pytest.mark.parametrize("over,expect", [
+    ({"count": 0, "latest": None, "rate_kg_h": None, "uncertainty_kg_h": None, "instrument": None},
+     "Carbon Mapper lists no methane plume within 5 km since 2025-01-01. Source: Carbon Mapper (data.carbonmapper.org)."),
+    ({"count": 1, "rate_kg_h": None, "uncertainty_kg_h": None, "instrument": "emit"},
+     "Carbon Mapper lists 1 methane plume within 5 km since 2025-01-01; the latest on 2026-06-20 by EMIT, "
+     "no emission estimate published. Source: Carbon Mapper (data.carbonmapper.org)."),
+    ({"uncertainty_kg_h": None, "rate_kg_h": 1513.1},
+     "Carbon Mapper lists 45 methane plumes within 5 km since 2025-01-01; the latest on 2026-06-20 by Tanager-1, "
+     "Carbon Mapper's estimate about 1,510 kg/h. Source: Carbon Mapper (data.carbonmapper.org)."),
+])
+def test_the_carbon_mapper_line_is_written_from_numbers(brief, over, expect):
+    rec = {"radius_km": 5.0, "since": "2025-01-01", "count": 45, "latest": "2026-06-20", "rate_kg_h": 273.1,
+           "uncertainty_kg_h": 260.9, "instrument": "tanager"}
+    assert brief.carbon_mapper_line({**rec, **over}) == expect
+
+
+@pytest.mark.parametrize("over", [{"count": "45"}, {"latest": "June"}, {"instrument": "Acme <b>"}, {"since": None},
+                                  {"radius_km": 500}, {"count": True}])
+def test_a_malformed_carbon_mapper_record_adds_no_line(brief, fake_s3, over):
+    _cm_record(fake_s3, 39.4741, 53.6435, **over)
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert out["status"] == "draft" and "Independent detections" not in out["markdown"]
+    assert "Acme" not in out["markdown"]
+
+
+def test_a_carbon_mapper_record_at_another_site_is_not_this_briefs(brief, fake_s3):
+    _cm_record(fake_s3, 37.8938, 113.5625)
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert "Independent detections" not in out["markdown"]
+
+
+def test_the_nearest_carbon_mapper_record_within_2_km_is_the_briefs(brief, fake_s3):
+    _cm_record(fake_s3, 39.4800, 53.6435, count=3)       # ~650 m away
+    _cm_record(fake_s3, 39.4745, 53.6440, count=45)      # ~50 m away: this one
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert "Carbon Mapper lists 45 methane plumes" in out["markdown"]
+
+
+def test_an_unavailable_carbon_mapper_record_adds_no_line(brief, fake_s3):
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/methane/cmplumes_39.4741_53.6435.json",
+                       Body=json.dumps({"lat": 39.4741, "lon": 53.6435, "radius_km": 5.0, "since": "2025-01-01",
+                                        "status": "unavailable"}).encode())
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert "Independent detections" not in out["markdown"]
