@@ -709,9 +709,11 @@
   color: var(--fog);
   font-weight: 600;
 }
-/* Open the long parts on request: plain words, underlined, a full-height target. */
+/* Open the long parts on request: plain words, underlined, a full-height target. Each toggle sits on
+   its own line (flex, sized to its words), so two in a row never run together. */
 .brief-card__toggle {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 8px;
   min-height: 40px;
