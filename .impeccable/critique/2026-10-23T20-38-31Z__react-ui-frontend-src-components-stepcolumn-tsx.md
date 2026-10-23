@@ -10,6 +10,7 @@ target_fingerprint: "sha256:8c943a0f3e7e573fbe890c7f5c4ad229f472ea8b40ff3dde1471
 target_path: /Users/tsteske/Documents/repos/sample-geospatial-agent-on-aws-main/.worktrees/methane-bars/react-ui/frontend/src/components/StepColumn.tsx
 timestamp: 2026-10-23T20-38-31Z
 slug: react-ui-frontend-src-components-stepcolumn-tsx
+closed: true
 ---
 Method: dual-agent (A: kirocrew-worker, design review · B: kirocrew-worker, detector and browser overlay)
 Target: the Methane Watch following beat before the bars change: the step column (`react-ui/frontend/src/components/StepColumn.tsx`, with `TipBoard.tsx`, `PassFilmstrip.tsx`, `RecordTimeline.tsx`, `utils/steps.ts`), the map's methane legend (`MapView.tsx` renderLegend, `utils/layerStack.ts`, `utils/methaneLayers.ts`) and the brief card (`BriefCard.tsx`, `utils/record.ts`). Evidence: the `methane-watch-record` replay at 1920x1080 and 1280x720 on branch methane-bars (develop 4ec4763 frontend), DOM geometry and the source. Assessment A could not view the PNGs (no image tool in its session) and worked from DOM geometry and pixel statistics.

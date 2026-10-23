@@ -656,8 +656,10 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-/* The gap, said once, on in the count's paragraph: its date and its months never broken. */
+/* The gap, said once, on in the count's paragraph: its date and its months never broken; nor the
+   count's own numbers and its "since" date (a 720p column broke 2025-01-01 at its hyphens). */
 .brief-card__decision .brief-card__num,
+.brief-card__line .brief-card__num,
 .brief-card__gap {
   white-space: nowrap;
 }
