@@ -353,12 +353,12 @@ async def follow_site(lat: float, lon: float, reason: str) -> str:
             out["record_window_s3_url"] = f"s3://{bucket}/{window_key}"
             steps.append("inspect_image(record_window_s3_url) and say one sentence on the shape")
         steps.append("display_visual(record_columns_s3_url, render=render_record_columns) in its own response with "
-                     "get_rasters: the record bars replace the tip bars")
+                     "get_rasters: the close-look bars replace this fortnight's bars")
     elif latest:
         out["record"] = None
-        steps.append("the latest confirmation's bars are not available: the tip bars stay")
+        steps.append("the latest confirmation's bars are not available: this fortnight's bars stay")
     else:
-        steps.append("no confirmation: the tip bars stay")
+        steps.append("no confirmation: this fortnight's bars stay")
     out["next_steps"] = "Say `say` word for word. Then " + "; then ".join(steps) + "."
     logger.info("FOLLOW: %s #%d (%s), record %s", f["area"], f["rank"], rule["reason"], record and record["by"])
     return json.dumps(out)

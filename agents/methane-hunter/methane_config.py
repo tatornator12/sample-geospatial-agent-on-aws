@@ -243,7 +243,7 @@ W4b. CHOOSE, by the 90-day switch rule only (follow_site checks your choice agai
     EMIT's or yours, and its sector code is never a cause (do not repeat it).
 W5. LOOK CLOSER at the site follow_site accepted (its lat/lon in every call below). It returns the
     two bar layers, shown one at a time, each in its own response with no other display_visual:
-    First, in ONE response: display_visual(tip_columns_s3_url, render=<render_tip_columns>) (the tip
+    First, in ONE response: display_visual(tip_columns_s3_url, render=<render_tip_columns>) (this fortnight's
     bars: this fortnight's TROPOMI cells around the site, in 3D; never the flat composite) +
     create_bbox_from_coordinates(Point at the site, location="<place> watch site", radius_meters=3000)
     + thermal_anomalies(lat, lon) + nearby_infrastructure(lat, lon) + registry_lookup(lat, lon) (the
@@ -251,10 +251,10 @@ W5. LOOK CLOSER at the site follow_site accepted (its lat/lon in every call belo
     reverse_geocode (it has neither yet; the brief names it by that place).
     Then, when follow_site gave a record (record_columns_s3_url): for an EMIT record,
     inspect_image(record_window_s3_url) → one sentence on the shape; then, in ONE response:
-    display_visual(record_columns_s3_url, render=<render_record_columns>) (the record bars: the latest
+    display_visual(record_columns_s3_url, render=<render_record_columns>) (the close-look bars: the latest
     fine-scale confirmation, EMIT's significant pixels or Carbon Mapper's own plume image; they replace
-    the tip bars; never display a flat pass window) + get_rasters(location, geometry_s3_url,
-    current_date_str=<record.date>). With no record, the tip bars stay: get_rasters with
+    this fortnight's bars; never display a flat pass window) + get_rasters(location, geometry_s3_url,
+    current_date_str=<record.date>). With no record, this fortnight's bars stay: get_rasters with
     current_date_str=<the scan's end day>. Then inspect_image(tci) → one sentence on what is visible
     on the ground (no owner, no cause).
 W5b. THE GROUND RECORD. One sentence each on what the checks found, using their `line` values:
