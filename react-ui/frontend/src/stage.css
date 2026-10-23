@@ -2048,6 +2048,15 @@
   display: block;
   box-sizing: border-box;
 }
+/* MapLibre strokes a circle outside its radius, so a ring's width here is 2r and its stroke sits
+   outside it, as on the map (the candidate's 25 px ring runs a little past the slot). */
+.sea-key--ring::before,
+.sea-key--once::before,
+.sea-key--claimed::before,
+.sea-key--tied::before,
+.sea-key--candidate::before {
+  box-sizing: content-box;
+}
 /* A ship broadcasting its position: the held AIS dot (r 3.2, fog, a 1.2 px pale cyan edge at 0.6). */
 .sea-key--ais::before {
   width: 6.4px;
@@ -2071,17 +2080,23 @@
   border: 1.2px solid color-mix(in srgb, var(--label) 55%, transparent);
 }
 /* Matched to a ship's AIS: the plain fog ring (r 7.5, 1.6 px), no dot and no line. */
-.sea-key--claimed::before,
-.sea-key--tied::before {
+.sea-key--claimed::before {
   width: 15px;
   height: 15px;
   border-radius: 50%;
   border: 1.6px solid var(--fog);
 }
-/* Only where our own detector's match drew one: the ring tied by a hairline to its ship's dot. */
+/* Only where our own detector's match drew one: the ring tied by a hairline to its ship's dot,
+   drawn smaller than the map's so the ring, the line and the dot share the row's slot. */
+.sea-key--tied::before {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.6px solid var(--fog);
+}
 .sea-key--tied {
   place-items: end start;
-  background: linear-gradient(to top right, transparent calc(50% - 0.6px), var(--fog) calc(50% - 0.6px), var(--fog) calc(50% + 0.6px), transparent calc(50% + 0.6px)) no-repeat right top / 12.5px 12.5px;
+  background: linear-gradient(to top right, transparent calc(50% - 0.6px), var(--fog) calc(50% - 0.6px), var(--fog) calc(50% + 0.6px), transparent calc(50% + 0.6px)) no-repeat right top / 12.9px 12.9px;
 }
 .sea-key--tied::after {
   content: "";
@@ -2120,11 +2135,12 @@
   height: 18px;
   border: 1px solid var(--hairline-strong);
 }
-/* Reception unknown: the map's hatch (1.4 px slate lines about 5 px apart), with no edge, as drawn. */
+/* Reception unknown: the map's hatch (seaStage's 14 px tile: 1.4 px slate lines 9.9 px apart, no
+   edge), a little stronger than the map's 0.33 so a small swatch still reads as a hatch. */
 .sea-key--unproven::before {
   width: 18px;
   height: 18px;
-  background: repeating-linear-gradient(-45deg, rgba(143, 163, 184, 0.5) 0 1.4px, transparent 1.4px 4.95px);
+  background: repeating-linear-gradient(-45deg, rgba(143, 163, 184, 0.45) 0 1.4px, transparent 1.4px 9.9px);
 }
 
 /* The tasking plate: the officer's decision. The layers plate folds its list while it is up and
@@ -2145,14 +2161,14 @@
   padding: 10px 12px 12px;
   animation: stage-rise 360ms var(--ease-out) both;
 }
-/* In the step column's slot it fills the slot, so no finished step shows under it; the decision
-   stays at its foot. */
+/* In the step column's place: the finished steps under it are hidden while it stands there (MapView). */
 .tasking-plate--left {
   left: 16px;
   right: auto;
 }
-.tasking-plate--left .tasking-plate__foot {
-  margin-top: auto;
+/* The plate's own place in the stage's overlay, first in it (the tab order); no box of its own. */
+.stage__tasking {
+  display: contents;
 }
 /* A wide screen (the console clear of the right column): the right column is 360 px while the plate
    is up, the key's plate and the tasking plate alike, so the key's long rows and the candidates'

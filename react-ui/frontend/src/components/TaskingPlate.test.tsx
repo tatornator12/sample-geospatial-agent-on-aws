@@ -106,7 +106,7 @@ describe('the tasking on stage (clock and plate together)', () => {
     expect(container.querySelector('.tasking-plate__option-sub')?.textContent).toBe('no look planned yet');
   });
 
-  it('stands where the map placed it: under the key on the right, or filling the step column\'s slot on the left', async () => {
+  it('stands where the map placed it: under the key on the right, or in the step column\'s place on the left', async () => {
     state.current = DRAFT;
     const at = (place: Parameters<typeof TaskingPlate>[0]['place']) =>
       render(<TaskingPlate sessionId="s" draftKey={1} busy={false} box={null} excluded={[]}
@@ -121,7 +121,9 @@ describe('the tasking on stage (clock and plate together)', () => {
     await screen.findByText('Approve the tasking');
     const l = left.container.querySelector<HTMLElement>('.tasking-plate')!;
     expect(l.classList.contains('tasking-plate--left')).toBe(true);
-    expect([l.style.top, l.style.maxHeight, l.style.height]).toEqual(['16px', '486px', '486px']);
+    expect([l.style.top, l.style.maxHeight, l.style.height]).toEqual(['16px', '486px', '']);
+    // Its choices are one named group (they scroll together on a short screen).
+    expect(l.querySelector('.tasking-plate__body')?.getAttribute('aria-label')).toBe('The box and the candidates');
     // Every choice is there on either side: the boxes, the candidates, Approve and Not now.
     expect(l.querySelectorAll('input[type="radio"]')).toHaveLength(3);
     expect(l.querySelectorAll('input[type="checkbox"]')).toHaveLength(4);

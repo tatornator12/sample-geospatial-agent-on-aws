@@ -1071,10 +1071,33 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     setTaskExcluded([]);
   }, [tasking?.key]);
 
-  // The stage's overlay (the layer the step column and the console live in), for the plate.
+  // The plate's place in the stage's overlay (the layer the step column and the console live in):
+  // its own first child, so the plate comes before the steps and the console in the tab order.
   useEffect(() => {
-    setOverlayEl(frameRef.current?.closest('.stage')?.querySelector<HTMLElement>('.stage__overlay') ?? null);
+    const overlay = frameRef.current?.closest('.stage')?.querySelector<HTMLElement>('.stage__overlay');
+    if (!overlay) return;
+    const slot = document.createElement('div');
+    slot.className = 'stage__tasking';
+    overlay.prepend(slot);
+    setOverlayEl(slot);
+    return () => {
+      slot.remove();
+      setOverlayEl(null);
+    };
   }, []);
+
+  // Over the step column the plate takes the column's place: the finished steps under it are hidden
+  // and out of the tab order and the reading order (inert) until the plate moves or goes.
+  useEffect(() => {
+    const steps = document.querySelector<HTMLElement>('.stage-steps');
+    if (!steps || !taskingOn || taskingPlace?.side !== 'left') return;
+    steps.inert = true;
+    steps.style.visibility = 'hidden';
+    return () => {
+      steps.inert = false;
+      steps.style.visibility = '';
+    };
+  }, [taskingOn, taskingPlace?.side]);
 
   // The plate's place, measured whenever the plate, the key or the stage changes size: under the
   // key on the right where it is usable there, else in the step column's slot (stageLayout.taskingSlot).
@@ -1084,9 +1107,12 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       setTaskingPlace(null);
       return;
     }
+    // A part's height and its own margins; the foot's top margin is left out (on the left it is
+    // `auto`, the slot's free space, which is not something the plate needs).
     const outer = (el: Element) => {
       const cs = getComputedStyle(el);
-      return (el as HTMLElement).offsetHeight + parseFloat(cs.marginTop || '0') + parseFloat(cs.marginBottom || '0');
+      const top = el.classList.contains('tasking-plate__foot') ? 0 : parseFloat(cs.marginTop || '0');
+      return (el as HTMLElement).offsetHeight + top + parseFloat(cs.marginBottom || '0');
     };
     const place = () => {
       const plate = taskingRef.current;

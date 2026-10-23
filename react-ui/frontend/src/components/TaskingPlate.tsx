@@ -43,13 +43,12 @@ export interface TaskingPlateProps {
   sectionRef?: Ref<HTMLElement>;
 }
 
-/** The plate where the map placed it: under the key on the right, or over the finished steps on the left (filling that slot). */
+/** The plate where the map placed it: under the key on the right, or in the step column's place on the left. */
 function placement(place: TaskingSlot | null | undefined): { className: string; style?: CSSProperties } {
   if (!place) return { className: 'map-plate tasking-plate' };
-  const left = place.side === 'left';
   return {
-    className: `map-plate tasking-plate${left ? ' tasking-plate--left' : ''}`,
-    style: { top: place.top, bottom: 'auto', maxHeight: place.maxHeight, ...(left ? { height: place.maxHeight } : {}) },
+    className: `map-plate tasking-plate${place.side === 'left' ? ' tasking-plate--left' : ''}`,
+    style: { top: place.top, bottom: 'auto', maxHeight: place.maxHeight },
   };
 }
 
@@ -209,7 +208,8 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
       </div>
 
       {/* The choice scrolls on a short screen; the summary and the decision stay in view below it. */}
-      <div className="tasking-plate__body">
+      <div className="tasking-plate__body" role="group" aria-label="The box and the candidates">
+
       <fieldset className="tasking-plate__group" disabled={inert || busy || filing}>
         {/* Each box in two lines: its share of past dark targets (the box is history's), then its next look. */}
         <legend className="tasking-plate__legend">Patrol box and its next radar look</legend>
