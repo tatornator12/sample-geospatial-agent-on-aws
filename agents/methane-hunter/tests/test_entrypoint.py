@@ -139,7 +139,10 @@ def test_the_mission_checks_carbon_mapper_and_puts_the_candidate_on_the_map_as_i
     # Oct 23 (the bars): the tip bars, then the record bars, each its own display; never a flat window.
     assert "display_visual(tip_columns_s3_url, render=<render_tip_columns>)" in p
     assert "display_visual(record_columns_s3_url, render=<render_record_columns>)" in p
-    assert "they replace the tip bars; never display a flat pass window" in p
+    assert "they replace this fortnight's bars; never display a flat pass window" in p
+    # The model echoes the prompt's names on stage, so W5 calls the bars by plain names only.
+    w5 = p[p.index("W5. LOOK CLOSER"):p.index("W5b. THE GROUND RECORD")]
+    assert "tip bars" not in w5 and "record bars" not in w5
     assert "display_visual(that window_s3_url" not in p
     assert "its sector code is never a cause" in p and "Carbon Mapper's estimate" in p
     names = [getattr(t, "__name__", "") for t in methane_hunter.LOCAL_TOOLS]
