@@ -484,3 +484,101 @@ fine-scale look" (never confused with the analyst's "Request another look").
    model text reaches the timeline or the card line.
 6. WHEN the golden `watch-mission` runs THEN it SHALL require "Recommendation:" in the record and
    a `draft_brief` call whose enums are valid (`expected_inputs`).
+
+## Act 2 v5: the bars and the 90-day switch rule (approved 2026-10-23)
+
+Approved 2026-10-23 by the presenter, from `.agents/tasks/methane-options/report.md` ("Recommendation
+for Nov 9") with one change: the follow gains a second step when its confirmation is stale. Branch
+`methane-bars`, release target Wed 28 October, freeze Tue 3 November. The tip is always this fortnight;
+a fine-scale confirmation is always a record with its own date, older by at least Carbon Mapper's
+30-day lag. The stage shows both as bars, one layer at a time, each with its date said once.
+
+### Requirement 17: The tip bars
+1. WHEN `scan_tropomi` builds a composite THEN it SHALL keep its valid-days band (v3 cache keys only:
+   `methane/cache/tropomi_v3_<stem>.tif`, `_days.tif`, `.json`), and write, for each of the area's
+   top three hotspots, the cells whose centre lies within ±15 km of it, seen on at least 3 days (the
+   hotspot rule) and above the area's median, as `tipcolumns_<lat>_<lon>.geojson` with one numeric
+   property, `ppb`. Never over a whole watch area (the anomaly is against the area's median, so a box
+   over two landscapes would raise a wall that reads as a source).
+2. The v2 and unversioned composites (the stable runtime's) SHALL be read only, and only when TROPOMI
+   itself cannot be read; they carry no days band, so no tip bars.
+3. The composite's window SHALL be the days TROPOMI was read on (`summary.end` the last day read,
+   `requested_end` the day asked for); a v3 composite missing the day asked for SHALL be built again
+   after six hours.
+4. The tip bars' hint SHALL be `columns` with `property` `ppb`, the ice ramp, `units` `ppb` and a
+   validated `height_scale` (metres per unit, above 0, at most 5,000; 40 m per ppb). The stage SHALL
+   reject a hint whose `height_scale` fails.
+
+### Requirement 18: The record bars
+1. WHEN `carbon_mapper_plumes` finds a plume within 7 km THEN, in the same call, it SHALL fetch the
+   newest one's concentration raster (`con_tif`) and write its pixels at 500 ppm·m or more as cells
+   reprojected from the raster's UTM grid to WGS84 (`cmcolumns_<plume_id>.geojson`, one numeric
+   property `ppm_m`, strongest first, at most 3,000), cached by plume id under
+   `methane/cache/cmimage_v1_<plume_id>.geojson` so an outage still draws a plume already seen.
+2. The fetch SHALL accept only an https URL on `catalog.carbonmapper.org` (default port, no
+   credentials) whose path names that plume id, follow no redirect, stream with a 2 MB cap (refused
+   while streaming, never downloaded then checked), and accept one float32 band of at most
+   1,000 × 1,000 pixels on a projected grid whose cells lie within 20 km of the plume's point. The
+   signed URL SHALL never be logged, returned, cached or stored; a failure SHALL be a short code
+   (an expired link is `cm_image_http_403`) and the tip bars stay.
+3. WHEN the agent follows a site THEN its record bars SHALL be its latest fine-scale confirmation:
+   EMIT's significant-pixel columns of its newest candidate pass, or Carbon Mapper's plume image.
+   They SHALL replace the tip bars on the map (one bar layer at a time). With no confirmation, the
+   tip bars stay and the brief card says so.
+4. "Source: Carbon Mapper (data.carbonmapper.org)" SHALL show beside Carbon Mapper's bars (their
+   legend row). Licence: non-commercial, attribution, share-alike (cleared 2026-10-22).
+
+### Requirement 19: The 90-day switch rule, a visible decision
+1. Step 1 (today's rule): among the two cued sites (the top hotspot of each of the two strongest
+   EMIT-visible areas; with one area scanned, its top two hotspots), follow the one with the newest
+   confirmed close look (an EMIT candidate pass, mirror test included, or a Carbon Mapper plume within
+   7 km); a tie goes to more EMIT candidate passes, then the higher peak; with neither, the stronger
+   tip.
+2. Step 2: WHEN step 1's follow has no confirmation within 90 days of the tip window's first day (or
+   none) THEN the agent SHALL check the top three hotspots the scan flagged in each cued area
+   (`check_recent_passes`, then `carbon_mapper_plumes`), and follow the one with the freshest
+   confirmation within 90 days (a tie: the stronger tip), else keep step 1's follow. The extra
+   hotspots are checked only in step 2. 90 days is `draft_brief`'s threshold.
+3. The agent SHALL make the choice through `follow_site(lat, lon, reason)` with one of
+   `newest_confirmation`, `top_spot_stale_switched`, `top_spot_stale_no_fresher`, `stronger_tip`.
+   The tool SHALL compute the facts from the session's records (tip, pass and Carbon Mapper
+   manifests) with the same pure rule the tests and the eval run (`follow_rule.py`), refuse a follow
+   the facts contradict naming the fact (and, when step 2 applies but its hotspots are unchecked, name
+   them), and on a follow write `follow.json` (enums, dates, numbers and file names only) and return
+   the two bar layers. The agent says the tool's `say` sentence word for word.
+4. On the options report's 20 boards the rule SHALL reproduce: a switch on 9 boards, a close look
+   within 90 days on 19 of 20 (median 38 days, worst 78), against 10 of 20 for step 1 alone
+   (median 77.5 of the 18 with one, worst 137). The brief asked for "12 of 20"; the same data give
+   10, the report's own "no new look needed on 10".
+
+### Requirement 20: Stage words
+1. Every word about the follow and the bars SHALL be written by the stage from `follow.json` and the
+   tools' file names, never from model text; at least 15 px; plain words for a mixed audience; no em
+   or en dashes; British spelling; one point per beat; each bar layer's date said once on the plate
+   and once in its legend row; never "now", "still", "active" or "leaking".
+2. Under the follow step, the decision line, e.g. "Methane was last seen up close at the top spot in
+   Shanxi 117 days before this fortnight, so the agent is following the third spot in the south
+   Caspian, last seen up close 40 days before." Under each bar layer's display step its plate line:
+   "TROPOMI, 7 to 20 October 2026. Taller bars mean more methane in the air than usual for this
+   area." / "Carbon Mapper's image of this plume, 20 June 2026. That is 109 days before this fortnight
+   began." / "EMIT saw methane here on 15 August 2026. That is 19 days before this fortnight began."
+   These steps stay in the end frame.
+3. The brief card's decision line: "Methane was last seen up close here N days before this fortnight."
+   then "The agent recommends a new close look." or "No new close look is needed yet."; with no
+   confirmation "No close look has confirmed methane here, so the bars are TROPOMI's only." The
+   record timeline keeps its marks and bracket and, with a follow on the plate, repeats neither the
+   window nor the gap words.
+4. Step 2's cue and Carbon Mapper steps show no filmstrips of their own; the followed spot (ranked 2
+   or 3 too) gets its record timeline and filmstrip.
+
+### Requirement 21: Review notes closed (from the Carbon Mapper build)
+1. The Slack post for a filed brief SHALL carry the card's "Independent detections" line, with its
+   source, in its ground record (the workflow keeps its twelve variables).
+2. Carbon Mapper's `sector` SHALL reach the model as a fixed code (`coal_mining`, `oil_gas`, ...,
+   `other`), never as the catalogue's text.
+3. The catalogue SHALL be called with an honest User-Agent (checked 2026-10-23: the API and its image
+   host answer it as they answer a browser), and every response's size cap SHALL be enforced while
+   it streams.
+4. Tests SHALL cover the ring popup's parsing (`detectionPopupHtml`) and `build_replay_case.py`'s
+   gates: a take with a confirmation and no record bars, or with no tip bars, or with the bars out of
+   order, is rejected.
