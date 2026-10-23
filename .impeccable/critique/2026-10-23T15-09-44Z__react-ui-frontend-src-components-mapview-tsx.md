@@ -10,6 +10,7 @@ target_fingerprint: "sha256:052e642ec1981466777e25607bbaf9950044eafd932919dd3563
 target_path: /Users/tsteske/Documents/repos/sample-geospatial-agent-on-aws-main/.worktrees/vessels-noise/react-ui/frontend/src/components/MapView.tsx
 timestamp: 2026-10-23T15-09-44Z
 slug: react-ui-frontend-src-components-mapview-tsx
+closed: true
 ---
 Method: dual-agent (A: context-gatherer · B: kirocrew-worker)
 
