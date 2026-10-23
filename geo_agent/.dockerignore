@@ -12,9 +12,13 @@ __pycache__*
 *.so
 .Python
 
+# Env files at ANY level of the build context (a bare `.env` only matches the root,
+# and `.env.dev` holds the same keys, including the ArcGIS MCP token)
+**/.env
+**/.env.*
+!**/.env.example
 # Virtual environments
 .venv/
-.env
 venv/
 env/
 ENV/
