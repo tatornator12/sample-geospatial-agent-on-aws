@@ -7,6 +7,9 @@
 #
 # Uses the same guard as the Earth Analyst (geo_agent/deploy_lib.sh) with this agent's names.
 set -e
+# Files this writes or stages go into an image that runs as uid 1000: keep them world-readable
+# whatever the caller's umask (Oct 22: a deploy under umask 077 crashed three runtimes).
+umask 022
 cd "$(dirname "$0")"
 
 export STABLE_AGENT_NAME="methane_hunter"

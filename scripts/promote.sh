@@ -20,6 +20,9 @@
 #
 # This is the ONLY sanctioned way demo-stable moves (see .kiro/steering/demo-program.md).
 set -euo pipefail
+# Every stable deploy below stages files into a Docker build context whose image runs as uid 1000;
+# a promotion run under umask 077 staged 600 files on Oct 22 and three runtimes died at start.
+umask 022
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"

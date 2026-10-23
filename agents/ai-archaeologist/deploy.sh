@@ -9,6 +9,9 @@
 # shared staging script (geo_agent/stage_shared.sh). 3DEP is public: no data token is needed; the
 # terrain is pre-built by scripts/build_site_catalogue.py into the shared bucket.
 set -e
+# Files this writes or stages go into an image that runs as uid 1000: keep them world-readable
+# whatever the caller's umask (Oct 22: a deploy under umask 077 crashed three runtimes).
+umask 022
 cd "$(dirname "$0")"
 
 export STABLE_AGENT_NAME="ai_archaeologist"

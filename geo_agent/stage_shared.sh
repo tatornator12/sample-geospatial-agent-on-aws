@@ -15,7 +15,16 @@
 #
 # Everything this writes is gitignored. Each agent's tests/test_staging.py parses the two arrays
 # below and fails if an agent module imports shared code that is not staged.
+#
+# Modes: the image COPYs the build context as root and runs as uid 1000 (USER bedrock_agentcore),
+# so everything staged must be world-readable whatever the caller's umask. On Oct 22 a deploy run
+# under umask 077 staged 600 files and three stable runtimes died at start with
+# "PermissionError: ... /app/_geo_agent/config.py". The umask below covers new files; rsync -a
+# keeps the source's modes and cp or `>` keep an existing destination's, so the modes are also set
+# explicitly after copying (make_readable). geo_agent/tests/test_stage_shared.py runs this under
+# umask 077 and checks every staged file.
 set -euo pipefail
+umask 022
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ $# -lt 2 ]; then
@@ -62,6 +71,24 @@ generate_dockerfile() {
             printf '%s\n' "${line//python -m geospatial_agent_on_aws/python -m $MODULE}"
         done < "$platform"
     } > "$AGENT_DIR/Dockerfile"
+    # `>` into an existing file keeps its mode (a 600 Dockerfile from an earlier run stays 600).
+    chmod a+r "$AGENT_DIR/Dockerfile"
+}
+
+# Everything the image reads from the build context, world-readable (directories traversable).
+# The agent's own git-tracked files are included: git writes them under the umask of whatever
+# checkout or merge created them, and `COPY . .` puts them in the image with that mode. Gitignored
+# files (.env, .env.dev) are never touched: they stay private and .dockerignore keeps them out.
+make_readable() {
+    chmod -R a+rX "$DEST"
+    chmod a+r "$AGENT_DIR/requirements.txt" "$AGENT_DIR/Dockerfile"
+    if git -C "$AGENT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        local f
+        while IFS= read -r -d '' f; do
+            # A tracked file deleted in the working tree is still listed; skip it.
+            if [ -f "$AGENT_DIR/$f" ]; then chmod a+r "$AGENT_DIR/$f"; fi
+        done < <(git -C "$AGENT_DIR" ls-files -z -- .)
+    fi
 }
 
 if [ "${3:-}" = "dockerfile" ]; then
@@ -84,5 +111,6 @@ else
     cp "$SRC/requirements.txt" "$AGENT_DIR/requirements.txt"
 fi
 generate_dockerfile
+make_readable
 
 echo "Staged shared code into $DEST (${SHARED_FILES[*]} ${SHARED_DIRS[*]}), requirements.txt and Dockerfile ($MODULE)."

@@ -89,6 +89,18 @@ EOF
     fi
 }
 
+# The image COPYs its build context as root and runs as uid 1000, so every file it reads must be
+# world-readable whatever umask git (or a cp into an existing file) left it with. Makes the
+# directory's git-tracked files readable; gitignored files (.env, .env.dev) are never touched.
+# The agents under agents/ get the same from geo_agent/stage_shared.sh.
+readable_tracked_files() {
+    local dir="$1" f
+    git -C "${dir}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+    while IFS= read -r -d '' f; do
+        if [ -f "${dir}/${f}" ]; then chmod a+r "${dir}/${f}"; fi
+    done < <(git -C "${dir}" ls-files -z -- .)
+}
+
 # Run a command, or print it (redacting secret-looking KEY=VALUE args) when DRY_RUN=1.
 run() {
     if [ "${DRY_RUN:-0}" = "1" ]; then

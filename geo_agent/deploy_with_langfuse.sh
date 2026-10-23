@@ -9,6 +9,9 @@
 #   DRY_RUN=1 DEPLOY_TARGET=dev ./deploy_with_langfuse.sh
 
 set -e
+# Files this writes or stages go into an image that runs as uid 1000: keep them world-readable
+# whatever the caller's umask (Oct 22: a deploy under umask 077 crashed three runtimes).
+umask 022
 
 cd "$(dirname "$0")"
 source ./deploy_lib.sh
@@ -91,8 +94,11 @@ run "${AGENTCORE_BIN}" configure \
 echo ""
 echo "🚀 Launching agent ${AGENT_NAME} with Langfuse environment variables..."
 
-#overwrite Dockerfile with custom Docker
+#overwrite Dockerfile with custom Docker (cp keeps an existing file's mode, so set it), and make
+# the build context's tracked files readable by the image's uid 1000 whatever umask wrote them
 run cp Dockerfile_geospatial_agent_on_aws Dockerfile
+run chmod a+r Dockerfile
+run readable_tracked_files .
 
 # Deploy with environment variables for LangFuse observability and app configuration
 # (always addressed by agent name, never the yaml default)
