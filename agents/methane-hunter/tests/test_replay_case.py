@@ -52,6 +52,18 @@ def test_a_take_without_the_tip_bars_or_with_a_confirmation_and_no_record_bars_i
     assert "the recorded mission has no follow decision (follow.json)" in brc.take_problems(BASE + [tip_bars()], NARRATIVE, None, True)
 
 
+def test_the_case_says_which_board_it_recorded():
+    assert brc.fortnight_words("2026-10-05", "2026-10-18") == "5 to 18 October 2026"
+    assert brc.fortnight_words("2026-09-25", "2026-10-08") == "25 September to 8 October 2026"
+    assert brc.fortnight_words("2025-12-25", "2026-01-07") == "25 December 2025 to 7 January 2026"
+    assert brc.fortnight_words("2026-13-01", "2026-10-18") is None and brc.fortnight_words("", "x") is None
+    said = brc.board_description("One prompt", {"start": "2026-10-05", "end": "2026-10-18"}, "2026-10-23")
+    assert said == ("One prompt. Recorded on the TROPOMI fortnight 5 to 18 October 2026, "
+                    "with the EMIT and Carbon Mapper records as read on 23 October 2026")
+    assert "\u2014" not in said and "\u2013" not in said
+    assert brc.board_description("One prompt", {}, "2026-10-23") == "One prompt"
+
+
 def test_the_older_gates_still_hold():
     window = call("inspect_image", s3_url=f"{D}pass_EMIT_L2B_CH4ENH_003_20260926T040000.tif")
     problems = brc.take_problems([call("follow_site"), tip_bars(), window], "no closer, no brief", follow(record=False, latest=False), True)

@@ -27,6 +27,7 @@ import json
 import re
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
 
 import boto3
@@ -126,6 +127,33 @@ def shows_columns(t: dict, prop: str | None = None, file: str | None = None) -> 
     url = str(inp.get("s3_url", ""))
     return (t["name"] == "display_visual" and isinstance(render, dict) and render.get("kind") == "columns"
             and (prop is None or render.get("property") == prop) and (file is None or url.endswith("/" + file)))
+
+
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+          "October", "November", "December")
+
+
+def fortnight_words(start: str, end: str) -> str | None:
+    """'5 to 18 October 2026' (or '25 September to 8 October 2026') for two ISO dates, else None."""
+    m1, m2 = (re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", str(d)) for d in (start, end))
+    if not m1 or not m2:
+        return None
+    (y1, mo1, d1), (y2, mo2, d2) = ((int(g) for g in m.groups()) for m in (m1, m2))
+    if not (1 <= mo1 <= 12 and 1 <= mo2 <= 12):
+        return None
+    head = f"{d1}" if (y1, mo1) == (y2, mo2) else f"{d1} {MONTHS[mo1 - 1]}" + ("" if y1 == y2 else f" {y1}")
+    return f"{head} to {d2} {MONTHS[mo2 - 1]} {y2}"
+
+
+def board_description(description: str, tip: dict | None, read_on: str) -> str:
+    """The case says which board it recorded: the TROPOMI fortnight, and the day EMIT and Carbon Mapper
+    were read (the take's day, which can be later than the fortnight)."""
+    words = fortnight_words((tip or {}).get("start", ""), (tip or {}).get("end", ""))
+    day = fortnight_words(read_on, read_on)
+    if not words or not day:
+        return description
+    return (f"{description}. Recorded on the TROPOMI fortnight {words}, "
+            f"with the EMIT and Carbon Mapper records as read on {day.split(' to ', 1)[1]}")
 
 
 def take_problems(tools: list[dict], narrative: str, follow: dict | None, needs_brief: bool) -> list[str]:
@@ -379,7 +407,8 @@ def main() -> int:
         dates["tip_window"] = f"{tip['start']}/{tip['end']}"
     config = {
         "name": preset["name"],
-        "description": preset["description"],
+        "description": (board_description(preset["description"], tip, date.today().isoformat())
+                        if preset["needs_brief"] else preset["description"]),
         "location": preset["location"],
         "user_question": prompt,
         "agent": "methane",
