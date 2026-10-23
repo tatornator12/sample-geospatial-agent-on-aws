@@ -404,15 +404,20 @@ def test_a_dotted_match_reads_a_nested_field_and_the_mission_must_show_its_colum
     cols = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}columns_EMIT_L2B_CH4ENH_002_20250925T060520_2526804_019.geojson",
                                                              "render": {"kind": "columns", "property": "ppm_m"}})}
     as_text = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}columns_x.geojson", "render": '{"kind": "columns"}'})}
-    # The mission's brief carries the agent's decision (checked on its own below).
+    # The mission's follow and brief carry the agent's decisions (checked on their own below), and the
+    # tip bars land before the record bars.
     ok = {"name": "draft_brief", "input": _json.dumps({"recommendation": "recommend_new_look",
                                                        "recommendation_reason": "confirmation_older_than_90_days"})}
-    assert ev.input_problems(mission, [window, cols, ok]) == []
-    assert ev.input_problems(mission, [window, as_text, ok]) == []
-    assert ev.input_problems(mission, [cols, window]) != []          # the columns must follow the look
-    problems = ev.input_problems(mission, [window, flat])            # the Oct 22 stable mission
+    follow = {"name": "follow_site", "input": _json.dumps({"lat": 37.7, "lon": 53.9, "reason": "newest_confirmation"})}
+    tip = {"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}tipcolumns_37.7000_53.9000.geojson",
+                                                            "render": {"kind": "columns", "property": "ppb"}})}
+    assert ev.input_problems(mission, [follow, tip, window, cols, ok]) == []
+    assert ev.input_problems(mission, [follow, tip, window, as_text, ok]) == []
+    assert ev.input_problems(mission, [follow, tip, cols, window, ok]) != []          # the columns must follow the look
+    problems = ev.input_problems(mission, [follow, tip, window, flat, ok])            # the Oct 22 stable mission
     assert any("render.kind=columns" in p for p in problems)
-    assert ev.input_problems(mission, [ok]) == []                    # no candidate looked at: nothing to show
+    assert ev.input_problems(mission, [follow, tip, ok]) == []                    # no candidate looked at: nothing to show
+    assert any("render.property=ppb" in p for p in ev.input_problems(mission, [follow, window, cols, ok]))   # no tip bars
     shown_flat = ev.input_problems(mission, [window, flat, cols])     # the flat window is never shown
     assert any("forbidden input display_visual" in p for p in shown_flat)
     assert ev.dotted({"render": {"kind": "columns"}}, "render.kind") == "columns"
@@ -432,13 +437,77 @@ def test_the_mission_must_carry_the_agents_decision_as_validated_enums():
     def brief(**decision):
         return {"name": "draft_brief", "input": _json.dumps({"place": "Yangquan, Shanxi, China", **decision})}
     ok = brief(recommendation="recommend_new_look", recommendation_reason="confirmation_older_than_90_days")
-    assert ev.input_problems(mission, [ok]) == []
+    pre = [{"name": "follow_site", "input": _json.dumps({"lat": 1, "lon": 2, "reason": "stronger_tip"})},
+           {"name": "display_visual", "input": _json.dumps({"s3_url": "s3://b/x/tipcolumns_1.0000_2.0000.geojson",
+                                                             "render": {"kind": "columns", "property": "ppb"}})}]
+    assert ev.input_problems(mission, pre + [ok]) == []
     # A refused first call (no enums) and an accepted second one still pass: the decision was made.
-    assert ev.input_problems(mission, [brief(), ok]) == []
+    assert ev.input_problems(mission, pre + [brief(), ok]) == []
     for bad in (brief(), brief(recommendation="recommend_new_look"),
                 brief(recommendation="yes", recommendation_reason="confirmation_older_than_90_days"),
                 brief(recommendation="no_new_look_needed", recommendation_reason="it is old")):
-        assert any("expected inputs: no draft_brief" in p for p in ev.input_problems(mission, [bad]))
+        assert any("expected inputs: no draft_brief" in p for p in ev.input_problems(mission, pre + [bad]))
+    sideways = {"name": "follow_site", "input": _json.dumps({"lat": 1, "lon": 2, "reason": "sideways"})}
+    assert any("expected inputs: no follow_site" in p for p in ev.input_problems(mission, [sideways] + pre[1:] + [ok]))
+
+
+# --- the follow decision against the mission's own records (the 90-day switch rule, Oct 23) -------------
+
+def follow_mission(record_shown=True, reason="top_spot_stale_switched", followed=("south caspian", 3), tip_shown=True,
+                   cm_date="2026-08-26"):
+    """A finished mission's records as eval reads them, and its tool calls."""
+    import json as _json
+    spots = {"shanxi coal basin": [(35.5493, 112.8982, 122.6), (37.9643, 113.6682, 102.1), (35.9693, 114.1932, 89.2)],
+             "south caspian": [(37.6834, 53.7827, 98.0), (39.4379, 53.5730, 80.1), (37.7625, 53.9324, 70.0)]}
+    files = {}
+    for area, pts in spots.items():
+        hs = [{"rank": i + 1, "lat": la, "lon": lo, "anomaly_ppb": ppb, "valid_days": 5, "emit_can_look": True}
+              for i, (la, lo, ppb) in enumerate(pts)]
+        files[f"tip_{area.replace(' ', '_')}.json"] = {"area": area, "start": "2026-10-07", "end": "2026-10-21",
+                                                       "emit_can_look": True, "top": hs[0], "hotspots": hs}
+        for la, lo, _ in pts:
+            files[f"passes_{la:.4f}_{lo:.4f}.json"] = {"passes": [{"date": "2026-04-25", "verdict": "rejected"}]}
+            dates = ([{"date": cm_date, "instrument": "tanager", "distance_km": 2.0}]
+                     if (la, lo) == (37.7625, 53.9324) and cm_date else [])
+            files[f"cmplumes_{la:.4f}_{lo:.4f}.json"] = {"follow_radius_km": 7.0, "dates": dates}
+    area, rank = followed
+    files["follow.json"] = {"reason": reason, "followed": {"area": area, "rank": rank},
+                            "tip_bars": {"file": "tipcolumns_37.7625_53.9324.geojson"},
+                            "record_bars": {"by": "carbon_mapper", "date": cm_date, "file": "cmcolumns_tan-A.geojson"}
+                            if cm_date else None}
+    d = "s3://bucket/session_data/eval-x/methane/"
+    calls = [{"name": "follow_site", "input": _json.dumps({"lat": 37.7625, "lon": 53.9324, "reason": reason})}]
+    if tip_shown:
+        calls.append({"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}tipcolumns_37.7625_53.9324.geojson",
+                                                                       "render": {"kind": "columns", "property": "ppb"}})})
+    if record_shown:
+        calls.append({"name": "display_visual", "input": _json.dumps({"s3_url": f"{d}cmcolumns_tan-A.geojson",
+                                                                       "render": {"kind": "columns", "property": "ppm_m"}})})
+    return calls, files
+
+
+def test_the_follow_check_holds_the_follow_and_the_bars_to_the_records():
+    calls, files = follow_mission()
+    assert ev.follow_problems(calls, files) == []
+    # The records say switch; a follow that stayed on the top spot fails, naming both.
+    calls, files = follow_mission(reason="stronger_tip", followed=("shanxi coal basin", 1))
+    assert any("the records give south caspian #3 (top_spot_stale_switched)" in p for p in ev.follow_problems(calls, files))
+    # A confirmation within 90 days needs its record bars shown, after the tip bars.
+    calls, files = follow_mission(record_shown=False)
+    assert any("record bars (cmcolumns_tan-A.geojson) were not shown" in p for p in ev.follow_problems(calls, files))
+    calls, files = follow_mission()
+    assert any("before the tip bars" in p for p in ev.follow_problems([calls[0], calls[2], calls[1]], files))
+    calls, files = follow_mission(tip_shown=False)
+    assert any("tip bars" in p for p in ev.follow_problems(calls, files))
+    # No confirmation anywhere: the tip bars alone are the whole beat.
+    calls, files = follow_mission(reason="stronger_tip", followed=("shanxi coal basin", 1), record_shown=False, cm_date=None)
+    assert ev.follow_problems(calls, files) == []
+    assert ev.follow_problems(calls, None) == ["follow_check: the mission's records could not be read"]
+    assert ev.follow_problems(calls, {}) == ["follow_check: no follow.json (follow_site never accepted a follow)"]
+    import json as _json
+    cases = _json.loads((ev.REPO_ROOT / "agents" / "methane-hunter" / "golden_prompts.json").read_text())["prompts"]
+    assert all(c.get("follow_check") is True for c in cases if c["name"] in ("watch-mission", "watch-named-area", "watch-super-emitters"))
+    assert ev.case_problems({"name": "x", "follow_check": "yes"}) == ["x: follow_check is not true or false"]
 
 
 # --- the archaeologist's condition survey (decision 10, Oct 22) ----------------------------------------------

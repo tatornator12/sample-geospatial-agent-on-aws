@@ -217,6 +217,96 @@ def registry_lines(s3, bucket: str, session_id: str) -> list[str]:
     return lines
 
 
+# --- Methane Watch: the follow decision against the mission's own records ------------------------------
+
+FOLLOW_FILE = re.compile(r"^(tip_[a-z_]{3,40}|(passes|cmplumes)_-?\d+\.\d{4}_-?\d+\.\d{4}|follow)\.json$")
+
+
+def follow_files(s3, bucket: str, session_id: str) -> dict | None:
+    """The mission's tip, pass and Carbon Mapper manifests and its follow.json, by file name; None
+    when they cannot be read (the check then fails, it never passes on a failed read)."""
+    prefix = f"session_data/{session_id}/methane/"
+    files: dict = {}
+    try:
+        token = None
+        while True:
+            kwargs = {"Bucket": bucket, "Prefix": prefix}
+            if token:
+                kwargs["ContinuationToken"] = token
+            page = s3.list_objects_v2(**kwargs)
+            for obj in page.get("Contents", []):
+                name = obj["Key"].rsplit("/", 1)[-1]
+                if FOLLOW_FILE.fullmatch(name) and len(files) < 200:
+                    files[name] = json.loads(s3.get_object(Bucket=bucket, Key=obj["Key"])["Body"].read(500_000))
+            token = page.get("NextContinuationToken") if page.get("IsTruncated") else None
+            if not token:
+                return files
+    except Exception as e:
+        print(f"         (follow records unavailable: {type(e).__name__})", flush=True)
+        return None
+
+
+def follow_rule_module():
+    """The agent's own pure rule (agents/methane-hunter/follow_rule.py: no AWS, no network)."""
+    import importlib
+    path = str(REPO_ROOT / "agents" / "methane-hunter")
+    if path not in sys.path:
+        sys.path.insert(0, path)
+    return importlib.import_module("follow_rule")
+
+
+def follow_problems(calls: list[dict], files: dict | None) -> list[str]:
+    """follow_check: the agent's accepted follow and its reason are what the 90-day switch rule gives
+    on the mission's own records; the tip bars (a ppb columns display of follow.json's tip file) were
+    shown; and when the followed site has a confirmation within 90 days, its record bars (follow.json's
+    record file, as columns) were shown after them. Pure: the files are passed in."""
+    if files is None:
+        return ["follow_check: the mission's records could not be read"]
+    follow = files.get("follow.json")
+    if not isinstance(follow, dict) or not isinstance(follow.get("followed"), dict):
+        return ["follow_check: no follow.json (follow_site never accepted a follow)"]
+    fr = follow_rule_module()
+    rule, _ = fr.rule_from_files(files, None)
+    if rule is None:
+        return ["follow_check: no cued watch area in the mission's records"]
+    problems = []
+    f, m = rule["followed"], follow["followed"]
+    if (m.get("area"), m.get("rank")) != (f["area"], f["rank"]) or follow.get("reason") != rule["reason"]:
+        problems.append(f"follow_check: followed {m.get('area')} #{m.get('rank')} ({follow.get('reason')}), the records "
+                        f"give {f['area']} #{f['rank']} ({rule['reason']})")
+    accepted = [c for c in calls if c.get("name") == "follow_site"]
+    if not accepted:
+        problems.append("follow_check: follow_site was never called")
+    elif tool_input(accepted[-1]).get("reason") != follow.get("reason"):
+        problems.append(f"follow_check: the last follow_site reason {tool_input(accepted[-1]).get('reason')!r} is not "
+                        f"follow.json's {follow.get('reason')!r}")
+
+    def shown(file: str | None, prop: str | None = None) -> int | None:
+        for i, c in enumerate(calls):
+            url = tool_input(c).get("s3_url")
+            if (c.get("name") == "display_visual" and isinstance(url, str) and file and url.endswith("/" + file)
+                    and dotted(tool_input(c), "render.kind") == "columns"
+                    and (prop is None or dotted(tool_input(c), "render.property") == prop)):
+                return i
+        return None
+
+    tip_file = (follow.get("tip_bars") or {}).get("file") if isinstance(follow.get("tip_bars"), dict) else None
+    tip_at = shown(tip_file, "ppb")
+    if tip_at is None:
+        problems.append("follow_check: the tip bars (a ppb columns display of " + (tip_file or "no tip file") + ") were not shown")
+    days = rule["followed_days"]
+    if days is not None and days <= fr.GAP_DAYS:
+        record = follow.get("record_bars") if isinstance(follow.get("record_bars"), dict) else None
+        record_at = shown(record.get("file")) if record else None
+        if record is None:
+            problems.append(f"follow_check: a confirmation {days} days before the tip, but no record bars were built")
+        elif record_at is None:
+            problems.append(f"follow_check: the record bars ({record.get('file')}) were not shown")
+        elif tip_at is not None and record_at < tip_at:
+            problems.append("follow_check: the record bars were shown before the tip bars")
+    return problems
+
+
 def scrub(text: str, lines: list[str]) -> str:
     for line in sorted(lines, key=len, reverse=True):
         text = text.replace(line, " [registry line] ")
@@ -475,6 +565,8 @@ def case_problems(case: dict) -> list[str]:
     if by_ending is not None and (not isinstance(by_ending, dict) or set(by_ending) - {"draft", "stop"}
                                   or not all(isinstance(v, list) for v in by_ending.values())):
         out.append(f"{case.get('name')}: required_text_by_ending is not {{draft: [...], stop: [...]}}")
+    if "follow_check" in case and not isinstance(case["follow_check"], bool):
+        out.append(f"{case.get('name')}: follow_check is not true or false")
     for key in ("max_seconds", "report_max_words"):
         if key in case and (not isinstance(case[key], (int, float)) or isinstance(case[key], bool) or case[key] <= 0):
             out.append(f"{case.get('name')}: {key} is not a positive number")
@@ -741,6 +833,8 @@ def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str 
             names = {c["toolUseId"]: c["name"] for c in calls}
             refused = [names[i] for i in refusals_in(messages, set(names))]
     problems += accepted_problems(case, tool_names, refused)
+    if case.get("follow_check"):
+        problems += follow_problems(calls, follow_files(s3, bucket, session_id) if (s3 is not None and bucket) else None)
 
     # Characters of prose (everything that is not a tool-call object): a proxy for how much
     # the model wrote, which is what the room waits on at the end of a turn.

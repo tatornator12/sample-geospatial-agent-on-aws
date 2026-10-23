@@ -44,6 +44,7 @@ from watch_tools import check_recent_passes, scan_tropomi, site_history, watch_b
 from brief_tools import brief_status, draft_brief  # noqa: E402
 from ground_tools import nearby_infrastructure, registry_lookup, thermal_anomalies  # noqa: E402
 from carbon_mapper import carbon_mapper_plumes  # noqa: E402
+from follow_tools import follow_site  # noqa: E402
 
 app = BedrockAgentCoreApp()
 
@@ -76,6 +77,8 @@ LOCAL_TOOLS = [
     site_history,
     # Independent detections: Carbon Mapper's public plume catalogue (Tanager-1, EMIT, aircraft).
     carbon_mapper_plumes,
+    # The follow decision (the 90-day switch rule), checked against the records; it hands back the bars.
+    follow_site,
     # The ground record: two open-data checks that test the brief's hypotheses.
     thermal_anomalies,
     nearby_infrastructure,

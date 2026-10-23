@@ -130,6 +130,12 @@ class FakeS3:
         body = self.objects[Key]
         return {"Body": io.BytesIO(body), "ContentLength": len(body)}
 
+    def head_object(self, Bucket, Key):
+        assert Bucket == BUCKET
+        if Key not in self.objects:
+            raise _NoSuchKey(Key)
+        return {"ContentLength": len(self.objects[Key])}
+
     def list_objects_v2(self, Bucket, Prefix):
         from datetime import datetime, timedelta
         base = datetime(2026, 1, 1)

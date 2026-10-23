@@ -132,6 +132,17 @@ describe('workflowPayload', () => {
     assert.equal(workflowPayload(filed({ card: card({ checks: [], hypotheses: [], gaps: [], nextCollection: undefined }) })).ground_record, '• No ground-record checks were run.');
     assert.equal(workflowPayload(filed({ card: card({ hypotheses: [] }) })).hypotheses, '• none listed');
   });
+  it('carries the card\'s "Independent detections" line, with its source, in the ground record (Block Kit too)', () => {
+    const independent = 'Carbon Mapper lists 45 methane plumes within 7 km since 2025-01-01; the latest on 2026-06-20 by Tanager-1, no emission estimate published. Source: Carbon Mapper (data.carbonmapper.org).';
+    const withCm = filed({ card: card({ independent }) });
+    const lines = workflowPayload(withCm).ground_record.split('\n');
+    assert.equal(lines.length, 6);
+    assert.equal(lines[2], `• Independent detections: ${independent}`);
+    assert.ok(JSON.stringify(filedMessage(withCm)).includes('Independent detections: Carbon Mapper lists 45'));
+    assert.ok(!workflowPayload(filed()).ground_record.includes('Independent detections'));
+    // The same twelve variables: the user's workflow needs no change.
+    assert.deepEqual(Object.keys(workflowPayload(withCm)).sort(), [...WORKFLOW_VARIABLES].sort());
+  });
 
   it('is what a workflow trigger receives, while an incoming webhook receives the Block Kit message', () => {
     assert.ok(!('blocks' in payloadFor(WORKFLOW_URL, filed())));

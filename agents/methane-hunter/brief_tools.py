@@ -279,15 +279,22 @@ def find_tip(lat: float, lon: float) -> dict | None:
             if not re.fullmatch(r"tip_[a-z_]{3,40}\.json", obj["Key"].rsplit("/", 1)[-1]):
                 continue
             tip = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=obj["Key"])["Body"].read(50_000))
-            top = tip.get("top") if isinstance(tip, dict) else None
-            tlat = _num((top or {}).get("lat"), -90, 90)
-            tlon = _num((top or {}).get("lon"), -180, 180)
-            start, end = tip.get("start"), tip.get("end")
-            if tlat is None or tlon is None or not all(isinstance(d, str) and _DAY.fullmatch(d) for d in (start, end)):
+            if not isinstance(tip, dict):
                 continue
-            d = math.hypot((tlat - lat) * 110.574, (tlon - lon) * 111.320 * math.cos(math.radians(lat)))
-            if d <= CHECK_RADIUS_KM and (best is None or d < best[0]):
-                best = (d, {"start": start, "end": end})
+            start, end = tip.get("start"), tip.get("end")
+            if not all(isinstance(d, str) and _DAY.fullmatch(d) for d in (start, end)):
+                continue
+            # The top hotspot, or any of the scan's top three (the follow rule's step 2 can follow them).
+            spots = [h for h in (tip.get("hotspots") if isinstance(tip.get("hotspots"), list) else [])[:3]
+                     if isinstance(h, dict)] or [tip.get("top") or {}]
+            for spot in spots:
+                tlat = _num(spot.get("lat"), -90, 90)
+                tlon = _num(spot.get("lon"), -180, 180)
+                if tlat is None or tlon is None:
+                    continue
+                d = math.hypot((tlat - lat) * 110.574, (tlon - lon) * 111.320 * math.cos(math.radians(lat)))
+                if d <= CHECK_RADIUS_KM and (best is None or d < best[0]):
+                    best = (d, {"start": start, "end": end})
         return best[1] if best else None
     except Exception as e:  # an addition to the brief, never a reason to fail it
         logger.warning("tip lookup failed: %s", type(e).__name__)
