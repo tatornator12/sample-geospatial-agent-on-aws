@@ -114,3 +114,23 @@ Oct 12 when Dark Vessels was chosen for Act 3.)
   nothing else. Tasking secret live: `geospatial-agent/dev/slack-tasking-webhook` set, ECS rolled,
   the task logs "Slack on filed taskings: on (workflow webhook)". Not yet seen: the signed-in
   rehearsal and one real approve posting to Slack. Way back: `deployed-2026-10-21` (`9a5c6f9`).
+- Oct 23 (fix-forward, all four acts + frontend): `develop` promoted to `demo-stable` = `a6e882f`,
+  tag `deployed-2026-10-23` (pushed to `fork`). Replaces the Oct 22 afternoon run, which deployed
+  stable `methane_hunter` v6, `ai_archaeologist` v3 and `dark_vessels` v2 with shared code staged
+  under umask 077 (PermissionError on `/app/_geo_agent/config.py` at start) and never reached the
+  frontend; its local tag `deployed-2026-10-22-1457` was deleted. Brings: the WAF approve-route
+  exemption (a17d05f), Methane Watch's Carbon Mapper check and columns fix (merge ff6cdf0), the Act
+  4 condition survey (merge 21e2d4d), staging world-readable under any umask with
+  `geo_agent/tests/test_stage_shared.py` (2afecee), the filmstrip key fix (4930189) and every
+  `.env*` kept out of the Earth image (a6e882f). Gates: pytest geo_agent 140, methane 181,
+  archaeologist 89, dark-vessels 260, scripts 31; vitest 607; backend 79; tsc and build clean;
+  detector 0. Dev evals: earth 8/8, methane 13/13, archaeologist 7/7, vessels 11/11 (in `promote.sh`
+  run 2; run 1 stopped on methane `watch-mission`, which read 0 of 0 EMIT passes, a transient read
+  failure; dev rerun 1/1 PASS; nothing moved). Stable: `geospatial_agent_on_aws` v76,
+  `methane_hunter` v7, `ai_archaeologist` v4, `dark_vessels` v3, all READY; smokes
+  `similar-central-park`, `strongest-plume`, `great-circle-measure`, `open-question` PASS. WAF: CRS
+  `SizeRestrictions_BODY` in Count, `BlockLargeBodyExceptApprove` at priority 4; signed-out 49 KB
+  POSTs gave 401 (brief approve), 401 (tasking approve) and 403 (invoke, sampled as BLOCK on
+  `LargeBodyBlockMetric`). The live bundle has the survey and Carbon Mapper strings and no "Measure
+  an Octagon wall"; maplibre worker 200; `/api/agents` 401. Not yet seen: a signed-in approve on the
+  live site posting to Slack. Way back: `deployed-2026-10-22` (`ab10a09`; approvals blocked by WAF).

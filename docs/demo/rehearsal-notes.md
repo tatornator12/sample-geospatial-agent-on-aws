@@ -1,6 +1,6 @@
 # Agentic AI for Earth: rehearsal and speaker notes
 
-**DRAFT, 22 October 2026 (updated after release `deployed-2026-10-22`).** Since 22 October the live site has all four acts on stable runtimes (Dark Vessels for the first time) and both batches of the stage review's fixes; the tasking post to Slack is on, and nothing has been posted yet. The stable evals passed that day: Earth Analyst 8/8, AI Archaeologist 8/8, Methane Watch 13/13, Dark Vessels 11/11 and its open question 3 of 3. Act 3's minutes are not yet timed by hand (Thu 29 Oct). These notes describe the live site as it is now; section 2 lists what is still open. The way back from this release is the tag `deployed-2026-10-21`, which has no stable Dark Vessels. Records: `.agents/tasks/promote-2026-10-21b/` (`report.md`, `verify.md`, `promote-status.md`).
+**DRAFT, 23 October 2026 (updated after release `deployed-2026-10-23`).** Since 23 October the live site has all four acts on stable runtimes (Earth Analyst v76, Methane Watch v7, AI Archaeologist v4, Dark Vessels v3), with Methane Watch's Carbon Mapper check and its columns fix, the Archaeologist's condition survey, and the firewall fix that lets "Approve and file" and "Approve the tasking" through on the live site (both got a 403 there until then). It replaced the 22 October afternoon release, which had left Methane Watch, the Archaeologist and Dark Vessels failing at start. The dev gates passed (Earth 8/8, Methane 13/13, Archaeologist 7/7, Dark Vessels 11/11) and one stable smoke per act passed. The tasking post to Slack is on, and nothing has been posted from the live site yet. Act 3's minutes are not yet timed by hand (Thu 29 Oct). These notes describe the live site as it is now; section 2 lists what is still open. The way back from this release is the tag `deployed-2026-10-22`, which has no survey, no Carbon Mapper and approvals blocked by the firewall. Records: `.agents/tasks/release-2026-10-23/` (`prep-report.md`, `promote.log`).
 
 **Show order (decided 21 October):** Earth Analyst (Act 1), then AI Archaeologist (Act 4), then Methane Watch (Act 2), and Dark Vessels (Act 3) closes the show. The act numbers are the agents' names in the code and specs; only the running order changed. These notes keep the act numbers and put the sections in show order.
 
@@ -26,7 +26,7 @@ Stage addresses below are relative to the stage URL (the `ApplicationURL` stack 
 Why this order:
 
 - **Earth Analyst first:** the agent sees, and turns down a cloudy scene (the Bergen plate).
-- **AI Archaeologist second:** the same eyes in a new domain, and it chooses its own line to measure across an Octagon wall.
+- **AI Archaeologist second:** the same eyes in a new domain, and it judges, site by site, whether the Octagon's shape still shows in the ground.
 - **Methane Watch third:** a whole mission at scale on live data, and the stage shows why it follows one site over the other.
 - **Dark Vessels last:** one open question. The agent chooses the radar pass and says why, checks that a silence can mean anything there, gives a measured prediction and drafts a patrol tasking. The officer approves it on the map, and the Slack post on a second screen is the final image.
 
@@ -62,9 +62,12 @@ If you run long, cut in this order. The order across acts is proposed; Dark Vess
 
 ## 2. Until fixed
 
-> **Until fixed.** Recheck every line on Fri 30 Oct, the re-check before the freeze, and after the freeze (Tue 3 Nov). Trimmed on 21 October: every other line of the first box was checked fixed on a local copy of the stage, at 1920×1080 and 1280×720. New session, the Stage link, refresh after a switch, Esc and Stop, earlier turns and Replay cases are now safe to use. Trimmed again on 22 October, when both batches of fixes and the tasking post reached the live site.
+> **Until fixed.** Recheck every line on Fri 30 Oct, the re-check before the freeze, and after the freeze (Tue 3 Nov). Trimmed on 21 October: every other line of the first box was checked fixed on a local copy of the stage, at 1920×1080 and 1280×720. New session, the Stage link, refresh after a switch, Esc and Stop, earlier turns and Replay cases are now safe to use. Trimmed again on 22 October, when both batches of fixes and the tasking post reached the live site, and on 23 October, when the firewall fix let approvals through.
 >
+> - **Approvals on the live site:** both approve buttons got a 403 from the firewall until 23 October. Signed-out tests now reach the app (401), but no signed-in approve has run there yet: do one "Approve and file" and one "Approve the tasking" at the next rehearsal and check both Slack channels.
 > - **Act 4:** if a layer row reads "LiDAR did not load", say so, and do not read the answer over plain imagery.
+> - **Act 2, old confirmation:** the tip is the last two weeks; the newest fine-scale confirmation is months older. Say it as the record (short speaker notes, Act 2). A timeline that shows the gap on screen is being built.
+> - **Act 3, the dots and the lines:** the dots held at the radar minute are what the agent matched; the faint route lines behind them are three days of history no number uses. Point at the dots.
 > - **Act 3, Slack:** the tasking post has been on in production since 22 October, and nothing has been posted yet: the first real approve on the live site is the first post, so check the "Patrol taskings" channel during the rehearsal.
 > - **Act 3, the next look:** a box has a look only if ESA has published one. The plan read on 20 October had no look over these waters from 31 October to 9 November; if no newer plan adds one, every box reads "no look planned yet" and the plate shows no countdown. Say "ESA hasn't planned a radar look there yet."
 > - **Act 3 replay:** recorded on the Oct 17 rehearsal data, so its board and its figure (47%, 9.4 times chance) differ from the live stage, and after 24 October its next look reads "under way or passed". It is re-recorded on the new data on 6 November.
@@ -78,7 +81,7 @@ If you run long, cut in this order. The order across acts is proposed; Dark Vess
 | Date | What | Source |
 |---|---|---|
 | Thu 22 Oct | Release `deployed-2026-10-22`: all four acts and both fix batches live | release report (`promote-2026-10-21b`) |
-| Fri 23 Oct | Archaeologist dev gate; first batch of stage fixes | act3 design decision 9; review summary |
+| Fri 23 Oct | Release `deployed-2026-10-23`: the firewall fix, Carbon Mapper and the columns fix, the condition survey; replaces the failed 22 October afternoon release | `.agents/tasks/release-2026-10-23/` |
 | Sat 24 Oct (about) | Dark Vessels: the dev rehearsal data rebuilt with the Oct 18 pass once Global Fishing Watch's AIS reaches 19 October, data only | act3 tasks 6.3 |
 | Mon 26 Oct | Act 3 gate A drop-dead 12:00: passed early, Wed 21 Oct | act3 redesign U10; act3 gate log |
 | Wed 28 Oct | Act 3 gate B drop-dead 12:00: passed early, Wed 21 Oct, with the replay case recorded the same day | act3 redesign U10; act3 tasks 6.1 |
@@ -260,7 +263,7 @@ Goal: same eyes, a new domain, on known sites only; the agent judges, site by si
 | 2 | Where else, like this | `Where else did they build like this?` |
 | 3 | Measure the Great Circle | `Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?` |
 
-"Measure an Octagon wall" left the act on 22 October: a measuring tool measures, which shows no judgement, and the Octagon has no verified line to measure on. Until the survey is released, the stable stage still shows the old four plates.
+"Measure an Octagon wall" left the act on 22 October: a measuring tool measures, which shows no judgement, and the Octagon has no verified line to measure on. The survey has been on the stable stage since 23 October.
 
 **Beats** (the run sheet's times):
 
@@ -306,7 +309,7 @@ What the agent decided on dev (22 October, 10 survey runs with the close look, d
 
 Goal: it senses the invisible and triages at scale, on live data, and shows why it follows one site.
 
-> **Not on the stable stage yet (as of 22 October):** the Carbon Mapper check, the new follow rule and the columns fix are on the dev runtime (`methane_hunter_dev` v46, branch `methane-fixes`), not yet on the stable stage. Until they are promoted, the live stage shows no Carbon Mapper lines, follows the site with more candidate passes, and may still leave out the 3D columns (the model dropped them in 14 of 43 missions from 20 to 22 October, the user's 22 October rehearsal included). The lines below describe the stage after that release.
+> **On the stable stage since 23 October:** the Carbon Mapper check, the follow rule (the newest confirmed detection) and the columns fix. The site it follows changes with the day's tip: on 23 October the dev gate followed a Shanxi hotspot near Jincheng, not the replay's. Being reworked before the freeze (dev only): EMIT passes after 31 August (NASA's newer V003 product) are not read yet, and a noise check may change which Shanxi passes count. Update this section when that ships.
 
 **Plates on the stage** (stageCopy.ts order; on the stable stage since the 21 October promotion):
 
