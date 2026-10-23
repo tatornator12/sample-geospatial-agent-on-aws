@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { globeOffset, globeZoom, stagePadding, stepColumnMaxHeight, stepColumnWidth } from './stageLayout.ts';
+import {
+  TASKING_GAP,
+  TASKING_MIN_BODY,
+  TASKING_PLATE_WIDTH,
+  globeOffset,
+  globeZoom,
+  stagePadding,
+  stepColumnMaxHeight,
+  stepColumnWidth,
+  taskingLeftOverhang,
+  taskingPlateWidth,
+  taskingSlot,
+} from './stageLayout.ts';
 
 describe('stepColumnWidth', () => {
   it('follows clamp(296px, 19vw, 380px), as stage.css does', () => {
@@ -52,5 +64,55 @@ describe('stepColumnMaxHeight', () => {
   });
   it('never collapses below a usable height', () => {
     expect(stepColumnMaxHeight({ stageHeight: 200, columnRight: 312, docentLeft: 240, docentTop: 60, railTop: 90 })).toBe(120);
+  });
+});
+
+describe('taskingSlot (Dark Vessels: the plate never covers the map key, Approve always in reach)', () => {
+  // The plate's head and foot (padding, title, summary, status, Approve) and its choices.
+  const fixed = 190;
+  const min = fixed + TASKING_MIN_BODY;
+
+  it('stands under the key in the right column at 1920x1080, nothing scrolled, when it fits', () => {
+    // Stage 1024 tall; the key's plate ends at 470; the basemap plate's top is at 960 (floor 950).
+    expect(TASKING_GAP).toBe(10);
+    const slot = taskingSlot({ keyBottom: 470, rightFloor: 950, leftFloor: 888, need: 460, min });
+    expect(slot).toEqual({ side: 'right', top: 480, maxHeight: 470, scrolls: false });
+    // Its top is below the key's bottom: the key is never under it.
+    expect(slot!.top).toBeGreaterThan(470);
+  });
+
+  it('stays on the right and scrolls its choices when the column is a little short', () => {
+    const slot = taskingSlot({ keyBottom: 520, rightFloor: 950, leftFloor: 888, need: 460, min });
+    expect(slot).toMatchObject({ side: 'right', top: 530, maxHeight: 420, scrolls: true });
+    expect(slot!.maxHeight).toBeGreaterThanOrEqual(min);
+  });
+
+  it('moves over the finished steps where the right is too short to use (1280x720, or the list opened)', () => {
+    // Stage 664 tall; the console reaches under the right column (its top at 518); the key ends at 470.
+    const slot = taskingSlot({ keyBottom: 470, rightFloor: 502, leftFloor: 502, need: 460, min });
+    expect(slot).toEqual({ side: 'left', top: 16, maxHeight: 486, scrolls: false });
+    // A shorter left slot scrolls the choices; the plate never runs below its floor.
+    const short = taskingSlot({ keyBottom: 470, rightFloor: 502, leftFloor: 420, need: 460, min });
+    expect(short).toEqual({ side: 'left', top: 16, maxHeight: 404, scrolls: true });
+    expect(short!.top + short!.maxHeight).toBeLessThanOrEqual(420);
+  });
+
+  it('keeps the plate usable at the edge: exactly its minimum on the right is still the right', () => {
+    expect(taskingSlot({ keyBottom: 100, rightFloor: 110 + min, leftFloor: 900, need: 600, min })?.side).toBe('right');
+    expect(taskingSlot({ keyBottom: 100, rightFloor: 109 + min, leftFloor: 900, need: 600, min })?.side).toBe('left');
+  });
+
+  it('leaves the stylesheet\'s place when a measure is missing, and never a negative height', () => {
+    expect(taskingSlot({ keyBottom: Number.NaN, rightFloor: 948, leftFloor: 888, need: 460, min })).toBeNull();
+    expect(taskingSlot({ keyBottom: 600, rightFloor: 500, leftFloor: 4, need: 460, min })).toMatchObject({ side: 'left', maxHeight: 0 });
+  });
+
+  it('frames the map clear of the plate where it reaches past a narrow step column', () => {
+    // 340 px where the console reaches under the right column; 360 px on a wide screen (stage.css).
+    expect([taskingPlateWidth(1280), taskingPlateWidth(1760), taskingPlateWidth(1761), taskingPlateWidth(1920)]).toEqual([340, 340, 360, 360]);
+    expect(TASKING_PLATE_WIDTH).toBe(340);
+    expect(taskingLeftOverhang(1280)).toBe(44);
+    expect(taskingLeftOverhang(1761)).toBe(25);
+    expect(taskingLeftOverhang(1920)).toBe(0);
   });
 });

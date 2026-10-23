@@ -79,3 +79,71 @@ export function stepColumnMaxHeight(opts: {
   const floor = overlaps ? Math.min(opts.docentTop, opts.railTop) : opts.railTop;
   return Math.max(120, Math.round(floor - gap - top));
 }
+
+/** The tasking plate's body below this is not a choice any more: its legend and about two box rows. */
+export const TASKING_MIN_BODY = 130;
+/** The gap between the plates in the right column while the tasking plate is up (key, plate, basemap). */
+export const TASKING_GAP = 10;
+/** The tasking plate's width (stage.css `.tasking-plate`), on either side. */
+export const TASKING_PLATE_WIDTH = 340;
+/**
+ * On a wide screen (the console clear of the right column, 1761 px and up) the right column is 360 px
+ * while the plate is up, the key's plate and the tasking plate alike: the key's long rows and the
+ * candidates' port names then take a line fewer, so both fit at 1920x1080.
+ */
+export const TASKING_PLATE_WIDTH_WIDE = 360;
+export const TASKING_WIDE_FROM = 1761;
+
+export function taskingPlateWidth(viewportWidth: number): number {
+  return viewportWidth >= TASKING_WIDE_FROM ? TASKING_PLATE_WIDTH_WIDE : TASKING_PLATE_WIDTH;
+}
+
+/**
+ * How far the tasking plate, standing in the step column's slot, reaches past the column (px): the
+ * camera's frame keeps the boxes and candidates clear of that much more (296 px column at 1280: 44).
+ */
+export function taskingLeftOverhang(viewportWidth: number): number {
+  return Math.max(0, taskingPlateWidth(viewportWidth) - stepColumnWidth(viewportWidth));
+}
+
+export interface TaskingSlotInput {
+  /** The layers plate's bottom edge (its map key showing), from the stage's top. */
+  keyBottom: number;
+  /** The lowest the plate may reach on the right: above the basemap plate, or above the console where it reaches under the column. */
+  rightFloor: number;
+  /** The same in the step column's slot on the left: above the console or the draw rail, whichever is higher there. */
+  leftFloor: number;
+  /** The plate's height with nothing scrolled. */
+  need: number;
+  /** The least it is usable at: its head, its foot (Approve, Not now) and the start of its choices. */
+  min: number;
+  top?: number;
+  gap?: number;
+}
+
+export interface TaskingSlot {
+  side: 'right' | 'left';
+  top: number;
+  maxHeight: number;
+  /** The plate's choices scroll inside it (its head and its foot never do). */
+  scrolls: boolean;
+}
+
+/**
+ * Where Dark Vessels' tasking plate stands, so the map key is never covered and Approve is always in
+ * reach. In the right column under the key wherever the plate is usable there (the show's 1920x1080:
+ * the key, the plate and the agent's answer are all on screen); its choices scroll if the column is
+ * a little short. Where it is not (a 720p screen, or the layer list opened over the key's column), in
+ * the step column's slot on the left, over the finished steps, whose answer is already cut off there.
+ * Null when a measure is missing (the stylesheet's own place stands).
+ */
+export function taskingSlot(o: TaskingSlotInput): TaskingSlot | null {
+  const top = o.top ?? 16;
+  const gap = o.gap ?? TASKING_GAP;
+  if (![o.keyBottom, o.rightFloor, o.leftFloor, o.need, o.min].every(Number.isFinite)) return null;
+  const rightTop = Math.round(o.keyBottom + gap);
+  const right = Math.round(o.rightFloor - rightTop);
+  if (right >= o.min) return { side: 'right', top: rightTop, maxHeight: right, scrolls: right < Math.ceil(o.need) };
+  const left = Math.max(0, Math.round(o.leftFloor - top));
+  return { side: 'left', top, maxHeight: left, scrolls: left < Math.ceil(o.need) };
+}

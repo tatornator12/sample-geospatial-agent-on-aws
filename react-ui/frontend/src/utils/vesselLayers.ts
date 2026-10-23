@@ -20,6 +20,8 @@ export const AIS = '#9fd3e6';
 export const FOG = '#e9eef3';
 export const LABEL = '#8fa3b8';
 export const DOME = '#0f141b';
+/** The pale orchid the history's heat ends in at its densest (seaStage's ramp), for its key. */
+export const HEAT_END = 'rgb(237, 180, 230)';
 /** The abyss behind the canvas (the frame's background under the seabed). */
 export const SEA_GROUND = '#03070d';
 /** Label halos on the sea: a shade of the deep water, so names cut out of it cleanly. */
@@ -184,7 +186,7 @@ export type ShownStatus = 'detected' | 'claimed' | 'port' | 'unproven' | 'seen_o
  */
 export const STATUS_KEY: Record<ShownStatus, { shape: string; colour: string; words: string }> = {
   detected: { shape: 'grey ring', colour: LABEL, words: 'radar target, not yet explained' },
-  claimed: { shape: 'fog ring (tied by a hairline to its AIS dot where that dot decided)', colour: FOG, words: 'a broadcast accounts for it' },
+  claimed: { shape: 'fog ring (a hairline to its AIS dot only where our own detector\'s match decided)', colour: FOG, words: 'a broadcast accounts for it' },
   port: { shape: 'fog square', colour: FOG, words: 'at or near a port' },
   unproven: { shape: 'grey ring, labelled', colour: LABEL, words: 'reception unknown: no AIS there proves nothing' },
   seen_once: { shape: 'small faint ring', colour: LABEL, words: 'seen by one detector only, set aside' },
@@ -206,6 +208,8 @@ export interface TargetCounts {
   unproven: number;
   seenOnce: number;
   candidate: number;
+  /** Matched targets the map ties by a hairline to their AIS dot (claimParts: our detector's alone). */
+  tied: number;
   /** match_ais has run (the statuses are its), so the candidates may be shown. */
   matched: boolean;
 }
@@ -213,7 +217,7 @@ export interface TargetCounts {
 type Feature = { type?: string; properties?: Record<string, unknown> | null; geometry?: { type: string; coordinates: unknown } | null };
 
 export function targetCounts(features: readonly Feature[]): TargetCounts {
-  const c: TargetCounts = { targets: 0, claimed: 0, port: 0, unproven: 0, seenOnce: 0, candidate: 0, matched: false };
+  const c: TargetCounts = { targets: 0, claimed: 0, port: 0, unproven: 0, seenOnce: 0, candidate: 0, tied: 0, matched: false };
   for (const f of features) {
     if (f?.geometry?.type !== 'Point') continue;
     const s = f.properties?.status;
@@ -225,7 +229,61 @@ export function targetCounts(features: readonly Feature[]): TargetCounts {
     else if (s === 'candidate') c.candidate++;
     if (s === 'broadcasting' || s === 'unproven' || s === 'seen_once' || s === 'candidate') c.matched = true;
   }
+  c.tied = claimParts(features).features.filter((f) => f.properties?.part === 'tie').length;
   return c;
+}
+
+// --- the map key ---------------------------------------------------------------------------------------
+
+/** One row of the stage's map key: its icon (drawn as the map draws the mark, stage.css) and its words. */
+export interface SeaKeyRow {
+  icon: string;
+  words: string;
+}
+
+/** The AIS dots in the key, in plain words: what a dot is, and when. */
+export const AIS_KEY_WORDS = 'ship broadcasting its position (AIS), where it was at the radar pass';
+
+/**
+ * The key's row for the AIS dots: while the dots held at the radar minute are on the map (aisLook),
+ * from the radar beat to the filed tasking. Not over the replay's loop (rest, choosing a pass: those
+ * dots move, and the clock names them), nor where the replay steps aside (another pass, the spares).
+ */
+export function aisKeyRow(beat: SeaBeat, earlierPass = false): SeaKeyRow | null {
+  if (beat === 'rest' || beat === 'forward') return null;
+  const look = aisLook(beat, earlierPass);
+  return look.shown && look.heads > 0 ? { icon: 'sea-key--ais', words: AIS_KEY_WORDS } : null;
+}
+
+/**
+ * The radar targets' rows, each icon the mark seaStage draws for that status (addSeaLayers):
+ * - the grey ring (16 px): not yet explained, and after the reveal set aside where reception is unknown;
+ * - the small faint ring (10 px), only on a pass with targets one detector alone saw;
+ * - the plain fog ring (15 px): matched to a ship's AIS (no dot: on most matches Global Fishing
+ *   Watch's own match decided, and the map draws no line);
+ * - the fog ring tied to its dot, only on a pass where our own detector's match drew a hairline;
+ * - the fog square at port, and the orchid ring once the candidates are revealed.
+ */
+export function targetKeyRows(o: { revealed: boolean; seenOnce?: boolean; tied?: boolean }): SeaKeyRow[] {
+  const rows: SeaKeyRow[] = [
+    { icon: 'sea-key--ring', words: o.revealed ? 'set aside: reception unknown' : 'radar target, not yet explained' },
+  ];
+  if (o.seenOnce) rows.push({ icon: 'sea-key--once', words: o.revealed ? 'set aside: seen by one detector only' : 'seen by one detector only' });
+  rows.push({ icon: 'sea-key--claimed', words: 'matched to a ship\'s AIS' });
+  if (o.tied) rows.push({ icon: 'sea-key--tied', words: 'matched to the ship at the end of its line' });
+  rows.push({ icon: 'sea-key--port', words: 'at or near a port' });
+  if (o.revealed) rows.push({ icon: 'sea-key--candidate', words: 'candidate: no AIS where AIS was received' });
+  return rows;
+}
+
+/** The coverage's rows: the received wash, the reception-unknown hatch, and (once the pass says what it can check) plain sea outside the radar. */
+export function coverageKeyRows(o: { outside: boolean }): SeaKeyRow[] {
+  const rows: SeaKeyRow[] = [
+    { icon: 'sea-key--heard', words: 'AIS received: other ships came through here in the three hours either side of the pass' },
+    { icon: 'sea-key--unproven', words: 'reception unknown: no AIS here proves nothing' },
+  ];
+  if (o.outside) rows.push({ icon: 'sea-key--outside', words: 'outside the radar: not imaged' });
+  return rows;
 }
 
 /**
@@ -617,6 +675,16 @@ export function utcMinute(ms: number): string {
   return `${d.slice(0, 10)} ${d.slice(11, 16)} UTC`;
 }
 
+/** "Oct 24 00:17 UTC" (month first, as the look lines give it) from an ISO time, or null. */
+export function monthDayTime(iso: string | undefined): string | null {
+  const t = Date.parse(iso ?? '');
+  if (!Number.isFinite(t)) return null;
+  const d = new Date(t);
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${MONTH_SHORT[d.getUTCMonth()]} ${d.getUTCDate()} ${hh}:${mm} UTC`;
+}
+
 /** "in 4 d 14 h", "in 3 h 20 min", "under way", from the look's start (ISO) and now (ms). */
 export function countdown(startIso: string, now: number): string {
   const t = Date.parse(startIso);
@@ -851,19 +919,19 @@ const FORECAST_BEATS: readonly SeaBeat[] = ['heat', 'boxes', 'look', 'tasking', 
 /**
  * Only the AIS the matching used is drawn. At rest and while the agent chooses a pass, the replay
  * runs with its comet tails and wakes (the intro: ships broadcast, here they are). From the radar
- * through the candidates, only the dots held at the radar minute: the positions match_ais compares
- * with the radar (no tails, no wakes: no number uses them); they step back to 0.7 while the claim is
- * read. Under the forecast and the tasking no AIS at all (the heat, the boxes and the next look use
- * none): the dots fade out as the heat comes in. Over the fleet's pull-back and an earlier pass the
- * replay steps aside (it is one pass's, so over another date it would mislead). The radar reads full
- * under the argument and recedes under the forecast.
+ * on, only the dots held at the radar minute: the positions match_ais compares with the radar (no
+ * tails, no wakes: no number uses them); they step back to 0.7 while the claim is read, and to 0.45
+ * under the forecast and the tasking, so the ships stay on the sea the candidates are dark against
+ * while the heat and the boxes read over them (the forecast itself uses no AIS positions). Over the
+ * fleet's pull-back and an earlier pass the replay steps aside (it is one pass's, so over another
+ * date it would mislead). The radar reads full under the argument and recedes under the forecast.
  */
 export function aisLook(beat: SeaBeat, earlierPass = false): AisLook {
   const quietCoverage: CoverageQuiet = FORECAST_BEATS.includes(beat) || beat === 'fleet' ? 'all' : beat === 'candidates' ? 'hatch' : 'none';
   if (beat === 'fleet' || beat === 'reach' || earlierPass) {
     return { shown: false, wakes: 0, faintWakes: 0, trail: 0, heads: 0, headStroke: 0, radar: 0.8, quietCoverage };
   }
-  if (FORECAST_BEATS.includes(beat)) return { shown: true, wakes: 0, faintWakes: 0, trail: 0, heads: 0, headStroke: 0, radar: 0.55, quietCoverage };
+  if (FORECAST_BEATS.includes(beat)) return { shown: true, wakes: 0, faintWakes: 0, trail: 0, heads: 0.45, headStroke: 0.25, radar: 0.55, quietCoverage };
   if (CLAIM_BEATS.includes(beat)) return { shown: true, wakes: 0, faintWakes: 0, trail: 0, heads: 0.7, headStroke: 0.35, radar: 0.8, quietCoverage };
   if (beat === 'radar') return { shown: true, wakes: 0, faintWakes: 0, trail: 0, heads: 1, headStroke: 0.6, radar: 0.8, quietCoverage };
   return { shown: true, wakes: 0.13, faintWakes: 0.05, trail: 1, heads: 1, headStroke: 0.6, radar: 0.8, quietCoverage };

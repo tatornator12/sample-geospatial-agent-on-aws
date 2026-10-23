@@ -11,7 +11,7 @@
 import { isMethaneLayer, isSimilarityLayer, type LayerMetadata } from './layerFormatting.ts';
 import { indexLegendFor, type ColormapName } from './render.ts';
 import { isTerrainLayer, reliefLegendLabel, terrainLegend, terrainRasterHint } from './archaeoLayers.ts';
-import { AIS, ORCHID, vesselKind } from './vesselLayers.ts';
+import { AIS, FOG, HEAT_END, ORCHID, vesselKind } from './vesselLayers.ts';
 import { COLUMNS_NOTE, methaneRampLabel } from './methaneLayers.ts';
 
 /** Move one entry from `from` to `to` (both indexes in the same list); a copy, never in place. */
@@ -161,8 +161,11 @@ export type StackLegend =
   | { kind: 'vessels'; key: 'vessels' }
   /** Dark Vessels' coverage: heard water outlined, unproven water hatched. */
   | { kind: 'coverage'; key: 'coverage' }
-  /** Dark Vessels' history heat (the candidates' hue, from clear) and the fleet's (the AIS hue). */
-  | { kind: 'seaheat'; key: 'heat' | 'fleet'; label: string; low: string; high: string; colour: string };
+  /**
+   * Dark Vessels' history heat (the candidates' hue, from clear, to the pale orchid its ramp ends in on
+   * the map) and the fleet's (the AIS hue, to fog).
+   */
+  | { kind: 'seaheat'; key: 'heat' | 'fleet'; label: string; low: string; high: string; colour: string; end: string };
 
 /** The legend a layer reads by, or null (true colour, boundaries, drawn shapes). */
 export function layerLegend(layer: LayerMetadata): StackLegend | null {
@@ -171,8 +174,8 @@ export function layerLegend(layer: LayerMetadata): StackLegend | null {
   if (sea) {
     if (sea === 'targets') return { kind: 'vessels', key: 'vessels' };
     if (sea === 'heard' || sea === 'unproven') return { kind: 'coverage', key: 'coverage' };
-    if (sea === 'heat') return { kind: 'seaheat', key: 'heat', label: 'Radar targets with no AIS, seen before', low: 'fewer', high: 'more', colour: ORCHID };
-    if (sea === 'fleet') return { kind: 'seaheat', key: 'fleet', label: 'Squid fleet fishing hours', low: 'fewer', high: 'more', colour: AIS };
+    if (sea === 'heat') return { kind: 'seaheat', key: 'heat', label: 'Radar targets with no AIS, seen before', low: 'fewer', high: 'more', colour: ORCHID, end: HEAT_END };
+    if (sea === 'fleet') return { kind: 'seaheat', key: 'fleet', label: 'Squid fleet fishing hours', low: 'fewer', high: 'more', colour: AIS, end: FOG };
     return null;
   }
   if (isTerrainLayer(layer)) {

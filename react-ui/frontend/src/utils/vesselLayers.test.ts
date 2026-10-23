@@ -2,10 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { layerLegend, stackLegends } from './layerStack.ts';
 import type { LayerMetadata } from './layerFormatting.ts';
 import { layerRowLabel } from './layerFormatting.ts';
+// @ts-expect-error -- the app's tsconfig carries no Node types; vitest runs on Node (the key's icons are read from stage.css).
+import { readFileSync } from 'node:fs';
 import {
   AIS,
+  AIS_KEY_WORDS,
   ATTRIBUTION,
   FOG,
+  HEAT_END,
+  aisKeyRow,
+  coverageKeyRows,
+  monthDayTime,
+  targetKeyRows,
   LABEL,
   ORCHID,
   RADAR_ALPHA,
@@ -204,8 +212,10 @@ describe('the targets and the claim', () => {
   ];
 
   it('counts the claim at detect, and knows when match_ais has run', () => {
-    expect(targetCounts(detected)).toEqual({ targets: 3, claimed: 1, port: 1, unproven: 0, seenOnce: 0, candidate: 0, matched: false });
-    expect(targetCounts(matched)).toEqual({ targets: 5, claimed: 1, port: 1, unproven: 1, seenOnce: 1, candidate: 1, matched: true });
+    expect(targetCounts(detected)).toEqual({ targets: 3, claimed: 1, port: 1, unproven: 0, seenOnce: 0, candidate: 0, tied: 0, matched: false });
+    expect(targetCounts(matched)).toEqual({ targets: 5, claimed: 1, port: 1, unproven: 1, seenOnce: 1, candidate: 1, tied: 0, matched: true });
+    // A hairline only where our own detector's match drew one (claimParts).
+    expect(targetCounts([...matched, point(-90.6, -0.4, { status: 'broadcasting', source: 'ours', claimed: true, claim: [-90.601, -0.401] })]).tied).toBe(1);
   });
 
   it('ties a target to its AIS dot only where that dot decided (our detector alone), and skips a claim without one', () => {
@@ -358,7 +368,7 @@ describe('the clock plate', () => {
       sub: 'other ships\' AIS was received there in the three hours either side of the pass',
     });
     expect(clockLines('coverage', {}).lead).toBe('Where AIS was received');
-    expect(clockLines('candidates', { counts: { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, matched: true } }).lead).toBe('4 candidates');
+    expect(clockLines('candidates', { counts: { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, tied: 0, matched: true } }).lead).toBe('4 candidates');
     // "A reason to look, not an accusation" is the answer's sentence alone.
     expect(clockLines('candidates', {}).sub).toBe('no AIS where AIS was being received, seen by both detectors');
     expect(clockLines('fleet', { fleetMonth: 'October 2026' }).sub).toContain(ATTRIBUTION);
@@ -429,7 +439,7 @@ describe('the clock plate', () => {
   });
 
   it('keeps every changed sub at 110 characters or fewer, with the longest values', () => {
-    const counts = { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, matched: true };
+    const counts = { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, tied: 0, matched: true };
     const now = Date.parse('2026-10-20T14:37:00Z');
     const subs = [
       clockLines('forward', {}).sub,
@@ -675,37 +685,44 @@ describe('the replay case\'s clock (every file lands at once)', () => {
 });
 
 describe('the beats\' paint', () => {
-  it('draws only the AIS the matching used: the loop at rest, the dots at the radar minute, none under the forecast', () => {
-    // [beat, wakes, faint wakes, comet tails, dots] as the room sees them (0 = not drawn).
-    const table: Array<[SeaBeat, number, number, number, number]> = [
-      ['rest', 0.13, 0.05, 1, 1],
-      ['forward', 0.13, 0.05, 1, 1],
-      // From the radar through the candidates: the dots held at the radar minute, nothing else.
-      ['radar', 0, 0, 0, 1],
-      ['targets', 0, 0, 0, 0.7],
-      ['coverage', 0, 0, 0, 0.7],
-      ['candidates', 0, 0, 0, 0.7],
-      // The forecast and the tasking use no AIS positions: none on the map.
-      ['heat', 0, 0, 0, 0],
-      ['boxes', 0, 0, 0, 0],
-      ['look', 0, 0, 0, 0],
-      ['tasking', 0, 0, 0, 0],
-      ['filed', 0, 0, 0, 0],
+  it('draws only the AIS the matching used: the loop at rest, then the dots at the radar minute to the end of the act', () => {
+    // [beat, wakes, faint wakes, comet tails, dots, dots' edge] as the room sees them (0 = not drawn).
+    const table: Array<[SeaBeat, number, number, number, number, number]> = [
+      ['rest', 0.13, 0.05, 1, 1, 0.6],
+      ['forward', 0.13, 0.05, 1, 1, 0.6],
+      // From the radar on: the dots held at the radar minute, no tails and no wakes.
+      ['radar', 0, 0, 0, 1, 0.6],
+      ['targets', 0, 0, 0, 0.7, 0.35],
+      ['coverage', 0, 0, 0, 0.7, 0.35],
+      ['candidates', 0, 0, 0, 0.7, 0.35],
+      // Under the forecast and the tasking the ships stay, dimmed so the heat and the boxes read.
+      ['heat', 0, 0, 0, 0.45, 0.25],
+      ['boxes', 0, 0, 0, 0.45, 0.25],
+      ['look', 0, 0, 0, 0.45, 0.25],
+      ['tasking', 0, 0, 0, 0.45, 0.25],
+      ['filed', 0, 0, 0, 0.45, 0.25],
       // The spares step it aside altogether.
-      ['fleet', 0, 0, 0, 0],
-      ['reach', 0, 0, 0, 0],
+      ['fleet', 0, 0, 0, 0, 0],
+      ['reach', 0, 0, 0, 0, 0],
     ];
-    for (const [beat, wakes, faintWakes, trail, heads] of table) {
+    for (const [beat, wakes, faintWakes, trail, heads, headStroke] of table) {
       const look = aisLook(beat);
-      expect({ beat, wakes: look.wakes, faintWakes: look.faintWakes, trail: look.trail, heads: look.heads }).toEqual({ beat, wakes, faintWakes, trail, heads });
-      // A dot with no fill shows no stroke either.
+      expect({ beat, wakes: look.wakes, faintWakes: look.faintWakes, trail: look.trail, heads: look.heads, headStroke: look.headStroke })
+        .toEqual({ beat, wakes, faintWakes, trail, heads, headStroke });
+      // A dot with no fill shows no stroke either; the edge never outshines the dot.
       if (heads === 0) expect(look.headStroke, beat).toBe(0);
+      expect(look.headStroke, beat).toBeLessThanOrEqual(look.heads);
     }
     const claim = aisLook('targets');
     const forecast = aisLook('boxes');
     expect(claim.heads).toBeGreaterThan(forecast.heads);
+    // Dimmed, not gone: between 0.4 and 0.5 under the heat and the boxes.
+    for (const beat of ['heat', 'boxes', 'look', 'tasking', 'filed'] as SeaBeat[]) {
+      expect(aisLook(beat).heads, beat).toBeGreaterThanOrEqual(0.4);
+      expect(aisLook(beat).heads, beat).toBeLessThanOrEqual(0.5);
+      expect(aisLook(beat).shown, beat).toBe(true);
+    }
     expect(forecast.radar).toBeLessThan(claim.radar);
-    // Under the forecast the dots fade out (the layers stay, at 0) rather than cut.
     expect(forecast.shown).toBe(true);
     expect(aisLook('fleet').shown).toBe(false);
     // Over an earlier pass the replay (another pass's) is not drawn at any beat.
@@ -767,5 +784,85 @@ describe('the tasking on the map', () => {
 
   it('asks the agent to check the filing (it never says so itself)', () => {
     expect(taskingFiledMessage('tasking-20261019T120000-a1b2c3')).toBe('The officer approved tasking-20261019T120000-a1b2c3 on the map. Is it filed?');
+  });
+});
+
+describe('the map key (every icon the mark the map draws)', () => {
+  // vitest serves CSS imports empty, so the stylesheet is read as text (from the package root, where vitest runs).
+  const css: string = readFileSync('src/stage.css', 'utf8');
+  const icons = (rows: ReadonlyArray<{ icon: string }>) => rows.map((r) => r.icon);
+
+  it('keys each target status by its own icon, before and after the candidates are revealed', () => {
+    expect(icons(targetKeyRows({ revealed: false }))).toEqual(['sea-key--ring', 'sea-key--claimed', 'sea-key--port']);
+    expect(targetKeyRows({ revealed: false })[0].words).toBe('radar target, not yet explained');
+    const after = targetKeyRows({ revealed: true, seenOnce: true });
+    expect(icons(after)).toEqual(['sea-key--ring', 'sea-key--once', 'sea-key--claimed', 'sea-key--port', 'sea-key--candidate']);
+    // Set aside: the grey ring and the fainter "seen once" ring are two marks on the map, so two rows.
+    expect(after.map((r) => r.words)).toEqual([
+      'set aside: reception unknown',
+      'set aside: seen by one detector only',
+      'matched to a ship\'s AIS',
+      'at or near a port',
+      'candidate: no AIS where AIS was received',
+    ]);
+    // No faint ring on the map, no row for it.
+    expect(icons(targetKeyRows({ revealed: true, seenOnce: false }))).not.toContain('sea-key--once');
+  });
+
+  it('draws a matched target as the plain fog ring, and the tied variant only on a pass with a hairline', () => {
+    // Oct 12: every match was Global Fishing Watch's, so the map draws no line and the key shows none.
+    expect(icons(targetKeyRows({ revealed: true, seenOnce: true, tied: false }))).not.toContain('sea-key--tied');
+    const tied = targetKeyRows({ revealed: true, tied: true });
+    expect(icons(tied)).toContain('sea-key--claimed');
+    expect(tied.find((r) => r.icon === 'sea-key--tied')?.words).toBe('matched to the ship at the end of its line');
+    // The plain ring's icon carries no dot (the old ::after), the tied one does.
+    expect(css).not.toMatch(/\.sea-key--claimed::after/);
+    expect(css).toMatch(/\.sea-key--tied::after/);
+  });
+
+  it('keys the AIS dots, in plain words, while the dots held at the radar minute are on the map', () => {
+    expect(AIS_KEY_WORDS).toBe('ship broadcasting its position (AIS), where it was at the radar pass');
+    for (const beat of ['radar', 'targets', 'coverage', 'candidates', 'heat', 'boxes', 'look', 'tasking', 'filed'] as SeaBeat[]) {
+      expect(aisKeyRow(beat), beat).toEqual({ icon: 'sea-key--ais', words: AIS_KEY_WORDS });
+    }
+    // Not over the replay's loop (the clock names it), another pass, or the spares (no dots drawn).
+    for (const beat of ['rest', 'forward', 'fleet', 'reach'] as SeaBeat[]) expect(aisKeyRow(beat), beat).toBeNull();
+    expect(aisKeyRow('tasking', true)).toBeNull();
+    // The row follows the paint: wherever it shows, the dots are drawn.
+    for (const beat of ['radar', 'heat', 'tasking'] as SeaBeat[]) expect(aisLook(beat).heads, beat).toBeGreaterThan(0);
+  });
+
+  it('keys the coverage, with plain sea outside the radar once the pass says what it can check', () => {
+    expect(icons(coverageKeyRows({ outside: false }))).toEqual(['sea-key--heard', 'sea-key--unproven']);
+    expect(icons(coverageKeyRows({ outside: true }))).toEqual(['sea-key--heard', 'sea-key--unproven', 'sea-key--outside']);
+  });
+
+  it('has a drawn icon in the stylesheet for every row, in plain words with no dashes', () => {
+    const rows = [
+      ...targetKeyRows({ revealed: true, seenOnce: true, tied: true }),
+      ...targetKeyRows({ revealed: false, seenOnce: true }),
+      ...coverageKeyRows({ outside: true }),
+      aisKeyRow('radar')!,
+    ];
+    for (const r of rows) {
+      expect(css, r.icon).toMatch(new RegExp(`\\.${r.icon}::before`));
+      expect(r.words, r.icon).not.toMatch(/[\u2013\u2014]|heard|unproven|not evidence/i);
+    }
+  });
+
+  it('ends the heat\'s key in the pale orchid its ramp ends in on the map', () => {
+    expect(layerLegend({ id: 'h', sourceId: 'h', name: 'x', url: `${S}hotspots.geojson`, type: 'geometry' }))
+      .toMatchObject({ kind: 'seaheat', colour: ORCHID, end: HEAT_END });
+    expect(layerLegend({ id: 'f', sourceId: 'f', name: 'x', url: `${S}fleet_2026-10.geojson`, type: 'geometry' }))
+      .toMatchObject({ kind: 'seaheat', colour: AIS, end: FOG });
+  });
+});
+
+describe('the tasking plate\'s look line', () => {
+  it('words a look\'s start month first, to the minute, in UTC', () => {
+    expect(monthDayTime('2026-10-24T00:17:29Z')).toBe('Oct 24 00:17 UTC');
+    expect(monthDayTime('2026-01-03T11:40:00Z')).toBe('Jan 3 11:40 UTC');
+    expect(monthDayTime('not a time')).toBeNull();
+    expect(monthDayTime(undefined)).toBeNull();
   });
 });

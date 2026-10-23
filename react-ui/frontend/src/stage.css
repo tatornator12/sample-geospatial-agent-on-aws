@@ -1904,10 +1904,14 @@
   mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
 }
 /* GFW's attribution is the plate's foot, outside the scroll: its data is on the map, so its line
-   stays in view whatever the list and the keys need. Aligned with the legends' words. */
+   stays in view whatever the list and the keys need. Aligned with the legends' words; the keys
+   above it keep only a short gap, so the key and the tasking plate fit the column together. */
 .map-layers__foot {
   flex: none;
   padding: 0 18px 12px;
+}
+.map-frame--sea .map-layers__legends--foot {
+  padding-bottom: 6px;
 }
 .map-layers__foot .map-legend__label {
   display: block;
@@ -2009,12 +2013,13 @@
   font-weight: 500;
 }
 
-/* The legends' keys: each status by its shape as drawn on the map, and its words. */
+/* The legends' keys: each status by its shape as drawn on the map, and its words. A row's two lines
+   sit close (1.2) and the rows 4 px apart, so the whole key stays on screen beside the tasking plate. */
 .map-legend--key {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 4px;
+  margin-top: 8px;
   padding: 0;
   list-style: none;
 }
@@ -2025,63 +2030,110 @@
 }
 .map-legend--key .map-legend__label {
   white-space: normal;
-  line-height: 1.3;
+  line-height: 1.2;
+  text-wrap: pretty;
 }
+/* Each icon is the mark at the size, stroke and strength seaStage.ts draws it, centred in a 20 px
+   slot (the largest mark, the revealed candidate's ring), so the words line up. */
 .sea-key {
+  position: relative;
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+}
+.sea-key::before {
+  content: "";
+  display: block;
   box-sizing: border-box;
 }
-.sea-key--ring,
-.sea-key--claimed,
-.sea-key--candidate {
-  border-radius: 50%;
-}
-.sea-key--ring {
-  border: 1.5px solid var(--label);
-}
-/* A fog ring tied by a hairline to the AIS dot that claims it. */
-.sea-key--claimed {
-  position: relative;
-  border: 1.5px solid var(--fog);
-}
-.sea-key--claimed::after {
-  content: "";
-  position: absolute;
-  right: -6px;
-  top: -4px;
-  width: 6px;
-  height: 6px;
+/* A ship broadcasting its position: the held AIS dot (r 3.2, fog, a 1.2 px pale cyan edge at 0.6). */
+.sea-key--ais::before {
+  width: 6.4px;
+  height: 6.4px;
   border-radius: 50%;
   background: var(--fog);
-  box-shadow: 0 0 0 1px var(--ais);
+  box-shadow: 0 0 0 1.2px color-mix(in srgb, var(--ais) 60%, transparent);
 }
-.sea-key--port {
+/* A radar target not yet explained, or set aside where reception is unknown (r 8, 1.5 px at 0.95). */
+.sea-key--ring::before {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--label) 95%, transparent);
+}
+/* Seen by one detector only: the small faint ring (r 5, 1.2 px at 0.55). */
+.sea-key--once::before {
   width: 10px;
   height: 10px;
-  margin: 4px;
+  border-radius: 50%;
+  border: 1.2px solid color-mix(in srgb, var(--label) 55%, transparent);
+}
+/* Matched to a ship's AIS: the plain fog ring (r 7.5, 1.6 px), no dot and no line. */
+.sea-key--claimed::before,
+.sea-key--tied::before {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1.6px solid var(--fog);
+}
+/* Only where our own detector's match drew one: the ring tied by a hairline to its ship's dot. */
+.sea-key--tied {
+  place-items: end start;
+  background: linear-gradient(to top right, transparent calc(50% - 0.6px), var(--fog) calc(50% - 0.6px), var(--fog) calc(50% + 0.6px), transparent calc(50% + 0.6px)) no-repeat right top / 12.5px 12.5px;
+}
+.sea-key--tied::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fog);
+  box-shadow: 0 0 0 1.4px color-mix(in srgb, var(--ais) 90%, transparent);
+}
+/* At or near a port: the fog square (8 px). */
+.sea-key--port::before {
+  width: 8px;
+  height: 8px;
   background: var(--fog);
 }
-.sea-key--candidate {
+/* A candidate: the revealed orchid ring (r 10, 2.5 px). */
+.sea-key--candidate::before {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   border: 2.5px solid var(--orchid);
 }
-.sea-key--heard {
-  border: 1px solid rgba(233, 238, 243, 0.45);
+/* The areas are swatches: the received wash and its edge (0.08, a 1 px line at 0.35). */
+.sea-key--heard::before {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(233, 238, 243, 0.35);
   background: rgba(233, 238, 243, 0.08);
 }
 /* Plain sea: reserve water the pass never imaged, so neither wash nor hatch (an outline, no fill). */
-.sea-key--outside {
+.sea-key--outside::before {
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--hairline-strong);
 }
-.sea-key--unproven {
-  border: 1px solid var(--hairline);
-  background: repeating-linear-gradient(-45deg, rgba(143, 163, 184, 0.6) 0 1.4px, transparent 1.4px 7px);
+/* Reception unknown: the map's hatch (1.4 px slate lines about 5 px apart), with no edge, as drawn. */
+.sea-key--unproven::before {
+  width: 18px;
+  height: 18px;
+  background: repeating-linear-gradient(-45deg, rgba(143, 163, 184, 0.5) 0 1.4px, transparent 1.4px 4.95px);
 }
 
-/* The tasking plate: the officer's decision, bottom right in the light plate's slot. The layers
-   plate folds to its head while it is up. */
+/* The tasking plate: the officer's decision. The layers plate folds its list while it is up and
+   keeps its map key; the map measures where the plate stands (MapView, stageLayout.taskingSlot):
+   under the key in the right column, or over the finished steps on the left where the right is too
+   short. These rules are its place before that measure (bottom right). It renders in the stage's
+   overlay, outside the sea's frame, so it carries the act's orchid itself. */
 .tasking-plate {
+  --orchid: #f07ad8;
   position: absolute;
   right: 16px;
   bottom: 76px;
@@ -2090,8 +2142,38 @@
   max-height: calc(100% - 76px - 84px);
   display: flex;
   flex-direction: column;
-  padding: 14px 16px 16px;
+  padding: 10px 12px 12px;
   animation: stage-rise 360ms var(--ease-out) both;
+}
+/* In the step column's slot it fills the slot, so no finished step shows under it; the decision
+   stays at its foot. */
+.tasking-plate--left {
+  left: 16px;
+  right: auto;
+}
+.tasking-plate--left .tasking-plate__foot {
+  margin-top: auto;
+}
+/* A wide screen (the console clear of the right column): the right column is 360 px while the plate
+   is up, the key's plate and the tasking plate alike, so the key's long rows and the candidates'
+   port names take a line fewer and both fit at 1920x1080 (stageLayout.taskingPlateWidth). */
+@media (min-width: 1761px) {
+  .tasking-plate,
+  .map-frame--tasking .map-layers {
+    width: 360px;
+  }
+}
+/* While the plate is up the key's plate keeps a tighter rhythm (its head, the ramp's top, the rows),
+   so the key and the whole plate share the column; the type stays 15 px. */
+.map-frame--tasking .map-layers__head {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.map-frame--tasking .map-legend--stacked {
+  margin-top: 6px;
+}
+.map-frame--tasking .map-legend--key {
+  gap: 3px;
 }
 /* Where the console reaches under the right column (narrower screens), the plate stops above it. */
 @media (max-width: 1760px) {
@@ -2105,7 +2187,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 .tasking-plate__title {
   margin: 0;
@@ -2131,10 +2213,10 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding-bottom: 16px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  gap: 8px;
+  padding-bottom: 8px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 8px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 8px), transparent);
 }
 .tasking-plate__group {
   min-width: 0;
@@ -2146,16 +2228,18 @@
   opacity: 1;
 }
 .tasking-plate__legend {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   padding: 0;
   font-size: 15px;
+  line-height: 1.3;
   color: var(--label);
 }
+/* A box in two lines: its share of past dark targets, then its next look and the countdown. */
 .tasking-plate__option {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 4px 6px;
   border: 1px solid transparent;
   border-radius: 8px;
   cursor: pointer;
@@ -2188,18 +2272,18 @@
 .tasking-plate__option-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 .tasking-plate__option-main {
   font-size: 16px;
-  line-height: 1.3;
+  line-height: 1.2;
   color: var(--fog);
   white-space: pre-wrap;
 }
 .tasking-plate__option-sub {
   font-size: 15px;
-  line-height: 1.3;
+  line-height: 1.2;
   color: var(--label);
 }
 .tasking-plate__candidates {
@@ -2207,11 +2291,12 @@
   padding: 0;
   list-style: none;
 }
+/* A candidate on one line where its port's name allows (a long one wraps under the distance). */
 .tasking-plate__check {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: 8px;
+  padding: 2px 6px;
   border-radius: 8px;
   cursor: pointer;
 }
@@ -2229,18 +2314,12 @@
 }
 .tasking-plate__where {
   font-size: 15px;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--fog);
-}
-.tasking-plate__note {
-  margin: 8px 0 0;
-  font-size: 15px;
-  line-height: 1.35;
-  color: var(--label);
 }
 .tasking-plate__foot {
   flex: none;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--hairline);
 }
 .tasking-plate__summary {
@@ -2252,9 +2331,9 @@
 }
 .tasking-plate__line,
 .tasking-plate__status {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 15px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--fog);
 }
 .tasking-plate__num {
@@ -2265,7 +2344,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .tasking-plate__error {
   margin: 8px 0 0;

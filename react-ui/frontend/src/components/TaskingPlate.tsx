@@ -10,10 +10,11 @@
  * (U4, R6.8); the filed line here is the only place that says who filed it. In a replay case the
  * plate is inert: a recorded decision would be theatre.
  */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type CSSProperties, type Ref } from 'react';
 import { approveTasking, getTasking, type TaskingBox, type TaskingState } from '../services/api.ts';
 import { SNAPSHOT_MAX_CHARS, mapSnapshot } from '../utils/snapshot.ts';
-import { countdown, numberRuns, passDay, taskingLine } from '../utils/vesselLayers.ts';
+import type { TaskingSlot } from '../utils/stageLayout.ts';
+import { countdown, monthDayTime, numberRuns, passDay, taskingLine } from '../utils/vesselLayers.ts';
 
 const RETRY_MS = 2000;
 const GIVE_UP_MS = 30_000;
@@ -36,6 +37,20 @@ export interface TaskingPlateProps {
   /** Told once the backend has filed it (the stage itself sends nothing then: R6.8). */
   onFiled?: (taskingId: string) => void;
   onDismiss: () => void;
+  /** Where the map measured room for it (stageLayout.taskingSlot); without one the stylesheet places it. */
+  place?: TaskingSlot | null;
+  /** The plate itself, for the map's measure. */
+  sectionRef?: Ref<HTMLElement>;
+}
+
+/** The plate where the map placed it: under the key on the right, or over the finished steps on the left (filling that slot). */
+function placement(place: TaskingSlot | null | undefined): { className: string; style?: CSSProperties } {
+  if (!place) return { className: 'map-plate tasking-plate' };
+  const left = place.side === 'left';
+  return {
+    className: `map-plate tasking-plate${left ? ' tasking-plate--left' : ''}`,
+    style: { top: place.top, bottom: 'auto', maxHeight: place.maxHeight, ...(left ? { height: place.maxHeight } : {}) },
+  };
 }
 
 function WorkingDots() {
@@ -61,12 +76,18 @@ function pct(share: number): string {
   return `${Math.round(share * 100)}%`;
 }
 
+/**
+ * A box's next look on one line: its time and the countdown ("Oct 24 00:17 UTC, in 7 h 1 min"). The
+ * group's legend says it is the next radar look, once, so no row repeats "next look" or the satellite.
+ */
 function lookWords(b: TaskingBox, now: number): string {
   if (!b.look) return 'no look planned yet';
-  return `next look ${b.look.text}, ${countdown(b.look.start, now)}`;
+  const when = monthDayTime(b.look.start) ?? b.look.text;
+  const left = countdown(b.look.start, now);
+  return left ? `${when}, ${left}` : when;
 }
 
-export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded, onLoaded, onBox, onToggle, onFiled, onDismiss }: TaskingPlateProps) {
+export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded, onLoaded, onBox, onToggle, onFiled, onDismiss, place, sectionRef }: TaskingPlateProps) {
   const [state, setState] = useState<TaskingState | null>(null);
   const [load, setLoad] = useState<'loading' | 'waiting' | 'failed' | 'loaded'>('loading');
   const [attempt, setAttempt] = useState(0);
@@ -112,10 +133,12 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
     return () => clearInterval(t);
   }, []);
 
+  const at = placement(place);
+
   if (!state) {
     if (load === 'loading') return null;
     return (
-      <section className="map-plate tasking-plate" aria-label="Patrol tasking" aria-busy={load === 'waiting'}>
+      <section ref={sectionRef} className={at.className} style={at.style} aria-label="Patrol tasking" aria-busy={load === 'waiting'}>
         {load === 'waiting' ? (
           <p className="tasking-plate__line" role="status">
             Drafting the tasking
@@ -177,7 +200,7 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
     : null;
 
   return (
-    <section className="map-plate tasking-plate" aria-labelledby={titleId}>
+    <section ref={sectionRef} className={at.className} style={at.style} aria-labelledby={titleId}>
       <div className="tasking-plate__head">
         <h2 className="tasking-plate__title" id={titleId}>Patrol tasking</h2>
         <span className={`tasking-plate__state${filed ? ' tasking-plate__state--filed' : ''}`}>
@@ -188,7 +211,8 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
       {/* The choice scrolls on a short screen; the summary and the decision stay in view below it. */}
       <div className="tasking-plate__body">
       <fieldset className="tasking-plate__group" disabled={inert || busy || filing}>
-        <legend className="tasking-plate__legend">Patrol box (from past dark targets)</legend>
+        {/* Each box in two lines: its share of past dark targets (the box is history's), then its next look. */}
+        <legend className="tasking-plate__legend">Patrol box and its next radar look</legend>
         {boxes.map((b) => (
           <label key={b.box} className={`tasking-plate__option${b.box === chosenBox.box ? ' tasking-plate__option--on' : ''}`}>
             <input type="radio" name={`${boxesId}-box`} checked={b.box === chosenBox.box} onChange={() => onBox(b.box)} />
