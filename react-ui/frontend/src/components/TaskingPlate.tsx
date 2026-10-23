@@ -74,7 +74,6 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const boxesId = useId();
-  const candidatesId = useId();
   const titleId = useId();
 
   useEffect(() => {
@@ -206,7 +205,7 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
       </fieldset>
 
       {card.candidates.length > 0 && (
-        <fieldset className="tasking-plate__group" disabled={inert || busy || filing} aria-describedby={candidatesId}>
+        <fieldset className="tasking-plate__group" disabled={inert || busy || filing}>
           <legend className="tasking-plate__legend">
             {/* The candidates are the pass's, the box is history's: each legend says where it comes from. */}
             <Runs text={candidatesDay ? `Candidates (${candidatesDay} pass)` : 'Candidates'} />
@@ -224,7 +223,7 @@ export function TaskingPlate({ sessionId, caseId, draftKey, busy, box, excluded,
               </li>
             ))}
           </ul>
-          <p className="tasking-plate__note" id={candidatesId}>{card.sentence}</p>
+          {/* The draft keeps its candidate sentence; the agent's answer says it, once (not here too). */}
         </fieldset>
       )}
       </div>

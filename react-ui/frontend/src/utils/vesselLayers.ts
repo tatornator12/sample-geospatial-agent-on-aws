@@ -180,11 +180,11 @@ export type ShownStatus = 'detected' | 'claimed' | 'port' | 'unproven' | 'seen_o
 
 /**
  * Every status by shape and words as well as hue (never colour alone), and never red or amber.
- * A ring is something the radar saw; a filled disc is a radar target a broadcast accounts for.
+ * A ring is something the radar saw; a fog ring is a radar target a broadcast accounts for.
  */
 export const STATUS_KEY: Record<ShownStatus, { shape: string; colour: string; words: string }> = {
   detected: { shape: 'grey ring', colour: LABEL, words: 'radar target, not yet explained' },
-  claimed: { shape: 'fog ring tied by a hairline to its AIS dot', colour: FOG, words: 'a broadcast accounts for it' },
+  claimed: { shape: 'fog ring (tied by a hairline to its AIS dot where that dot decided)', colour: FOG, words: 'a broadcast accounts for it' },
   port: { shape: 'fog square', colour: FOG, words: 'at or near a port' },
   unproven: { shape: 'grey ring, labelled', colour: LABEL, words: 'reception unknown: no AIS there proves nothing' },
   seen_once: { shape: 'small faint ring', colour: LABEL, words: 'seen by one detector only, set aside' },
@@ -228,10 +228,17 @@ export function targetCounts(features: readonly Feature[]): TargetCounts {
   return c;
 }
 
-/** The claim's hairlines (target to the AIS position at the pass minute) and those positions, from `claim`. */
+/**
+ * The claim's hairlines (target to the AIS position at the pass minute) and those positions, from
+ * `claim`, only where that dot decided: a target our detector alone saw (`source: 'ours'`), matched
+ * by an AIS position within 1 km. A target Global Fishing Watch's radar also saw (`both`, `gfw`) is
+ * decided by GFW's own match against the full broadcast record; the nearest dot need not be the ship
+ * it matched, and a line to it would read as the tolerance. Its fog ring says it was matched.
+ */
 export function claimParts(features: readonly Feature[]): { type: 'FeatureCollection'; features: Feature[] } {
   const out: Feature[] = [];
   for (const f of features) {
+    if (f?.properties?.source !== 'ours') continue;
     const c = f?.properties?.claim;
     const at = f?.geometry?.type === 'Point' ? (f.geometry.coordinates as number[]) : null;
     if (!at || !Array.isArray(c) || c.length !== 2 || !c.every((v) => typeof v === 'number' && Number.isFinite(v))) continue;
@@ -445,10 +452,17 @@ export function prepareReplay(tracks: readonly ReplayTrack[]): PreparedTrack[] {
     .filter((tr) => tr.ts.length > 0 && tr.ts.length === tr.cs.length && tr.ts.every(Number.isFinite));
 }
 
-/** Every track's whole wake, broken where a gap is longer than `maxGapH` (a long gap is not a route). */
-export function wakes(prepared: readonly PreparedTrack[], maxGapH = 3): { type: 'FeatureCollection'; features: Feature[] } {
+/**
+ * Every track's wake, broken where a gap is longer than `maxGapH` (a long gap is not a route). With a
+ * `window` ([start, end] ms), only the positions inside it: the rest view's wakes are the loop's own
+ * hours, as the clock says, not the whole file.
+ */
+export function wakes(prepared: readonly PreparedTrack[], maxGapH = 3, window?: [number, number]): { type: 'FeatureCollection'; features: Feature[] } {
   const out: Feature[] = [];
-  for (const tr of prepared) {
+  for (const whole of prepared) {
+    const keep = window ? whole.ts.map((t) => t >= window[0] && t <= window[1]) : null;
+    const tr = keep ? { ...whole, ts: whole.ts.filter((_, j) => keep[j]), cs: whole.cs.filter((_, j) => keep[j]) } : whole;
+    if (!tr.cs.length) continue;
     let seg: Array<[number, number]> = [tr.cs[0]];
     for (let j = 1; j < tr.cs.length; j++) {
       if (tr.ts[j] - tr.ts[j - 1] > maxGapH * HOUR) {
@@ -539,6 +553,8 @@ export interface SeaFacts {
   boxCheck?: BoxCheck;
   /** The officer's filed choice (the filed beat's sub); without it the sub points at the plate. */
   tasking?: { box: number; kept: number; total: number; lookStart?: string | null };
+  /** The tasking on the plate is a replay case's (read-only): the tasking beat names it so. */
+  taskingRecorded?: boolean;
   fleetMonth?: string;
   look?: string;
   lookStart?: string;
@@ -632,10 +648,11 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
     case 'radar':
       return {
         lead: pass ? `${pass.satellite} radar  ${pass.when}` : 'Sentinel-1 radar',
-        // The replay is one pass's: over any other pass, older or newer, it steps aside rather than mislead.
+        // The replay is one pass's: over any other pass, older or newer, its dots are not drawn
+        // rather than mislead, and the clock says which pass they belong to.
         sub: f.replayPassId && f.passId && f.replayPassId !== f.passId
-          ? `the AIS replay is of the ${passWords(f.replayPassId)?.day ?? 'other'} pass, so it steps aside`
-          : `AIS held at the pass minute · ${f.vessels ?? 0} vessels broadcasting`,
+          ? `ships' broadcasts are shown for ${passDay(f.replayPassId) ?? 'one other pass'} only`
+          : `${f.vessels ?? 0} ships broadcasting at the radar minute`,
       };
     case 'targets': {
       if (!c) return { lead: 'Radar targets', sub: 'nothing is called dark before the coverage check' };
@@ -648,21 +665,23 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
     case 'coverage':
       // What the pass can check: the water it imaged where AIS was received (both areas lie inside
       // the radar). A coverage file without the checkable share (an earlier recording) keeps the
-      // received share, which is of the whole reserve.
+      // received share, which is of the whole reserve. "Received" is any hour stamped within 3 h of
+      // the pass (check_ais_coverage), so the sub says so; the hatch carries its own label on the map.
       if (isShare(f.checkable)) {
         return {
           lead: `This pass can check ${Math.round(f.checkable * 100)}% of the reserve`,
-          sub: 'the radar imaged it and other ships\' AIS was received there near the pass · hatched: reception unknown',
+          sub: 'the radar imaged it and other ships\' AIS was received there in the three hours either side of the pass',
         };
       }
       return {
         lead: isShare(f.heardShare) ? `AIS received over ${Math.round(f.heardShare * 100)}% of the reserve` : 'Where AIS was received',
-        sub: 'other ships\' AIS was received there near the pass · hatched: reception unknown',
+        sub: 'other ships\' AIS was received there in the three hours either side of the pass',
       };
     case 'candidates':
+      // "A reason to look, not an accusation" is the answer's sentence, said once there.
       return {
         lead: `${c?.candidate ?? 0} ${(c?.candidate ?? 0) === 1 ? 'candidate' : 'candidates'}`,
-        sub: 'no AIS where AIS was being received, seen by both detectors · a reason to look, not an accusation',
+        sub: 'no AIS where AIS was being received, seen by both detectors',
       };
     case 'heat': {
       // Each figure beside its own layer: the heat carries the top 5% figure, never the boxes'.
@@ -699,6 +718,8 @@ export function clockLines(beat: SeaBeat, f: SeaFacts): { lead: string; sub: str
         sub: `${f.reach ? `${f.reach} · ` : ''}I cannot say which, if any, of these it is.`,
       };
     case 'tasking':
+      // A replay case's plate is inert and says why; the clock only names what it shows.
+      if (f.taskingRecorded) return { lead: 'Patrol tasking  recorded', sub: 'the box and candidates the agent drafted, as recorded' };
       return { lead: 'Patrol tasking  draft', sub: 'choose a box and the candidates, then approve' };
     case 'filed':
       // The filed sentence is the plate's alone (it says who filed it, and when); the clock states the choice.
@@ -742,6 +763,37 @@ export function lookHoldLeft(heatShownAt: number | null, boxesShownAt: number | 
   if (boxesShownAt !== null && Number.isFinite(boxesShownAt)) return Math.max(0, BOXES_HOLD_MS - Math.max(0, now - boxesShownAt));
   const heat = heatHoldLeft(heatShownAt, now);
   return heat > 0 ? heat + BOXES_HOLD_MS : 0;
+}
+
+/**
+ * The beat the candidates' reveal puts on the stage, 1.4 s after the coverage landed: the candidates,
+ * but only from the coverage's beat. A replay case lands every file within about two seconds, so by
+ * then the heat (or the tasking) may already be up; the reveal still paints the rings, and the clock
+ * stays on the later beat (null) instead of going back to the candidates.
+ */
+export function revealBeat(current: SeaBeat): SeaBeat | null {
+  return current === 'coverage' ? 'candidates' : null;
+}
+
+/** The beats a file of the argument or the forecast puts up (the replay case's files land after its draft). */
+const LANDING_BEATS: readonly SeaBeat[] = ['radar', 'targets', 'coverage', 'candidates', 'heat', 'boxes', 'look'];
+
+/**
+ * A replay case reads its draft from the case and lands every file at once, in network order, so the
+ * draft loads first and each file's beat then takes the clock from the tasking. Once a beat that came
+ * up after the draft has held this long (the heat its own hold first: the boxes follow it), the clock
+ * comes back to the tasking, the act's last beat. Longer than the boxes' hold, so the next look (which
+ * waits that hold out) lands first and holds in its turn.
+ */
+export const RECORDED_SETTLE_MS = BOXES_HOLD_MS + 1000;
+
+/**
+ * How long after `beat` went up (ms) a replay case's clock comes back to its tasking; null for a beat
+ * no file of the argument puts up (the tasking itself, the filed beat, the rest, the spares).
+ */
+export function recordedTaskingWait(beat: SeaBeat, heatShownAt: number | null, now: number): number | null {
+  if (!LANDING_BEATS.includes(beat)) return null;
+  return (beat === 'heat' ? heatHoldLeft(heatShownAt, now) : 0) + RECORDED_SETTLE_MS;
 }
 
 /** The beat a newly landed layer puts on the stage (the targets' depends on whether match_ais ran). */
@@ -797,18 +849,23 @@ const CLAIM_BEATS: readonly SeaBeat[] = ['targets', 'coverage', 'candidates'];
 const FORECAST_BEATS: readonly SeaBeat[] = ['heat', 'boxes', 'look', 'tasking', 'filed'];
 
 /**
- * The traffic steps back while the room reads the claim (the comet tails go, the heads stay so the
- * hairlines have something to tie to), dims under the forecast, and steps aside for the fleet's
- * pull-back and for an earlier pass (the replay is the latest pass's, so over another date it would
- * mislead). The radar reads full under the argument and recedes under the forecast.
+ * Only the AIS the matching used is drawn. At rest and while the agent chooses a pass, the replay
+ * runs with its comet tails and wakes (the intro: ships broadcast, here they are). From the radar
+ * through the candidates, only the dots held at the radar minute: the positions match_ais compares
+ * with the radar (no tails, no wakes: no number uses them); they step back to 0.7 while the claim is
+ * read. Under the forecast and the tasking no AIS at all (the heat, the boxes and the next look use
+ * none): the dots fade out as the heat comes in. Over the fleet's pull-back and an earlier pass the
+ * replay steps aside (it is one pass's, so over another date it would mislead). The radar reads full
+ * under the argument and recedes under the forecast.
  */
 export function aisLook(beat: SeaBeat, earlierPass = false): AisLook {
   const quietCoverage: CoverageQuiet = FORECAST_BEATS.includes(beat) || beat === 'fleet' ? 'all' : beat === 'candidates' ? 'hatch' : 'none';
   if (beat === 'fleet' || beat === 'reach' || earlierPass) {
     return { shown: false, wakes: 0, faintWakes: 0, trail: 0, heads: 0, headStroke: 0, radar: 0.8, quietCoverage };
   }
-  if (CLAIM_BEATS.includes(beat)) return { shown: true, wakes: 0.045, faintWakes: 0.02, trail: 0, heads: 0.7, headStroke: 0.35, radar: 0.8, quietCoverage };
-  if (FORECAST_BEATS.includes(beat)) return { shown: true, wakes: 0.13, faintWakes: 0.05, trail: 0.35, heads: 0.3, headStroke: 0.15, radar: 0.55, quietCoverage };
+  if (FORECAST_BEATS.includes(beat)) return { shown: true, wakes: 0, faintWakes: 0, trail: 0, heads: 0, headStroke: 0, radar: 0.55, quietCoverage };
+  if (CLAIM_BEATS.includes(beat)) return { shown: true, wakes: 0, faintWakes: 0, trail: 0, heads: 0.7, headStroke: 0.35, radar: 0.8, quietCoverage };
+  if (beat === 'radar') return { shown: true, wakes: 0, faintWakes: 0, trail: 0, heads: 1, headStroke: 0.6, radar: 0.8, quietCoverage };
   return { shown: true, wakes: 0.13, faintWakes: 0.05, trail: 1, heads: 1, headStroke: 0.6, radar: 0.8, quietCoverage };
 }
 

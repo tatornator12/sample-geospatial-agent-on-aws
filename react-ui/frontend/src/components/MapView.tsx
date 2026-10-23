@@ -106,7 +106,9 @@ import {
   passOf,
   prepareReplay,
   radarTileParams,
+  recordedTaskingWait,
   replayWindow,
+  revealBeat,
   seaPadding,
   targetCounts,
   toggled,
@@ -503,9 +505,26 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   const seaOnRef = useRef(false);
   const [seaBeat, setSeaBeatState] = useState<SeaBeat>('rest');
   const seaBeatRef = useRef<SeaBeat>('rest');
+  // A replay case's draft (status 'replay'), once the plate has loaded it, and the timer that brings
+  // the clock back to its tasking after the beats of the files that land after it.
+  const recordedDraft = useRef(false);
+  const recordedBack = useRef<ReturnType<typeof setTimeout> | null>(null);
   const setSeaBeat = (beat: SeaBeat) => {
     seaBeatRef.current = beat;
     setSeaBeatState(beat);
+    // A replay case lands every file at once, in network order: its draft loads first, then each
+    // file's beat takes the clock from the tasking. Once that beat has held, the clock comes back to
+    // the tasking, the act's last beat. A live draft is the turn's last tool, so this never runs live.
+    if (recordedBack.current) clearTimeout(recordedBack.current);
+    recordedBack.current = null;
+    const wait = recordedDraft.current ? recordedTaskingWait(beat, heatShownAt.current, Date.now()) : null;
+    if (wait === null) return;
+    recordedBack.current = setTimeout(() => {
+      recordedBack.current = null;
+      if (recordedDraft.current && seaBeatRef.current === beat) setSeaBeat('tasking');
+    }, wait);
+    // Cleared with the act's other timers (a cleared map, an unmount).
+    seaTimers.current.push(recordedBack.current);
   };
   const [seaFacts, setSeaFacts] = useState<SeaFacts>({});
   // The pass the stage is showing (a radar, its targets, its coverage, an earlier pass's reach).
@@ -586,7 +605,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
 
   // The date reset: one pass on the stage at a time. A pass's layers landing hide another pass's; the
   // forecast's (no pass) bring back the pass the argument ended on. The AIS replay is the rest's pass's, so
-  // over another pass it steps aside (the paint effect below).
+  // over another pass it is not drawn (the paint effect below).
   const showPass = (pass: string | null) => {
     if (!pass) return;
     stagePassRef.current = pass;
@@ -631,7 +650,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           if ((x.kind === 'heard' || x.kind === 'unproven') && x.pass === f.pass) sea.quietCoverageLabels(m, xid);
         });
         setCandidatesShown(true);
-        setSeaBeat('candidates');
+        // The candidates' beat only from the coverage's: in a replay case the heat (or the tasking)
+        // may be up by now, and the clock stays on it.
+        const next = revealBeat(seaBeatRef.current);
+        if (next) setSeaBeat(next);
         // The column's candidate count (and any "no candidates" line) waits for this moment (R4.2).
         const shown = seaFiles.current.get(id);
         if (f.pass && shown?.data) onRevealRef.current?.(f.pass, targetCounts(shown.data.features).candidate);
@@ -964,6 +986,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   // The tasking: the draft loaded (the beat, the officer's starting choice), the plate replaces the
   // layers plate's body while it is up.
   const onTaskingLoaded = (state: TaskingState) => {
+    recordedDraft.current = state.status === 'replay';
     setTaskingState(state);
     setTaskBox(state.choice?.box ?? state.card.box.box);
     const ids = state.card.candidates.map((c) => c.id);
@@ -1014,7 +1037,8 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     frameTaskingRef.current(m, taskingState, taskBox);
   }, [taskBox, taskingOn, taskingState]);
   useEffect(() => {
-    // A new draft starts with nothing chosen.
+    // A new draft starts with nothing chosen (and is no replay case's until it loads as one).
+    recordedDraft.current = false;
     setTaskingState(null);
     setTaskExcluded([]);
   }, [tasking?.key]);
@@ -2902,6 +2926,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     stagePassRef.current = null;
     setStagePass(null);
     setCandidatesShown(false);
+    recordedDraft.current = false;
     setSeaBeat('rest');
     setSeaFacts((f) => ({ replayAt: f.replayAt, vessels: f.vessels }));
     setTaskingState(null);
@@ -3621,7 +3646,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
     if (lg.kind === 'coverage') {
       return (
         <ul key={lg.key} className="map-legend map-legend--key" aria-label="AIS coverage key">
-          <li><span className="sea-key sea-key--heard" aria-hidden="true" /><span className="map-legend__label">AIS received: other ships came through here near the pass</span></li>
+          <li><span className="sea-key sea-key--heard" aria-hidden="true" /><span className="map-legend__label">AIS received: other ships came through here in the three hours either side of the pass</span></li>
           <li><span className="sea-key sea-key--unproven" aria-hidden="true" /><span className="map-legend__label">reception unknown: no AIS here proves nothing</span></li>
           {/* Both areas lie inside the radar when the coverage carries what the pass can check, so
               reserve water outside the swath is plain sea, and the key says why (review L6). */}
@@ -3721,7 +3746,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       {/* Top centre, Dark Vessels: what the room is looking at, dated. */}
       {seaOn && (
         <div className="sea-clock-band">
-          <SeaClock beat={seaBeat} facts={{ ...seaFacts, replayPassId: vesselRest?.pass.pass_id, tasking: filedFacts(taskingState) }} />
+          <SeaClock
+            beat={seaBeat}
+            facts={{ ...seaFacts, replayPassId: vesselRest?.pass.pass_id, tasking: filedFacts(taskingState), taskingRecorded: taskingState?.status === 'replay' }}
+          />
         </div>
       )}
 

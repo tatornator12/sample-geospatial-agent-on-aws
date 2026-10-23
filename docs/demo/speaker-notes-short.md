@@ -132,7 +132,7 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 
 **Beats**
 1. **Click "Who is there without broadcasting, and where next?".** Point at the board: "It chose the radar pass, and told us why."
-2. When the dots stop moving: "These dots are the ships' broadcasts, each placed where that ship was at the minute the radar passed. Those are what it compares with the radar." If the faint route lines are on screen: "The lines are the last three days of routes, just for context."
+2. When the route lines fade and the dots stop moving: "These dots are the ships' broadcasts, each placed where that ship was at the minute the radar passed. Those are what it compares with the radar."
 3. "First it checks where broadcasts could be received at all. Silence only means something there." Point at "can check 19%".
 4. "These four are radar targets in water where broadcasts were being received, but with no broadcast of their own: a reason to look."
 5. "Where to look next: its forecast has a measured record, and the satellite's next pass over each box." Point at the boxes.

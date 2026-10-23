@@ -42,9 +42,12 @@ import {
   radarColour,
   radarColormap,
   radarTileParams,
+  RECORDED_SETTLE_MS,
+  recordedTaskingWait,
   regionLabelPoint,
   replayFrame,
   replayWindow,
+  revealBeat,
   sweepRows,
   targetCounts,
   taskingFiledMessage,
@@ -205,10 +208,27 @@ describe('the targets and the claim', () => {
     expect(targetCounts(matched)).toEqual({ targets: 5, claimed: 1, port: 1, unproven: 1, seenOnce: 1, candidate: 1, matched: true });
   });
 
-  it('ties a claimed target to its AIS position, and skips a claim without one', () => {
-    const parts = claimParts([...detected, point(0, 0, { claimed: true, claim: ['x', 1] })]);
+  it('ties a target to its AIS dot only where that dot decided (our detector alone), and skips a claim without one', () => {
+    const ours = point(-90.1, -0.5, { status: 'broadcasting', source: 'ours', claimed: true, claim: [-90.11, -0.49] });
+    const parts = claimParts([ours, ...detected, point(0, 0, { source: 'ours', claimed: true, claim: ['x', 1] })]);
     expect(parts.features.map((f) => f.properties?.part)).toEqual(['tie', 'head']);
     expect(parts.features[0].geometry).toEqual({ type: 'LineString', coordinates: [[-90.1, -0.5], [-90.11, -0.49]] });
+    expect(parts.features[1].geometry).toEqual({ type: 'Point', coordinates: [-90.11, -0.49] });
+  });
+
+  it('draws no hairline where Global Fishing Watch\'s own match decided (both detectors, or GFW\'s alone)', () => {
+    // Oct 12: all four matches were GFW's; three carry a claim (the nearest dot, 2.7 to 4.1 km away).
+    const gfwDecided = [
+      point(-90.1, -0.5, { status: 'broadcasting', source: 'gfw', claimed: true, claim: [-90.12, -0.48] }),
+      point(-90.2, -0.4, { status: 'broadcasting', source: 'gfw', claimed: true, claim: [-90.23, -0.41] }),
+      point(-90.3, -0.3, { status: 'broadcasting', source: 'both', claimed: true, claim: [-90.31, -0.33] }),
+      point(-90.4, -0.2, { status: 'broadcasting', source: 'gfw', claimed: true }),
+    ];
+    expect(claimParts(gfwDecided).features).toEqual([]);
+    // A file without a source says nothing about who decided: no line either.
+    expect(claimParts(detected).features).toEqual([]);
+    // The fog ring stays: they are still counted as accounted for by a broadcast.
+    expect(targetCounts(gfwDecided).claimed).toBe(4);
   });
 
   it('calls nothing a candidate before match_ais, and never before the coverage beat', () => {
@@ -298,6 +318,23 @@ describe('the AIS replay', () => {
     expect(w.features[0].geometry?.coordinates).toEqual([[-90, -0.5], [-90.1, -0.5]]);
   });
 
+  it('clips the rest view\'s wakes to the loop\'s hours, as the clock says (not the file\'s three days)', () => {
+    const long = prepareReplay([
+      // Hourly fixes from before the loop to an hour after the pass (the file runs 72 h to +1 h).
+      { n: 1, type: 'fishing', t: ['2026-10-10T11:00Z', '2026-10-10T12:00Z', '2026-10-10T13:00Z', '2026-10-10T14:00Z', '2026-10-11T23:00Z', '2026-10-12T00:00Z', '2026-10-12T01:00Z'],
+        c: [[-91, -1], [-90.9, -1], [-90.8, -1], [-90.7, -1], [-90.6, -1], [-90.5, -1], [-90.4, -1]] },
+      // A track wholly before the loop draws no wake.
+      { n: 2, type: 'cargo', t: ['2026-10-09T02:00Z', '2026-10-09T03:00Z'], c: [[-89, 0], [-89, 0.1]] },
+    ]);
+    const win = replayWindow({ replay: { start: '2026-10-09T00:18Z', end: '2026-10-12T00:18Z', tracks: [] } });
+    expect(wakes(long).features).toHaveLength(3);
+    // The loop is 12:18 Oct 10 to the pass minute, 00:18 Oct 12: 13:00 to 00:00 stay, and the long gap still breaks the wake.
+    expect(wakes(long, 3, win).features.map((f) => f.geometry?.coordinates)).toEqual([
+      [[-90.8, -1], [-90.7, -1]],
+      [[-90.6, -1], [-90.5, -1]],
+    ]);
+  });
+
   it('loops the last 36 hours before the pass', () => {
     const win = replayWindow({ replay: { start: '2026-10-09T00:18Z', end: '2026-10-12T00:18Z', tracks: [] } });
     expect(win[1] - win[0]).toBe(REPLAY_LOOP_H * 3600e3);
@@ -318,23 +355,33 @@ describe('the clock plate', () => {
     // The received share is of the whole reserve on this path: no checkable share is claimed.
     expect(clockLines('coverage', { heardShare: 0.298 })).toEqual({
       lead: 'AIS received over 30% of the reserve',
-      sub: 'other ships\' AIS was received there near the pass · hatched: reception unknown',
+      sub: 'other ships\' AIS was received there in the three hours either side of the pass',
     });
     expect(clockLines('coverage', {}).lead).toBe('Where AIS was received');
     expect(clockLines('candidates', { counts: { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, matched: true } }).lead).toBe('4 candidates');
-    expect(clockLines('candidates', {}).sub).toBe('no AIS where AIS was being received, seen by both detectors · a reason to look, not an accusation');
+    // "A reason to look, not an accusation" is the answer's sentence alone.
+    expect(clockLines('candidates', {}).sub).toBe('no AIS where AIS was being received, seen by both detectors');
     expect(clockLines('fleet', { fleetMonth: 'October 2026' }).sub).toContain(ATTRIBUTION);
   });
 
-  it('sets the AIS replay aside over an earlier pass rather than mislead', () => {
+  it('says in plain clock words which AIS is on the map: the ships at the radar minute, and only for their own pass', () => {
+    // The radar beat: the dots held at the radar minute are the ones the matching used (the count is the stage's).
+    expect(clockLines('radar', { passId: 's1d-20261012t0018', replayPassId: 's1d-20261012t0018', vessels: 142 }).sub)
+      .toBe('142 ships broadcasting at the radar minute');
     const earlier = clockLines('radar', { passId: 's1a-20240306t0027', replayPassId: 's1d-20261012t0018' });
     expect(earlier.lead).toBe('Sentinel-1A radar  2024-03-06 00:27 UTC');
-    expect(earlier.sub).toBe('the AIS replay is of the 2026-10-12 pass, so it steps aside');
-    // A newer pass than the replay's steps it aside the same way (the replay is one pass's, not "the latest").
+    expect(earlier.sub).toBe('ships\' broadcasts are shown for Oct 12 only');
+    // A newer pass than the replay's reads the same way (the replay is one pass's, not "the latest").
     expect(clockLines('radar', { passId: 's1d-20261024t0017', replayPassId: 's1d-20261012t0018' }).sub)
-      .toBe('the AIS replay is of the 2026-10-12 pass, so it steps aside');
-    expect(clockLines('radar', { passId: 's1d-20261012t0018', replayPassId: 's1d-20261012t0018', vessels: 120 }).sub)
-      .toBe('AIS held at the pass minute · 120 vessels broadcasting');
+      .toBe('ships\' broadcasts are shown for Oct 12 only');
+    expect(clockLines('radar', { passId: 's1d-20260830t0026', replayPassId: 'not-a-pass' }).sub)
+      .toBe('ships\' broadcasts are shown for one other pass only');
+    // The coverage's window in words: the hours stamped within 3 h of the pass, either side.
+    expect(clockLines('coverage', { checkable: 0.19, standard: 0.15 }).sub).toContain('in the three hours either side of the pass');
+    for (const b of ['radar', 'coverage', 'candidates'] as SeaBeat[]) {
+      const { sub } = clockLines(b, { passId: 's1d-20261012t0018', replayPassId: 's1d-20261012t0018', vessels: 142, checkable: 0.19 });
+      expect(sub).not.toMatch(/held at the pass minute|near the pass|steps aside|accusation|reason to look/);
+    }
     expect(clockLines('reach', { passId: 's1a-20240306t0027', reach: '133 km by water at 6 kn' }).sub)
       .toBe('133 km by water at 6 kn · I cannot say which, if any, of these it is.');
   });
@@ -353,6 +400,10 @@ describe('the clock plate', () => {
       expect(`${lead} ${sub}`).not.toMatch(/Filed by the officer|did not file|officer's|heard|unproven|not evidence/i);
     }
     expect(clockLines('tasking', {}).sub).toBe('choose a box and the candidates, then approve');
+    // A replay case's plate is read-only: the clock names it recorded and asks for nothing.
+    expect(clockLines('tasking', { taskingRecorded: true })).toEqual({
+      lead: 'Patrol tasking  recorded', sub: 'the box and candidates the agent drafted, as recorded',
+    });
     expect(clockLines('filed', {}).sub).toBe('the approved box and candidates are on the tasking plate');
     const now = Date.parse('2026-10-20T14:37:00Z');
     expect(clockLines('filed', { now, tasking: { box: 3, kept: 3, total: 4, lookStart: '2026-10-24T00:17:00Z' } }).sub)
@@ -383,6 +434,8 @@ describe('the clock plate', () => {
     const subs = [
       clockLines('forward', {}).sub,
       clockLines('radar', { passId: 's1a-20240306t0027', replayPassId: 's1d-20261012t0018' }).sub,
+      clockLines('radar', { passId: 's1d-20261012t0018', replayPassId: 's1d-20261012t0018', vessels: 9999 }).sub,
+      clockLines('tasking', { taskingRecorded: true }).sub,
       clockLines('coverage', { heardShare: 1 }).sub,
       clockLines('coverage', { heardShare: 1, checkable: 1, standard: 0.15 }).sub,
       clockLines('heat', { heatCheck: { since: '2026-09-01', pct: 100 } }).sub,
@@ -405,8 +458,9 @@ describe('the clock plate', () => {
     const coverage = clockLines('coverage', { heardShare: 0.298, checkable: 0.19, standard: 0.15 });
     expect(coverage).toEqual({
       lead: 'This pass can check 19% of the reserve',
-      sub: 'the radar imaged it and other ships\' AIS was received there near the pass · hatched: reception unknown',
+      sub: 'the radar imaged it and other ships\' AIS was received there in the three hours either side of the pass',
     });
+    // The hatch carries its own label on the map, so the sub has room for the window in words.
     expect(coverage.sub).toHaveLength(102);
     // A checkable share out of range is not a number the stage prints.
     expect(clockLines('coverage', { heardShare: 0.298, checkable: 1.9 }).lead).toBe('AIS received over 30% of the reserve');
@@ -505,17 +559,157 @@ describe('the clock plate', () => {
   });
 });
 
+describe('the replay case\'s clock (every file lands at once)', () => {
+  it('moves to the candidates only from the coverage\'s beat', () => {
+    expect(revealBeat('coverage')).toBe('candidates');
+    for (const b of ['radar', 'targets', 'candidates', 'heat', 'boxes', 'look', 'tasking', 'filed', 'fleet', 'reach'] as SeaBeat[]) {
+      expect(revealBeat(b), b).toBeNull();
+    }
+  });
+
+  it('brings a recorded case back to its tasking once each beat after the draft has held', () => {
+    const on = Date.parse('2026-10-23T15:00:00Z');
+    // Longer than the boxes' hold, so the next look lands (and holds) before the tasking comes back.
+    expect(RECORDED_SETTLE_MS).toBeGreaterThan(BOXES_HOLD_MS);
+    expect(recordedTaskingWait('coverage', null, on)).toBe(RECORDED_SETTLE_MS);
+    expect(recordedTaskingWait('boxes', on, on + 5000)).toBe(RECORDED_SETTLE_MS);
+    expect(recordedTaskingWait('look', on, on + 8000)).toBe(RECORDED_SETTLE_MS);
+    // The heat holds its own 5 s first (the boxes follow it).
+    expect(recordedTaskingWait('heat', on, on)).toBe(HEAT_HOLD_MS + RECORDED_SETTLE_MS);
+    expect(recordedTaskingWait('heat', on, on + 2000)).toBe(3000 + RECORDED_SETTLE_MS);
+    // Nothing to come back from: the tasking itself, the filed beat, the rest, the spares.
+    for (const b of ['tasking', 'filed', 'rest', 'forward', 'fleet', 'reach'] as SeaBeat[]) {
+      expect(recordedTaskingWait(b, on, on), b).toBeNull();
+    }
+  });
+
+  /**
+   * A model of the stage's beat rules (MapView.tsx: landTargets, landSeaFile, maybeReveal, the
+   * heat and boxes holds, the look's wait, onTaskingLoaded) on a virtual clock, fed the order the
+   * files landed in a headless replay of vessels-open-question (the case's draft first, then every
+   * file within about a second). `fixed` switches the reveal rule and the recorded tasking's return.
+   */
+  function replayBeats(events: Array<[number, string]>, fixed: boolean, recorded = true): SeaBeat[] {
+    let now = 0;
+    let beat: SeaBeat = 'rest';
+    let heatAt: number | null = null;
+    let boxesAt: number | null = null;
+    let recordedDraft = false;
+    let back: number | null = null;
+    let matchedOn = false;
+    let coverageOn = false;
+    let revealed = false;
+    const seq: SeaBeat[] = [];
+    const queue: Array<{ at: number; id: number; fn: () => void }> = [];
+    let nextId = 0;
+    const later = (ms: number, fn: () => void) => { const id = ++nextId; queue.push({ at: now + ms, id, fn }); return id; };
+    const set = (b: SeaBeat) => {
+      beat = b;
+      seq.push(b);
+      if (back !== null) { const i = queue.findIndex((q) => q.id === back); if (i >= 0) queue.splice(i, 1); back = null; }
+      const wait = fixed && recordedDraft ? recordedTaskingWait(b, heatAt, now) : null;
+      if (wait !== null) back = later(wait, () => { back = null; if (recordedDraft && beat === b) set('tasking'); });
+    };
+    // The reveal waits for the matched targets and the coverage of the pass, then a breath.
+    const maybeReveal = () => {
+      if (!matchedOn || !coverageOn || revealed) return;
+      revealed = true;
+      later(1400, () => {
+        if (!fixed) return set('candidates');
+        const next = revealBeat(beat);
+        if (next) set(next);
+      });
+    };
+    const land: Record<string, () => void> = {
+      draft: () => { recordedDraft = recorded; set('tasking'); },
+      radar: () => set('radar'),
+      targets: () => set('targets'),
+      matched: () => { matchedOn = true; if (!revealed) set('coverage'); maybeReveal(); },
+      heard: () => { coverageOn = true; set('coverage'); maybeReveal(); },
+      heat: () => { heatAt = now; boxesAt = null; set('heat'); },
+      boxes: () => {
+        const showBoxes = () => { boxesAt = now; set('boxes'); };
+        const wait = heatHoldLeft(heatAt, now);
+        if (wait === 0) showBoxes();
+        else later(wait, () => { if (beat === 'heat') showBoxes(); });
+      },
+      look: () => {
+        const arrive = () => { if (beat !== 'tasking' && beat !== 'filed') set('look'); };
+        const wait = lookHoldLeft(heatAt, boxesAt, now);
+        if (wait > 0) later(wait, arrive);
+        else arrive();
+      },
+    };
+    for (const [at, what] of events) queue.push({ at, id: ++nextId, fn: land[what] });
+    while (queue.length) {
+      queue.sort((a, b) => a.at - b.at || a.id - b.id);
+      const q = queue.shift()!;
+      now = q.at;
+      q.fn();
+    }
+    return seq;
+  }
+  // The headless replay's order (ms after the page loaded): the draft at 3.5 s, then the matched
+  // targets, the received area, the heat, the boxes and the look within 1.2 s of each other.
+  const REPLAY: Array<[number, string]> = [[3530, 'draft'], [4530, 'matched'], [4630, 'heard'], [4640, 'heat'], [5600, 'boxes'], [5710, 'look']];
+
+  it('ended the replay on the next look with the old rules: the reveal and the deferred look took the clock from the tasking', () => {
+    const old = replayBeats(REPLAY, false);
+    expect(old).toEqual(['tasking', 'coverage', 'coverage', 'heat', 'candidates', 'look']);
+  });
+
+  it('ends the replay on the tasking, after the heat, the boxes and the next look have each held', () => {
+    const seq = replayBeats(REPLAY, true);
+    expect(seq).toEqual(['tasking', 'coverage', 'coverage', 'heat', 'boxes', 'look', 'tasking']);
+    expect(seq.at(-1)).toBe('tasking');
+  });
+
+  it('leaves a live turn as it was: the candidates after the coverage, and the tasking last, once', () => {
+    // A live turn's files, seconds apart (the final gates' run on dev), and its draft last.
+    const live: Array<[number, string]> = [[14900, 'radar'], [19000, 'targets'], [21600, 'heard'], [28100, 'matched'], [42100, 'heat'], [42200, 'boxes'], [44200, 'look'], [56700, 'draft']];
+    const seq = replayBeats(live, true, false);
+    expect(seq).toEqual(['radar', 'targets', 'coverage', 'coverage', 'candidates', 'heat', 'boxes', 'look', 'tasking']);
+    // The old rules gave the same live sequence: the change is the replay's alone.
+    expect(replayBeats(live, false, false)).toEqual(seq);
+  });
+});
+
 describe('the beats\' paint', () => {
-  it('steps the traffic back for the claim, dims it for the forecast, and sets it aside for the fleet and an earlier pass', () => {
-    const rest = aisLook('rest');
+  it('draws only the AIS the matching used: the loop at rest, the dots at the radar minute, none under the forecast', () => {
+    // [beat, wakes, faint wakes, comet tails, dots] as the room sees them (0 = not drawn).
+    const table: Array<[SeaBeat, number, number, number, number]> = [
+      ['rest', 0.13, 0.05, 1, 1],
+      ['forward', 0.13, 0.05, 1, 1],
+      // From the radar through the candidates: the dots held at the radar minute, nothing else.
+      ['radar', 0, 0, 0, 1],
+      ['targets', 0, 0, 0, 0.7],
+      ['coverage', 0, 0, 0, 0.7],
+      ['candidates', 0, 0, 0, 0.7],
+      // The forecast and the tasking use no AIS positions: none on the map.
+      ['heat', 0, 0, 0, 0],
+      ['boxes', 0, 0, 0, 0],
+      ['look', 0, 0, 0, 0],
+      ['tasking', 0, 0, 0, 0],
+      ['filed', 0, 0, 0, 0],
+      // The spares step it aside altogether.
+      ['fleet', 0, 0, 0, 0],
+      ['reach', 0, 0, 0, 0],
+    ];
+    for (const [beat, wakes, faintWakes, trail, heads] of table) {
+      const look = aisLook(beat);
+      expect({ beat, wakes: look.wakes, faintWakes: look.faintWakes, trail: look.trail, heads: look.heads }).toEqual({ beat, wakes, faintWakes, trail, heads });
+      // A dot with no fill shows no stroke either.
+      if (heads === 0) expect(look.headStroke, beat).toBe(0);
+    }
     const claim = aisLook('targets');
     const forecast = aisLook('boxes');
-    expect(rest).toMatchObject({ shown: true, trail: 1, heads: 1 });
-    expect(claim.trail).toBe(0);
-    expect(claim.wakes).toBeLessThan(rest.wakes);
     expect(claim.heads).toBeGreaterThan(forecast.heads);
     expect(forecast.radar).toBeLessThan(claim.radar);
+    // Under the forecast the dots fade out (the layers stay, at 0) rather than cut.
+    expect(forecast.shown).toBe(true);
     expect(aisLook('fleet').shown).toBe(false);
+    // Over an earlier pass the replay (another pass's) is not drawn at any beat.
+    for (const [beat] of table) expect(aisLook(beat, true).shown, beat).toBe(false);
     // The coverage steps back under the forecast, is full under the argument, and only the
     // reception-unknown hatch steps back while the candidates are read.
     expect(aisLook('boxes').quietCoverage).toBe('all');

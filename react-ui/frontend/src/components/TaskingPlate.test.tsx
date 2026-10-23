@@ -80,6 +80,35 @@ describe('the tasking on stage (clock and plate together)', () => {
     expect(text).toContain('Box 1  9% of past dark targets');
   });
 
+  it('lists the candidates without the candidate sentence: the agent\'s answer says it, once', async () => {
+    for (const s of [DRAFT, { ...DRAFT, status: 'replay' as const }]) {
+      state.current = s;
+      const { container, unmount } = render(<Stage beat="tasking" facts={{ taskingRecorded: s.status === 'replay' }} />);
+      await screen.findByText('Patrol box (from past dark targets)');
+      const text = document.body.textContent ?? '';
+      expect(text).toContain('Patrol box 1 · check 4 of 4 candidates on the way');
+      // The draft still carries the sentence (tasking_tools.py); the stage does not repeat it.
+      expect(DRAFT.card.sentence).toMatch(/not an accusation/);
+      expect(text).not.toContain(DRAFT.card.sentence);
+      expect(count(text, /accusation|reason to look/)).toBe(0);
+      expect(container.querySelector('.tasking-plate__note')).toBeNull();
+      // The candidates themselves are all there, by id and distance from port.
+      for (const id of ['T01', 'T02', 'T03', 'T04']) expect(text).toContain(id);
+      expect(count(text, /31 km from Baltra/)).toBe(4);
+      unmount();
+    }
+  });
+
+  it('names a replay case\'s tasking recorded on the clock, and asks for no approval there', async () => {
+    state.current = { ...DRAFT, status: 'replay' };
+    render(<Stage beat="tasking" facts={{ taskingRecorded: true }} />);
+    await screen.findByText('Recorded case: the decision is made live, not replayed.');
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('the box and candidates the agent drafted, as recorded');
+    expect(text).not.toContain('then approve');
+    expect(screen.queryByText('Approve the tasking')).toBeNull();
+  });
+
   it('keeps the clock quiet for screen readers while the plate announces the tasking', () => {
     const live = (beat: SeaBeat) => {
       const { container, unmount } = render(<SeaClock beat={beat} facts={{}} />);
