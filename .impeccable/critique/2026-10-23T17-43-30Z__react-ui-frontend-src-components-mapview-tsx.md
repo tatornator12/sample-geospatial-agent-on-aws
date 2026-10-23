@@ -10,6 +10,7 @@ target_fingerprint: "sha256:2d906e7f5912b50036efd2cc7c8712086ef892ee64b757596087
 target_path: /Users/tsteske/Documents/repos/sample-geospatial-agent-on-aws-main/.worktrees/vessels-legend/react-ui/frontend/src/components/MapView.tsx
 timestamp: 2026-10-23T17-43-30Z
 slug: react-ui-frontend-src-components-mapview-tsx
+closed: true
 ---
 Method: dual-agent (A: kirocrew-worker, design review · B: kirocrew-worker, detector and browser overlay)
 
