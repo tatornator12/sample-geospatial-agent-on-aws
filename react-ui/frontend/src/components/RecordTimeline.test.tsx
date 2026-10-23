@@ -46,7 +46,7 @@ describe('RecordTimeline', () => {
   it('says so when nothing fine-scale is on record, with no bracket', () => {
     render(<RecordTimeline model={recordTimeline({ tip: TIP, frames: [frame('2026-08-17', 'rejected', 'cloud or gap')], cm: null })!} />);
     expect(document.querySelector('.record-timeline__bracket')).toBeNull();
-    expect(words(document.querySelector('.record-timeline__gap-words'))).toBe('No fine-scale confirmation since Jan 2025');
+    expect(words(document.querySelector('.record-timeline__gap-words'))).toBe('No fine-scale confirmation on record');
   });
 
   it('writes only stage words: no dashes, no now, still, active or leaking', () => {

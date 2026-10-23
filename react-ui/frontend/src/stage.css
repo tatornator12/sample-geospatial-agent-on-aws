@@ -553,6 +553,11 @@
   text-align: right;
   color: var(--fog);
 }
+/* Without a bracket (nothing confirmed, or a confirmation inside the window) the words open the line. */
+.record-timeline__gap-words--open {
+  margin-top: 6px;
+  text-align: left;
+}
 .record-timeline__axis {
   display: flex;
   justify-content: space-between;

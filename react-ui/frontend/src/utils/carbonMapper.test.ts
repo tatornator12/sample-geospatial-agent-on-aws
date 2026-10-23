@@ -64,7 +64,7 @@ describe('the step column', () => {
     const steps = [call('carbon_mapper_plumes', { lat: 1, lon: 2 }, 'a'), call('carbon_mapper_plumes', { lat: 3, lon: 4 }, 'b')];
     const [group] = groupSteps(steps);
     expect(groupName(group)).toBe('Check Carbon Mapper on 2 sites');
-    expect(groupDetail(group)).toEqual({ text: "Carbon Mapper's public plumes, within 5 km since 2025" });
+    expect(groupDetail(group)).toEqual({ text: "Carbon Mapper's public plumes, within 7 km since 2025" });
     expect(planStage([call('scan_tropomi', {}), ...steps])).toBe(2);
   });
 

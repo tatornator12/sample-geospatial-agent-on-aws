@@ -312,7 +312,8 @@ export function groupDetail(group: StepGroup, earlier: StepGroup[] = []): { text
   }
   if (group.name === 'carbon_mapper_plumes') {
     const r = group.calls.map((c) => c.params?.radius_km).find((v) => typeof v === 'number' && v >= 0.5 && v <= 10);
-    return { text: `Carbon Mapper's public plumes, within ${typeof r === 'number' ? r : 5} km since 2025` };
+    // The tool's default since Oct 23: one TROPOMI footprint (carbon_mapper.CM_RADIUS_KM).
+    return { text: `Carbon Mapper's public plumes, within ${typeof r === 'number' ? r : 7} km since 2025` };
   }
   if (group.name === 'thermal_anomalies') {
     const nights = group.calls.map((c) => c.params?.nights).find((n) => typeof n === 'number' && n >= 1 && n <= 60);
@@ -514,7 +515,7 @@ export function parseCmPlumes(raw: unknown): CmPlumes | null {
   };
 }
 
-/** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h"; "Carbon Mapper: no plumes within 5 km". */
+/** "Carbon Mapper: 45 plumes · latest 2026-06-20 · ~270 kg/h"; "Carbon Mapper: no plumes within 7 km" (the record's radius). */
 export function cmLineText(c: CmPlumes): string {
   if (c.unavailable) return 'Carbon Mapper: could not be checked';
   if (c.count === 0) return `Carbon Mapper: no plumes within ${c.radiusKm} km`;
