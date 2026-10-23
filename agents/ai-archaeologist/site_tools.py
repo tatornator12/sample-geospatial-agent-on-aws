@@ -17,6 +17,7 @@ import logging
 import math
 import os
 import re
+import secrets
 import time
 import unicodedata
 from functools import lru_cache
@@ -43,6 +44,8 @@ REFUSAL = "I only work with sites already on the public record."
 PRODUCTS = ("hillshade", "lrm")
 SITE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 DEFAULT_TRANSECT_M = 600          # a line through the centre: the agent's bearing, or east-west by default
+SITE_EXTENT_M = 1200              # show_terrain(extent="site"): the frame's centre, where the earthwork is
+EXTENTS = ("frame", "site")
 # The lines the agent may choose (decision 9): a bearing through the site's centre, never coordinates.
 # Azimuths in degrees clockwise from north. The stage mirrors the keys (steps.ts BEARING_LABELS).
 BEARINGS = {"n-s": 0, "ne-sw": 45, "e-w": 90, "nw-se": 135}
@@ -82,6 +85,25 @@ def _put_json(key: str, body: dict) -> str:
     _s3().put_object(Bucket=config.S3_BUCKET_NAME, Key=key, Body=json.dumps(body).encode(),
                      ContentType="application/geo+json" if key.endswith(".geojson") else "application/json")
     return f"s3://{config.S3_BUCKET_NAME}/{key}"
+
+
+# --- the turn (the condition survey's guards, survey_tools.py) ---------------------------------
+# One runtime per session: the entrypoint calls begin_turn() for every presenter turn, so "this
+# turn's matches" and "looked at this turn" never carry over from an earlier question.
+_turn: dict = {"turn_id": None, "started_at": 0.0, "matches": {}, "recorded": {}}
+
+
+def begin_turn() -> str:
+    """A new turn: a fresh id and start time; no matches, no verdicts."""
+    _turn.update(turn_id=secrets.token_hex(6), started_at=time.time(), matches={}, recorded={})
+    return _turn["turn_id"]
+
+
+def current_turn() -> dict:
+    """This turn's state (a turn begins on first use when the entrypoint has not begun one)."""
+    if _turn["turn_id"] is None:
+        begin_turn()
+    return _turn
 
 
 # --- the catalogue -----------------------------------------------------------------------------
@@ -150,6 +172,13 @@ def _site(site_id: str) -> dict | None:
 def _frame(site_id: str) -> list[float] | None:
     built = manifest().get("sites", {}).get(site_id)
     return built.get("bounds") if built else None
+
+
+def has_lrm(site_id: str) -> bool:
+    """Whether the terrain build wrote this site's local relief model (the manifest's products)."""
+    built = manifest().get("sites", {}).get(site_id) or {}
+    products = built.get("products")
+    return isinstance(products, dict) and "lrm" in products
 
 
 def _km(a: dict, b: dict) -> float:
@@ -228,15 +257,58 @@ def _lrm_stretch(site: dict) -> float:
     return 0.3 if isinstance(s, (int, float)) and s < 0.6 else 1.0
 
 
-def session_name(site_id: str, product: str, stretch: float) -> str:
-    """hillshade_<id>.tif, lrm_<id>.tif or lrm03_<id>.tif: the shared inspect_image styles key on it."""
+def session_name(site_id: str, product: str, stretch: float, extent: str = "frame") -> str:
+    """hillshade_<id>.tif, lrm_<id>.tif or lrm03_<id>.tif (the whole frame), or lrm(03)_<id>_site.tif
+    (the site's centre 1.2 km): the shared inspect_image styles and the stage key on these names."""
     if product == "hillshade":
         return f"hillshade_{site_id}.tif"
-    return f"{'lrm03' if stretch < 0.6 else 'lrm'}_{site_id}.tif"
+    base = f"{'lrm03' if stretch < 0.6 else 'lrm'}_{site_id}"
+    return f"{base}_site.tif" if extent == "site" else f"{base}.tif"
+
+
+def _lrm_path(site_id: str) -> str:
+    """A GDAL path to the cached local relief (presigned HTTPS, range reads only). Patched in tests."""
+    from utils.tools import _presigned_vsicurl
+    return _presigned_vsicurl(f"s3://{config.S3_BUCKET_NAME}/{CACHE_PREFIX}/{site_id}_lrm.tif")
+
+
+def _site_relief(site: dict, key: str) -> list[float] | dict:
+    """Cut the centre SITE_EXTENT_M of the site's cached local relief (around its catalogue centre,
+    at the cache's own 1 m) into the session at `key`. Its WGS 84 bounds, or {"error": ...}."""
+    import tempfile
+    from rasterio.enums import Resampling
+    from rasterio.transform import array_bounds
+    from rasterio.warp import transform_bounds
+    from rasterio.windows import Window
+    lat, lon = site["centre"]["lat"], site["centre"]["lon"]
+    half = SITE_EXTENT_M / 2
+    try:
+        with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", CPL_VSIL_CURL_USE_HEAD="NO",
+                          CPL_VSIL_CURL_ALLOWED_EXTENSIONS=".tif"), rasterio.open(_lrm_path(site["id"])) as ds:
+            xs, ys = warp_transform("EPSG:4326", ds.crs, [lon], [lat])
+            win = from_bounds(xs[0] - half, ys[0] - half, xs[0] + half, ys[0] + half, transform=ds.transform)
+            win = win.round_offsets().round_lengths().intersection(Window(0, 0, ds.width, ds.height))
+            data = ds.read(1, window=win)
+            transform = ds.window_transform(win)
+            h, w = data.shape
+            profile = {"driver": "GTiff", "width": w, "height": h, "count": 1, "dtype": data.dtype, "crs": ds.crs,
+                       "transform": transform, "nodata": ds.nodata, "tiled": True, "blockxsize": 256,
+                       "blockysize": 256, "compress": "deflate", "predictor": 3}
+            with tempfile.NamedTemporaryFile(suffix=".tif") as tmp:
+                with rasterio.open(tmp.name, "w", **profile) as out:
+                    out.write(data, 1)
+                    out.build_overviews([2, 4], Resampling.average)
+                body = Path(tmp.name).read_bytes()
+            west, south, east, north = transform_bounds(ds.crs, "EPSG:4326", *array_bounds(h, w, transform))
+        _s3().put_object(Bucket=config.S3_BUCKET_NAME, Key=key, Body=body, ContentType="image/tiff")
+    except Exception as e:  # a window outside the raster is a WindowError (a ValueError) too
+        logger.warning("show_terrain site window failed for %s: %s", site["id"], type(e).__name__)
+        return {"error": f"The site's relief for {site['names'][0]} could not be cut ({type(e).__name__})."}
+    return [round(west, 6), round(south, 6), round(east, 6), round(north, 6)]
 
 
 @tool
-async def show_terrain(site_id: str, product: str = "hillshade") -> str:
+async def show_terrain(site_id: str, product: str = "hillshade", extent: str = "frame") -> str:
     """Put a catalogue site's LiDAR terrain (USGS 3DEP 1 m) into the session for the map and your eyes.
 
     Args:
@@ -244,6 +316,9 @@ async def show_terrain(site_id: str, product: str = "hillshade") -> str:
         product: "hillshade" (the ground lit from the north-west: walls and mounds cast shadows) or
             "lrm" (local relief model: each metre's height above or below its 21 m neighbourhood;
             banks read red, ditches blue).
+        extent: "frame" (the default: the whole 3 km frame) or, for "lrm" only, "site" (the centre
+            1.2 km, where the earthwork is, at full 1 m detail: the close look a condition survey
+            judges on).
 
     Returns: JSON with s3_url (the raster), bounds, render (pass it to display_visual unchanged),
     stretch_m for the LRM, source (the 3DEP project and tile dates), next_steps. Never reads
@@ -254,21 +329,31 @@ async def show_terrain(site_id: str, product: str = "hillshade") -> str:
         return _refusal()
     if product not in PRODUCTS:
         return json.dumps({"error": f"product must be one of {', '.join(PRODUCTS)}"})
+    if extent not in EXTENTS:
+        return json.dumps({"error": f"extent must be one of {', '.join(EXTENTS)}"})
+    if extent == "site" and product != "lrm":
+        return json.dumps({"error": 'extent "site" is for the local relief: show_terrain(site_id, "lrm", extent="site")'})
     built = manifest().get("sites", {}).get(site_id)
     if not built:
         return json.dumps({"error": f"No terrain is built for {site['names'][0]} (scripts/build_site_catalogue.py)."})
     src_key = f"{CACHE_PREFIX}/{site_id}_{product}.tif"
     stretch = _lrm_stretch(site)
-    key = f"{session_prefix()}terrain/{session_name(site_id, product, stretch)}"
-    try:
-        _s3().copy_object(Bucket=config.S3_BUCKET_NAME, Key=key,
-                          CopySource={"Bucket": config.S3_BUCKET_NAME, "Key": src_key},
-                          ContentType="image/tiff", MetadataDirective="REPLACE")
-    except Exception as e:
-        logger.warning("show_terrain copy failed for %s: %s", src_key, type(e).__name__)
-        return json.dumps({"error": f"The {product} for {site['names'][0]} is missing from the terrain cache "
-                                    "(scripts/build_site_catalogue.py)."})
-    bounds = built["bounds"]
+    key = f"{session_prefix()}terrain/{session_name(site_id, product, stretch, extent)}"
+    if extent == "site":
+        cut = _site_relief(site, key)
+        if isinstance(cut, dict):
+            return json.dumps(cut)
+        bounds = cut
+    else:
+        try:
+            _s3().copy_object(Bucket=config.S3_BUCKET_NAME, Key=key,
+                              CopySource={"Bucket": config.S3_BUCKET_NAME, "Key": src_key},
+                              ContentType="image/tiff", MetadataDirective="REPLACE")
+        except Exception as e:
+            logger.warning("show_terrain copy failed for %s: %s", src_key, type(e).__name__)
+            return json.dumps({"error": f"The {product} for {site['names'][0]} is missing from the terrain cache "
+                                        "(scripts/build_site_catalogue.py)."})
+        bounds = built["bounds"]
     # The hillshade travels with the DEM it was lit from, so the stage can light the ground itself
     # (the light sweeps round the earthwork when the LiDAR lands, and the presenter can move the sun).
     # A server-side copy of the cached COG into the session; the stage reads it through TiTiler.
@@ -292,8 +377,18 @@ async def show_terrain(site_id: str, product: str = "hillshade") -> str:
     return json.dumps({
         "site_id": site_id, "product": product, "s3_url": f"s3://{config.S3_BUCKET_NAME}/{key}",
         "bounds": bounds, "render": render, **({"stretch_m": stretch} if product == "lrm" else {}),
+        **({"extent": f"the centre {SITE_EXTENT_M} m of the frame, where the earthwork is, at 1 m"}
+           if extent == "site" else {}),
+        **({"relief_note": ("Stretched to ±0.3 m because this site's walls were ploughed down to tens of "
+                            "centimetres: however bold the red reads here, it stands under 0.3 m. In a condition "
+                            "survey a wall you can trace here is ploughed_but_traced, never walls_in_relief.")}
+           if product == "lrm" and stretch < 0.6 else {}),
         "source": {"dataset": "USGS 3DEP 1 m DEM (bare earth)", "tiles": tiles},
-        "next_steps": "inspect_image(s3_url) and say what you see in one sentence; then display_visual(s3_url, render=render).",
+        "next_steps": (("inspect_image(s3_url) as a call of its own and say in one sentence what you see; only in "
+                        "your next response, once you have seen it, record_condition(site_id, verdict, because). "
+                        "Then display_visual(s3_url, render=render) rides with your next tool call.")
+                       if extent == "site" else
+                       "inspect_image(s3_url) and say what you see in one sentence; then display_visual(s3_url, render=render)."),
     })
 
 
@@ -477,8 +572,10 @@ async def find_similar_sites(site_id: str, top_k: int = 3) -> str:
         site_id: From find_known_site (the example).
         top_k: How many sites to return (default 3, max 8).
 
-    Returns: JSON with example (name, form terms), matches [{site_id, name, designation, culture,
-    distance_km, shared_form, same_culture}], same_complex [names], method, next_steps.
+    Returns: JSON with example (name, form terms), matches [{site_id, rank, name, designation,
+    culture, distance_km, shared_form, same_culture, form, lidar}], same_complex [names], method,
+    next_steps. `lidar` says whether the match's local relief is built: a condition survey
+    (record_condition) looks only at matches with lidar true, and only at this turn's matches.
     """
     site = _site(site_id)
     if site is None:
@@ -505,15 +602,24 @@ async def find_similar_sites(site_id: str, top_k: int = 3) -> str:
         score = len(shared) / max(1, len(mine | theirs)) + (0.25 if same_culture else 0.0)
         rows.append((-score, d, sid, shared, same_culture))
     rows.sort()
-    matches = [{"site_id": sid, "name": catalogue()[sid]["names"][0], "designation": catalogue()[sid]["designation"],
-                "culture": catalogue()[sid]["culture"], "distance_km": round(d), "shared_form": shared,
-                "same_culture": same, "form": catalogue()[sid]["form"]}
-               for _, d, sid, shared, same in rows[:k]]
+    matches = [{"site_id": sid, "rank": i + 1, "name": catalogue()[sid]["names"][0],
+                "designation": catalogue()[sid]["designation"], "culture": catalogue()[sid]["culture"],
+                "distance_km": round(d), "shared_form": shared, "same_culture": same,
+                "form": catalogue()[sid]["form"], "lidar": has_lrm(sid)}
+               for i, (_, d, sid, shared, same) in enumerate(rows[:k])]
+    # This turn's matches: the only sites record_condition will judge (survey_tools.py).
+    turn = current_turn()
+    for m in matches:
+        turn["matches"][m["site_id"]] = {"example": site_id, "rank": m["rank"],
+                                         "distance_km": m["distance_km"], "lidar": m["lidar"]}
     return json.dumps({
         "example": {"site_id": site_id, "name": site["names"][0], "form_terms": sorted(mine)},
         "matches": matches, "same_complex": same_complex,
         "method": ("Ranked by the published form of each site in the catalogue (the record's own words), then "
-                   "the same culture, then distance. Only sites already on the public record are compared."),
-        "next_steps": ("Name the top match and what it shares; show_terrain(top match, 'lrm'), inspect it, and say "
-                       "in one sentence what form you see."),
+                   "the same culture, then distance. Only sites already on the public record are compared; "
+                   "the ranking reads the descriptions, not the LiDAR."),
+        "next_steps": ("Survey the top 2 or 3 matches with lidar true, in rank order: for each, "
+                       "show_terrain(site_id, 'lrm', extent='site'), inspect_image(its s3_url), then, once that "
+                       "image has come back, record_condition(site_id, verdict, because). A match with lidar "
+                       "false is skipped and gets no verdict: say so."),
     })

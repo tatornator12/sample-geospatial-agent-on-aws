@@ -1,0 +1,262 @@
+{
+  "name": "Sites like the Octagon, surveyed",
+  "description": "The agent looks at the 1 m LiDAR of the recorded sites that share the Octagon's form and judges whether each still shows in the ground",
+  "location": "Ohio",
+  "user_question": "Where else did they build like this?",
+  "agent": "archaeologist",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "ai_archaeologist_dev",
+  "tool_calls": [
+    {
+      "id": "tooluse_S5mwTmkxr1TUk8ZD1ZMkQS",
+      "name": "find_similar_sites",
+      "params": {
+        "site_id": "newark-octagon",
+        "top_k": 3
+      },
+      "result": "Sites of the same form ranked"
+    },
+    {
+      "id": "tooluse_jVzhR15Zqk4GfUAvDOJSVd",
+      "name": "show_terrain",
+      "params": {
+        "site_id": "hopeton-earthworks",
+        "product": "lrm",
+        "extent": "site"
+      },
+      "result": "1 m LiDAR terrain from the cache"
+    },
+    {
+      "id": "tooluse_Y51qy598NQp4oKINLiet8m",
+      "name": "inspect_image",
+      "params": {
+        "question": "Can you trace the square enclosure, the circle, and the parallel walls? How clearly do the walls show in the local relief?",
+        "s3_url": "s3://bucket/use-cases/archaeologist-survey/lrm03_hopeton-earthworks_site.tif",
+        "title": "Hopeton Earthworks, local relief"
+      },
+      "result": "Looked at the image",
+      "saw": "The walls are ploughed down but the LiDAR still traces the circle and the square enclosure as continuous red lines across the agricultural fields."
+    },
+    {
+      "id": "tooluse_kybvm7uYQ7RFdIXVYD9lGB",
+      "name": "record_condition",
+      "params": {
+        "site_id": "hopeton-earthworks",
+        "verdict": "visible",
+        "because": "ploughed_but_traced"
+      },
+      "result": "Verdict recorded"
+    },
+    {
+      "id": "tooluse_UBN3sNiQYKMGiPZVJ34XLF",
+      "name": "show_terrain",
+      "params": {
+        "extent": "site",
+        "product": "lrm",
+        "site_id": "high-bank-works"
+      },
+      "result": "1 m LiDAR terrain from the cache"
+    },
+    {
+      "id": "tooluse_LNg6JTP2bKP6q9o7ENI8VL",
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/archaeologist-survey/lrm03_hopeton-earthworks_site.tif",
+        "title": "Hopeton Earthworks, local relief",
+        "description": "USGS 3DEP 1 m, OH Statewide Phase 3 2021",
+        "render": {
+          "kind": "raster",
+          "colormap": "rdbu_r",
+          "rescale": [
+            -0.3,
+            0.3
+          ],
+          "units": "m",
+          "group": "terrain",
+          "legend": "Local relief",
+          "bounds": [
+            -82.986282,
+            39.379277,
+            -82.972051,
+            39.39032
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_Aof2MbDOUto8Jl2jwwATPl",
+      "name": "inspect_image",
+      "params": {
+        "question": "Can you trace the circle and octagon walls? How clearly do they show?",
+        "s3_url": "s3://bucket/use-cases/archaeologist-survey/lrm03_high-bank-works_site.tif",
+        "title": "High Bank Works, local relief"
+      },
+      "result": "Looked at the image",
+      "saw": "The large circle is clearly traceable on the lower left, and the angled walls of the octagon read as continuous red lines in the centre and right of the frame, though ploughed down."
+    },
+    {
+      "id": "tooluse_53QciBcUdz5KCBOyLXVJxL",
+      "name": "record_condition",
+      "params": {
+        "because": "ploughed_but_traced",
+        "site_id": "high-bank-works",
+        "verdict": "visible"
+      },
+      "result": "Verdict recorded"
+    },
+    {
+      "id": "tooluse_o8bm0DWaTRdA19M6TvZcG1",
+      "name": "show_terrain",
+      "params": {
+        "extent": "site",
+        "product": "lrm",
+        "site_id": "seip-earthworks"
+      },
+      "result": "1 m LiDAR terrain from the cache"
+    },
+    {
+      "id": "tooluse_J1nchRKjDoTdHzlheBR1qz",
+      "name": "display_visual",
+      "params": {
+        "description": "USGS 3DEP 1 m, OH Statewide Phase 3 2021",
+        "render": {
+          "bounds": [
+            -82.925591,
+            39.293046,
+            -82.911387,
+            39.304082
+          ],
+          "colormap": "rdbu_r",
+          "group": "terrain",
+          "kind": "raster",
+          "legend": "Local relief",
+          "rescale": [
+            -0.3,
+            0.3
+          ],
+          "units": "m"
+        },
+        "s3_url": "s3://bucket/use-cases/archaeologist-survey/lrm03_high-bank-works_site.tif",
+        "title": "High Bank Works, local relief"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_YwOapMXQ75jOoI3a5YcrrJ",
+      "name": "inspect_image",
+      "params": {
+        "question": "Can you trace the large circle, the smaller circle, and the square enclosure? How clearly do the walls show?",
+        "s3_url": "s3://bucket/use-cases/archaeologist-survey/lrm03_seip-earthworks_site.tif",
+        "title": "Seip Earthworks, local relief"
+      },
+      "result": "Looked at the image",
+      "saw": "The Central Mound reads clearly as a bold red ring at centre, but the enclosure walls of the large circle and the square are only faint, broad rises across heavily ploughed agricultural fields; I can make out the arc of the great circle but cannot trace it as a continuous line."
+    },
+    {
+      "id": "tooluse_TIIkIxXCcTTvMVOrIxqax6",
+      "name": "record_condition",
+      "params": {
+        "because": "low_relief_only",
+        "site_id": "seip-earthworks",
+        "verdict": "faint"
+      },
+      "result": "Verdict recorded"
+    },
+    {
+      "id": "tooluse_R8CpZQtg9lcfrvTqLyjKJR",
+      "name": "display_visual",
+      "params": {
+        "description": "USGS 3DEP 1 m, OH Statewide Phase 3 2021",
+        "render": {
+          "bounds": [
+            -83.226943,
+            39.231938,
+            -83.212708,
+            39.243008
+          ],
+          "colormap": "rdbu_r",
+          "group": "terrain",
+          "kind": "raster",
+          "legend": "Local relief",
+          "rescale": [
+            -0.3,
+            0.3
+          ],
+          "units": "m"
+        },
+        "s3_url": "s3://bucket/use-cases/archaeologist-survey/lrm03_seip-earthworks_site.tif",
+        "title": "Seip Earthworks, local relief"
+      },
+      "result": "Shown on the map"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "lrm03_hopeton-earthworks_site.tif",
+        "title": "Hopeton Earthworks, local relief",
+        "render": {
+          "kind": "raster",
+          "colormap": "rdbu_r",
+          "rescale": [
+            -0.3,
+            0.3
+          ],
+          "units": "m",
+          "group": "terrain",
+          "legend": "Local relief",
+          "bounds": [
+            -82.986282,
+            39.379277,
+            -82.972051,
+            39.39032
+          ]
+        }
+      },
+      {
+        "file": "lrm03_high-bank-works_site.tif",
+        "title": "High Bank Works, local relief",
+        "render": {
+          "bounds": [
+            -82.925591,
+            39.293046,
+            -82.911387,
+            39.304082
+          ],
+          "colormap": "rdbu_r",
+          "group": "terrain",
+          "kind": "raster",
+          "legend": "Local relief",
+          "rescale": [
+            -0.3,
+            0.3
+          ],
+          "units": "m"
+        }
+      },
+      {
+        "file": "lrm03_seip-earthworks_site.tif",
+        "title": "Seip Earthworks, local relief",
+        "render": {
+          "bounds": [
+            -83.226943,
+            39.231938,
+            -83.212708,
+            39.243008
+          ],
+          "colormap": "rdbu_r",
+          "group": "terrain",
+          "kind": "raster",
+          "legend": "Local relief",
+          "rescale": [
+            -0.3,
+            0.3
+          ],
+          "units": "m"
+        }
+      }
+    ]
+  }
+}

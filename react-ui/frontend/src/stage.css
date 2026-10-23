@@ -668,6 +668,59 @@
 .evidence-chip--ready .evidence-chip__title {
   color: var(--fog);
 }
+/* The thumbnail alone, inside a row that names the image (the archaeologist's survey). */
+.evidence-chip--compact {
+  width: auto;
+  margin: 0;
+}
+.evidence-chip--compact .evidence-chip__frame {
+  width: 72px;
+  height: 72px;
+}
+
+/* The archaeologist's condition survey: one row per site it judged, the relief it looked at
+   beside the verdict. 15px throughout (the Back Row Rule); the verdict word in fog, its reason
+   and the distance in label grey. No amber: nothing here is the presenter's to press. */
+.survey-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  column-gap: 12px;
+  align-items: center;
+  width: calc(100% - 36px);
+  margin: 4px 0 8px 36px;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--label);
+  animation: stage-rise 360ms var(--ease-out) both;
+}
+.survey-row__thumb {
+  display: block;
+  width: 72px;
+  min-height: 72px;
+}
+.survey-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.survey-row__site {
+  color: var(--fog);
+  overflow-wrap: anywhere;
+}
+.survey-row__km {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+  white-space: nowrap;
+}
+.survey-row__word {
+  color: var(--fog);
+  font-weight: 600;
+}
+.survey-row--cannot_confirm .survey-row__word {
+  color: var(--label);
+}
 
 /* Enlarged evidence: one image floated over the stage, readable from the back row. */
 .evidence-plate__backdrop {

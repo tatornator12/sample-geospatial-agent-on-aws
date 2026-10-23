@@ -24,7 +24,11 @@ And on the words and the clock:
   * required_text_by_ending {draft: [...], stop: [...]}: the ending is the last of draft_tasking
     ("draft") or decide with step "stop" ("stop"); a run with neither fails;
   * max_seconds: the last turn's wall time; report_max_words: the words of the final report
-    (the prose after the last tool call), split on whitespace.
+    (the prose after the last tool call), split on whitespace;
+  * report_first_line_regex: the final report's first line (markdown emphasis and heading marks
+    removed) matches this regular expression (the archaeologist's survey opens on its counts);
+  * min_accepted {tool: n}: at least n of the tool's calls were not refused (counted from the
+    session transcript, so only for an agent with "refusals" set).
 
 The closing paragraph (closer_*) is the last paragraph of the prose, a tool call counting as a
 paragraph break, so a closer streamed right after a tool call is read alone.
@@ -81,6 +85,10 @@ AGENTS = {
         "yaml": REPO_ROOT / "agents" / "ai-archaeologist" / ".bedrock_agentcore.yaml",
         "targets": {"dev": "ai_archaeologist_dev", "stable": "ai_archaeologist"},
         "prompts": REPO_ROOT / "agents" / "ai-archaeologist" / "golden_prompts.json",
+        # The condition survey's refused verdicts (record_condition) are counted from the transcript.
+        "env": {"dev": REPO_ROOT / "agents" / "ai-archaeologist" / ".env.dev",
+                "stable": REPO_ROOT / "agents" / "ai-archaeologist" / ".env"},
+        "refusals": True,
     },
     "vessels": {
         "yaml": REPO_ROOT / "agents" / "dark-vessels" / ".bedrock_agentcore.yaml",
@@ -470,6 +478,15 @@ def case_problems(case: dict) -> list[str]:
     for key in ("max_seconds", "report_max_words"):
         if key in case and (not isinstance(case[key], (int, float)) or isinstance(case[key], bool) or case[key] <= 0):
             out.append(f"{case.get('name')}: {key} is not a positive number")
+    need = case.get("min_accepted")
+    if need is not None and (not isinstance(need, dict) or not all(
+            isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool) and v > 0 for k, v in need.items())):
+        out.append(f"{case.get('name')}: min_accepted is not {{tool: positive count}}")
+    if "report_first_line_regex" in case:
+        try:
+            re.compile(case["report_first_line_regex"])
+        except (re.error, TypeError) as e:
+            out.append(f"{case.get('name')}: report_first_line_regex does not compile: {e}")
     return out
 
 
@@ -498,6 +515,12 @@ def report_text(text: str) -> str:
     """The final report: the prose after the last tool call."""
     spans = tool_spans(text)
     return (text[spans[-1][1]:] if spans else text).strip()
+
+
+def report_first_line(text: str) -> str:
+    """The final report's first non-empty line, without markdown emphasis or heading marks."""
+    first = next((line.strip() for line in report_text(text).splitlines() if line.strip()), "")
+    return re.sub(r"^#+\s*", "", first.replace("**", "").replace("__", "")).strip()
 
 
 def ending(calls: list[dict]) -> str | None:
@@ -593,6 +616,12 @@ def evaluate(case: dict, text: str, elapsed: float, quoted: list[str] | None = N
     n_words = len(report_text(text).split())
     if cap and n_words > cap:
         problems.append(f"final report is {n_words} words (> {cap})")
+    # report_first_line_regex: the answer's first line has the case's shape (the survey's counts).
+    shape = case.get("report_first_line_regex")
+    if shape:
+        first = report_first_line(text)
+        if not re.search(shape, first):
+            problems.append(f"first line {first[:140]!r} does not match {shape!r}")
     return problems, warnings
 
 
@@ -660,6 +689,23 @@ def refusals_in(messages: list[dict], tool_ids: set[str]) -> list[str]:
 
 # --- one case, and the repeat summary --------------------------------------------------------------------
 
+def accepted_problems(case: dict, tool_names: list[str], refused: list[str] | None) -> list[str]:
+    """min_accepted {tool: n}: at least n calls of the tool that the tool did not refuse (the
+    archaeologist's survey needs two accepted verdicts, not two attempts). Refusals come from the
+    session transcript; when it could not be read the check fails rather than pass on attempts."""
+    need = case.get("min_accepted") or {}
+    if not need:
+        return []
+    if refused is None:
+        return ["min_accepted: refusals not counted (no session transcript), so accepted calls are unknown"]
+    out = []
+    for name, n in need.items():
+        accepted = tool_names.count(name) - refused.count(name)
+        if accepted < n:
+            out.append(f"{accepted} accepted {name} call(s), fewer than {n}")
+    return out
+
+
 def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str | None = None,
                registry: bool = True, count_refusals: bool = False) -> tuple[bool, str, dict]:
     """Run one golden prompt; returns (passed, detail, record). With `s3` and `bucket`, forbidden
@@ -694,6 +740,7 @@ def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str 
         if messages is not None:
             names = {c["toolUseId"]: c["name"] for c in calls}
             refused = [names[i] for i in refusals_in(messages, set(names))]
+    problems += accepted_problems(case, tool_names, refused)
 
     # Characters of prose (everything that is not a tool-call object): a proxy for how much
     # the model wrote, which is what the room waits on at the end of a turn.

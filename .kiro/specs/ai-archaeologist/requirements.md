@@ -135,8 +135,24 @@ that I see similarity search and the same eyes working in a new domain.
 2. WHEN the method uses Clay embeddings THEN the tool SHALL call the shared similarity search
    with the matches clipped to the catalogue's site frames, so no cell outside a known site can
    be ranked, returned or drawn.
-3. WHEN the agent has the top match THEN it SHALL show its LiDAR (hillshade or LRM) and say in
-   one sentence what form it shares with the example.
+3. WHEN the agent has the matches THEN it SHALL survey the top two or three that have an LRM
+   (decision 10): show each one's close relief (`show_terrain(site_id, "lrm", extent="site")`),
+   inspect it, and only then record one verdict with `record_condition(site_id, verdict,
+   because)`, `verdict` one of `visible`, `faint`, `cannot_confirm` and `because` one of the
+   reasons that verdict takes. A match without an LRM SHALL be skipped with its reason and never
+   given a verdict.
+4. WHEN `record_condition` is called for a site that is not one of this turn's matches, not in
+   the catalogue, without an LRM, not inspected this turn, in the same model response as its
+   `inspect_image` (chosen before the image came back), already judged this turn, with a pair
+   the verdict does not take, or with `walls_in_relief` for a ploughed (±0.3 m) site THEN it SHALL
+   refuse and write nothing; an accepted verdict SHALL write a file of enums and numbers only.
+5. WHEN a verdict is accepted THEN the stage SHALL show a row under its step with the site's
+   name, its distance, the verdict and the reason in the stage's own words (at least 15 px), and
+   the relief the agent inspected; no model-written text SHALL reach the row.
+6. WHEN the survey's answer is written THEN its first line SHALL give the result in counts with
+   the example's name ("Two of the three sites like the Octagon still show in the ground; one is
+   faint."), then one bullet per site, then the closer and the designation sentence; it SHALL
+   state no dimensions, name known sites only and add no construction methods (rule 4).
 
 ### Requirement 6: The UI knows three agents
 

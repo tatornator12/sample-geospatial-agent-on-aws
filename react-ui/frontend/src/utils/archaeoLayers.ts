@@ -219,14 +219,26 @@ export const SITE_WINDOW = 0.4;
  */
 export const FINE_RELIEF_WINDOW = 0.27;
 
+/**
+ * A site's close relief (`lrm_<site>_site.tif`, `lrm03_<site>_site.tif`: show_terrain's
+ * extent="site", the condition survey's look) is already the frame's centre 1.2 km, so the camera
+ * lands on the same ground as on the full frame: the share scaled by 3 km / 1.2 km.
+ */
+const SITE_EXTENT_SHARE = 3000 / 1200;
+
 /** The share of the frame the camera lands on for this raster: closer for a ploughed site's relief. */
 export function siteWindowShare(url: string | undefined): number {
-  return /^lrm03_.+\.tiff?$/.test(basenameOf(url)) ? FINE_RELIEF_WINDOW : SITE_WINDOW;
+  const name = basenameOf(url);
+  const share = /^lrm03_.+\.tiff?$/.test(name) ? FINE_RELIEF_WINDOW : SITE_WINDOW;
+  return /^lrm(?:03)?_[a-z0-9-]+_site\.tiff?$/.test(name) ? Math.min(1, share * SITE_EXTENT_SHARE) : share;
 }
 
-/** The site a local relief file belongs to (`lrm_<site>.tif`, `lrm03_<site>.tif`), or null. */
+/**
+ * The site a local relief file belongs to (`lrm_<site>.tif`, `lrm03_<site>.tif`, or the close look
+ * `lrm03_<site>_site.tif`), or null. Site ids have no underscores, so `_site` is never part of one.
+ */
 export function reliefSite(url: string | undefined): string | null {
-  return basenameOf(url).match(/^lrm(?:03)?_([a-z0-9][a-z0-9_-]{0,63})\.tiff?$/)?.[1] ?? null;
+  return basenameOf(url).match(/^lrm(?:03)?_([a-z0-9][a-z0-9-]{0,63})(?:_site)?\.tiff?$/)?.[1] ?? null;
 }
 
 /**

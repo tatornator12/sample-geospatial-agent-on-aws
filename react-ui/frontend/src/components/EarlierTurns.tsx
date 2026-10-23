@@ -27,6 +27,8 @@ interface EarlierTurnsProps {
   showSaw?: boolean;
   onOpenEvidence?: (item: EvidenceItem, imageUrl: string) => void;
   methaneDir?: string | null;
+  /** Where the archaeologist's survey files are, so a record's survey rows read the same. */
+  archaeologyDir?: string | null;
   profiles?: Record<string, ProfileData>;
 }
 
@@ -36,7 +38,7 @@ function stepCount(n: number): string {
 }
 
 export function EarlierTurns({
-  turns, sessionId, speaker, showSaw = true, onOpenEvidence, methaneDir = null, profiles = {},
+  turns, sessionId, speaker, showSaw = true, onOpenEvidence, methaneDir = null, archaeologyDir = null, profiles = {},
 }: EarlierTurnsProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showOlder, setShowOlder] = useState(false);
@@ -97,6 +99,7 @@ export function EarlierTurns({
                       evidence={evidence}
                       onOpenEvidence={onOpenEvidence}
                       methaneDir={methaneDir}
+                      archaeologyDir={archaeologyDir}
                       profiles={profiles}
                     />
                   )}

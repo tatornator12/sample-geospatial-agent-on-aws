@@ -34,20 +34,23 @@ describe('stageCopyFor', () => {
     for (const words of ['Brief me', 'watch areas', 'how confident']) expect(brief.prompt).toContain(words);
   });
 
-  it('gives the AI Archaeologist its four plates and a placeholder that asks for a known site (Week 5)', () => {
+  it('gives the AI Archaeologist its three plates in click order and a placeholder that asks for a known site', () => {
+    // Decision 10 (Oct 22): the Octagon, then the condition survey; the Great Circle is the asked-only spare.
     const copy = stageCopyFor('archaeologist');
-    expect(copy.prompts.map((p) => p.label)).toEqual(['The Octagon, from space', 'Measure an Octagon wall', 'Measure the Great Circle', 'Where else, like this']);
+    expect(copy.prompts.map((p) => p.label)).toEqual(['The Octagon, from space', 'Where else, like this', 'Measure the Great Circle']);
     expect(copy.prompts.every((p) => !p.fill)).toBe(true);
     expect(copy.placeholder).toBe('Name a known site, or ask how they built it');
     expect(copy.placeholder).not.toMatch(/any place/i);
   });
 
-  it('asks the measure plates what the LiDAR can answer, never how it was built (stage review D10)', () => {
-    // The golden prompts octagon-wall-measure and great-circle-measure, word for word.
-    const [, octagon, circle] = stageCopyFor('archaeologist').prompts;
-    expect(octagon.prompt).toBe('Measure across a wall of the Newark Octagon, on a line you choose from the local relief.');
+  it('keeps the golden prompts word for word, and the measure plate asks what the LiDAR can answer (stage review D10)', () => {
+    // The golden prompts octagon-from-space, like-this and great-circle-measure, word for word.
+    const [octagon, survey, circle] = stageCopyFor('archaeologist').prompts;
+    expect(octagon.prompt).toBe('Show me the Newark Octagon the way an archaeologist sees it');
+    expect(survey.prompt).toBe('Where else did they build like this?');
     expect(circle.prompt).toBe('Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?');
-    for (const p of [octagon, circle]) expect(p.prompt).not.toMatch(/built|build/i);
+    expect(circle.prompt).not.toMatch(/built|build/i);
+    expect(stageCopyFor('archaeologist').prompts.some((p) => /Octagon wall/.test(p.label))).toBe(false);
   });
 
   it('gives Dark Vessels one question and the spare plate (the golden prompts) and a placeholder about passes on file', () => {
@@ -113,6 +116,7 @@ describe('stepName', () => {
     expect(stepName('show_terrain')).toBe('Show the 1 m LiDAR');
     expect(stepName('measure_profile')).toBe('Measure across the earthwork');
     expect(stepName('find_similar_sites')).toBe('Find sites of the same form');
+    expect(stepName('record_condition')).toBe('Judge what still shows');
     expect(stepName('check_ais_coverage')).toBe('Check where AIS was received');
     expect(stepName('list_passes')).toBe('Weigh the passes on file');
     expect(stepName('match_ais')).toBe('Match targets to broadcasts');

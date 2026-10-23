@@ -63,11 +63,12 @@ const STAGE_COPY: Record<string, AgentStageCopy> = {
   archaeologist: {
     prompts: [
       { label: 'The Octagon, from space', prompt: 'Show me the Newark Octagon the way an archaeologist sees it' },
-      // The agent picks the line from the local relief (decision 9; golden octagon-wall-measure).
-      { label: 'Measure an Octagon wall', prompt: 'Measure across a wall of the Newark Octagon, on a line you choose from the local relief.' },
-      // What the LiDAR can answer, not "how was it built?", which prompt rule 4 limits (stage review D10, act4 P1-10).
-      { label: 'Measure the Great Circle', prompt: 'Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?' },
+      // The condition survey (decision 10, Oct 22; golden like-this): after the Octagon, the agent
+      // looks at the LiDAR of the sites that share its form and judges whether each still shows.
       { label: 'Where else, like this', prompt: 'Where else did they build like this?' },
+      // The asked-only spare. What the LiDAR can answer, not "how was it built?", which prompt
+      // rule 4 limits (stage review D10, act4 P1-10).
+      { label: 'Measure the Great Circle', prompt: 'Measure the Great Circle: how wide is it, how high is the bank, how deep is the ditch?' },
     ],
     placeholder: 'Name a known site, or ask how they built it',
   },
@@ -131,11 +132,12 @@ const STEP_NAMES: Record<string, string> = {
   thermal_anomalies: 'Check for heat',
   nearby_infrastructure: 'Check what is mapped nearby',
   registry_lookup: 'Check the public registry',
-  // The AI Archaeologist's four tools.
+  // The AI Archaeologist's tools.
   find_known_site: 'Look up the public record',
   show_terrain: 'Show the 1 m LiDAR',
   measure_profile: 'Measure across the earthwork',
   find_similar_sites: 'Find sites of the same form',
+  record_condition: 'Judge what still shows',
   // Dark Vessels' tools (decide is no step: its line sits under the step it leads to).
   list_passes: 'Weigh the passes on file',
   find_pass: 'Find the radar pass',

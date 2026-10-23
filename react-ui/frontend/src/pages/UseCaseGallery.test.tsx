@@ -97,6 +97,8 @@ describe('UseCaseGallery', () => {
     expect(open('Newark Earthworks')).toBe('/?scenario=archaeologist-newark&agent=archaeologist');
     cleanup();
     expect(open('The Great Circle, measured')).toBe('/?scenario=archaeologist-great-circle&agent=archaeologist');
+    cleanup();
+    expect(open('Sites like the Octagon, surveyed')).toBe('/?scenario=archaeologist-survey&agent=archaeologist');
   });
 
   it('is titled "Replay cases" and groups the cases by act in show order, with no act numbers', () => {
@@ -109,7 +111,7 @@ describe('UseCaseGallery', () => {
         .getAllByRole('heading', { level: 3 })
         .map((h) => h.textContent);
     expect(cases('Earth Analyst')).toEqual(['LA Palisades Fire', 'Places like Central Park', 'Amazon Deforestation', 'Lake Mead Drought']);
-    expect(cases('AI Archaeologist')).toEqual(['Newark Earthworks', 'The Great Circle, measured']);
+    expect(cases('AI Archaeologist')).toEqual(['Newark Earthworks', 'Sites like the Octagon, surveyed', 'The Great Circle, measured']);
     expect(cases('Methane Watch')).toEqual(['Permian Basin Methane', 'Methane Watch brief']);
     expect(cases('Dark Vessels')).toEqual(['Dark Vessels, Galápagos: one open question']);
     const page = document.body.textContent ?? '';
@@ -119,7 +121,7 @@ describe('UseCaseGallery', () => {
   it('opens every available case from one native button (Tab, Enter and Space are the browser’s own)', () => {
     renderGallery();
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(9);
+    expect(buttons).toHaveLength(10);
     for (const button of buttons) {
       expect(button.tagName).toBe('BUTTON');
       expect(button.getAttribute('type')).toBe('button');

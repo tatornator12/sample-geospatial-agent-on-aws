@@ -120,6 +120,21 @@ const scenarios: Scenario[] = [
     agent: 'archaeologist',
   },
   {
+    // The condition survey (decision 10), recorded Oct 22 from dev v20 by build_replay_case.py
+    // --case survey (a take that passed the golden like-this case): Hopeton and High Bank still
+    // show (ploughed down, still traced), Seip is faint (only low, broad rises).
+    id: 'archaeologist-survey',
+    name: 'Sites like the Octagon, surveyed',
+    description: "After the Octagon, the agent looks at the 1 m LiDAR of the three recorded sites that share its form, matched on the public record's descriptions, and judges whether each still shows in the ground",
+    icon: '/survey_like_octagon.png',
+    metrics: [
+      { label: 'Sites Judged', value: '3, from their LiDAR' },
+      { label: 'Verdicts', value: '2 still show, 1 faint' },
+    ],
+    status: 'available',
+    agent: 'archaeologist',
+  },
+  {
     id: 'archaeologist-great-circle',
     name: 'The Great Circle, measured',
     description: 'The Great Circle Earthworks measured across on 1 m LiDAR: the bank and the interior ditch in metres, beside what the record says',

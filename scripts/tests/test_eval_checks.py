@@ -415,3 +415,79 @@ def test_a_dotted_match_reads_a_nested_field_and_the_mission_must_show_its_colum
     assert ev.dotted({"render": {"kind": "columns"}}, "render.kind") == "columns"
     assert ev.dotted({"render": "not json"}, "render.kind") is None and ev.dotted({}, "a.b") is None
     assert ev.case_problems(mission) == []
+
+
+# --- the archaeologist's condition survey (decision 10, Oct 22) ----------------------------------------------
+TERRAIN_URL = "s3://bucket/session_data/eval-x/terrain/"
+SURVEY_REPORT = (
+    "**Two of the three sites like the Octagon still show in the ground; one I cannot confirm.**\n\n"
+    "- Hopeton Earthworks, 87 km: still shows, ploughed down but traced.\n"
+    "- High Bank Works, 93 km: still shows, ploughed down but traced.\n"
+    "- Seip Earthworks, 112 km: I cannot confirm, only low, broad rises around the mound.\n\n"
+    "At High Bank Works the LiDAR still traces the circle and the octagon. They are already on the World Heritage list.")
+
+
+def survey_path(seip: str = "cannot_confirm", report: str = SURVEY_REPORT) -> str:
+    """The survey as one stream: the matches, then per site its relief, a look and a verdict."""
+    parts = [call("s01", "find_similar_sites", site_id="newark-octagon", top_k=3)]
+    for i, (site, verdict) in enumerate([("hopeton-earthworks", "visible"), ("high-bank-works", "visible"),
+                                         ("seip-earthworks", seip)]):
+        url = f"{TERRAIN_URL}lrm03_{site}.tif"
+        parts += [call(f"t{i}a", "show_terrain", site_id=site, product="lrm"),
+                  call(f"t{i}b", "inspect_image", s3_url=url, title=site), "The walls read as thin red lines.",
+                  call(f"t{i}c", "record_condition", site_id=site, verdict=verdict,
+                       because="ploughed_but_traced" if verdict == "visible" else "low_relief_only"),
+                  call(f"t{i}d", "display_visual", s3_url=url, title=site)]
+    return "".join(parts + [report])
+
+
+def arch_golden(name: str) -> dict:
+    cases = json.loads((ev.AGENTS["archaeologist"]["prompts"]).read_text())["prompts"]
+    return next(c for c in cases if c["name"] == name)
+
+
+def test_the_golden_survey_passes_on_a_survey_of_three():
+    assert problems(arch_golden("like-this"), survey_path()) == []
+
+
+def test_the_golden_survey_fails_a_confident_visible_at_seip():
+    assert any("forbidden input record_condition" in p for p in problems(arch_golden("like-this"), survey_path("visible")))
+
+
+def test_the_golden_survey_needs_two_verdicts_and_its_first_line():
+    case = arch_golden("like-this")
+    one = "".join([call("s01", "find_similar_sites", site_id="newark-octagon"), call("a", "show_terrain", site_id="x"),
+                   call("b", "inspect_image", s3_url="s3://b/x.tif"), call("c", "record_condition", site_id="x"),
+                   SURVEY_REPORT])
+    assert any("expected inputs" in p for p in problems(case, one))
+    led_by_a_site = survey_path(report=SURVEY_REPORT.replace("**Two of the three sites like the Octagon", "**Hopeton Earthworks and two more sites like the Octagon"))
+    assert any("first line" in p for p in problems(case, led_by_a_site))
+
+
+def test_report_first_line_drops_emphasis_and_heading_marks():
+    assert ev.report_first_line(call("t", "x") + "\n\n## **All three sites like the Octagon still show.**\n\nmore") == \
+        "All three sites like the Octagon still show."
+    assert ev.report_first_line("") == ""
+
+
+def test_a_first_line_pattern_that_does_not_compile_is_malformed():
+    assert ev.case_problems({"name": "x", "report_first_line_regex": "(unclosed"})
+
+
+def test_min_accepted_counts_the_calls_the_tool_did_not_refuse():
+    case = {"name": "x", "min_accepted": {"record_condition": 2}}
+    names = ["find_similar_sites", "record_condition", "record_condition", "record_condition"]
+    assert ev.accepted_problems(case, names, []) == []
+    assert ev.accepted_problems(case, names, ["record_condition"]) == []
+    assert ev.accepted_problems(case, names, ["record_condition", "record_condition"]) == [
+        "1 accepted record_condition call(s), fewer than 2"]
+    # No transcript: the gate fails rather than pass on attempts.
+    assert "not counted" in ev.accepted_problems(case, names, None)[0]
+    assert ev.accepted_problems({"name": "y"}, names, None) == []
+
+
+def test_min_accepted_must_be_tool_counts():
+    for bad in ({"record_condition": 0}, {"record_condition": "2"}, ["record_condition"], {"record_condition": True}):
+        assert ev.case_problems({"name": "x", "min_accepted": bad})
+    assert ev.case_problems({"name": "x", "min_accepted": {"record_condition": 2}}) == []
+    assert arch_golden("like-this")["min_accepted"] == {"record_condition": 2}
