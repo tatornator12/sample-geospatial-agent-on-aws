@@ -223,6 +223,10 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     tip = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_south_caspian.json"])
     assert tip["area"] == "south caspian" and tip["emit_can_look"] is True and tip["top"]["anomaly_ppb"] == 50.0
     assert set(tip["top"]) == {"lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look"}
+    assert (tip["start"], tip["end"]) == ("2026-09-10", "2026-09-10")      # the window's first and last day
+    # The composite is cached under a versioned key only: the stable runtime's keys are never written.
+    written = [p["Key"] for p in fake_s3.puts if p["Key"].startswith("methane/cache/")]
+    assert written and all(k.startswith("methane/cache/tropomi_v2_") for k in written)
     # Warm: same answer from the shared cache, nothing read from TROPOMI, a fresh session copy.
     monkeypatch.setattr(watch, "read_tropomi_window", lambda *a, **k: pytest.fail("should come from the cache"))
     monkeypatch.setenv("AGENT_SESSION_ID", "another-session-0002")
@@ -240,14 +244,37 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     assert restyled["render"]["bounds"] == out["render"]["bounds"]
 
 
+def test_scan_tropomi_reads_an_unversioned_composite_and_never_writes_one(watch, fake_s3, monkeypatch):
+    """A composite the stable runtime cached (unversioned key) is read as it is; nothing is written there."""
+    monkeypatch.setattr(watch, "read_tropomi_window", lambda *a, **k: pytest.fail("should come from the cache"))
+    box = watch.WATCH_AREAS["south caspian"]["bbox"]
+    sig = "_".join(f"{v:.2f}" for v in box).replace("-", "m")
+    legacy = f"methane/cache/tropomi_south_caspian_turkmenistan_{sig}_2026-09-10_14d"
+    summary = {"area": "south caspian (Turkmenistan)", "start": "2026-08-27", "end": "2026-09-10", "days_requested": 14,
+               "orbits": 27, "background_ppb": 1948.9, "emit_can_look": True}
+    fake_s3.put_object(Bucket=BUCKET, Key=f"{legacy}.json", Body=json.dumps(
+        {"summary": summary, "hotspots": [{"rank": 1, "lat": 37.688, "lon": 53.7829, "anomaly_ppb": 94.8, "valid_days": 3,
+                                           "emit_can_look": True}], "next_steps": "an old instruction"}).encode())
+    fake_s3.put_object(Bucket=BUCKET, Key=f"{legacy}.tif", Body=b"II*\x00tif")
+    before = {k: v for k, v in fake_s3.objects.items()}
+    out = json.loads(_run(watch.scan_tropomi(area="south caspian", days=14, end_date="2026-09-10")))
+    assert out["summary"]["source"] == "cache" and out["hotspots"][0]["anomaly_ppb"] == 94.8
+    assert out["next_steps"] == watch.TROPOMI_NEXT_STEPS                     # today's words, not the cache's
+    assert {k: fake_s3.objects[k] for k in before} == before                  # nothing it read was rewritten
+    assert not [k for k in fake_s3.objects if k.startswith("methane/cache/") and k not in before]
+    tip = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_south_caspian.json"])
+    assert (tip["start"], tip["end"], tip["days"]) == ("2026-08-27", "2026-09-10", 14)
+
+
 # --- 9.4 EMIT recent passes -------------------------------------------------------------------------
 
 SCENE = "EMIT_L2B_CH4ENH_002_20260812T060000_2622401_012"
 LAT, LON = 37.48, 61.025
 
 
-def _scene_tifs(peak_pixels: int, value: float, uncert: float):
-    """A 0.2° x 0.2° enhancement scene centred on the site, 60 m-ish pixels, and its uncertainty."""
+def _scene_tifs(peak_pixels: int, value: float, uncert: float, negative_pixels: int = 0):
+    """A 0.2° x 0.2° enhancement scene centred on the site, 60 m-ish pixels, and its uncertainty.
+    `negative_pixels` of them, beside the peak block, read -value (the mirror side of noise)."""
     px = 0.0005
     n = int(0.2 / px)
     enh = np.full((n, n), 50.0, dtype=np.float32)
@@ -256,6 +283,10 @@ def _scene_tifs(peak_pixels: int, value: float, uncert: float):
     flat = enh[c - 10:c + 10, c - 10:c + 10].reshape(-1)
     flat[:peak_pixels] = value
     enh[c - 10:c + 10, c - 10:c + 10] = flat.reshape(20, 20)
+    if negative_pixels:
+        side = enh[c + 12:c + 32, c - 10:c + 10].reshape(-1)
+        side[:negative_pixels] = -value
+        enh[c + 12:c + 32, c - 10:c + 10] = side.reshape(20, 20)
     unc = np.full((n, n), uncert, dtype=np.float32)
     out = []
     for arr in (enh, unc):
@@ -267,13 +298,24 @@ def _scene_tifs(peak_pixels: int, value: float, uncert: float):
     return out
 
 
+SCENE_V3 = "EMIT_L2B_CH4ENH_003_20261017T184631"
+
+
 def test_scene_ids_and_urls_are_validated(watch):
     assert watch.scene_url(SCENE, "CH4UNCERT").endswith(f"/EMITL2BCH4ENH.002/{SCENE}/{SCENE.replace('_CH4ENH_', '_CH4UNCERT_')}.tif")
-    for bad in ("EMIT_L2B_CH4ENH_002_x", SCENE + "/../x", None):
+    # V003 (after 2026-08-31): its own folder, the timestamp-only id, the layer named the same way.
+    assert watch.scene_url(SCENE_V3, "CH4UNCERT") == (
+        f"https://{watch.mt.LPDAAC_HOST}/lp-prod-protected/EMITL2BCH4ENH.003/{SCENE_V3}/EMIT_L2B_CH4UNCERT_003_20261017T184631.tif")
+    assert (watch.scene_product(SCENE), watch.scene_product(SCENE_V3)) == ("V002", "V003")
+    assert (watch.scene_date(SCENE), watch.scene_date(SCENE_V3)) == ("2026-08-12", "2026-10-17")
+    for bad in ("EMIT_L2B_CH4ENH_002_x", SCENE + "/../x", None, "EMIT_L2B_CH4ENH_003_20261017T184631_2622903_012",
+                "EMIT_L2B_CH4ENH_002_20261017T184631", "EMIT_L2B_CH4ENH_004_20261017T184631", SCENE_V3 + "/../x"):
         with pytest.raises(watch.MethaneError):
             watch.scene_url(bad, "CH4ENH")
     with pytest.raises(watch.MethaneError):
         watch.scene_url(SCENE, "RFL")
+    # The shared cache is versioned by rule: verdicts judged before the mirror test are never read.
+    assert watch.pass_cache_base(SCENE_V3, LAT, LON) == f"methane/cache/passwin_rule2_{SCENE_V3}_37.4800_61.0250_6km"
 
 
 @pytest.mark.parametrize("pixels,value,uncert,verdict,why", [
@@ -288,41 +330,104 @@ def test_window_verdicts(watch, pixels, value, uncert, verdict, why):
     assert s["peak_ppm_m"] == pytest.approx(value, abs=0.1)
 
 
+@pytest.mark.parametrize("positive,negative,verdict", [
+    (40, 40, "rejected"),     # symmetric noise: as many significant pixels below zero as above
+    (40, 14, "rejected"),     # 40 < 3 x 14
+    (40, 13, "candidate"),    # 40 >= 3 x 13: the boundary
+    (40, 0, "candidate"),     # a one-sided plume
+])
+def test_the_mirror_test_rejects_two_sided_noise_and_keeps_a_one_sided_plume(watch, positive, negative, verdict):
+    enh, unc = _scene_tifs(positive, 2500.0, 100.0, negative_pixels=negative)
+    s = watch.window_stats(enh, unc, LAT, LON)
+    assert (s["pixels_significant"], s["pixels_significant_negative"]) == (positive, negative)
+    assert s["verdict"] == verdict
+    if verdict == "rejected":
+        assert s["short"] == "within noise" and f"but {negative} as far below zero" in s["reason"]
+        assert watch.short_reason(s) == "within noise"
+    # The floors still come first: a symmetric window with too few strong pixels is "too weak".
+    weak = watch.window_stats(*_scene_tifs(3, 2500.0, 100.0, negative_pixels=40), LAT, LON)
+    assert weak["short"] == "too weak" and weak["pixels_significant_negative"] is None
+
+
+def test_emit_looks_read_v002_to_its_end_and_v003_after_it(watch):
+    from datetime import datetime, timezone
+    seen = []
+
+    def fake(client, params, limit):
+        seen.append(params)
+        return ([{"title": SCENE_V3}], 2) if params["version"] == "003" else ([{"title": SCENE}], 17)
+    real = watch._cmr_entries
+    watch._cmr_entries = fake
+    try:
+        entries, looks = watch.emit_looks(None, LAT, LON, datetime(2025, 1, 1, tzinfo=timezone.utc),
+                                          datetime(2026, 10, 23, 23, 59, 59, tzinfo=timezone.utc), 24)
+        assert [e["title"] for e in entries] == [SCENE_V3, SCENE] and looks == 19      # newest first, counted once
+        v3, v2 = seen
+        assert (v3["version"], v2["version"]) == ("003", "002") and v3["short_name"] == v2["short_name"] == "EMITL2BCH4ENH"
+        assert v3["temporal"] == "2026-08-31T01:26:01Z,2026-10-23T23:59:59Z"
+        assert v2["temporal"] == "2025-01-01T00:00:00Z,2026-08-31T01:26:00Z"
+        # A window wholly before V002's end asks V002 only; one wholly after it asks V003 only.
+        seen.clear()
+        watch.emit_looks(None, LAT, LON, datetime(2024, 1, 1, tzinfo=timezone.utc),
+                         datetime(2024, 12, 31, tzinfo=timezone.utc), 5)
+        assert [p["version"] for p in seen] == ["002"]
+        seen.clear()
+        watch.emit_looks(None, LAT, LON, datetime(2026, 9, 1, tzinfo=timezone.utc),
+                         datetime(2026, 10, 1, tzinfo=timezone.utc), 5, sort_key="start_date")
+        assert [p["version"] for p in seen] == ["003"]
+    finally:
+        watch._cmr_entries = real
+
+
 def test_check_recent_passes_reads_scenes_and_stages_windows(watch, fake_s3, monkeypatch):
     import methane_tools as mt
     monkeypatch.setenv("EARTHDATA_TOKEN", TOKEN)
     monkeypatch.setattr(mt, "archive_latest", lambda client: date(2025, 9, 22))
     seen = []
+    old = "EMIT_L2B_CH4ENH_002_20260101T000000_2600001_001"
     monkeypatch.setattr(watch, "_cmr_entries", lambda client, params, limit: seen.append(params) or (
-        [{"title": SCENE}, {"title": "EMIT_L2B_CH4ENH_002_20260101T000000_2600001_001"}, {"title": "junk"}], 17))
-    strong, weak = _scene_tifs(40, 2500.0, 100.0), _scene_tifs(2, 2500.0, 100.0)
+        ([{"title": SCENE_V3}], 2) if params["version"] == "003" else
+        ([{"title": SCENE}, {"title": old}, {"title": "junk"}], 17)))
+    strong, weak, noisy = _scene_tifs(40, 2500.0, 100.0), _scene_tifs(2, 2500.0, 100.0), \
+        _scene_tifs(40, 2500.0, 100.0, negative_pixels=40)
     reads = []
 
     def fake_read(sid, layer, token, box):
         reads.append((sid, layer))
-        data = (strong if sid == SCENE else weak)[0 if layer == "CH4ENH" else 1]
+        data = {SCENE: strong, SCENE_V3: noisy}.get(sid, weak)[0 if layer == "CH4ENH" else 1]
         with rasterio.MemoryFile(data) as mem, mem.open() as ds:
             return watch._read_window(ds, box)
     monkeypatch.setattr(watch, "read_scene_window", fake_read)
     out = json.loads(_run(watch.check_recent_passes(LAT, LON)))
-    assert seen[0]["short_name"] == "EMITL2BCH4ENH" and seen[0]["temporal"].startswith("2025-01-01T")
+    assert [p["version"] for p in seen] == ["003", "002"]
+    assert seen[1]["short_name"] == "EMITL2BCH4ENH" and seen[1]["temporal"].startswith("2025-01-01T")
     s = out["summary"]
-    assert (s["looks"], s["read"], s["candidates"], s["rejected"]) == (17, 2, 1, 1)
+    assert (s["looks"], s["read"], s["candidates"], s["rejected"]) == (19, 3, 1, 2)
+    assert s["products"] == ["V002", "V003"] and "as below it" in s["rule"]
     assert out["strongest_candidate"]["date"] == "2026-08-12"
     assert out["strongest_candidate"]["window_s3_url"] == f"s3://{BUCKET}/session_data/{SESSION}/methane/pass_{SCENE}.tif"
     assert TOKEN not in json.dumps(out)
     # The weak pass fails on the enhancement alone: its uncertainty layer is never read.
-    assert sorted(reads) == sorted([(SCENE, "CH4ENH"), (SCENE, "CH4UNCERT"),
-                                    ("EMIT_L2B_CH4ENH_002_20260101T000000_2600001_001", "CH4ENH")])
-    weak_pass = next(p for p in out["passes"] if p["scene_id"] != SCENE)
+    assert sorted(reads) == sorted([(SCENE, "CH4ENH"), (SCENE, "CH4UNCERT"), (SCENE_V3, "CH4ENH"),
+                                    (SCENE_V3, "CH4UNCERT"), (old, "CH4ENH")])
+    weak_pass = next(p for p in out["passes"] if p["scene_id"] == old)
     assert weak_pass["pixels_significant"] is None and "only 2 pixels" in weak_pass["reason"]
     assert weak_pass["short"] == "too weak" and next(p for p in out["passes"] if p["scene_id"] == SCENE)["short"] == "candidate"
-    # The filmstrip manifest, keyed by the call's lat/lon; chips relative to it.
+    # The V003 pass is read and judged like any other: two-sided, so within noise (the mirror test).
+    v3 = next(p for p in out["passes"] if p["scene_id"] == SCENE_V3)
+    assert (v3["product"], v3["date"], v3["short"]) == ("V003", "2026-10-17", "within noise")
+    # The filmstrip manifest, keyed by the call's lat/lon; chips relative to it; every look, newest first.
     mkey = f"session_data/{SESSION}/methane/passes_{LAT:.4f}_{LON:.4f}.json"
     manifest = json.loads(fake_s3.objects[mkey])
-    assert [(f["date"], f["verdict"], f["short"]) for f in manifest["passes"]] == [
-        ("2026-08-12", "candidate", "candidate"), ("2026-01-01", "rejected", "too weak")]
-    assert manifest["passes"][0]["chip"] == f"passchip_{SCENE}.png"
+    assert [(f["date"], f["product"], f["verdict"], f["short"]) for f in manifest["passes"]] == [
+        ("2026-10-17", "V003", "rejected", "within noise"), ("2026-08-12", "V002", "candidate", "candidate"),
+        ("2026-01-01", "V002", "rejected", "too weak")]
+    assert manifest["passes"][1]["chip"] == f"passchip_{SCENE}.png"
+    # Verdicts go to the shared cache under the rule's version only.
+    cached = [p["Key"] for p in fake_s3.puts if p["Key"].startswith("methane/cache/")]
+    assert cached and all(k.startswith("methane/cache/passwin_rule2_") for k in cached)
+    assert f"{watch.pass_cache_base(SCENE, LAT, LON)}_sig.tif" in fake_s3.objects        # the candidate's columns
+    assert f"{watch.pass_cache_base(SCENE_V3, LAT, LON)}_sig.tif" not in fake_s3.objects  # a rejected pass has none
     assert fake_s3.objects[f"session_data/{SESSION}/methane/passchip_{SCENE}.png"][:8] == b"\x89PNG\r\n\x1a\n"
     # The display window keeps only enhanced pixels, so the ground shows through it.
     with rasterio.MemoryFile(fake_s3.objects[f"session_data/{SESSION}/methane/pass_{SCENE}.tif"]) as mem, mem.open() as ds:
@@ -335,8 +440,57 @@ def test_check_recent_passes_reads_scenes_and_stages_windows(watch, fake_s3, mon
     # Second run: every verdict from the shared cache, no read, same answer.
     monkeypatch.setattr(watch, "read_scene_window", lambda *a, **k: pytest.fail("should come from the cache"))
     again = json.loads(_run(watch.check_recent_passes(LAT, LON)))
-    assert again["summary"]["from_cache"] == 2 and again["summary"]["candidates"] == 1
+    assert again["summary"]["from_cache"] == 3 and again["summary"]["candidates"] == 1
     assert [p["verdict"] for p in again["passes"]] == [p["verdict"] for p in out["passes"]]
+
+
+def test_the_columns_are_drawn_from_significant_pixels_only(watch, fake_s3, monkeypatch):
+    """A candidate's 3D columns carry only pixels beyond 3x their own uncertainty, never the noise around them."""
+    import methane_tools as mt
+    monkeypatch.setenv("EARTHDATA_TOKEN", TOKEN)
+    monkeypatch.setattr(mt, "archive_latest", lambda client: None)
+    monkeypatch.setattr(watch, "_cmr_entries", lambda client, params, limit: (
+        ([{"title": SCENE}], 1) if params["version"] == "002" else ([], 0)))
+    enh, unc = _scene_tifs(40, 2500.0, 100.0)
+    # 30 more pixels at 900 ppm·m (above the 500 display floor) whose uncertainty is 400: not significant.
+    with rasterio.MemoryFile(enh) as m1, m1.open() as e, rasterio.MemoryFile(unc) as m2, m2.open() as u:
+        a, b, profile = e.read(1), u.read(1), e.profile
+    c = a.shape[0] // 2
+    a[c + 12, c - 15:c + 15] = 900.0
+    b[c + 12, c - 15:c + 15] = 400.0
+    tifs = []
+    for arr in (a, b):
+        with rasterio.MemoryFile() as mem:
+            with mem.open(**profile) as ds:
+                ds.write(arr, 1)
+            tifs.append(mem.read())
+
+    def fake_read(sid, layer, token, box):
+        with rasterio.MemoryFile(tifs[0 if layer == "CH4ENH" else 1]) as mem, mem.open() as ds:
+            return watch._read_window(ds, box)
+    monkeypatch.setattr(watch, "read_scene_window", fake_read)
+    out = json.loads(_run(watch.check_recent_passes(LAT, LON)))
+    cols = json.loads(fake_s3.objects[out["strongest_candidate"]["columns_s3_url"].split(f"{BUCKET}/", 1)[1]])
+    assert len(cols["features"]) == 40 and min(f["properties"]["ppm_m"] for f in cols["features"]) == pytest.approx(2500.0)
+    # The flat window the agent inspects still shows everything above the display floor.
+    with rasterio.MemoryFile(fake_s3.objects[f"session_data/{SESSION}/methane/pass_{SCENE}.tif"]) as mem, mem.open() as ds:
+        assert ds.read(1, masked=True).count() == 70
+
+
+def test_the_baseline_rewrites_the_shared_globe_only_when_it_changed(watch, fake_s3, monkeypatch):
+    import methane_tools as mt
+    fc = {"type": "FeatureCollection", "built_at": 10**12, "detections": 1, "features": [
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [53.6, 39.5]},
+         "properties": {"repeat_dates": 6, "plumes": 7, "first": "2023-01-01", "last": "2024-06-01", "tier": "repeat"}}]}
+    monkeypatch.setattr(watch, "load_sites", lambda client, s3: (json.loads(json.dumps(fc)), "cache"))
+    monkeypatch.setattr(mt, "archive_latest", lambda client: date(2025, 9, 22))
+    _run(watch.watch_baseline())
+    _run(watch.watch_baseline())
+    writes = [p for p in fake_s3.puts if p["Key"] == watch.WATCH_SITES_CACHE_KEY]
+    assert len(writes) == 1                     # the second mission found the same globe and left it alone
+    fc["features"][0]["properties"]["repeat_dates"] = 7
+    _run(watch.watch_baseline())
+    assert len([p for p in fake_s3.puts if p["Key"] == watch.WATCH_SITES_CACHE_KEY]) == 2
 
 
 def test_check_recent_passes_says_when_emit_cannot_look(watch, monkeypatch):

@@ -20,7 +20,7 @@ from conftest import BUCKET, SESSION
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 KRASNOVODSK = (39.4379, 53.5730)       # the south Caspian site the orchestrator checked: Tanager plumes in 2026
-SHANXI = (37.8938, 113.5625)           # the Oct 22 Shanxi tip: seven coal-mine plumes, all just beyond 5 km
+SHANXI = (37.8938, 113.5625)           # the Oct 22 Shanxi tip: seven coal-mine plumes, 5.1 km away (inside 7 km)
 
 
 def _run(coro):
@@ -61,7 +61,7 @@ def serve(cm, monkeypatch):
 
 def test_krasnovodsk_lists_the_tanager_plumes_newest_first_with_numbers_only(cm, serve, fake_s3):
     requests = serve(page("carbonmapper_krasnovodsk_2026-10-22.json"))
-    out = json.loads(_run(cm.carbon_mapper_plumes(*KRASNOVODSK)))
+    out = json.loads(_run(cm.carbon_mapper_plumes(*KRASNOVODSK, radius_km=5)))
     s = out["summary"]
     assert s["count"] == 45 and s["by_instrument"] == {"Tanager-1": 45}
     assert s["latest_date"] == "2026-06-20" and s["source"] == "carbon-mapper"
@@ -83,9 +83,16 @@ def test_krasnovodsk_lists_the_tanager_plumes_newest_first_with_numbers_only(cm,
         assert leaked not in text
     # The stage's record and the map's points, numbers and codes only.
     rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/cmplumes_39.4379_53.5730.json"])
+    dates = rec.pop("dates")
     assert rec == {"lat": 39.4379, "lon": 53.573, "radius_km": 5.0, "since": "2025-01-01", "count": 45,
                    "latest": "2026-06-20", "rate_kg_h": 273.1, "uncertainty_kg_h": 260.9, "instrument": "tanager",
-                   "source": "carbon-mapper"}
+                   "source": "carbon-mapper", "follow_radius_km": 7.0,
+                   "latest_confirmed": {"date": "2026-06-20", "by": "carbon_mapper"}}
+    # The record timeline's plumes: every one in the radius, newest first, numbers and codes only.
+    assert len(dates) == 45 and dates[0] == {"date": "2026-06-20", "instrument": "tanager", "rate_kg_h": None,
+                                             "distance_km": 2.0}
+    assert all(set(d) == {"date", "instrument", "rate_kg_h", "distance_km"} for d in dates)
+    assert [d["date"] for d in dates] == sorted((d["date"] for d in dates), reverse=True)
     geo = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/cmplumes_39.4379_53.5730.geojson"])
     assert len(geo["features"]) == 45
     assert set(geo["features"][0]["properties"]) == {"date", "rate_kg_h", "instrument"}
@@ -101,19 +108,25 @@ def test_krasnovodsk_lists_the_tanager_plumes_newest_first_with_numbers_only(cm,
     assert r.headers["user-agent"].startswith("Mozilla/5.0")
 
 
-def test_shanxi_plumes_just_beyond_the_radius_are_not_counted(cm, serve, fake_s3):
+def test_shanxi_plumes_beyond_5_km_count_within_one_tropomi_footprint(cm, serve, fake_s3):
     serve(page("carbonmapper_shanxi_2026-10-22.json"))
-    out = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI)))
+    out = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI, radius_km=5)))
     assert out["summary"]["count"] == 0 and out["plumes"] == [] and out["summary"]["latest_date"] is None
     assert out["say"] == ("Carbon Mapper lists no methane plume within 5 km since 2025-01-01 "
                           "(it publishes about 30 days after a detection).")
     assert "plumes_geometry_s3_url" not in out and "render" not in out
     rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/cmplumes_37.8938_113.5625.json"])
     assert rec["count"] == 0 and rec["latest"] is None and rec["rate_kg_h"] is None
-    # A wider radius reaches the seven coal-mine plumes about 5.1 km away (one Carbon Mapper EMIT plume).
-    wider = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI, radius_km=6)))
+    # The default, one TROPOMI footprint (7 km, approved 2026-10-23 after seeing this case), reaches the
+    # seven coal-mine plumes about 5.1 km away (one of them Carbon Mapper's own EMIT plume).
+    wider = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI)))
+    assert wider["summary"]["radius_km"] == 7.0
     assert wider["summary"]["count"] == 7 and wider["summary"]["by_instrument"] == {"Tanager-1": 6, "EMIT": 1}
     assert {p["sector"] for p in wider["plumes"]} == {"coal mining"}
+    assert wider["latest_confirmed"] == {"date": "2026-06-10", "by": "a Carbon Mapper plume"}
+    rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/cmplumes_37.8938_113.5625.json"])
+    assert rec["latest_confirmed"] == {"date": "2026-06-10", "by": "carbon_mapper"} and len(rec["dates"]) == 7
+    assert {d["instrument"] for d in rec["dates"]} == {"tanager", "emit"}
 
 
 def test_every_field_is_validated_and_free_text_never_passes(cm):
@@ -156,15 +169,16 @@ def test_the_cache_answers_a_second_call_and_stands_in_when_the_api_is_down(cm, 
     requests = serve(page("carbonmapper_krasnovodsk_2026-10-22.json"))
     _run(cm.carbon_mapper_plumes(*KRASNOVODSK))
     again = json.loads(_run(cm.carbon_mapper_plumes(*KRASNOVODSK)))
-    assert len(requests) == 1 and again["summary"]["source"] == "cache" and again["summary"]["count"] == 45
+    assert len(requests) == 1 and again["summary"]["source"] == "cache" and again["summary"]["count"] == 58   # within 7 km
     # Age the cache past its TTL, then take the API down: the old record answers, and says so.
-    key = cm.cache_key(*KRASNOVODSK, 5.0)
+    key = cm.cache_key(*KRASNOVODSK, 7.0)
+    assert key.startswith("methane/cache/carbonmapper_v2_") and key.endswith("_7km.json")
     cached = json.loads(fake_s3.objects[key])
     cached["fetched_at"] = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
     fake_s3.objects[key] = json.dumps(cached).encode()
     serve(fail=httpx.ConnectTimeout("timed out"))
     stale = json.loads(_run(cm.carbon_mapper_plumes(*KRASNOVODSK)))
-    assert stale["summary"]["source"] == "stale cache" and stale["summary"]["count"] == 45
+    assert stale["summary"]["source"] == "stale cache" and stale["summary"]["count"] == 58
     assert "could not be reached" in stale["note"]
     # A server error with nothing cached: the check says it is unavailable, and the choice rests on EMIT.
     serve(body={"detail": "boom"}, status=503)
@@ -174,7 +188,7 @@ def test_the_cache_answers_a_second_call_and_stands_in_when_the_api_is_down(cm, 
 
 def test_a_tampered_cache_row_is_dropped(cm, fake_s3, serve):
     serve(fail=httpx.ConnectError("down"))
-    key = cm.cache_key(*KRASNOVODSK, 5.0)
+    key = cm.cache_key(*KRASNOVODSK, 7.0)
     rows = [{"id": "ok-1", "date": "2026-05-01", "lat": 39.44, "lon": 53.57, "instrument": "tanager",
              "rate_kg_h": 900.0, "uncertainty_kg_h": 100.0, "sector": "oil and gas"},
             {"id": "bad-1", "date": "2026-05-02", "lat": 39.44, "lon": 53.57, "instrument": "<img>", "rate_kg_h": 1.0},
@@ -233,11 +247,30 @@ def test_an_unreachable_catalogue_leaves_a_record_the_board_can_say_it_with(cm, 
     assert rec["status"] == "unavailable" and "count" not in rec
 
 
-def test_the_follow_rule_counts_plumes_within_5_km_whatever_the_radius(cm, serve):
-    serve(page("carbonmapper_shanxi_2026-10-22.json"))
-    wide = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI, radius_km=6)))
-    assert wide["summary"]["latest_date"] == "2026-06-10"        # the seven plumes at ~5.1 km
-    assert wide["latest_confirmed"] is None                        # none of them within 5 km
+def test_the_follow_rule_counts_plumes_within_7_km_whatever_the_radius(cm, serve, fake_s3):
+    one = page("carbonmapper_shanxi_2026-10-22.json")
+    item = one["items"][0]
+    # One more plume, newer, 8.5 km north of the site: inside a 10 km search, outside the follow rule.
+    far = {**item, "plume_id": "far-1", "scene_timestamp": "2026-08-01T03:00:00Z",
+           "geometry_json": {"type": "Point", "coordinates": [SHANXI[1], SHANXI[0] + 8.5 / 111.2]}}
+    serve({"bbox_count": len(one["items"]) + 1, "items": one["items"] + [far]})
+    wide = json.loads(_run(cm.carbon_mapper_plumes(*SHANXI, radius_km=10)))
+    assert wide["summary"]["latest_date"] == "2026-08-01"        # the far plume is listed
+    assert wide["latest_confirmed"] == {"date": "2026-06-10", "by": "a Carbon Mapper plume"}   # but not followed
+    rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/cmplumes_37.8938_113.5625.json"])
+    assert rec["latest_confirmed"]["date"] == "2026-06-10" and rec["follow_radius_km"] == 7.0
+
+
+def test_the_record_lists_at_most_60_plumes(cm):
+    rows = [{"date": f"2026-0{1 + i % 9}-1{i % 10}", "instrument": "tanager", "rate_kg_h": 100.0 + i,
+             "distance_km": 1.0, "id": f"p{i}", "lat": 0, "lon": 0, "uncertainty_kg_h": None, "sector": None}
+            for i in range(80)]
+    out = cm.record_dates(cm.newest_first(rows))
+    assert len(out) == 60 and all(set(r) == {"date", "instrument", "rate_kg_h", "distance_km"} for r in out)
+    assert cm.latest_confirmed_code("2025-08-18", "2026-06-10") == {"date": "2026-06-10", "by": "carbon_mapper"}
+    assert cm.latest_confirmed_code("2026-06-10", "2026-06-10") == {"date": "2026-06-10", "by": "both"}
+    assert cm.latest_confirmed_code("2026-07-01", None) == {"date": "2026-07-01", "by": "emit"}
+    assert cm.latest_confirmed_code(None, None) is None
 
 
 def test_rates_round_half_up_like_the_stage():

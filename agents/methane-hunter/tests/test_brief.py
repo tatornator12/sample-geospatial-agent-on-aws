@@ -32,6 +32,7 @@ def good(**over):
         confidence="moderate",
         gaps=["EMIT cannot see between passes", "NASA's plume product is nearly empty after 2024"],
         next_collection="Next EMIT overpass and an aircraft survey.",
+        recommendation="recommend_new_look", recommendation_reason="no_confirmation_on_record",
     )
     args.update(over)
     return args
@@ -211,7 +212,8 @@ def test_pass_counts_and_their_window_come_from_the_tools_own_record(brief, fake
         "lat": lat, "lon": lon, "since": "2025-01-01", "looks": 9,
         "passes": [{"date": "2025-08-01", "verdict": "candidate"}, {"date": "2025-08-20", "verdict": "candidate"},
                    {"date": "2025-09-02", "verdict": "rejected"}]}).encode())
-    out = json.loads(_run(brief.draft_brief(**good(candidates=4, passes_read=4))))      # the model's numbers differ
+    out = json.loads(_run(brief.draft_brief(**good(candidates=4, passes_read=4,      # the model's numbers differ
+                                                    recommendation_reason="confirmation_older_than_90_days"))))
     rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/briefs/{out['brief_id']}.draft.json"])["brief"]
     assert (rec["candidates"], rec["passes_read"], rec["passes_since"]) == (2, 3, "2025-01-01")
     assert "Looks: 2 of 3 passes read since 2025-01-01 are candidates; EMIT looked 11 times in all." in out["markdown"]
@@ -346,3 +348,139 @@ def test_an_unavailable_carbon_mapper_record_adds_no_line(brief, fake_s3):
                                         "status": "unavailable"}).encode())
     out = json.loads(_run(brief.draft_brief(**good())))
     assert "Independent detections" not in out["markdown"]
+
+
+# --- the agent's decision (approved 2026-10-23) ------------------------------------------------------
+
+SHANXI = (37.8938, 113.5625)
+
+
+def put_record(fake_s3, lat=SHANXI[0], lon=SHANXI[1], tip=("2026-10-06", "2026-10-20"), cm_days=("2026-06-10",),
+               passes=(("2026-08-17", "rejected", "cloud or gap"), ("2025-08-18", "candidate", "candidate"),
+                       ("2025-04-22", "candidate", "candidate"), ("2025-04-22", "candidate", "candidate"))):
+    """The session's records for one site: the tip, the EMIT passes and Carbon Mapper's plumes within 7 km."""
+    pre = f"session_data/{SESSION}/methane/"
+    if tip:
+        fake_s3.put_object(Bucket=BUCKET, Key=f"{pre}tip_shanxi_coal_basin.json", Body=json.dumps({
+            "area": "shanxi coal basin", "start": tip[0], "end": tip[1], "days": 14,
+            "top": {"lat": lat, "lon": lon, "anomaly_ppb": 124.7, "valid_days": 3, "emit_can_look": True}}).encode())
+    if passes is not None:
+        fake_s3.put_object(Bucket=BUCKET, Key=f"{pre}passes_{lat:.4f}_{lon:.4f}.json", Body=json.dumps({
+            "lat": lat, "lon": lon, "since": "2025-01-01", "looks": len(passes),
+            "passes": [{"date": d, "verdict": v, "short": sh, "product": "V002"} for d, v, sh in passes]}).encode())
+    if cm_days is not None:
+        dates = [{"date": d, "instrument": "tanager", "rate_kg_h": 2050.0, "distance_km": 5.1} for d in cm_days]
+        dates.append({"date": "2026-09-01", "instrument": "tanager", "rate_kg_h": 300.0, "distance_km": 9.5})  # beyond 7 km
+        fake_s3.put_object(Bucket=BUCKET, Key=f"{pre}cmplumes_{lat:.4f}_{lon:.4f}.json", Body=json.dumps({
+            "lat": lat, "lon": lon, "radius_km": 10.0, "since": "2025-01-01", "count": len(dates), "latest": "2026-09-01",
+            "rate_kg_h": 300.0, "uncertainty_kg_h": 100.0, "instrument": "tanager", "follow_radius_km": 7.0,
+            "dates": dates}).encode())
+
+
+def shanxi(**over):
+    return good(place="Yangquan, Shanxi, China", lat=SHANXI[0], lon=SHANXI[1], watch_area="shanxi coal basin", **over)
+
+
+def test_the_brief_says_the_record_and_the_agents_recommendation_in_code_written_lines(brief, fake_s3):
+    put_record(fake_s3)
+    out = json.loads(_run(brief.draft_brief(**shanxi(recommendation="recommend_new_look",
+                                                     recommendation_reason="confirmation_older_than_90_days"))))
+    assert "error" not in out, out
+    md = out["markdown"]
+    assert ("Record: TROPOMI tipped this site from 2026-10-06 to 2026-10-20; the latest fine-scale confirmation is a "
+            "Carbon Mapper plume on 2026-06-10, 118 days earlier; EMIT last looked on 2026-08-17 (clouded out).") in md
+    assert ("Recommendation: a new fine-scale look, because the latest confirmation is more than 90 days older than "
+            "the tip.") in md
+    rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/briefs/{out['brief_id']}.draft.json"])["brief"]
+    assert (rec["recommendation"], rec["recommendation_reason"]) == ("recommend_new_look", "confirmation_older_than_90_days")
+    assert rec["record"] == {"tip_start": "2026-10-06", "tip_end": "2026-10-20", "reference": "tip",
+                             "latest_confirmed": {"date": "2026-06-10", "by": "carbon_mapper"}, "days_between": 118,
+                             "last_look": {"date": "2026-08-17", "result": "clouded_out"}, "confirmed_dates": 3}
+    assert "follow_days" not in rec["checks"]["carbon_mapper"]
+    # Two reasons hold here (older than 90 days, last look clouded out): the one the model leads with is the brief's.
+    other = json.loads(_run(brief.draft_brief(**shanxi(recommendation="recommend_new_look",
+                                                       recommendation_reason="last_look_clouded_out"))))
+    assert "Recommendation: a new fine-scale look, because EMIT's last look here was clouded out." in other["markdown"]
+
+
+@pytest.mark.parametrize("reason,fact", [
+    ("confirmed_within_90_days", "the latest fine-scale confirmation is a Carbon Mapper plume on 2026-06-10, 118 days "
+                                 "before the tip's first day (2026-10-06)"),
+    ("no_confirmation_on_record", "a Carbon Mapper plume on 2026-06-10"),
+])
+def test_a_choice_the_record_contradicts_is_refused_naming_the_fact(brief, fake_s3, reason, fact):
+    put_record(fake_s3)
+    want = brief.REASONS[reason]
+    before = set(fake_s3.objects)
+    out = json.loads(_run(brief.draft_brief(**shanxi(recommendation=want, recommendation_reason=reason))))
+    assert fact in out["error"] and "does not fit the record" in out["error"]
+    assert "confirmation_older_than_90_days (recommend_new_look)" in out["error"]      # what the record supports
+    assert "last_look_clouded_out (recommend_new_look)" in out["error"]
+    assert set(fake_s3.objects) == before                                             # nothing written
+
+
+def test_a_clouded_out_reason_needs_a_clouded_out_last_look(brief, fake_s3):
+    put_record(fake_s3, passes=(("2026-08-17", "rejected", "too weak"), ("2025-08-18", "candidate", "candidate")))
+    out = json.loads(_run(brief.draft_brief(**shanxi(recommendation="recommend_new_look",
+                                                     recommendation_reason="last_look_clouded_out"))))
+    assert "EMIT's last look here, on 2026-08-17, was too faint, not clouded out" in out["error"]
+
+
+@pytest.mark.parametrize("cm_day,ok,refused", [
+    ("2026-07-08", "confirmed_within_90_days", "confirmation_older_than_90_days"),    # 90 days before 2026-10-06
+    ("2026-07-07", "confirmation_older_than_90_days", "confirmed_within_90_days"),    # 91 days
+])
+def test_the_90_day_boundary(brief, fake_s3, cm_day, ok, refused):
+    put_record(fake_s3, cm_days=(cm_day,))
+    good_out = json.loads(_run(brief.draft_brief(**shanxi(recommendation=brief.REASONS[ok], recommendation_reason=ok))))
+    assert "error" not in good_out, good_out
+    bad = json.loads(_run(brief.draft_brief(**shanxi(recommendation=brief.REASONS[refused], recommendation_reason=refused))))
+    assert "does not fit the record" in bad["error"]
+    if ok == "confirmed_within_90_days":
+        assert ("Recommendation: no new fine-scale look needed, because the latest confirmation is within 90 days of "
+                "the tip.") in good_out["markdown"]
+        assert "a Carbon Mapper plume on 2026-07-08, 90 days earlier" in good_out["markdown"]
+
+
+def test_the_enums_are_validated_and_must_agree(brief, fake_s3):
+    for over, msg in ((dict(recommendation="maybe"), "recommendation must be one of"),
+                      (dict(recommendation_reason="it is old"), "recommendation_reason must be one of"),
+                      (dict(recommendation=None), "recommendation must be one of"),
+                      (dict(recommendation="no_new_look_needed", recommendation_reason="no_confirmation_on_record"),
+                       "leads to 'recommend_new_look', not 'no_new_look_needed'")):
+        out = json.loads(_run(brief.draft_brief(**good(**over))))
+        assert msg in out["error"]
+    assert not [k for k in fake_s3.objects if "/briefs/" in k]
+
+
+def test_no_record_at_all_is_said_as_such(brief, fake_s3):
+    out = json.loads(_run(brief.draft_brief(**good())))      # no tip, no passes, no Carbon Mapper record
+    md = out["markdown"]
+    assert "Record: no fine-scale confirmation is on record; EMIT's passes here were not read." in md
+    assert "Recommendation: a new fine-scale look, because no fine-scale confirmation is on record here." in md
+
+
+def test_an_emit_confirmation_inside_the_tip_window_is_said_so(brief, fake_s3):
+    put_record(fake_s3, cm_days=(), passes=(("2026-10-12", "candidate", "candidate"),))
+    out = json.loads(_run(brief.draft_brief(**shanxi(recommendation="no_new_look_needed",
+                                                     recommendation_reason="confirmed_within_90_days"))))
+    assert ("the latest fine-scale confirmation is an EMIT candidate pass on 2026-10-12, inside the tip's window; "
+            "EMIT last looked on 2026-10-12 (methane seen).") in out["markdown"]
+
+
+def test_the_code_written_lines_never_say_now_still_active_or_leaking(brief):
+    import re
+    facts = [brief.record_facts(p, c, t, "2026-10-23") for p, c, t in (
+        (None, None, None),
+        ({"candidate_days": ["2025-08-18"], "last_look": {"date": "2026-08-17", "result": "clouded_out"}},
+         {"follow_days": ["2026-06-10"]}, {"start": "2026-10-06", "end": "2026-10-20"}),
+        ({"candidate_days": ["2026-10-12"], "last_look": {"date": "2026-10-12", "result": "methane_seen"}}, None,
+         {"start": "2026-10-06", "end": "2026-10-20"}),
+        ({"candidate_days": [], "last_look": {"date": "2026-10-17", "result": "within_noise"}}, {"follow_days": ["2026-09-10"]}, None),
+    )]
+    lines = [brief.record_line(f) for f in facts]
+    lines += [brief.recommendation_line(brief.REASONS[r], r, f) for f in facts for r in brief.REASONS]
+    for line in lines:
+        assert not re.search(r"\b(now|still|active|leaking)\b", line, re.IGNORECASE), line
+        assert "\u2014" not in line and "\u2013" not in line, line
+        assert brief.check_text(line) == [], line

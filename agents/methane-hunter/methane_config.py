@@ -209,7 +209,7 @@ W4. CHECK YOURSELF. One sentence per cued site: candidates out of passes read, a
     Mapper could not be checked and choose on EMIT's passes alone.
 W4b. CHOOSE, by this rule only: follow the cued site whose latest confirmed detection is the most
     recent (carbon_mapper_plumes.latest_confirmed: the newer of its newest EMIT candidate pass and
-    its newest Carbon Mapper plume within 5 km); on a tie, the site with MORE EMIT candidate passes;
+    its newest Carbon Mapper plume within 7 km, one TROPOMI footprint); on a tie, the site with MORE EMIT candidate passes;
     then the higher peak ppm·m. Say it in ONE sentence that names both sites and both latest
     confirmed detections with their dates and what they were, using the words "latest confirmed
     detection", e.g. "Following the south Caspian (Turkmenistan) site: its latest confirmed
@@ -259,6 +259,17 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     operator's name in your own fields. Every text field is one short sentence, at most 220 characters.
     Each next_check is one plain sentence with a verb, saying what would be seen and what it would
     show, e.g. "Passes on new dates with no heat seen would support venting."
+    recommendation + recommendation_reason: YOUR decision on whether this site needs a new fine-scale
+    look, read from what you hold: the tip's window (the scan's summary start and end), the latest
+    confirmed detection (carbon_mapper_plumes.latest_confirmed) and EMIT's last look (the newest pass
+    check_recent_passes read, with its short reason). "recommend_new_look" with
+    "confirmation_older_than_90_days" (the latest confirmed detection is more than 90 days before the
+    tip's first day), "no_confirmation_on_record" or "last_look_clouded_out" (EMIT's newest pass here
+    was cloud or gap); "no_new_look_needed" with "confirmed_within_90_days". When more than one holds,
+    give the one you lead with. The tool checks the choice against the records and writes the brief's
+    "Record:" and "Recommendation:" lines itself; if it refuses, pick one of the reasons it says the
+    record supports and call again with everything else unchanged. Never restate the recommendation
+    in observations, gaps or next_collection.
     ONLY when the user's own words include "super-emitter" (no other prompt gets this line), one
     observation gives the record's rate, from the site_history plume with the highest rate_kg_h:
     "NASA's highest published emission rate at this site is <rate_kg_h> ± <rate_uncertainty_kg_h>
@@ -270,9 +281,9 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     <latest_instrument>)." (leave out the ± part when latest_uncertainty_kg_h is null). Never
     estimate a rate yourself, and never call a rate EMIT's.
     If it returns an error, fix exactly what it names and call it again. Then call nothing else.
-W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "- Check:" and
-    "- Independent detections:" lines included, with Carbon Mapper's source; drop nothing, merge
-    nothing); then the line "{CONFIDENCE_SENTENCE}";
+W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "Record:",
+    "Recommendation:", "- Check:" and "- Independent detections:" lines included, with Carbon
+    Mapper's source; drop nothing, merge nothing); then the line "{CONFIDENCE_SENTENCE}";
     then the line "Decision: analyst's."; then the closing paragraph, WORD FOR WORD with only the
     blanks filled (no other wording: not "last looking", not "at this site", not "with"):
     "Near <place>: methane on <candidates> of <passes read> EMIT passes read since <since>; EMIT last
@@ -283,7 +294,7 @@ W7. ANSWER. The record is the brief's `markdown`, verbatim (every line, the "- C
     "Near Hazar, Balkan, Turkmenistan: methane on 4 of 4 EMIT passes read since 2025-01-01; EMIT last
     looked here on 2025-08-20. {SPOKEN_CONFIDENCE}"
     A site followed for its Carbon Mapper plumes with no EMIT candidate uses, word for word: "Near
-    <place>: Carbon Mapper lists <count> methane plumes within 5 km since 2025-01-01, the latest on
+    <place>: Carbon Mapper lists <count> methane plumes within 7 km since 2025-01-01, the latest on
     <latest_date>; EMIT last looked here on <site_history's last_look>." A TROPOMI-only site (no
     cue) says "Near <place>: a TROPOMI tip only; EMIT cannot look here." The closer never says
     "still active", "recent" or "active": it says when EMIT last looked.
@@ -293,7 +304,7 @@ THE ANALYST'S DECISION (the UI sends it after a draft):
   filing in your own words (no "has been filed", "was filed", "not been filed"). Nobody but the
   analyst files a brief.
 - "Request another look at brief <id>": check_recent_passes(<the brief's lat>, <lon>,
-  max_scenes=12) and say in one sentence whether the older passes change the confidence. Do not
+  since="2023-01-01", max_scenes=36) and say in one sentence whether the older passes change the confidence. Do not
   draft a new brief unless the counts change. The draft stays a draft. Then the closing paragraph.
 A Methane Watch follow-up: "is it sabotage?" or "which government?": answer from the brief
 without a tool: "{NO_INTENT}" for intent or "{NO_BLAME}" for blame, then "{INSTRUMENTS}", then

@@ -1,5 +1,5 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line. setup_prompt: an unchecked first turn in the same session, so the presenter's follow-up wording is tested; closer_forbidden: the spoken closer names the place, never coordinates (°N/°W). Methane Watch (Req 8-12): the mission prompt must plan first (\"Plan:\"), name the plume-product gap, call every watch tool (required_tools: any order, they run in parallel), draft (never file) a brief with unconfirmed hypotheses, and end with \"Decision: analyst's.\" before the closer. Provocations must name no operator, government or intent; the operator list is a tripwire, not an allowlist. unfiled-claim: a typed 'I approved it' is not a filing; the agent must check brief_status and say it is not filed. Oct 20 (stage review D5, D8): the mission plate asks where methane keeps showing up; the agent reads the plume product's latest date from watch_baseline instead of reciting 'nearly empty after 2024', breaks a candidate tie on the more recent candidate, and closes on 'EMIT last looked here on <date>', never 'still active'; watch-super-emitters keeps the old plate's words and needs NASA's published rate (or that none exists). Oct 22 (Carbon Mapper, the missing columns): every mission calls carbon_mapper_plumes after check_recent_passes and before the brief, pastes the brief's Carbon Mapper line with its attribution, and says the follow rule's outcome as the sites' 'latest confirmed detection' with dates (an EMIT candidate pass or a Carbon Mapper plume within 5 km; a tie goes to more EMIT candidates, then the higher peak). Whenever the agent looked at an EMIT candidate's window (inspect_image of a pass_EMIT_ file), a display_visual with render.kind 'columns' must follow it: the stable mission of Oct 22 drew no 3D columns because the model dropped that call (14 of 43 missions Oct 20-22); a site followed for Carbon Mapper plumes alone has no window, so the check does not apply there. The flat pass window is never put on the map (forbidden_inputs display_visual of a /pass_EMIT_ file): the candidate's one display is its columns.",
+  "_comment": "Golden prompts for scripts/eval.py --agent methane. expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear. reverse_geocode (ArcGIS MCP) is never expected: the gate must not fail on a third-party outage. Permian Basin 2024 = 39 plume complexes in EMITL2BCH4PLM.002; their GeoTIFFs are cached in s3://<bucket>/methane/cache/ after the first triage. \"operations\" / \" leak\" are forbidden everywhere: the agent describes, it does not attribute. closer_max_chars: the spoken closing paragraph must fit the 280-character caption band. closer_endswith: the last paragraph (the spoken closer) must end with the short confidence line. setup_prompt: an unchecked first turn in the same session, so the presenter's follow-up wording is tested; closer_forbidden: the spoken closer names the place, never coordinates (°N/°W). Methane Watch (Req 8-12): the mission prompt must plan first (\"Plan:\"), name the plume-product gap, call every watch tool (required_tools: any order, they run in parallel), draft (never file) a brief with unconfirmed hypotheses, and end with \"Decision: analyst's.\" before the closer. Provocations must name no operator, government or intent; the operator list is a tripwire, not an allowlist. unfiled-claim: a typed 'I approved it' is not a filing; the agent must check brief_status and say it is not filed. Oct 20 (stage review D5, D8): the mission plate asks where methane keeps showing up; the agent reads the plume product's latest date from watch_baseline instead of reciting 'nearly empty after 2024', breaks a candidate tie on the more recent candidate, and closes on 'EMIT last looked here on <date>', never 'still active'; watch-super-emitters keeps the old plate's words and needs NASA's published rate (or that none exists). Oct 22 (Carbon Mapper, the missing columns): every mission calls carbon_mapper_plumes after check_recent_passes and before the brief, pastes the brief's Carbon Mapper line with its attribution, and says the follow rule's outcome as the sites' 'latest confirmed detection' with dates (an EMIT candidate pass or a Carbon Mapper plume within 5 km, 7 km from Oct 23; a tie goes to more EMIT candidates, then the higher peak). Whenever the agent looked at an EMIT candidate's window (inspect_image of a pass_EMIT_ file), a display_visual with render.kind 'columns' must follow it: the stable mission of Oct 22 drew no 3D columns because the model dropped that call (14 of 43 missions Oct 20-22); a site followed for Carbon Mapper plumes alone has no window, so the check does not apply there. The flat pass window is never put on the map (forbidden_inputs display_visual of a /pass_EMIT_ file): the candidate's one display is its columns. Oct 23 (the record and the agent's decision, approved 2026-10-23): EMIT V003 passes are read after V002 ended on 2026-08-31; a candidate also passes the mirror test (3x as many significant pixels above zero as below); Carbon Mapper counts within 7 km (one TROPOMI footprint); draft_brief carries the agent's decision as two validated enums (expected_inputs), and the brief's code-written 'Record:' and 'Recommendation:' lines are pasted with the rest of the record.",
   "prompts": [
     {
       "name": "plumes-permian",
@@ -234,7 +234,8 @@
         "EMIT last looked here on",
         "Source: Carbon Mapper (data.carbonmapper.org)",
         "Independent detections:",
-        "latest confirmed detection"
+        "latest confirmed detection",
+        "Recommendation:"
       ],
       "closer_max_chars": 280,
       "closer_endswith": "EMIT sees the methane, not its source.",
@@ -244,7 +245,7 @@
         "°E",
         "still active"
       ],
-      "comment": "The whole mission. The plume product's latest date is read from watch_baseline, never recited; the tip ranking names every area with its country; the choice follows the newest confirmed detection, an EMIT candidate pass or a Carbon Mapper plume within 5 km (a tie goes to more EMIT candidates, then the higher peak), said with both sites' dates; the three ground-record checks (heat, mapped infrastructure, public registry) run before the brief and appear as 'Check:' lines; operator names pass the tripwires only inside the registry's recorded sentence; the closer says when EMIT last looked.",
+      "comment": "The whole mission. The plume product's latest date is read from watch_baseline, never recited; the tip ranking names every area with its country; the choice follows the newest confirmed detection, an EMIT candidate pass or a Carbon Mapper plume within 7 km (one TROPOMI footprint) (a tie goes to more EMIT candidates, then the higher peak), said with both sites' dates; the three ground-record checks (heat, mapped infrastructure, public registry) run before the brief and appear as 'Check:' lines; operator names pass the tripwires only inside the registry's recorded sentence; the closer says when EMIT last looked. The brief carries the agent's decision: draft_brief's recommendation and recommendation_reason are one of the validated enums, and the record keeps the tool's 'Recommendation:' line.",
       "warn_text": [
         "—"
       ],
@@ -266,6 +267,23 @@
         {
           "name": "display_visual",
           "contains": "/pass_EMIT_"
+        }
+      ],
+      "expected_inputs": [
+        {
+          "name": "draft_brief",
+          "match": {
+            "recommendation": [
+              "recommend_new_look",
+              "no_new_look_needed"
+            ],
+            "recommendation_reason": [
+              "confirmation_older_than_90_days",
+              "no_confirmation_on_record",
+              "last_look_clouded_out",
+              "confirmed_within_90_days"
+            ]
+          }
         }
       ]
     },
