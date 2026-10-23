@@ -69,11 +69,14 @@ export function PassFilmstrip({ toolId, frames, onOpen, summaryOnly = false }: P
   return (
     <div className="pass-film">
       <ul className="pass-film__frames" aria-label="Recent EMIT passes, newest first">
-        {frames.map((f) => {
+        {frames.map((f, i) => {
           const label = `${f.date}: ${f.short}`;
           const imageUrl = f.chipUrl ? images[f.chipUrl] : undefined;
+          // A date alone is not unique: one orbit can give two granules over a site on the same day,
+          // and a pass with no chip (cloud or gap) has no URL to tell them apart. The manifest's
+          // order is fixed (newest first), so its position settles the key.
           return (
-            <li key={f.date + (f.chipUrl ?? '')}>
+            <li key={`${i}:${f.date}:${f.chipUrl ?? ''}`}>
               <button
                 type="button"
                 className={`pass-film__frame pass-film__frame--${f.verdict}`}

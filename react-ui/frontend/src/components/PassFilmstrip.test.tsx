@@ -36,4 +36,22 @@ describe('PassFilmstrip', () => {
     expect(container.querySelector('.pass-film__summary')?.textContent).toBe('1 candidate · 1 within noise · 1 cloud or gap');
     await waitFor(() => expect(getPresignedUrl).toHaveBeenCalledTimes(2));
   });
+
+  it('two chipless passes on one date (two granules of one orbit) are two frames with their own keys', () => {
+    // The Oct 22 watch recording reads 2026-06-17 twice over the south Caspian, both cloud or gap.
+    const sameDay: PassFrame[] = [
+      { date: '2026-06-17', verdict: 'rejected', short: 'cloud or gap', reason: null, peak: null, chipUrl: null },
+      { date: '2026-06-17', verdict: 'rejected', short: 'cloud or gap', reason: null, peak: null, chipUrl: null },
+      { date: '2025-09-27', verdict: 'rejected', short: 'too weak', reason: null, peak: 577.9, chipUrl: `${dir}passchip_c.png` },
+    ];
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { container } = render(<PassFilmstrip toolId="t1" frames={sameDay} />);
+      expect(container.querySelectorAll('.pass-film__frame')).toHaveLength(3);
+      const keyWarnings = errors.mock.calls.filter((args) => args.some((a) => typeof a === 'string' && a.includes('same key')));
+      expect(keyWarnings).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
 });
