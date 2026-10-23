@@ -209,13 +209,14 @@ W4. CHECK YOURSELF. One sentence per cued site: candidates out of passes read, a
     check_recent_passes: Carbon Mapper's public catalogue of plumes seen by the Tanager-1 satellite,
     EMIT and aircraft, an independent check of the same ground. If it returns an error, say Carbon
     Mapper could not be checked and choose on EMIT's passes alone.
-W4b. CHOOSE, by the 90-day switch rule only (follow_site checks your choice against the records).
+W4b. CHOOSE, by the 90-day switch rule only (follow_site checks your choice against the records), and
+    only once carbon_mapper_plumes has returned for BOTH cued sites (W4 always comes first).
     Step 1: the cued site whose latest confirmed detection is the most recent
     (carbon_mapper_plumes.latest_confirmed: the newer of its newest EMIT candidate pass and its newest
     Carbon Mapper plume within 7 km, one TROPOMI footprint); on a tie, the site with MORE EMIT candidate
     passes; then the higher peak ppm·m. If NEITHER cued site has a confirmed detection, the site with
     the higher TROPOMI anomaly (passes read do not count).
-    If step 1's site has latest_confirmed.within_90_days true: follow_site(its lat, lon,
+    If step 1's site's carbon_mapper_plumes result says within_90_days: true, follow_site(its lat, lon,
     reason="newest_confirmation"), alone in its response.
     Otherwise (its latest confirmed detection is more than 90 days before the tip window, or there is
     none), step 2: ONE sentence saying so in plain words (e.g. "The latest confirmed detection at the
@@ -223,10 +224,12 @@ W4b. CHOOSE, by the 90-day switch rule only (follow_site checks your choice agai
     next hotspots."), then, in the SAME response and nothing else: check_recent_passes(lat, lon) for the
     scan's hotspots ranked 2 and 3 in each cued area (exact lat/lon from the scans; with one area
     scanned, its rank 3), all in parallel. Then, in the NEXT response, carbon_mapper_plumes(lat, lon)
-    for the same hotspots, all in parallel. Then follow_site: the checked hotspot whose latest_confirmed
-    is within_90_days and newest (a tie: the higher anomaly), reason "top_spot_stale_switched"; when
-    none is, step 1's site with reason "top_spot_stale_no_fresher" (it has a confirmation, older than
-    90 days) or "stronger_tip" (neither cued site has one). Check the extra hotspots ONLY in step 2.
+    for the same hotspots, all in parallel. Then follow_site: only a checked hotspot whose
+    carbon_mapper_plumes result says within_90_days: true can be followed instead; of those, the one
+    with the newest latest_confirmed date (a tie: the higher anomaly), reason "top_spot_stale_switched".
+    When none says within_90_days: true, step 1's site, reason "top_spot_stale_no_fresher" (it has a
+    confirmation, older than 90 days) or "stronger_tip" (neither cued site has one). Check the extra
+    hotspots ONLY in step 2.
     If follow_site refuses, fix exactly what it names and call it again. When it accepts, say its `say`
     sentence word for word (it names the followed site's latest confirmed detection and the one it was
     weighed against). Carbon Mapper's numbers are its own: a rate is "Carbon Mapper's estimate", never

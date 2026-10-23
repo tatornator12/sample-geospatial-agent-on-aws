@@ -159,49 +159,42 @@ export interface BriefDecision {
   confirmedDates: number;
 }
 
-const BY_WORDS: Record<ConfirmedBy, string> = {
-  emit: 'an EMIT pass',
-  carbon_mapper: 'a Carbon Mapper plume',
-  both: 'an EMIT pass and a Carbon Mapper plume',
-};
-
-/** One sentence each: what the record shows, then what the agent recommends. Never "now", "still", "active". */
+/**
+ * The card's decision line (approved 2026-10-23, the bars): how long before this fortnight methane
+ * was last seen up close here, then what the agent recommends. One point: the recommendation and its
+ * reason. The latest close look's date is said once, on the step column with its bars; the card says
+ * the days. Never "now", "still", "active".
+ */
 export interface DecisionLine {
-  /** "Methane keeps showing up here." with 3 or more confirmed dates, else "Methane has shown up here before."; null without one. */
-  lead: string | null;
-  /** The latest confirmation and the gap: the words around the date and the gap, split so both print in mono. */
-  confirmation: { before: string; date: string; gap: string; after: string } | null;
+  /** The latest close look, as words around its number of days (printed in mono); null without one. */
+  confirmation: { before: string; days: string | null; after: string } | null;
   /** The recommendation in words, with its reason when the reason is not the gap itself. */
   recommendation: string;
 }
 
-export function decisionLine(d: BriefDecision): DecisionLine {
-  const lead = !d.latestConfirmed ? null
-    : d.confirmedDates >= 3 ? 'Methane keeps showing up here.' : 'Methane has shown up here before.';
+export function decisionLine(d: BriefDecision, opts: { bars?: boolean } = {}): DecisionLine {
   let confirmation: DecisionLine['confirmation'] = null;
   if (d.latestConfirmed && d.daysBetween !== null) {
-    const against = d.reference === 'tip' ? 'the tip' : 'this brief';
-    const inside = d.daysBetween <= 0 && d.reference === 'tip';
-    confirmation = {
-      before: `The latest fine-scale confirmation is ${BY_WORDS[d.latestConfirmed.by]} on `,
-      date: dayMonthYear(d.latestConfirmed.date),
-      gap: inside ? '' : gapWords(d.daysBetween),
-      after: inside ? ", inside the tip's window." : ` before ${against}.`,
-    };
+    const against = d.reference === 'tip' ? 'this fortnight' : 'this brief';
+    confirmation = d.daysBetween <= 0
+      ? { before: `Methane was seen up close here during ${against}.`, days: null, after: '' }
+      : { before: 'Methane was last seen up close here ', days: `${d.daysBetween} ${d.daysBetween === 1 ? 'day' : 'days'}`,
+          after: ` before ${against}.` };
   }
-  const agent = d.recommendation === 'recommend_new_look'
-    ? 'The agent recommends a new fine-scale look.'
-    : 'The agent sees no need for a new fine-scale look.';
+  const agent = d.recommendation === 'recommend_new_look' ? 'The agent recommends a new close look.' : 'No new close look is needed yet.';
   const because: Partial<Record<RecommendationReason, string>> = {
-    no_confirmation_on_record: 'No fine-scale confirmation is on record here.',
+    // With the tip bars on the map, the card says whose they are (their window is said with them).
+    no_confirmation_on_record: opts.bars
+      ? "No close look has confirmed methane here, so the bars are TROPOMI's only."
+      : 'No close look has confirmed methane here.',
     last_look_clouded_out: d.lastLook ? `EMIT's last look, on ${dayMonthYear(d.lastLook.date)}, was clouded out.` : '',
   };
-  return { lead, confirmation, recommendation: [because[d.reason], agent].filter(Boolean).join(' ') };
+  return { confirmation, recommendation: [because[d.reason], agent].filter(Boolean).join(' ') };
 }
 
 /** The whole line as text (tests, screen readers). */
-export function decisionText(d: BriefDecision): string {
-  const l = decisionLine(d);
-  const conf = l.confirmation ? `${l.confirmation.before}${l.confirmation.date}${l.confirmation.gap ? `, ${l.confirmation.gap}` : ''}${l.confirmation.after}` : null;
-  return [l.lead, conf, l.recommendation].filter(Boolean).join(' ');
+export function decisionText(d: BriefDecision, opts: { bars?: boolean } = {}): string {
+  const l = decisionLine(d, opts);
+  const conf = l.confirmation ? `${l.confirmation.before}${l.confirmation.days ?? ''}${l.confirmation.after}` : null;
+  return [conf, l.recommendation].filter(Boolean).join(' ');
 }

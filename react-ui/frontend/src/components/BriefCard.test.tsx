@@ -83,34 +83,31 @@ const withDecision = (decision: BriefDecision | undefined) =>
   vi.mocked(getBrief).mockResolvedValue({ ...STATE, card: { ...STATE.card, ...(decision ? { decision } : {}) } });
 
 describe('BriefCard decision line', () => {
-  it('says the gap once, in its own line under the count, above the verdict', async () => {
+  it('says the days once, in its own line under the count, above the verdict', async () => {
     withDecision(DECISION);
     card();
-    const line = await screen.findByText(/latest fine-scale confirmation/);
+    const line = await screen.findByText(/last seen up close here/);
     expect(line.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Methane keeps showing up here. The latest fine-scale confirmation is a Carbon Mapper plume on 10 Jun 2026, ' +
-        'about 4 months before the tip. The agent recommends a new fine-scale look.'
+      'Methane was last seen up close here 118 days before this fortnight. The agent recommends a new close look.'
     );
     expect(line.className).toContain('brief-card__decision');
-    expect(Array.from(line.querySelectorAll('.brief-card__num')).map((s) => s.textContent)).toEqual(['10 Jun 2026']);
-    // It runs on in the count's paragraph (no last look any more: the gap is said once, here), which
-    // keeps the decision on the column's first screen at 720p.
+    expect(Array.from(line.querySelectorAll('.brief-card__gap')).map((s) => s.textContent)).toEqual(['118 days']);
+    // It runs on in the count's paragraph, which keeps the decision on the column's first screen at 720p.
     expect(lineText()[0]).toBe('2 of 4 passes read since 2025-01-01 are candidates; EMIT looked 23 times in all. ' +
-      'Methane keeps showing up here. The latest fine-scale confirmation is a Carbon Mapper plume on 10 Jun 2026, ' +
-      'about 4 months before the tip. The agent recommends a new fine-scale look.');
+      'Methane was last seen up close here 118 days before this fortnight. The agent recommends a new close look.');
     expect(screen.queryByText(/Last EMIT look/)).toBeNull();
     expect(line.compareDocumentPosition(document.querySelector('.brief-card__verdict')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Never confused with the analyst's "Request another look": the stage says "a new fine-scale look".
+    // Never confused with the analyst's "Request another look": the stage says "a new close look".
     expect(line.textContent).not.toMatch(/another look/);
   });
 
-  it('words each reason from the enums, and "has shown up here before" under 3 confirmed dates', async () => {
+  it('words each reason from the enums', async () => {
     withDecision({ ...DECISION, reason: 'last_look_clouded_out', confirmedDates: 2 });
     card();
-    const line = await screen.findByText(/latest fine-scale confirmation/);
+    const line = await screen.findByText(/last seen up close here/);
     expect(line.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Methane has shown up here before. The latest fine-scale confirmation is a Carbon Mapper plume on 10 Jun 2026, ' +
-        "about 4 months before the tip. EMIT's last look, on 17 Aug 2026, was clouded out. The agent recommends a new fine-scale look."
+      "Methane was last seen up close here 118 days before this fortnight. EMIT's last look, on 17 Aug 2026, was clouded out. " +
+        'The agent recommends a new close look.'
     );
   });
 

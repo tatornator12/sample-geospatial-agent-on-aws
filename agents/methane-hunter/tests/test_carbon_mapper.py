@@ -449,3 +449,17 @@ def test_a_cached_image_is_cleaned_field_by_field(cm):
         {"geometry": {"coordinates": [[[53.9, 37.7]] * 5]}, "properties": {"ppm_m": "lots"}}]}
     out = cm.clean_columns(dirty)
     assert len(out["features"]) == 1 and out["features"][0]["properties"] == {"ppm_m": 900.0}
+
+
+def test_the_latest_confirmation_says_its_days_before_the_tip_and_the_90_day_test(cm, catalogue, fake_s3):
+    """The follow rule's facts, said by the tool: days from the latest confirmation to the tip
+    window of the watch area holding the site, and whether that is within 90 days."""
+    site, _ = catalogue
+    out = json.loads(_run(cm.carbon_mapper_plumes(*site)))
+    assert out["within_90_days"] is False and "days_before_tip" not in out["latest_confirmed"]   # no tip read yet
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/methane/tip_south_caspian.json",
+                       Body=json.dumps({"area": "south caspian", "start": "2026-10-07", "end": "2026-10-21"}).encode())
+    out = json.loads(_run(cm.carbon_mapper_plumes(*site)))
+    assert out["latest_confirmed"] == {"date": "2026-08-26", "by": "a Carbon Mapper plume", "days_before_tip": 42,
+                                       "within_90_days": True}
+    assert out["within_90_days"] is True

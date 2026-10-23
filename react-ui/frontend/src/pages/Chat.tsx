@@ -22,8 +22,9 @@ import type { GeometryData, RasterData } from '../types';
 import { getIdToken } from '../utils/auth';
 import { parseRenderHint } from '../utils/render';
 import { formatDate } from '../utils/layerFormatting';
-import { holdAfterLanding, holdMs, type Held, type HeldAfterLanding } from '../utils/heldLayers';
+import { holdAfterLanding, holdMs, scheduleHeld, type Held, type HeldAfterLanding } from '../utils/heldLayers';
 import type { Tip } from '../utils/steps';
+import type { Follow } from '../utils/follow';
 import '../stage.css';
 
 interface ScenarioToolCall {
@@ -117,6 +118,8 @@ export function Chat() {
   const [mapReady, setMapReady] = useState(true); // Controls MapView render delay on scenario switch
   const [agentWorking, setAgentWorking] = useState(false);
   const [tips, setTips] = useState<Tip[]>([]);
+  // Methane Watch: the followed site (follow.json), for the bar layers' legend rows.
+  const [follow, setFollow] = useState<Follow | null>(null);
   // Dark Vessels: the act's resting state and the session's tasking drafts. The officer's approval
   // ends the act on the plate's filed line: the stage sends no follow-up turn (U4, R6.8).
   const [vesselRest, setVesselRest] = useState<VesselRest | null>(null);
@@ -161,6 +164,7 @@ export function Chat() {
     setScenarioError(null);
     setIsLoadingScenario(false);
     setTips([]);
+    setFollow(null);
     setTaskingKey(0);
   }, []);
 
@@ -236,6 +240,9 @@ export function Chat() {
         if (layers.length > 0) {
           const rasters: RasterData[] = [];
           const held: Held<RasterData>[] = [];
+          // A GeoJSON layer can be held too (the Methane Watch record bars wait for the tip bars to
+          // stand alone first: one bar layer at a time, as live).
+          const heldGeometry: Held<GeometryData>[] = [];
           for (const [i, layer] of layers.entries()) {
             const render = parseRenderHint(layer.render) ?? undefined;
             if (layer.s3_url.toLowerCase().endsWith('.geojson')) {
@@ -245,7 +252,9 @@ export function Chat() {
                 geometry.locationName = layer.title;
                 geometry.sourceUrl = layer.s3_url;
                 if (render && render.kind !== 'raster') geometry.render = render;
-                setCurrentGeometry(geometry);
+                const wait = holdMs(layer.delay_ms);
+                if (wait > 0) heldGeometry.push({ item: geometry, delayMs: wait });
+                else setCurrentGeometry(geometry);
               }
             } else {
               const date = layer.s3_url.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
@@ -263,12 +272,20 @@ export function Chat() {
           }
           // The scene standing alone is framed, as the live turn framed it before the LiDAR came.
           setCurrentRasters(held.length > 0 ? rasters.map((r) => ({ ...r, frame: true })) : rasters);
-          heldLayers.current = holdAfterLanding(
+          const rasterHold = holdAfterLanding(
             rasters.map((r) => r.url),
             held,
             (raster) => setCurrentRasters((current) => [...current, raster]),
             superseded
           );
+          const cancelGeometry = scheduleHeld(heldGeometry, (g) => setCurrentGeometry(g), superseded);
+          heldLayers.current = {
+            landed: rasterHold.landed,
+            cancel: () => {
+              rasterHold.cancel();
+              cancelGeometry();
+            },
+          };
           return;
         }
 
@@ -487,6 +504,7 @@ export function Chat() {
             onDrawnGeometry={stageAgentId !== 'archaeologist' ? handleDrawnGeometry : undefined}
             working={agentWorking}
             tips={tips}
+            follow={follow}
             vesselRest={selectedAgentId === 'vessels' ? vesselRest : null}
             tasking={{ sessionId, caseId: scenarioId || undefined, key: taskingKey }}
             onCandidatesRevealed={onCandidatesRevealed}
@@ -511,6 +529,7 @@ export function Chat() {
           onDrawnGeometryMessageSent={() => setDrawnGeometryMessage(null)}
           onWorkingChange={setAgentWorking}
           onTipsUpdate={setTips}
+          onFollowUpdate={setFollow}
           onTaskingDrafted={setTaskingKey}
           vesselBucket={selectedAgentId === 'vessels' ? vesselRest?.bucket ?? null : null}
           revealedPasses={revealedPasses}

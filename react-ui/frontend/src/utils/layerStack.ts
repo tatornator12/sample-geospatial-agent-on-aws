@@ -12,7 +12,8 @@ import { isMethaneLayer, isSimilarityLayer, type LayerMetadata } from './layerFo
 import { indexLegendFor, type ColormapName } from './render.ts';
 import { isTerrainLayer, reliefLegendLabel, terrainLegend, terrainRasterHint } from './archaeoLayers.ts';
 import { AIS, FOG, HEAT_END, ORCHID, vesselKind } from './vesselLayers.ts';
-import { COLUMNS_NOTE, methaneRampLabel } from './methaneLayers.ts';
+import { CARBON_MAPPER_SOURCE, COLUMNS_NOTE, TIP_COLUMNS_NOTE, methaneRampLabel } from './methaneLayers.ts';
+import { barKind, barLegendLabel, type Follow } from './follow.ts';
 
 /** Move one entry from `from` to `to` (both indexes in the same list); a copy, never in place. */
 export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
@@ -143,8 +144,8 @@ export function clampDrag(tops: readonly number[], heights: readonly number[], f
 export type StackLegend =
   /** An Earth index or the change map: ends in words. */
   | { kind: 'index'; key: string; label: string; ramp: ColormapName; low: string; high: string }
-  /** A methane measure: numeric ends in the mono face, the units after the high end. */
-  | { kind: 'measure'; key: string; label: string; ramp: ColormapName; lo: number; hi: number; units: string; note?: string }
+  /** A methane measure: numeric ends in the mono face, the units after the high end; a source line when the data asks for one. */
+  | { kind: 'measure'; key: string; label: string; ramp: ColormapName; lo: number; hi: number; units: string; note?: string; source?: string }
   /** The watch baseline's dots and rings. */
   | { kind: 'sites'; key: 'sites' }
   /** Carbon Mapper's plumes near the site: a mint ring each, with its source. */
@@ -167,8 +168,8 @@ export type StackLegend =
    */
   | { kind: 'seaheat'; key: 'heat' | 'fleet'; label: string; low: string; high: string; colour: string; end: string };
 
-/** The legend a layer reads by, or null (true colour, boundaries, drawn shapes). */
-export function layerLegend(layer: LayerMetadata): StackLegend | null {
+/** The legend a layer reads by, or null (true colour, boundaries, drawn shapes). `follow` dates the bar layers. */
+export function layerLegend(layer: LayerMetadata, follow?: Follow | null): StackLegend | null {
   if (isSimilarityLayer(layer)) return { kind: 'similar', key: 'similar' };
   const sea = vesselKind(layer.url);
   if (sea) {
@@ -194,6 +195,22 @@ export function layerLegend(layer: LayerMetadata): StackLegend | null {
     const ramp = hint.colormap ?? hint.ramp;
     if (!ramp || !hint.rescale) return null;
     const units = hint.units ?? 'ppm·m';
+    // The bars (approved 2026-10-23): one row per bar layer, its date in its name, Carbon Mapper's
+    // source beside its own bars (its licence asks for it wherever its data shows).
+    const bar = hint.kind === 'columns' ? barKind(layer.url) : null;
+    if (bar) {
+      return {
+        kind: 'measure',
+        key: `bars-${bar}`,
+        label: barLegendLabel(layer.url, follow) ?? methaneRampLabel(units, hint.legend, layer.url),
+        ramp,
+        lo: hint.rescale[0],
+        hi: hint.rescale[1],
+        units,
+        note: bar === 'tip' ? TIP_COLUMNS_NOTE : COLUMNS_NOTE,
+        ...(bar === 'carbon_mapper' ? { source: CARBON_MAPPER_SOURCE } : {}),
+      };
+    }
     return {
       kind: 'measure',
       key: `${ramp}-${units}`,
@@ -216,12 +233,13 @@ export function layerLegend(layer: LayerMetadata): StackLegend | null {
  * where its highest layer puts it. The keys (the sites' dot and ring, the similarity ramp) follow
  * the measure ramps.
  */
-export function stackLegends(layersTopFirst: readonly LayerMetadata[], shown: (id: string) => boolean): StackLegend[] {
+export function stackLegends(layersTopFirst: readonly LayerMetadata[], shown: (id: string) => boolean,
+                             follow?: Follow | null): StackLegend[] {
   const seen = new Set<string>();
   const out: StackLegend[] = [];
   for (const layer of layersTopFirst) {
     if (!shown(layer.id)) continue;
-    const legend = layerLegend(layer);
+    const legend = layerLegend(layer, follow);
     if (!legend) continue;
     if (seen.has(legend.key)) {
       // The columns share the plume's ramp: its legend says what their height means too.

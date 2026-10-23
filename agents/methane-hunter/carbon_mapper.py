@@ -687,6 +687,7 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
     except Exception as e:  # the board is decoration: never fail the check for it
         logger.warning("carbon mapper record failed: %s", type(e).__name__)
     summary["seconds"] = round(time.time() - started, 1)
+    confirmed_gap = with_gap(latest_confirmed(emit, cm_follow), tip_start_at(lat, lon, s3))
     logger.info("CARBON MAPPER: %.3f,%.3f %d plumes, latest %s (%s, %.1fs)", lat, lon, len(plumes),
                 summary["latest_date"], source, summary["seconds"])
     out = {
@@ -695,7 +696,10 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
                     "uncertainty_kg_h": p["uncertainty_kg_h"], "distance_km": p["distance_km"], "sector": p["sector"]}
                    for p in plumes[:CM_LIST_MAX]],
         "emit": emit,
-        "latest_confirmed": with_gap(latest_confirmed(emit, cm_follow), tip_start_at(lat, lon, s3)),
+        "latest_confirmed": confirmed_gap,
+        # The follow rule's test, said plainly: is this site's latest confirmed detection within 90 days
+        # of the tip window (false with none)? Only such a site can be the 90-day rule's switch.
+        "within_90_days": bool(confirmed_gap and confirmed_gap.get("within_90_days")),
         "latest_image": image and ({k: image[k] for k in ("date", "pixels", "peak_ppm_m")} if image.get("status") == "ok"
                                    else {"date": image["date"], "status": "unavailable"}),
         "say": say_line(len(plumes), radius_km, since.isoformat(), latest),

@@ -16,6 +16,7 @@ import { SNAPSHOT_MAX_CHARS, mapSnapshot } from '../utils/snapshot.ts';
 import { anotherLookMessage, approvedMessage, missionChain, siteCue, siteTip, type MissionChain } from '../utils/brief.ts';
 import { decisionLine, type BriefDecision } from '../utils/record.ts';
 import { parseManifest, passManifestUrl, type PassFrame, type Tip } from '../utils/steps.ts';
+import { samePoint, type Follow } from '../utils/follow.ts';
 import { useStageFiles } from '../hooks/useStageFiles.ts';
 
 const RETRY_MS = 2000;
@@ -37,6 +38,9 @@ interface BriefCardProps {
   cues?: ToolCall[];
   /** The TROPOMI tips loaded this session; the one over the card's site is the latest sign. */
   tips?: Tip[];
+  /** Methane Watch: the followed site's decision (follow.json). Its tip names a spot ranked 2 or 3, and
+   *  its tip bars are what the card's no-confirmation line refers to. */
+  follow?: Follow | null;
   /** How many ground checks the session ran (the chain's Check). */
   checks?: number;
 }
@@ -54,21 +58,17 @@ function causeWords(singleExplanation: string): string {
     : singleExplanation;
 }
 
-/** The card's line about the gap: "Methane keeps showing up here. The latest fine-scale confirmation is a
- *  Carbon Mapper plume on 10 Jun 2026, about 4 months before the tip. The agent recommends a new
- *  fine-scale look." Dates in mono; the months come from the same function as the timeline's bracket. */
-function DecisionText({ decision }: { decision: BriefDecision }) {
-  const line = decisionLine(decision);
+/** The card's line about the gap: "Methane was last seen up close here 109 days before this fortnight.
+ *  The agent recommends a new close look." The days in mono; the date is said with the record bars. */
+function DecisionText({ decision, bars }: { decision: BriefDecision; bars: boolean }) {
+  const line = decisionLine(decision, { bars });
   const c = line.confirmation;
   return (
     <span className="brief-card__decision">
       {' '}
-      {line.lead && <>{line.lead} </>}
       {c && (
         <>
-          {c.before}<span className="brief-card__num">{c.date}</span>
-          {c.gap && <>, <span className="brief-card__gap">{c.gap}</span></>}
-          {c.after}{' '}
+          {c.before}{c.days && <span className="brief-card__gap">{c.days}</span>}{c.after}{' '}
         </>
       )}
       {line.recommendation}
@@ -131,7 +131,7 @@ function WorkingDots() {
   );
 }
 
-export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methaneDir = null, cues = [], tips = [], checks = 0 }: BriefCardProps) {
+export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methaneDir = null, cues = [], tips = [], checks = 0, follow = null }: BriefCardProps) {
   const [state, setState] = useState<BriefState | null>(null);
   const [load, setLoad] = useState<'loading' | 'waiting' | 'failed' | 'loaded'>('loading');
   const [attempt, setAttempt] = useState(0);
@@ -147,9 +147,14 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
   const cue = site ? siteCue(cues, site.lat, site.lon) : null;
   const manifestUrl = cue ? passManifestUrl(methaneDir, cue) : null;
   const manifests = useStageFiles<PassFrame[]>(manifestUrl ? [manifestUrl] : [], (raw) => (methaneDir ? parseManifest(raw, methaneDir) : null));
-  // The chain tip, cue, check, brief (A2 P1-2), from the same records.
+  // The chain tip, cue, check, brief (A2 P1-2), from the same records. A spot the 90-day rule followed
+  // that is not its area's top hotspot takes its area's tip with its own anomaly (follow.json).
+  const followsCard = !!follow && !!site && samePoint(follow.followed, site.lat, site.lon);
+  const areaTip = followsCard ? tips.find((t) => t.area.name === follow!.followed.area) ?? null : null;
+  const tip = (site ? siteTip(tips, site.lat, site.lon) : null)
+    ?? (areaTip ? { ...areaTip, anomalyPpb: follow!.followed.anomalyPpb } : null);
   const chain = site
-    ? missionChain({ tip: siteTip(tips, site.lat, site.lon), frames: manifestUrl ? manifests[manifestUrl] : null, checks })
+    ? missionChain({ tip, frames: manifestUrl ? manifests[manifestUrl] : null, checks })
     : null;
 
   useEffect(() => {
@@ -253,7 +258,7 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
             agent recommends. Worded here from the draft's validated enums and dates, never model text.
             It runs on in the count's paragraph, which keeps the decision on the column's first screen
             at 720p too. */}
-        {card.decision && <DecisionText decision={card.decision} />}
+        {card.decision && <DecisionText decision={card.decision} bars={!!follow?.tipBars && followsCard} />}
       </p>
       {/* The two lines the room restates, at the size it reads from the back. */}
       <dl className="brief-card__verdict">

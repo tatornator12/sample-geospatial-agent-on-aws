@@ -17,7 +17,12 @@ function plural(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-export function RecordTimeline({ model }: { model: RecordTimelineModel }) {
+/**
+ * `plate`: the follow decision and the bars' plate lines are on the step column (Methane Watch, the
+ * bars), and they say the window and the latest confirmation's date and gap. The timeline then draws
+ * its marks and its bracket and says neither again (one point per beat, a date said once).
+ */
+export function RecordTimeline({ model, plate = false }: { model: RecordTimelineModel; plate?: boolean }) {
   const { band, emit, carbonMapper, latest } = model;
   const seen = emit.filter((m) => m.kind === 'seen').length;
   const faint = emit.filter((m) => m.kind === 'faint').length;
@@ -31,8 +36,8 @@ export function RecordTimeline({ model }: { model: RecordTimelineModel }) {
         <p className="record-timeline__label">
           TROPOMI{' '}
           <span className="record-timeline__note">
-            {ppb && <><span className="record-timeline__num">{ppb}</span> ppb, </>}
-            <span className="record-timeline__num">{windowWords(band.start, band.end)}</span>
+            {ppb && <><span className="record-timeline__num">{ppb}</span> ppb{plate ? '' : ', '}</>}
+            {!plate && <span className="record-timeline__num">{windowWords(band.start, band.end)}</span>}
           </span>
         </p>
         <div className="record-timeline__track" role="img" aria-label={`TROPOMI tip from ${dayMonthYear(band.start)} to ${dayMonthYear(band.end)}`}>
@@ -96,7 +101,7 @@ export function RecordTimeline({ model }: { model: RecordTimelineModel }) {
       {/* The foot: where the axis starts, and the gap in words (the window's end is the band's own). */}
       <p className="record-timeline__foot">
         <span className="record-timeline__num record-timeline__start" aria-hidden="true">Jan 2025</span>{' '}
-        <span className={`record-timeline__gap-words${bracket ? '' : ' record-timeline__gap-words--open'}`}>
+        {!plate && <span className={`record-timeline__gap-words${bracket ? '' : ' record-timeline__gap-words--open'}`}>
           {latest && bracket ? (
             <><span className="record-timeline__num">{dayMonthYear(latest.date)}</span> to the tip: {latest.words}</>
           ) : latest ? (
@@ -104,7 +109,7 @@ export function RecordTimeline({ model }: { model: RecordTimelineModel }) {
           ) : (
             <>No fine-scale confirmation on record</>
           )}
-        </span>
+        </span>}
       </p>
     </section>
   );
