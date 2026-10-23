@@ -463,3 +463,13 @@ def test_the_latest_confirmation_says_its_days_before_the_tip_and_the_90_day_tes
     assert out["latest_confirmed"] == {"date": "2026-08-26", "by": "a Carbon Mapper plume", "days_before_tip": 42,
                                        "within_90_days": True}
     assert out["within_90_days"] is True
+
+
+def test_the_ninety_day_note_says_the_test_in_words():
+    import importlib
+    cm = importlib.import_module("carbon_mapper")
+    assert cm.ninety_day_note(None) == "No confirmed detection here since 2025-01-01: outside 90 days."
+    assert cm.ninety_day_note({"date": "2026-06-20", "days_before_tip": 109}).endswith("109 days before the tip window: more than 90 days, outside it.")
+    assert cm.ninety_day_note({"date": "2026-08-26", "days_before_tip": 42}).endswith("within 90 days.")
+    assert cm.ninety_day_note({"date": "2026-10-09", "days_before_tip": -2}).endswith("inside the tip window: within 90 days.")
+    assert "cannot be read" in cm.ninety_day_note({"date": "2026-08-26"})

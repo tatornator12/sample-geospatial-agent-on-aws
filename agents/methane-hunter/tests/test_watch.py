@@ -626,3 +626,32 @@ def test_baseline_carries_unlabelled_watch_area_outlines(watch, fake_s3, monkeyp
     areas = [f for f in feats if f["properties"]["tier"] == "watch_area"]
     assert len(areas) == len(watch.WATCH_AREAS) and all(set(f["properties"]) == {"tier", "emit"} for f in areas)
     assert out["summary"]["sites"] == 1 and out["repeat_sites"][0]["repeat_dates"] == 6
+
+
+def test_the_window_ends_on_the_last_day_read_and_an_incomplete_composite_is_read_again(watch, fake_s3, monkeypatch):
+    """Oct 23: the composite asked for 21 October had no orbit that day (27 orbits, as for 20 October),
+    yet said "to 21 October". The window is the days read; a composite missing the day asked for is
+    served for six hours, then built again (that day's orbits may have landed)."""
+    listing = {"Contents": [{"Key": f"COGT/OFFL/L2__CH4___/2026/09/10/{STEM}_PRODUCT_methane_mixing_ratio_4326.tif"}]}
+
+    class FakeS5P:
+        def list_objects_v2(self, Bucket, Prefix):
+            return listing if Prefix.endswith("2026/09/10/") else {}
+    monkeypatch.setattr(watch, "tropomi_s3", lambda: FakeS5P())
+    a = np.full((20, 30), 1940.0)
+    a[10, 15] = 1990.0
+    reads = []
+    monkeypatch.setattr(watch, "read_tropomi_window", lambda stem, box: reads.append(stem) or (a.copy(), from_origin(52, 41.5, 0.35, 0.25)))
+    out = json.loads(_run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-11")))
+    assert (out["summary"]["start"], out["summary"]["end"], out["summary"]["requested_end"]) == ("2026-09-10", "2026-09-10", "2026-09-11")
+    tip = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_south_caspian.json"])
+    assert tip["end"] == "2026-09-10"
+    _run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-11"))
+    assert len(reads) == 1                                                   # served from the cache
+    key = next(k for k in fake_s3.objects if k.endswith("_2026-09-11_1d.json") and "tropomi_v3_" in k)
+    old = json.loads(fake_s3.objects[key])
+    old["built_at"] -= 7 * 3600
+    fake_s3.objects[key] = json.dumps(old).encode()
+    _run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-11"))
+    assert len(reads) == 2                                                   # built again after six hours
+    assert not watch.cache_current({"summary": {"end": "2026-09-11"}}, watch.date(2026, 9, 11))   # no requested_end: an early v3

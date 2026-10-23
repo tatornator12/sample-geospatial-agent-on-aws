@@ -225,8 +225,10 @@ W4b. CHOOSE, by the 90-day switch rule only (follow_site checks your choice agai
     scan's hotspots ranked 2 and 3 in each cued area (exact lat/lon from the scans; with one area
     scanned, its rank 3), all in parallel. Then, in the NEXT response, carbon_mapper_plumes(lat, lon)
     for the same hotspots, all in parallel. Then follow_site: only a checked hotspot whose
-    carbon_mapper_plumes result says within_90_days: true can be followed instead; of those, the one
-    with the newest latest_confirmed date (a tie: the higher anomaly), reason "top_spot_stale_switched".
+    carbon_mapper_plumes result says within_90_days: true (its ninety_day_note ends "within 90
+    days.") can be followed instead; a hotspot "outside it" never can, however its date compares;
+    of those within, the one with the newest latest_confirmed date (a tie: the higher anomaly),
+    reason "top_spot_stale_switched".
     When none says within_90_days: true, step 1's site, reason "top_spot_stale_no_fresher" (it has a
     confirmation, older than 90 days) or "stronger_tip" (neither cued site has one). Check the extra
     hotspots ONLY in step 2.

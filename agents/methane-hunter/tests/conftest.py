@@ -13,6 +13,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import types
 from pathlib import Path
 
@@ -29,6 +30,9 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 os.environ.setdefault("S3_BUCKET_NAME", "test-bucket")
 os.environ.setdefault("AWS_REGION", "us-east-1")
 os.environ.pop("EARTHDATA_TOKEN", None)
+# The registry copies its cells to a local folder (24 h); the tests read their own, never the copies a
+# warm run on this machine left in /tmp/methane_registry (they made a "nothing on record" test find records).
+os.environ.setdefault("REGISTRY_CACHE_DIR", tempfile.mkdtemp(prefix="methane-registry-test-"))
 for p in (str(AGENT_DIR), str(GEO_AGENT_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)

@@ -404,6 +404,19 @@ def with_gap(found: dict | None, tip_start: str | None) -> dict | None:
 FOLLOW_GAP_DAYS = 90                  # the follow rule's step 2 and draft_brief's threshold
 
 
+def ninety_day_note(found: dict | None) -> str:
+    """The 90-day test in words, from the numbers (what the follow rule reads; the choice stays the model's)."""
+    if not found:
+        return "No confirmed detection here since 2025-01-01: outside 90 days."
+    days = found.get("days_before_tip")
+    if not isinstance(days, int):
+        return "The tip window is not known yet: the 90-day test cannot be read."
+    if days <= 0:
+        return f"Latest confirmed detection {found['date']}, inside the tip window: within 90 days."
+    return (f"Latest confirmed detection {found['date']}, {days} days before the tip window: "
+            + ("within 90 days." if days <= FOLLOW_GAP_DAYS else "more than 90 days, outside it."))
+
+
 def latest_confirmed(emit: dict | None, cm_latest: str | None) -> dict | None:
     """The site's newest confirmed detection: an EMIT candidate pass or a Carbon Mapper plume (in words)."""
     found = latest_confirmed_code((emit or {}).get("latest_candidate"), cm_latest)
@@ -700,6 +713,7 @@ async def carbon_mapper_plumes(lat: float, lon: float, radius_km: float = CM_RAD
         # The follow rule's test, said plainly: is this site's latest confirmed detection within 90 days
         # of the tip window (false with none)? Only such a site can be the 90-day rule's switch.
         "within_90_days": bool(confirmed_gap and confirmed_gap.get("within_90_days")),
+        "ninety_day_note": ninety_day_note(confirmed_gap),
         "latest_image": image and ({k: image[k] for k in ("date", "pixels", "peak_ppm_m")} if image.get("status") == "ok"
                                    else {"date": image["date"], "status": "unavailable"}),
         "say": say_line(len(plumes), radius_km, since.isoformat(), latest),

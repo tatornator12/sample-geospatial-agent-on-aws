@@ -549,9 +549,14 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     session_key = f"{mt.session_prefix()}tropomi_anomaly_{slug}_{end.isoformat()}_{days}d.tif"
     s3 = mt._s3()
 
-    def from_cache(base: str) -> str | None:
+    def from_cache(base: str, fresh_only: bool = False) -> str | None:
         try:
             cached = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.json")["Body"].read(5_000_000))
+        except s3.exceptions.NoSuchKey:
+            return None
+        if fresh_only and not cache_current(cached, end):
+            return None
+        try:
             tif = s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=f"{base}.tif")["Body"].read(50_000_000)
         except s3.exceptions.NoSuchKey:
             return None
@@ -577,7 +582,7 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
                 except Exception as e:  # the bars are decoration: never fail the scan for them
                     logger.warning("tip columns failed: %s", type(e).__name__)
 
-    hit = from_cache(cache_base)
+    hit = from_cache(cache_base, fresh_only=True)
     if hit:
         return hit
     computed = compute_composite(box, end, days)
@@ -600,8 +605,11 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     cog = _cog_bytes(anomaly, transform.c, transform.f, transform.a, -transform.e)
     days_cog = _days_cog_bytes(valid_days, transform)
     url = _put_bytes(session_key, cog, "image/tiff")
-    first_day = min(s.split('/')[3] + '-' + s.split('/')[4] + '-' + s.split('/')[5] for s in stems)
-    summary = {"area": label, "bbox": list(box), "start": first_day, "end": end.isoformat(),
+    read_days = sorted({s.split('/')[3] + '-' + s.split('/')[4] + '-' + s.split('/')[5] for s in stems})
+    # The window is the days TROPOMI was read on: its last day can be before the day asked for, when
+    # that day's orbits are not published yet (the stage says the window's own dates).
+    summary = {"area": label, "bbox": list(box), "start": read_days[0], "end": read_days[-1],
+               "requested_end": end.isoformat(),
                "days_requested": days, "orbits": len(stems), "background_ppb": round(background, 1),
                "valid_pixel_fraction": round(float(np.isfinite(med).mean()), 3),
                "emit_can_look": emit, "seconds": round(time.time() - started, 1),
@@ -609,7 +617,7 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
                                f"median, quality ≥ {TROPOMI_QA_MIN}/100. A tip, not a detection: cue EMIT.")}
     logger.info("TROPOMI: %s %d orbits → %d hotspots in %.1fs", label, len(stems), len(hotspots), summary["seconds"])
     result = {
-        "summary": {**summary, "source": "meeo-s5p"}, "hotspots": hotspots,
+        "summary": {**summary, "source": "meeo-s5p"}, "hotspots": hotspots, "built_at": int(time.time()),
         "render": {**RENDER_TROPOMI, "bounds": [round(v, 4) for v in box]},
         "next_steps": TROPOMI_NEXT_STEPS,
     }
@@ -626,6 +634,21 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
         write_tip_columns(bars)
     write_tip(area_key, result["summary"], hotspots)
     return json.dumps({**result, "anomaly_s3_url": url})
+
+
+TROPOMI_INCOMPLETE_TTL_S = 6 * 3600     # a composite missing the day asked for is read again after this
+
+
+def cache_current(cached: dict, end: date) -> bool:
+    """Whether a v3 composite may be served for `end`: complete (its last day read is the day asked
+    for), or incomplete and built less than six hours ago (that day's orbits may land since)."""
+    summary = cached.get("summary") if isinstance(cached, dict) else None
+    if not isinstance(summary, dict) or summary.get("requested_end") != end.isoformat():
+        return False
+    if summary.get("end") == end.isoformat():
+        return True
+    built = cached.get("built_at")
+    return isinstance(built, (int, float)) and time.time() - built < TROPOMI_INCOMPLETE_TTL_S
 
 
 def compute_composite(box, end: date, days: int):

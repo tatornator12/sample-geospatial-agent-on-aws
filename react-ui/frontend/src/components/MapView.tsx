@@ -188,6 +188,8 @@ const GLOBE_DEG_PER_S_RESTING = 1.5;
 const COLUMNS_PITCH = 55;
 /** How close the camera comes when a bar layer lands, by kind (see the columns branch). */
 const COLUMNS_MAX_ZOOM: Record<BarKind, number> = { tip: 11, emit: 13, carbon_mapper: 14.5 };
+/** The tip bars' opacity once the ground scene is under them (0.9 before). */
+const TIP_BARS_GROUND_OPACITY = 0.45;
 // A coarse raster (TROPOMI) is dimmer than the finding so the EMIT candidate reads through it.
 const COARSE_RASTER_OPACITY = 0.75;
 
@@ -3473,6 +3475,15 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
               pitch: groundOnRef.current ? GROUND_PITCH : columnsOnStage ? COLUMNS_PITCH : 0,
               ...(groundOnRef.current ? { bearing: GROUND_BEARING } : {}),
             });
+          }
+
+          // The ground beat: the tip bars (kilometres tall, over ~4 km cells) step back so the scene under
+          // them reads; they stay on the map, as the card says. The record bars are 30 to 60 m cells and
+          // stand on the scene as they are.
+          if (!isMethaneRaster && !isTerrainRaster && !seaRadar) {
+            allLayersRef.current
+              .filter((l) => l.type === 'geometry' && barKind(l.url) === 'tip' && mapInstance.getLayer(l.id))
+              .forEach((l) => mapInstance.setPaintProperty(l.id, 'fill-extrusion-opacity', TIP_BARS_GROUND_OPACITY));
           }
 
           console.log(`✅ [${i}] Raster successfully added to map:`, raster.name, `Layer ID: ${layerId}`, `Visible: ${isVisible}`);
