@@ -33,6 +33,7 @@ import {
   radarTileParams,
   regionLabelPoint,
   replayFrame,
+  replayWindow,
   sweepRows,
   wakes,
   type AisLook,
@@ -171,7 +172,8 @@ export function furnitureOn(map: M, rest: VesselRest, prepared: readonly Prepare
   if (map.getLayer(F.islands)) return;
   // Under the presenter's drawn shapes, which stay on top of everything.
   const before = map.getLayersOrder().find((id) => id.startsWith('gl-draw'));
-  map.addSource(FS.wakes, { type: 'geojson', data: wakes(prepared) as GeoJSON.FeatureCollection });
+  // The wakes are the loop's own hours (the 36 to the pass, as the clock says), not the file's 72.
+  map.addSource(FS.wakes, { type: 'geojson', data: wakes(prepared, 3, replayWindow(rest)) as GeoJSON.FeatureCollection });
   map.addSource(FS.trail, { type: 'geojson', data: EMPTY as GeoJSON.FeatureCollection, lineMetrics: true });
   map.addSource(FS.heads, { type: 'geojson', data: EMPTY as GeoJSON.FeatureCollection });
   map.addSource(FS.reserve, {
@@ -180,7 +182,7 @@ export function furnitureOn(map: M, rest: VesselRest, prepared: readonly Prepare
   });
   map.addSource(FS.harbours, { type: 'geojson', data: pointsOf(rest.ports) as GeoJSON.FeatureCollection });
   map.addSource(FS.islands, { type: 'geojson', data: pointsOf(rest.islands) as GeoJSON.FeatureCollection });
-  // The long exposure: every track's whole three days, transits fainter (the network is the routes between the islands).
+  // The long exposure: every track over the loop's hours, transits fainter (the network is the routes between the islands).
   map.addLayer({
     id: F.wakesFaint, type: 'line', source: FS.wakes, filter: ['==', ['get', 'faint'], true],
     paint: { 'line-color': AIS, 'line-width': 1, 'line-opacity': 0.05, 'line-opacity-transition': FADE },
@@ -448,7 +450,8 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
         'circle-pitch-alignment': 'map',
       },
     });
-    // The claim: a broadcast accounts for it (a fog ring tied by a hairline to the AIS dot).
+    // The claim: a broadcast accounts for it (a fog ring; tied by a hairline to the AIS dot only
+    // where that dot decided, claimParts).
     map.addLayer({
       id: c('-outline'), type: 'circle', source, filter: ['==', shown, 'claimed'], layout: vis,
       paint: {
