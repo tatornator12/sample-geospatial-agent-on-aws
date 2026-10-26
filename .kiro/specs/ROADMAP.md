@@ -134,3 +134,25 @@ Oct 12 when Dark Vessels was chosen for Act 3.)
   `LargeBodyBlockMetric`). The live bundle has the survey and Carbon Mapper strings and no "Measure
   an Octagon wall"; maplibre worker 200; `/api/agents` 401. Not yet seen: a signed-in approve on the
   live site posting to Slack. Way back: `deployed-2026-10-22` (`ab10a09`; approvals blocked by WAF).
+- Oct 26 (all four acts + frontend): `develop` promoted to `demo-stable` = `c03af74`, tag
+  `deployed-2026-10-26` (pushed to `fork`). Brings: Methane Watch tip bars and record bars (EMIT
+  columns or Carbon Mapper's plume image), the 90-day switch rule, EMIT V003, the mirror noise test,
+  Carbon Mapper at 7 km, the card's call, replay `methane-watch-bars` in the gallery (merges 286d027
+  and the record work); Dark Vessels draws only the AIS the matching used, keeps the key beside the
+  tasking plate, key icons as drawn, ships under the rings (merges 9ba2c4a, 4ec4763, b68d183); the
+  brief card's toggles on their own lines (3a6eb1c); plain stage words for the methane model
+  (5644cee, ef092c4); an ArcGIS MCP drop after a finished answer no longer prints 'Error:' (c03af74,
+  Earth, Archaeologist, Methane). Gates: pytest geo_agent 140, methane 238, archaeologist 90,
+  dark-vessels 260, scripts 33; vitest 663; backend 82; tsc and build clean; detector 0. Dev evals
+  in `promote.sh` run 3: earth 8/8, methane 13/13, archaeologist 7/7, vessels 11/11. Run 1 stopped
+  on methane `watch-named-area` (a complete answer followed by 'Error: Connection to the MCP server
+  was closed' at MCP teardown; fixed in c03af74, dev redeployed: earth v33, methane v55,
+  archaeologist v23); run 2 stopped on vessels `second-question` (a follow-up flake, 4 refusals; two
+  dev reruns passed). Nothing moved in runs 1 and 2. Stable: `geospatial_agent_on_aws` v77,
+  `methane_hunter` v8, `ai_archaeologist` v5, `dark_vessels` v4 (5 env keys, no GFW token or cache
+  prefix), all READY; smokes `similar-central-park`, `strongest-plume`, `great-circle-measure`,
+  `open-question` PASS; stable `watch-mission` PASS 73 s (fortnight 11 to 24 Oct: Shanxi #1 near
+  Pingding, `newest_confirmation`, EMIT 2026-07-25, 78 days, tip then EMIT bars,
+  `no_new_look_needed`). Live: bundle has the bars, follow and AIS-key strings; worker 200;
+  `/api/agents` 401; 49 KB POSTs 401 (brief and tasking approve) and 403 (invoke). Not yet seen: a
+  signed-in approve on the live site posting to Slack. Way back: `deployed-2026-10-23` (`a6e882f`).
