@@ -139,6 +139,7 @@ async def methane_hunter_agent(payload, context=None):
         strands_telemetry.setup_otlp_exporter()
         strands_telemetry.setup_meter(enable_console_exporter=False, enable_otlp_exporter=True)
 
+    turn_done = False
     try:
         with contextlib.ExitStack() as stack:
             # Geocoding is additive: when the MCP server is unreachable the turn runs with the
@@ -220,8 +221,15 @@ async def methane_hunter_agent(payload, context=None):
                 open_tools.remove(tool_id)
 
             logger.info("✅ Turn completed - session persisted to S3")
+            turn_done = True
 
     except Exception as e:
+        if turn_done:
+            # The answer is already on the stage. An error while closing the ArcGIS MCP connection
+            # (the server dropped it: "Connection to the MCP server was closed", Oct 26) must not
+            # print "Error:" after the closer.
+            logger.warning(f"⚠️ Error after the turn completed, while closing: {e}")
+            return
         logger.error(f"Error processing request: {e}", exc_info=True)
         yield f"Error: {str(e)}"
 

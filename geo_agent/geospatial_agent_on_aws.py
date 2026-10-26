@@ -118,6 +118,7 @@ async def sat_image_analyzer_agent(payload, context=None):
     else:
         logger.info("ℹ️ Using ADOT global TracerProvider for AgentCore Observability")
 
+    turn_done = False
     try:
         with contextlib.ExitStack() as stack:
             # The ArcGIS MCP tools are additive (geocoding, portal search). When the server
@@ -262,9 +263,16 @@ async def sat_image_analyzer_agent(payload, context=None):
                 open_tools.remove(tool_id)
 
             logger.info(f"✅ Turn completed - session automatically persisted to S3")
+            turn_done = True
 
 
     except Exception as e:
+        if turn_done:
+            # The answer is already on the stage. An error while closing the ArcGIS MCP connection
+            # (the server dropped it: "Connection to the MCP server was closed", Oct 26) must not
+            # print "Error:" after the closer.
+            logger.warning(f"⚠️ Error after the turn completed, while closing: {e}")
+            return
         logger.error(f"Error processing request: {e}", exc_info=True)
         yield f"Error: {str(e)}"
 

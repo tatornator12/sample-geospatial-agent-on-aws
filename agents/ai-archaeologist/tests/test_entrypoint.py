@@ -181,3 +181,32 @@ def test_no_or_bad_scenario_id_is_the_live_prompt(entry, monkeypatch):
     live = entry.archaeo_config.build_prompt()
     for payload in ({"prompt": "x"}, {"prompt": "x", "scenario_id": "../sessions"}, {"scenario_id": 7}, None):
         assert entry.system_prompt_for(payload)[:300] == live[:300]
+
+
+class _ClosingMcp:
+    """An MCP client whose connection drops: entering works, closing raises (as on Oct 26)."""
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        raise RuntimeError("Connection to the MCP server was closed")
+
+    def list_tools_sync(self):
+        return []
+
+
+def test_an_mcp_connection_closing_after_the_answer_prints_no_error(entry, monkeypatch):
+    class _Agent:
+        def __init__(self, *a, **k):
+            pass
+
+        async def stream_async(self, prompt):
+            yield {"data": "Both are already on the World Heritage list."}
+
+    monkeypatch.setattr(entry, "mcp_client", _ClosingMcp())
+    monkeypatch.setattr(entry, "Agent", _Agent)
+    monkeypatch.setattr(entry, "S3SessionManager", lambda **k: None)
+    monkeypatch.setattr(entry, "SlidingWindowConversationManager", lambda **k: None)
+    monkeypatch.setattr(entry, "system_prompt_for", lambda payload: "prompt")
+    chunks = _collect(entry.ai_archaeologist_agent({"prompt": "go"}, types.SimpleNamespace(session_id="s" * 33)))
+    assert chunks == ["Both are already on the World Heritage list."]

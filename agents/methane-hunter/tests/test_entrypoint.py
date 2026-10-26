@@ -179,3 +179,53 @@ def test_no_or_bad_scenario_id_is_the_live_prompt(entry, monkeypatch):
         assert entry.system_prompt_for(payload)[:300] == live[:300]
     monkeypatch.setattr(loader, "load_scenario", lambda sid: None)
     assert "SCENARIO MODE" not in entry.system_prompt_for({"scenario_id": "missing-case"})
+
+
+class _ClosingMcp:
+    """An MCP client whose connection drops: entering works, closing raises (as on Oct 26)."""
+    def __init__(self, fail_on_exit=True):
+        self.fail_on_exit = fail_on_exit
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        if self.fail_on_exit:
+            raise RuntimeError("Connection to the MCP server was closed")
+        return False
+
+    def list_tools_sync(self):
+        return []
+
+
+def _fake_agent(events):
+    class _Agent:
+        def __init__(self, *a, **k):
+            pass
+
+        async def stream_async(self, prompt):
+            for e in events:
+                if isinstance(e, Exception):
+                    raise e
+                yield e
+    return _Agent
+
+
+def _run_turn(entry, monkeypatch, mcp, events):
+    monkeypatch.setattr(entry, "mcp_client", mcp)
+    monkeypatch.setattr(entry, "Agent", _fake_agent(events))
+    monkeypatch.setattr(entry, "S3SessionManager", lambda **k: None)
+    monkeypatch.setattr(entry, "SlidingWindowConversationManager", lambda **k: None)
+    monkeypatch.setattr(entry, "system_prompt_for", lambda payload: "prompt")
+    return _collect(entry.methane_hunter_agent({"prompt": "go"}, types.SimpleNamespace(session_id="s" * 33)))
+
+
+def test_an_mcp_connection_closing_after_the_answer_prints_no_error(entry, monkeypatch):
+    chunks = _run_turn(entry, monkeypatch, _ClosingMcp(), [{"data": "EMIT sees the methane, not its source."}])
+    assert chunks == ["EMIT sees the methane, not its source."]
+
+
+def test_an_error_during_the_turn_is_still_reported(entry, monkeypatch):
+    chunks = _run_turn(entry, monkeypatch, _ClosingMcp(fail_on_exit=False),
+                       [{"data": "Plan:"}, RuntimeError("model unavailable")])
+    assert chunks == ["Plan:", "Error: model unavailable"]
