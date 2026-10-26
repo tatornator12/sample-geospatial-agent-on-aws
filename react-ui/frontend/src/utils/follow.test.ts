@@ -58,11 +58,11 @@ describe('the stage words (approved 2026-10-23)', () => {
 
   it('says the tip bars and the record bars as the table has them, the date once each', () => {
     expect(tipBarsLine(F)).toBe('TROPOMI, 7 to 21 October 2026. Taller bars mean more methane in the air than usual for this area.');
-    expect(recordBarsLine(F)).toBe("Carbon Mapper's image of this plume, 26 August 2026. That is 42 days before this fortnight began.");
+    expect(recordBarsLine(F)).toBe("Carbon Mapper's image of this plume, 26 August 2026.");
     const emit = parseFollow({ ...RAW, record_bars: { by: 'emit', date: '2026-08-15', file: 'columns_EMIT_L2B_CH4ENH_002_20260815T061000_2622401_012.geojson', days_before_tip: 19 } })!;
-    expect(recordBarsLine(emit)).toBe('EMIT saw methane here on 15 August 2026. That is 19 days before this fortnight began.');
+    expect(recordBarsLine(emit)).toBe('EMIT saw methane here on 15 August 2026.');
     const inside = parseFollow({ ...RAW, record_bars: { ...RAW.record_bars, days_before_tip: -3 } })!;
-    expect(recordBarsLine(inside)).toContain('That is within this fortnight.');
+    expect(recordBarsLine(inside)).toBe("Carbon Mapper's image of this plume, 26 August 2026.");
     expect(recordBarsLine(parseFollow({ ...RAW, record_bars: null })!)).toBeNull();
   });
 

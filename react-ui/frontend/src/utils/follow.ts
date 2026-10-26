@@ -224,14 +224,14 @@ export function tipBarsLine(f: Follow): string {
   return `TROPOMI, ${windowLongWords(f.tip.start, f.tip.end)}. Taller bars mean more methane in the air than usual for this area.`;
 }
 
-/** The record bars' plate line: whose look, its date once, and how long before the fortnight it was. */
+/** The record bars' plate line: whose look and its date, once. The gap to the fortnight is said by
+ *  the timeline's bracket, the follow line and the card, so it is not repeated here (one point, said once). */
 export function recordBarsLine(f: Follow): string | null {
   const r = f.recordBars;
   if (!r) return null;
-  const when = r.daysBeforeTip <= 0 ? 'That is within this fortnight.' : `That is ${days(r.daysBeforeTip)} before this fortnight began.`;
   return r.by === 'carbon_mapper'
-    ? `Carbon Mapper's image of this plume, ${dayWords(r.date)}. ${when}`
-    : `EMIT saw methane here on ${dayWords(r.date)}. ${when}`;
+    ? `Carbon Mapper's image of this plume, ${dayWords(r.date)}.`
+    : `EMIT saw methane here on ${dayWords(r.date)}.`;
 }
 
 export type BarKind = 'tip' | 'emit' | 'carbon_mapper';
