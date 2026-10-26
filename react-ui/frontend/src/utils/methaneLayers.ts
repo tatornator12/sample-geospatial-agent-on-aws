@@ -303,3 +303,50 @@ export function detectionPopupRows(p: Record<string, unknown>): { date: string; 
     rate: rate === null ? 'not published' : `about ${aboutKgH(rate)} kg/h`,
   };
 }
+
+// --- the layers list: replaced methane layers stay listed, unticked (approved 2026-10-26) -----------
+
+type ListedLayer = { id: string; type: 'raster' | 'geometry'; url: string; render?: RenderHint };
+
+/** A bar layer: methane columns (the tip bars, EMIT's or Carbon Mapper's record bars), by hint or file name. */
+export function isBarLayer(layer: ListedLayer): boolean {
+  return layer.type === 'geometry' && methaneGeometryHint(layer.render, layer.url)?.kind === 'columns';
+}
+
+/** The flat TROPOMI composite (scan_tropomi's `tropomi_anomaly_*.tif` in a methane folder). */
+export function isTropomiComposite(layer: ListedLayer): boolean {
+  return layer.type === 'raster' && inMethaneTree(layer.url) && /^tropomi_anomaly_.+\.tiff?$/.test(basenameOf(layer.url));
+}
+
+/**
+ * What a bar layer landing does to the layers already listed. The map shows one bar layer at a time,
+ * and the flat TROPOMI composite steps back for the bars; but what they replace stays in the layers
+ * list, unticked (hidden on the map), so the presenter can tick it back and refer to it ("I'd rather
+ * it stay there"). Only the same file shown again replaces its first showing (one row per file).
+ */
+export function barLanding(layers: readonly ListedLayer[], landed: ListedLayer): { remove: string[]; hide: string[] } {
+  const others = layers.filter((l) => l.id !== landed.id);
+  return {
+    remove: others.filter((l) => isBarLayer(l) && l.url === landed.url).map((l) => l.id),
+    hide: others.filter((l) => (isBarLayer(l) && l.url !== landed.url) || isTropomiComposite(l)).map((l) => l.id),
+  };
+}
+
+/** A TROPOMI composite that lands after the bars (a replay's layers load in any order) lands unticked too. */
+export function compositeLandsHidden(layers: readonly ListedLayer[], shown: (id: string) => boolean): boolean {
+  return layers.some((l) => isBarLayer(l) && shown(l.id));
+}
+
+/**
+ * A tick in the layers list: the layer itself, and when a bar layer is ticked on, every other bar
+ * layer shown is unticked (the record bars and the tip bars never stand on the map together). The
+ * flat composite and every other layer tick freely.
+ */
+export function tickChanges(layers: readonly ListedLayer[], id: string, checked: boolean,
+                            shown: (id: string) => boolean): Record<string, boolean> {
+  const changes: Record<string, boolean> = { [id]: checked };
+  const layer = layers.find((l) => l.id === id);
+  if (!checked || !layer || !isBarLayer(layer)) return changes;
+  for (const l of layers) if (l.id !== id && isBarLayer(l) && shown(l.id)) changes[l.id] = false;
+  return changes;
+}

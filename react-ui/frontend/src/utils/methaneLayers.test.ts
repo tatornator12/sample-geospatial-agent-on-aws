@@ -5,14 +5,19 @@ import {
   METHANE_SITES,
   METHANE_TROPOMI,
   METHANE_VECTOR,
+  barLanding,
+  compositeLandsHidden,
   footprintFrame,
   globeCentre,
+  isBarLayer,
+  isTropomiComposite,
   isoDay,
   labelPointOutside,
   methaneGeometryHint,
   methaneLegend,
   methaneRampLabel,
   methaneRasterHint,
+  tickChanges,
 } from './methaneLayers.ts';
 import { parseRenderHint } from './render.ts';
 
@@ -183,5 +188,57 @@ describe('footprintFrame (B13, A2 P1-7)', () => {
 
   it('is null without footprints', () => {
     expect(footprintFrame([])).toBeNull();
+  });
+});
+
+describe('the layers list keeps what the bars replace, unticked (approved 2026-10-26)', () => {
+  // The order the live run lands them in: the baseline, the flat composite (when the agent shows
+  // it), the tip bars, then the record bars (EMIT's or Carbon Mapper's).
+  const geo = (id: string, file: string) => ({ id, type: 'geometry' as const, url: `${S}${file}`,
+    render: methaneGeometryHint(undefined, `${S}${file}`) ?? undefined });
+  const sites = geo('sites', 'watch_sites_v002.geojson');
+  const composite = { id: 'tropomi', type: 'raster' as const, url: `${S}tropomi_anomaly_shanxi_coal_basin_2026-10-24_14d.tif` };
+  const tipBars = geo('tip', 'tipcolumns_37.8927_113.5628.geojson');
+  const emitBars = geo('emit', 'columns_EMIT_L2B_CH4ENH_002_20260725T060520_2620604_019.geojson');
+  const cmBars = geo('cm', 'cmcolumns_tan20260826t084806c27s4001-I.geojson');
+  const scene = { id: 'tci', type: 'raster' as const, url: `${S}tci_clipped_pingding_county_watch_site_2026-07-15.tif` };
+
+  it('knows the bar layers and the flat composite by their file names', () => {
+    expect([sites, composite, tipBars, emitBars, cmBars, scene].map((l) => [l.id, isBarLayer(l), isTropomiComposite(l)])).toEqual([
+      ['sites', false, false], ['tropomi', false, true], ['tip', true, false], ['emit', true, false], ['cm', true, false],
+      ['tci', false, false]]);
+    // Outside a methane folder a tropomi-named file is not the act's composite.
+    expect(isTropomiComposite({ ...composite, url: 's3://b/other/tropomi_anomaly_x_14d.tif' })).toBe(false);
+  });
+
+  it('the tip bars untick the flat composite; the record bars untick the tip bars and the composite; nothing leaves the list', () => {
+    expect(barLanding([sites, composite], tipBars)).toEqual({ remove: [], hide: ['tropomi'] });
+    expect(barLanding([sites, composite, tipBars], emitBars)).toEqual({ remove: [], hide: ['tropomi', 'tip'] });
+    expect(barLanding([sites, tipBars, scene], cmBars)).toEqual({ remove: [], hide: ['tip'] });
+    // The baseline and the ground scene are never touched.
+    expect(barLanding([sites, tipBars, scene], cmBars).hide).not.toContain('sites');
+  });
+
+  it('the same file shown again replaces its first showing (one row per file)', () => {
+    const again = { ...tipBars, id: 'tip-again' };
+    expect(barLanding([sites, composite, tipBars], again)).toEqual({ remove: ['tip'], hide: ['tropomi'] });
+  });
+
+  it('a composite that lands after the bars lands unticked; before any bars, ticked', () => {
+    expect(compositeLandsHidden([sites, emitBars], () => true)).toBe(true);
+    expect(compositeLandsHidden([sites, emitBars], (id) => id !== 'emit')).toBe(false);
+    expect(compositeLandsHidden([sites], () => true)).toBe(false);
+  });
+
+  it('one bar layer on the map at a time: ticking the tip bars unticks the record bars, and back', () => {
+    const layers = [sites, composite, tipBars, emitBars, scene];
+    const shownNow = new Set(['sites', 'emit', 'tci']);           // the record bars are on, the rest kept unticked
+    const shown = (id: string) => shownNow.has(id);
+    expect(tickChanges(layers, 'tip', true, shown)).toEqual({ tip: true, emit: false });
+    expect(tickChanges(layers, 'emit', true, (id) => id === 'tip')).toEqual({ emit: true, tip: false });
+    // The flat composite ticks freely, and so does everything else; unticking never ticks another.
+    expect(tickChanges(layers, 'tropomi', true, shown)).toEqual({ tropomi: true });
+    expect(tickChanges(layers, 'emit', false, shown)).toEqual({ emit: false });
+    expect(tickChanges(layers, 'tci', false, shown)).toEqual({ tci: false });
   });
 });
