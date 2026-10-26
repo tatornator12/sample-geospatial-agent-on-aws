@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  barKind, barLegendLabel, barShown, dayWords, decisionWords, followUrl, parseFollow, recordBarsLine, samePoint, tipBarsLine,
+  barKind, barLegendLabel, barShown, dayWords, decisionParts, decisionWords, followUrl, parseFollow, recordBarsLine, samePoint, tipBarsLine,
   windowLongWords, type Follow,
 } from './follow.ts';
 import { stagePunctuation } from './caption.ts';
@@ -58,11 +58,11 @@ describe('the stage words (approved 2026-10-23)', () => {
 
   it('says the tip bars and the record bars as the table has them, the date once each', () => {
     expect(tipBarsLine(F)).toBe('TROPOMI, 7 to 21 October 2026. Taller bars mean more methane in the air than usual for this area.');
-    expect(recordBarsLine(F)).toBe("Carbon Mapper's image of this plume, 26 August 2026. That is 42 days before this fortnight began.");
+    expect(recordBarsLine(F)).toBe("Carbon Mapper's image of this plume, 26 August 2026.");
     const emit = parseFollow({ ...RAW, record_bars: { by: 'emit', date: '2026-08-15', file: 'columns_EMIT_L2B_CH4ENH_002_20260815T061000_2622401_012.geojson', days_before_tip: 19 } })!;
-    expect(recordBarsLine(emit)).toBe('EMIT saw methane here on 15 August 2026. That is 19 days before this fortnight began.');
+    expect(recordBarsLine(emit)).toBe('EMIT saw methane here on 15 August 2026.');
     const inside = parseFollow({ ...RAW, record_bars: { ...RAW.record_bars, days_before_tip: -3 } })!;
-    expect(recordBarsLine(inside)).toContain('That is within this fortnight.');
+    expect(recordBarsLine(inside)).toBe("Carbon Mapper's image of this plume, 26 August 2026.");
     expect(recordBarsLine(parseFollow({ ...RAW, record_bars: null })!)).toBeNull();
   });
 
@@ -80,10 +80,19 @@ describe('the stage words (approved 2026-10-23)', () => {
     const tip = parseFollow({ ...RAW, reason: 'stronger_tip', followed: RAW.step1 })!;
     expect(decisionWords(tip)).toBe('Methane has not been seen up close at either top spot, or at the 4 next spots within 90 days, so '
       + 'the agent follows the stronger tip, the top spot in Shanxi.');
-    const newest = parseFollow({ ...RAW, reason: 'newest_confirmation', checked: 0, followed: { ...RAW.followed, rank: 1 } })!;
-    expect(decisionWords(newest)).toBe('Of the two spots it checked first, the agent follows the top spot in the south Caspian, where '
-      + 'methane was seen up close most recently.');
-    for (const f of [F, stale, kept, tip, newest]) {
+    // Step 1 held (the presenter's live run, Oct 26): the gap and the rule, from follow.json's numbers.
+    const newest = parseFollow({ ...RAW, reason: 'newest_confirmation', checked: 0,
+      followed: { ...RAW.step1, latest: { date: '2026-07-25', by: 'emit' }, days_before_tip: 78 } })!;
+    expect(decisionWords(newest)).toBe('Methane was last seen up close at the top spot in Shanxi 78 days before this fortnight, '
+      + 'within 90 days, so the agent stays with it and checks no more spots.');
+    const during = parseFollow({ ...RAW, reason: 'newest_confirmation', checked: 0,
+      followed: { ...RAW.step1, latest: { date: '2026-10-12', by: 'emit' }, days_before_tip: -5 } })!;
+    expect(decisionWords(during)).toBe('Methane was seen up close at the top spot in Shanxi during this fortnight, '
+      + 'so the agent stays with it and checks no more spots.');
+    const sameDay = parseFollow({ ...RAW, reason: 'newest_confirmation', checked: 0,
+      followed: { ...RAW.step1, latest: { date: '2026-10-07', by: 'both' }, days_before_tip: 0 } })!;
+    expect(decisionWords(sameDay)).toContain('during this fortnight');
+    for (const f of [F, stale, kept, tip, newest, during]) {
       for (const w of words(f)) {
         expect(w).not.toMatch(/\b(now|still|active|leaking)\b/i);
         expect(stagePunctuation(w)).toBe(w);       // no em or en dashes, no rules
@@ -91,6 +100,25 @@ describe('the stage words (approved 2026-10-23)', () => {
         expect(w).not.toMatch(/\b(color|center)\b/);
       }
     }
+  });
+
+  it('prints the decision\'s figures in mono, and takes the rule\'s days from follow.json', () => {
+    const newest = parseFollow({ ...RAW, reason: 'newest_confirmation', checked: 0,
+      followed: { ...RAW.step1, latest: { date: '2026-07-25', by: 'emit' }, days_before_tip: 78 } })!;
+    expect(newest.gapDays).toBe(90);
+    expect(decisionParts(newest).filter((p) => p.mono).map((p) => p.text)).toEqual(['78 days', '90 days']);
+    const sixty = parseFollow({ ...RAW, gap_days: 60, reason: 'newest_confirmation', checked: 0,
+      followed: { ...RAW.step1, latest: { date: '2026-07-25', by: 'emit' }, days_before_tip: 52 } })!;
+    expect(decisionWords(sixty)).toContain('52 days before this fortnight, within 60 days,');
+    // A file from before the threshold was recorded: the rule's own 90; a malformed one is dropped.
+    const older: Record<string, unknown> = { ...RAW };
+    delete older.gap_days;
+    expect(parseFollow(older)!.gapDays).toBe(90);
+    expect(parseFollow({ ...RAW, gap_days: 'ninety' })).toBeNull();
+    expect(parseFollow({ ...RAW, gap_days: 0 })).toBeNull();
+    // The other reasons' lines are unchanged in words (their 90 now read from the file).
+    const tip = parseFollow({ ...RAW, reason: 'stronger_tip', followed: RAW.step1 })!;
+    expect(decisionParts(tip).filter((p) => p.mono).map((p) => p.text)).toEqual(['90 days']);
   });
 
   it('writes dates day first, long on the plate and short in the legend', () => {

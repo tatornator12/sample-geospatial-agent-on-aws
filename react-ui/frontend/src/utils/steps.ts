@@ -547,6 +547,36 @@ export const MAX_PASSES = 36;
 /** The filmstrip shows the newest frames; the record timeline above it draws every look. */
 export const FILM_FRAMES = 8;
 
+/**
+ * The filmstrip's frames: the newest FILM_FRAMES passes, then oldest first, left to right, so they
+ * read the same way as the record's date axis above them (approved 2026-10-26). Each keeps its index
+ * in the manifest (two granules of one orbit can share a date and have no chip to tell them apart).
+ */
+export function filmFrames(frames: PassFrame[], n = FILM_FRAMES): Array<{ frame: PassFrame; index: number }> {
+  return frames
+    .map((frame, index) => ({ frame, index }))
+    .sort((a, b) => b.frame.date.localeCompare(a.frame.date) || a.index - b.index)
+    .slice(0, n)
+    .reverse();
+}
+
+/** A pass's verdict in the room's words, as the record's key says it (frames, their names, the plate). */
+export function passWords(f: PassFrame): string {
+  if (f.verdict === 'candidate') return 'methane seen';
+  if (f.short === 'too weak') return 'too faint';
+  if (f.short === 'within noise') return 'within noise';
+  if (f.short === 'cloud or gap') return 'clouded out';
+  return 'not read';
+}
+
+/** The words over the frames: whose they are and how many of the passes read (numbers in mono). */
+export function filmCaption(shown: number, total: number): Array<{ text: string; mono?: boolean }> {
+  return shown < total
+    ? [{ text: 'Newest ' }, { text: String(shown), mono: true }, { text: ' of ' }, { text: String(total), mono: true },
+      { text: ' EMIT passes' }]
+    : [{ text: 'The ' }, { text: String(total), mono: true }, { text: total === 1 ? ' EMIT pass read' : ' EMIT passes read' }];
+}
+
 /** The manifest's passes, validated field by field (at most MAX_PASSES); null when it is not a manifest. */
 export function parseManifest(raw: unknown, dir: string): PassFrame[] | null {
   if (!raw || typeof raw !== 'object' || !Array.isArray((raw as { passes?: unknown }).passes)) return null;

@@ -36,10 +36,14 @@ export interface Follow {
   followed: FollowPoint;
   /** How many more hotspots step 2 checked (0 when step 2 did not apply). */
   checked: number;
+  /** The rule's threshold in days (follow.json's `gap_days`; the tools' GAP_DAYS, 90). */
+  gapDays: number;
   tipBars: { file: string } | null;
   recordBars: { by: 'emit' | 'carbon_mapper'; date: string; file: string; daysBeforeTip: number } | null;
 }
 
+/** The 90-day switch rule's threshold (agents/methane-hunter/follow_rule.py GAP_DAYS). */
+export const GAP_DAYS = 90;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TIP_FILE = /^tipcolumns_-?\d{1,3}\.\d{4}_-?\d{1,3}\.\d{4}\.geojson$/;
 const RECORD_FILE = /^(cmcolumns_[A-Za-z0-9_.-]{1,80}|columns_EMIT_L2B_CH4ENH_[A-Za-z0-9_]{1,60})\.geojson$/;
@@ -93,6 +97,9 @@ export function parseFollow(raw: unknown): Follow | null {
   const followed = point(r.followed);
   const checked = whole(r.checked, 0, 12);
   if (!reason || !start || !end || start > end || !step1 || !followed || checked === null) return null;
+  // A file written before follow_site recorded its threshold carries none: the rule's own 90 days.
+  const gapDays = r.gap_days === undefined ? GAP_DAYS : whole(r.gap_days, 1, 365);
+  if (gapDays === null) return null;
   const tb = r.tip_bars && typeof r.tip_bars === 'object' ? (r.tip_bars as Record<string, unknown>) : null;
   const tipBars = tb && typeof tb.file === 'string' && TIP_FILE.test(tb.file) ? { file: tb.file } : null;
   let recordBars: Follow['recordBars'] = null;
@@ -106,7 +113,7 @@ export function parseFollow(raw: unknown): Follow | null {
       recordBars = { by, date, file, daysBeforeTip: days };
     }
   }
-  return { reason, tip: { start, end }, step1, followed, checked, tipBars, recordBars };
+  return { reason, tip: { start, end }, step1, followed, checked, gapDays, tipBars, recordBars };
 }
 
 /** Where follow.json is, once the agent called follow_site this session (or in this replay). */
@@ -163,28 +170,53 @@ function spot(p: FollowPoint): string {
   return `the ${RANK[p.rank]} spot in ${AREA_IN[p.area] ?? 'this area'}`;
 }
 
+/** A run of the stage's words; `mono` marks a figure (the Tabular Rule: numbers in the mono face). */
+export interface WordPart {
+  text: string;
+  mono?: boolean;
+}
+
 /**
  * The follow decision in the stage's words (one sentence, under the follow step): which spot the
- * agent follows and why, by the 90-day rule. "Seen up close" is a fine-scale confirmation (an EMIT
- * pass that saw methane, or a Carbon Mapper plume within 7 km).
+ * agent follows and why, by the 90-day rule, with the gap and the rule's threshold from follow.json's
+ * own numbers. "Seen up close" is a fine-scale confirmation (an EMIT pass that saw methane, or a
+ * Carbon Mapper plume within 7 km). "Within N days" is the rule; "during this fortnight" is a
+ * confirmation inside the tip window.
  */
-export function decisionWords(f: Follow): string {
+export function decisionParts(f: Follow): WordPart[] {
   const s1 = f.step1;
   const fo = f.followed;
   const inside = fo.daysBeforeTip !== null && fo.daysBeforeTip <= 0;
+  const n = (v: number | null): WordPart => ({ text: days(v ?? 0), mono: true });
+  const rule: WordPart = { text: days(f.gapDays), mono: true };
+  const t = (text: string): WordPart => ({ text });
   switch (f.reason) {
     case 'newest_confirmation':
-      return `Of the two spots it checked first, the agent follows ${spot(fo)}, where methane was seen up close most recently.`;
+      // The rule's step 1 held, so step 2 never ran: the line says the gap, the rule, and that the
+      // agent checks no more spots (the replay's switch to a spot ranked 2 or 3 is the other case).
+      return inside
+        ? [t(`Methane was seen up close at ${spot(fo)} during this fortnight, so the agent stays with it and checks no more spots.`)]
+        : [t(`Methane was last seen up close at ${spot(fo)} `), n(fo.daysBeforeTip), t(' before this fortnight, within '), rule,
+          t(', so the agent stays with it and checks no more spots.')];
     case 'top_spot_stale_switched':
       if (s1.latest) {
-        return `Methane was last seen up close at ${spot(s1)} ${days(s1.daysBeforeTip ?? 0)} before this fortnight, so the agent is following ${spot(fo)}, ${inside ? 'seen up close during this fortnight' : `last seen up close ${days(fo.daysBeforeTip ?? 0)} before`}.`;
+        return [t(`Methane was last seen up close at ${spot(s1)} `), n(s1.daysBeforeTip), t(` before this fortnight, so the agent is following ${spot(fo)}, `),
+          ...(inside ? [t('seen up close during this fortnight')] : [t('last seen up close '), n(fo.daysBeforeTip), t(' before')]), t('.')];
       }
-      return `Methane has not been seen up close at either top spot, so the agent is following ${spot(fo)}, ${inside ? 'seen up close during this fortnight' : `last seen up close ${days(fo.daysBeforeTip ?? 0)} before this fortnight`}.`;
+      return [t(`Methane has not been seen up close at either top spot, so the agent is following ${spot(fo)}, `),
+        ...(inside ? [t('seen up close during this fortnight')] : [t('last seen up close '), n(fo.daysBeforeTip), t(' before this fortnight')]), t('.')];
     case 'top_spot_stale_no_fresher':
-      return `Methane was last seen up close at ${spot(s1)} ${days(s1.daysBeforeTip ?? 0)} before this fortnight, and at none of the ${f.checked} next spots within 90 days, so the agent stays with it.`;
+      return [t(`Methane was last seen up close at ${spot(s1)} `), n(s1.daysBeforeTip),
+        t(` before this fortnight, and at none of the ${f.checked} next spots within `), rule, t(', so the agent stays with it.')];
     case 'stronger_tip':
-      return `Methane has not been seen up close at either top spot, or at the ${f.checked} next spots within 90 days, so the agent follows the stronger tip, ${spot(fo)}.`;
+      return [t(`Methane has not been seen up close at either top spot, or at the ${f.checked} next spots within `), rule,
+        t(`, so the agent follows the stronger tip, ${spot(fo)}.`)];
   }
+}
+
+/** The follow decision as one sentence (tests, screen readers, the transcript). */
+export function decisionWords(f: Follow): string {
+  return decisionParts(f).map((p) => p.text).join('');
 }
 
 /** The tip bars' plate line: the window once, and what height means. */
@@ -192,14 +224,14 @@ export function tipBarsLine(f: Follow): string {
   return `TROPOMI, ${windowLongWords(f.tip.start, f.tip.end)}. Taller bars mean more methane in the air than usual for this area.`;
 }
 
-/** The record bars' plate line: whose look, its date once, and how long before the fortnight it was. */
+/** The record bars' plate line: whose look and its date, once. The gap to the fortnight is said by
+ *  the timeline's bracket, the follow line and the card, so it is not repeated here (one point, said once). */
 export function recordBarsLine(f: Follow): string | null {
   const r = f.recordBars;
   if (!r) return null;
-  const when = r.daysBeforeTip <= 0 ? 'That is within this fortnight.' : `That is ${days(r.daysBeforeTip)} before this fortnight began.`;
   return r.by === 'carbon_mapper'
-    ? `Carbon Mapper's image of this plume, ${dayWords(r.date)}. ${when}`
-    : `EMIT saw methane here on ${dayWords(r.date)}. ${when}`;
+    ? `Carbon Mapper's image of this plume, ${dayWords(r.date)}.`
+    : `EMIT saw methane here on ${dayWords(r.date)}.`;
 }
 
 export type BarKind = 'tip' | 'emit' | 'carbon_mapper';

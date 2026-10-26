@@ -26,13 +26,18 @@ import {
   DETECTIONS_COLOUR,
   DETECTIONS_ROW,
   METHANE_RASTER,
+  barLanding,
+  compositeLandsHidden,
+  isBarLayer,
   detectionPopupHtml,
   footprintFrame,
+  isTropomiComposite,
   globeCentre,
   labelPointOutside,
   isoDay,
   methaneGeometryHint,
   methaneRasterHint,
+  tickChanges,
   TROPOMI_RAMP,
 } from '../utils/methaneLayers.ts';
 import {
@@ -305,6 +310,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
   const tileWatch = useRef<Map<string, () => void>>(new Map());
   const [failedLayers, setFailedLayers] = useState<ReadonlySet<string>>(() => new Set());
   const [rasterVisibility, setRasterVisibility] = useState<Record<string, boolean>>({});
+  // Mirror of the ticks for the loaders (a TROPOMI composite that lands after the bars lands unticked).
+  const rasterVisibilityRef = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    rasterVisibilityRef.current = rasterVisibility;
+  }, [rasterVisibility]);
   const [isLayerControlOpen, setIsLayerControlOpen] = useState(true);
   const [drawMode, setDrawMode] = useState<'none' | 'point' | 'polygon'>('none');
   const [hasDrawnFeatures, setHasDrawnFeatures] = useState(false);
@@ -2604,13 +2614,24 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         // The ranked footprints replace the detected ones (same plumes, now measured): one set of
         // outlines on the stage, never two stacked.
         if (isMethane && methaneHint) {
-          // Same kind replaces same kind (ranked footprints replace detected ones; a second
-          // baseline or a second set of columns replaces the first); the baseline stays under
-          // the columns and the footprints.
-          allLayersRef.current
-            .filter((l) => l.type === 'geometry' && l.id !== fillLayerId && isMethaneLayer(l) &&
-              (methaneGeometryHint(l.render, l.url)?.kind ?? 'vector') === methaneHint.kind)
-            .forEach((l) => removeLayer(l.id));
+          if (methaneHint.kind === 'columns') {
+            // The bars (approved 2026-10-26): one bar layer stands on the map at a time, and the flat
+            // TROPOMI composite steps back for them, but what they replace stays in the layers list,
+            // unticked, so the presenter can tick it back (the tip bars under the record bars). Only
+            // the same file shown again replaces its first showing.
+            const { remove, hide } = barLanding(allLayersRef.current, {
+              id: fillLayerId, type: 'geometry', url: geometry.sourceUrl || '', render: methaneHint,
+            });
+            remove.forEach((id) => removeLayer(id));
+            if (hide.length > 0) setRasterVisibility((prev) => ({ ...prev, ...Object.fromEntries(hide.map((id) => [id, false])) }));
+          } else {
+            // Same kind replaces same kind (ranked footprints replace detected ones; a second
+            // baseline replaces the first); the baseline stays under the columns and the footprints.
+            allLayersRef.current
+              .filter((l) => l.type === 'geometry' && l.id !== fillLayerId && isMethaneLayer(l) &&
+                (methaneGeometryHint(l.render, l.url)?.kind ?? 'vector') === methaneHint.kind)
+              .forEach((l) => removeLayer(l.id));
+          }
           const rasterOnStage = plumeFramed.current || allLayersRef.current.some((l) => l.type === 'raster' && isMethaneLayer(l));
           if (methaneHint.kind === 'points') {
             // The watch globe: the whole baseline at once, facing the watch areas.
@@ -2638,20 +2659,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             // Carbon Mapper's rings land where the camera already is: the TROPOMI tip or the columns
             // own the frame, and the rings read when the dive reaches the site.
           } else if (methaneHint.kind === 'columns') {
-            // The columns are read at a tilt, over the pass they were built from. Framed with the
-            // stage's padding only; any padding the globe left on the map eases out on the way.
-            const cam = cameraForStage(currentMap, bounds, { padding: STAGE_PADDING_NOW() });
-            plumeFramed.current = true;
-            currentMap.easeTo({
-              ...(cam?.center ? { center: cam.center } : {}),
-              // The tip bars span ±15 km, so they are read from further out; Carbon Mapper's 30 m plume
-              // image is about 1.5 km across, so it is read closer in; EMIT's 60 m columns in between.
-              zoom: Math.min(cam?.zoom ?? 12, COLUMNS_MAX_ZOOM[barKind(geometry.sourceUrl) ?? 'emit']),
-              pitch: COLUMNS_PITCH,
-              bearing: -20,
-              padding: NO_PADDING,
-              duration: 2200,
-            });
+            frameColumns(currentMap, boundsArray, geometry.sourceUrl);
           } else if (!rasterOnStage) {
             // The frame rule, methane edition: once a plume raster is on the stage it owns the frame
             // (a replay case lands the footprints and the plume together; the plume wins). A set
@@ -2835,6 +2843,24 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       mapInstance.jumpTo(before);
     }
     src.setData(labels);
+  };
+
+  // The columns are read at a tilt, over the pass they were built from: as they land, and when the
+  // presenter ticks a kept bar layer back on. Framed with the stage's padding only; any padding the
+  // globe left on the map eases out on the way.
+  const frameColumns = (mapInstance: maplibregl.Map, box: [number, number, number, number], url: string | undefined) => {
+    const cam = cameraForStage(mapInstance, [[box[0], box[1]], [box[2], box[3]]], { padding: STAGE_PADDING_NOW() });
+    plumeFramed.current = true;
+    mapInstance.easeTo({
+      ...(cam?.center ? { center: cam.center } : {}),
+      // The tip bars span ±15 km, so they are read from further out; Carbon Mapper's 30 m plume
+      // image is about 1.5 km across, so it is read closer in; EMIT's 60 m columns in between.
+      zoom: Math.min(cam?.zoom ?? 12, COLUMNS_MAX_ZOOM[barKind(url) ?? 'emit']),
+      pitch: COLUMNS_PITCH,
+      bearing: -20,
+      padding: NO_PADDING,
+      duration: 2200,
+    });
   };
 
   const flyToLayer = (layerId: string) => {
@@ -3327,7 +3353,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
             bounds: rasterBounds,
           });
 
-          const isVisible = rasterVisibility[layerId] !== undefined ? rasterVisibility[layerId] : true;
+          // A flat TROPOMI composite that lands while a bar layer is on the map (a replay's layers load
+          // in any order) lands listed but unticked: the bars replaced it, as they do when it came first.
+          const behindBars = isTropomiComposite({ id: layerId, type: 'raster', url: raster.url }) &&
+            compositeLandsHidden(allLayersRef.current, (id) => rasterVisibilityRef.current[id] !== false);
+          const isVisible = rasterVisibility[layerId] !== undefined ? rasterVisibility[layerId] : !behindBars;
           setRasterVisibility(prev => ({ ...prev, [layerId]: isVisible }));
 
           // Stacking: the finding sits on the ground. An index (NDVI, NBR, NDWI, change), a methane
@@ -3614,7 +3644,11 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
           checked={isVisible}
           onChange={(e) => {
             e.stopPropagation();
-            setRasterVisibility((prev) => ({ ...prev, [layer.id]: e.target.checked }));
+            // A bar layer ticked on unticks the other bar layer (one stands on the map at a time) and
+            // is framed as it was when it landed (the tip bars span ±15 km; the record bars ~1.5 km).
+            const checked = e.target.checked;
+            setRasterVisibility((prev) => ({ ...prev, ...tickChanges(allLayersRef.current, layer.id, checked, (id) => prev[id] !== false) }));
+            if (checked && isBarLayer(layer) && layer.bounds && map.current) frameColumns(map.current, layer.bounds, layer.url);
           }}
           aria-label={`${isVisible ? 'Hide' : 'Show'} ${label}`}
         />

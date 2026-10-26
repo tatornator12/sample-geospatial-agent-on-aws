@@ -5,7 +5,7 @@
  * Mapper's plumes), never from model text; every word here is the stage's own.
  *
  * Also the brief card's one line about the gap (the draft's validated enums and numbers, worded
- * here), so the bracket on the timeline and the card's line say the same months from one function.
+ * here), so the bracket on the timeline and the card's line say the same days.
  */
 import type { CmPlumes, PassFrame, Tip } from './steps.ts';
 
@@ -47,10 +47,21 @@ export function windowWords(start: string, end: string): string {
   return `${dayMonthYear(start)} to ${dayMonthYear(end)}`;
 }
 
-/** The gap as the room hears it: "about 4 months", or "26 days" under 60 days ("1 day"). */
-export function gapWords(days: number): string {
-  if (days < 60) return `${days} ${days === 1 ? 'day' : 'days'}`;
-  return `about ${Math.round(days / 30.44)} months`;
+/** "25 Jul": a pass's date under its frame (the axis above it says the year). */
+export function dayMonth(iso: string): string {
+  const [, m, d] = parts(iso);
+  return `${d} ${MONTHS[m - 1]}`;
+}
+
+/** "11 to 24 Oct", "28 Sep to 12 Oct", "28 Dec to 10 Jan": the fortnight over its band (the axis says the year). */
+export function windowShortWords(start: string, end: string): string {
+  const [, ms, ds] = parts(start);
+  const [, me, de] = parts(end);
+  return ms === me ? `${ds} to ${de} ${MONTHS[me - 1]}` : `${ds} ${MONTHS[ms - 1]} to ${de} ${MONTHS[me - 1]}`;
+}
+
+function daysText(n: number): string {
+  return `${n} ${n === 1 ? 'day' : 'days'}`;
 }
 
 export type EmitMarkKind = 'seen' | 'faint' | 'clouded';
@@ -64,6 +75,34 @@ export interface RecordMark {
   count: number;
 }
 
+/** A run of the stage's words; `mono` marks a date or a figure (printed in the mono face). */
+export interface AxisPart {
+  text: string;
+  mono?: boolean;
+}
+
+/**
+ * The shared date axis under the three rows (approved 2026-10-26): a tick at each month's first day
+ * (January's taller, with its year beside it), the latest close look's date at its mark, the gap from
+ * it to the fortnight's first day in days, and the fortnight's own words over its band.
+ */
+export interface RecordAxis {
+  ticks: Array<{ at: number; year: boolean }>;
+  years: Array<{ at: number; text: string }>;
+  /** "11 to 24 Oct": the fortnight, over its band at the axis's right end. */
+  fortnight: string;
+  /** The latest fine-scale confirmation's date at its mark ("25 Jul 2026"); null without one. */
+  latest: { at: number; text: string } | null;
+  /**
+   * The bracket from the latest confirmation to the fortnight's first day, and its words ("78 days to
+   * 11 Oct": pinned to the first day, as the follow rule measures it, never to the fortnight's end).
+   * Null without a confirmation or when it is inside the fortnight.
+   */
+  gap: { from: number; to: number; days: number; words: AxisPart[] } | null;
+  /** The latest confirmation is inside the fortnight: its words instead of a bracket. */
+  during: AxisPart[] | null;
+}
+
 export interface RecordTimelineModel {
   /** The axis: the record's first day to the tip's last day. */
   axisStart: string;
@@ -72,8 +111,17 @@ export interface RecordTimelineModel {
   band: { start: string; end: string; from: number; to: number; ppb: number | null };
   emit: Array<RecordMark & { kind: EmitMarkKind }>;
   carbonMapper: RecordMark[];
+  /** Whether Carbon Mapper was read at this point: an empty row says which ("none since January 2025"). */
+  carbonMapperRead: 'read' | 'unavailable' | 'not_checked';
   /** The latest fine-scale confirmation and the bracket from it to the tip's first day; null without one. */
   latest: { date: string; by: ConfirmedBy; at: number; days: number; words: string } | null;
+  axis: RecordAxis;
+}
+
+/** What an empty row says, in the room's words (never a blank hairline). */
+export function emptyRowWords(row: 'emit' | 'carbon_mapper', read: RecordTimelineModel['carbonMapperRead'] = 'read'): string {
+  if (row === 'emit') return 'no pass read since January 2025';
+  return read === 'unavailable' ? 'could not be read' : read === 'not_checked' ? 'not checked here' : 'none since January 2025';
 }
 
 /** A look's mark: methane seen, too faint or within noise, or clouded out (unread looks are not drawn). */
@@ -85,6 +133,23 @@ function emitKind(f: PassFrame): EmitMarkKind | null {
 }
 
 const KIND_ORDER: EmitMarkKind[] = ['seen', 'faint', 'clouded'];
+
+/** Month ticks and year labels from the axis's first day to its last. */
+function axisTicks(axisStart: string, end: string, at: (iso: string) => number): Pick<RecordAxis, 'ticks' | 'years'> {
+  const ticks: RecordAxis['ticks'] = [];
+  const years: RecordAxis['years'] = [];
+  let [y, m] = parts(axisStart);
+  if (parts(axisStart)[2] !== 1) m += 1;
+  for (let guard = 0; guard < 240; guard++) {
+    if (m > 12) { y += 1; m = 1; }
+    const iso = `${y}-${String(m).padStart(2, '0')}-01`;
+    if (iso > end) break;
+    ticks.push({ at: at(iso), year: m === 1 });
+    if (m === 1) years.push({ at: at(iso), text: String(y) });
+    m += 1;
+  }
+  return { ticks, years };
+}
 
 /**
  * The timeline for the followed site, or null when there is no tip window to measure against.
@@ -130,13 +195,112 @@ export function recordTimeline({ tip, frames, cm }: {
     const by: ConfirmedBy = e && c && e === c ? 'both' : e && (!c || e > c) ? 'emit' : 'carbon_mapper';
     const date = by === 'carbon_mapper' ? c! : e!;
     const days = daysBetween(date, bandStart);
-    latest = { date, by, at: at(date), days, words: gapWords(Math.max(0, days)) };
+    latest = { date, by, at: at(date), days, words: daysText(Math.max(0, days)) };
   }
-  return {
-    axisStart, axisEnd: end,
-    band: { start: bandStart, end, from: at(bandStart), to: 1, ppb: tip.anomalyPpb },
-    emit, carbonMapper, latest,
+  const band = { start: bandStart, end, from: at(bandStart), to: 1, ppb: tip.anomalyPpb };
+  const axis: RecordAxis = {
+    ...axisTicks(axisStart, end, at),
+    fortnight: windowShortWords(bandStart, end),
+    latest: latest ? { at: latest.at, text: dayMonthYear(latest.date) } : null,
+    gap: latest && latest.days > 0
+      ? { from: latest.at, to: band.from, days: latest.days,
+          words: [{ text: daysText(latest.days), mono: true }, { text: ' to ' }, { text: dayMonth(bandStart), mono: true }] }
+      : null,
+    during: latest && latest.days <= 0 ? [{ text: 'during this fortnight' }] : null,
   };
+  return {
+    axisStart, axisEnd: end, band, emit, carbonMapper,
+    carbonMapperRead: !cm ? 'not_checked' : cm.unavailable ? 'unavailable' : 'read',
+    latest, axis,
+  };
+}
+
+// --- the axis's labels, laid out in lines ---------------------------------------------------------
+
+/** The width of one mono character at the stage's 15 px (Atkinson Hyperlegible Mono, measured 9.48 px). */
+export const MONO_CHAR_PX = 9.5;
+/** The space kept between two labels on one line, and between a label and its bracket. */
+export const LABEL_GAP_PX = 8;
+
+export interface PlacedLabel {
+  /** The label's line under the ticks: 0 is the years' line. */
+  line: number;
+  /** Its left edge and width, px from the axis's left end. */
+  left: number;
+  width: number;
+}
+
+export interface AxisLayout {
+  years: Array<PlacedLabel & { text: string }>;
+  latest: (PlacedLabel & { text: string }) | null;
+  /** The gap's words and its bracket (from the latest mark to the fortnight's first day). */
+  gap: (PlacedLabel & { words: AxisPart[]; bracket: { left: number; right: number; line: number }; inside: boolean }) | null;
+  during: (PlacedLabel & { words: AxisPart[] }) | null;
+  /** How many label lines the axis needs (the years' line included). */
+  lines: number;
+}
+
+/** A label's width on the stage: every character at the mono width (prose runs a little narrower, so this never under-measures). */
+export function labelWidth(text: string | AxisPart[], charPx = MONO_CHAR_PX): number {
+  const chars = typeof text === 'string' ? text.length : text.reduce((n, p) => n + p.text.length, 0);
+  return Math.ceil(chars * charPx);
+}
+
+const overlaps = (a: { left: number; width: number }, b: { left: number; width: number }, gap: number) =>
+  a.left < b.left + b.width + gap && b.left < a.left + a.width + gap;
+
+/**
+ * Where the axis's labels go at a given width (px), so none is ever shrunk below 15 px: the years on
+ * the first line at their Januaries; the latest close look's date with its right edge at its mark (on
+ * the years' line when it clears them, else the next); the gap's words inside the bracket when they
+ * fit there, else just left of it on the line after the date, the bracket beside them; the words of a
+ * confirmation inside the fortnight right-aligned on the line after the date. Pure, so the stage's
+ * line breaks at 1280 and 1920 wide are tested.
+ */
+export function axisLayout(axis: RecordAxis, width: number, charPx = MONO_CHAR_PX, gapPx = LABEL_GAP_PX): AxisLayout {
+  const W = Math.max(1, width);
+  const clampLeft = (left: number, w: number) => Math.max(0, Math.min(W - w, left));
+  const years: AxisLayout['years'] = [];
+  for (const y of axis.years) {
+    const w = labelWidth(y.text, charPx);
+    const placed = { text: y.text, line: 0, left: clampLeft(y.at * W + 2, w), width: w };
+    if (years.length > 0 && overlaps(years[years.length - 1], placed, gapPx)) continue;
+    years.push(placed);
+  }
+  let latest: AxisLayout['latest'] = null;
+  if (axis.latest) {
+    const w = labelWidth(axis.latest.text, charPx);
+    const box = { left: clampLeft(axis.latest.at * W - w, w), width: w };
+    latest = { text: axis.latest.text, ...box, line: years.some((y) => overlaps(y, box, gapPx)) ? 1 : 0 };
+  }
+  let gap: AxisLayout['gap'] = null;
+  if (axis.gap && latest) {
+    const x = axis.gap.from * W;
+    const right = Math.max(x + 4, axis.gap.to * W);
+    const w = labelWidth(axis.gap.words, charPx);
+    if (right - x >= w + 2 * gapPx) {
+      // Inside the bracket, on the date's line (the date ends where the bracket starts).
+      const clash = latest.line === 0 && years.some((y) => overlaps(y, { left: x, width: right - x }, gapPx));
+      const line = clash ? 1 : latest.line;
+      gap = { words: axis.gap.words, left: x + (right - x - w) / 2, width: w, line, bracket: { left: x, right, line }, inside: true };
+    } else if (x - gapPx - w >= 0) {
+      // Just left of the bracket, on the line after the date: "78 days to 11 Oct ⌊__⌋".
+      const line = latest.line + 1;
+      gap = { words: axis.gap.words, left: x - gapPx - w, width: w, line, bracket: { left: x, right, line }, inside: false };
+    } else {
+      // No room either side (a narrow column, an early confirmation): the bracket on the line after
+      // the date, its words under it, ending where it ends.
+      const line = latest.line + 1;
+      gap = { words: axis.gap.words, left: clampLeft(right - w, w), width: w, line: line + 1, bracket: { left: x, right, line }, inside: false };
+    }
+  }
+  let during: AxisLayout['during'] = null;
+  if (axis.during && latest) {
+    const w = labelWidth(axis.during, charPx);
+    during = { words: axis.during, left: W - w, width: w, line: latest.line + 1 };
+  }
+  const lines = 1 + Math.max(0, latest?.line ?? 0, gap?.line ?? 0, gap?.bracket.line ?? 0, during?.line ?? 0);
+  return { years, latest, gap, during, lines };
 }
 
 // --- the brief card's line ----------------------------------------------------------------------

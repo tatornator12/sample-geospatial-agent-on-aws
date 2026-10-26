@@ -14,7 +14,7 @@ import { EvidenceChip } from './EvidenceChip.tsx';
 import { PassFilmstrip } from './PassFilmstrip.tsx';
 import { RecordTimeline } from './RecordTimeline.tsx';
 import { recordTimeline } from '../utils/record.ts';
-import { barShown, decisionWords, recordBarsLine, samePoint, tipBarsLine, type Follow } from '../utils/follow.ts';
+import { barShown, decisionParts, recordBarsLine, samePoint, tipBarsLine, type Follow, type WordPart } from '../utils/follow.ts';
 import { ProfileSection } from './ProfileSection.tsx';
 import { SurveyRow } from './SurveyRow.tsx';
 import { TipBoard } from './TipBoard.tsx';
@@ -257,7 +257,9 @@ export function StepColumn({
           const extra = isExtra(group);
           // The stage's own words for the following beat (from follow.json), one point each: the
           // decision under the follow step, each bar layer's date under its display step.
-          const ownLine = follow && group === lastFollow ? decisionWords(follow)
+          // The decision's figures (the gap, the rule's days) print in the mono face.
+          const ownParts: WordPart[] | null = follow && group === lastFollow ? decisionParts(follow) : null;
+          const ownLine = ownParts ? ownParts.map((p) => p.text).join('')
             : follow && bar === 'tip' ? tipBarsLine(follow)
               : follow && bar === 'record' ? recordBarsLine(follow)
                 : null;
@@ -357,8 +359,18 @@ export function StepColumn({
               {/* The board replaces the scan's area list; two filmstrips label their own sites. */}
               {detail && !board && (
                 <span className="step-detail">
-                  {detail.text}
-                  {detail.mono && films.length < 2 && <span className="step-detail__mono">{detail.mono}</span>}
+                  {ownParts ? (
+                    // One flex item: the sentence runs on with its figures inline.
+                    <span>{ownParts.map((p, k) => (p.mono ? <span key={k} className="step-detail__num">{p.text}</span> : p.text))}</span>
+                  ) : detail.text}
+                  {detail.mono && films.length < 2 && (
+                    <span className="step-detail__mono">
+                      {/* A coordinate pair never breaks across lines (the 1280 column broke "35.86," from "114.40"). */}
+                      {detail.points
+                        ? detail.points.map((p, k) => <span key={k}>{k > 0 && ' · '}<span className="step-detail__pair">{p}</span></span>)
+                        : detail.mono}
+                    </span>
+                  )}
                 </span>
               )}
               {board && (
@@ -382,8 +394,8 @@ export function StepColumn({
                 const area = isFollowed && follow ? tips.find((t) => t.area.name === follow.followed.area) : undefined;
                 const site = top ?? (area ? { ...area, anomalyPpb: follow!.followed.anomalyPpb } : undefined);
                 // The following beat: the site the agent followed gets its record above its frames
-                // (every look since 2025, Carbon Mapper's plumes, the gap to the tip). With a follow
-                // decision on the plate, the timeline draws the marks and leaves the words to the plate.
+                // (every look since 2025, Carbon Mapper's plumes, the dates under them on one axis,
+                // the gap to the fortnight in days); its frames sit right under the EMIT row.
                 const record = !summaryOnly && isFollowed && site
                   ? recordTimeline({ tip: site, frames, cm: cmAt(call) ?? cm[site.area.name] })
                   : null;
@@ -394,7 +406,7 @@ export function StepColumn({
                         {site ? site.area.label : detail?.points?.[j] ?? ''}
                       </span>
                     )}
-                    {record && <RecordTimeline model={record} plate={!!follow} />}
+                    {record && <RecordTimeline model={record} />}
                     <PassFilmstrip toolId={call.id} frames={frames!} onOpen={onOpenEvidence} summaryOnly={summaryOnly}
                       noSummary={record !== null} />
                   </div>

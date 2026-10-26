@@ -260,6 +260,16 @@
   font-variant-numeric: tabular-nums;
   color: var(--fog);
 }
+.step-detail__pair {
+  white-space: nowrap;
+}
+/* A figure inside a sentence (the follow decision's days): mono, fog, never split from its unit. */
+.step-detail__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fog);
+  white-space: nowrap;
+}
 /* The tip board: every watch area scanned, strongest first; the anomaly in mono on a bar in the TROPOMI ramp (ice). */
 .tip-board {
   display: grid;
@@ -366,35 +376,56 @@
 .tip-row--pending {
   grid-template-rows: auto;
 }
-/* The pass filmstrip: one frame per EMIT pass judged; rejected passes dimmed. */
+/* The pass filmstrip: the newest EMIT passes judged, oldest first (the record's axis runs that way),
+   four to a row, each frame with its date under it. A pass that saw methane wears the record's
+   "methane seen" orange (the filled dot's colour), rejected passes are dimmed (the image only: the
+   date stays legible), a clouded-out pass is a dark frame with the record's clouded-out tick. */
 .pass-film {
+  --emit-seen: #f89540;
   margin-top: 8px;
+  container-type: inline-size;
 }
 .pass-film__site {
   display: block;
   margin-top: 10px;
   font-size: 15px;
 }
+.pass-film__caption {
+  margin: 0 0 6px;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--label);
+}
+.pass-film__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
 .pass-film__frames {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
+.pass-film__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  animation: stage-rise 360ms var(--ease-out) both;
+}
 .pass-film__frame {
   display: block;
-  width: 44px;
-  height: 44px;
+  width: 100%;
+  aspect-ratio: 1;
   padding: 0;
   overflow: hidden;
   border-radius: 6px;
-  border: 1px solid var(--hairline-strong);
+  /* Every frame reserves the candidate's 2 px, so all the images are one size. */
+  border: 2px solid var(--hairline);
   background: var(--dome);
   cursor: pointer;
-  transition: border-color 200ms var(--ease-out), opacity 200ms var(--ease-out);
-  animation: stage-rise 360ms var(--ease-out) both;
 }
 .pass-film__frame:disabled {
   cursor: default;
@@ -404,18 +435,68 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity 200ms var(--ease-out);
 }
 .pass-film__frame--candidate {
-  border: 2px solid var(--fog);
+  border-color: var(--emit-seen);
 }
-.pass-film__frame--rejected,
-.pass-film__frame--error {
+.pass-film__frame--rejected img,
+.pass-film__frame--error img {
   opacity: 0.45;
 }
+/* Clouded out: the record's tick, centred in the dark frame (a chip still loading has none). */
+.pass-film__blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pass-film__frame--clouded .pass-film__blank {
+  background: linear-gradient(var(--label), var(--label)) center / 3px 14px no-repeat;
+  opacity: 0.8;
+}
+/* Pointing: an amber ring outside the frame, so it reads on an orange border too (a hue swap would not). */
 .pass-film__frame:not(:disabled):hover,
 .pass-film__frame:focus-visible {
-  border-color: var(--amber);
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+.pass-film__frame:not(:disabled):hover img,
+.pass-film__frame:focus-visible img {
   opacity: 1;
+}
+.pass-film__date {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 0.6ch;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--label);
+  white-space: nowrap;
+}
+.pass-film__date--seen {
+  color: var(--fog);
+}
+/* The year, on its own line, under the first frame and the first of each new year. */
+.pass-film__year {
+  flex-basis: 100%;
+  text-align: center;
+  color: var(--label);
+}
+/* A narrow column (1280 x 720): every date takes two lines, day over month, so none is shrunk and
+   the row stays even (a lone "3 Mar" would fit where "25 Jul" does not). */
+@container (max-width: 268px) {
+  .pass-film__date {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .pass-film__year {
+    flex-basis: auto;
+  }
 }
 .pass-film__summary {
   margin: 6px 0 0;
@@ -423,24 +504,36 @@
   line-height: 1.3;
   color: var(--fog);
 }
-/* The followed site's record (the following beat): a row per source on one date axis, January 2025
-   to the tip, and one bracket from the latest fine-scale confirmation to the tip. Each row's label
-   has its own line over a full-width track, so the track keeps the column's width at 1280 too.
-   Colour says the source, shape says what a look found. No amber: the decision owns it. */
+/* The followed site's record (the following beat): a row per source, TROPOMI, Carbon Mapper, then
+   EMIT (its frames sit under it), on one date axis from January 2025 to the tip, with the axis under
+   the rows: month ticks, the years at their Januaries, the latest close look's date at its mark and
+   the bracket from it to the fortnight's first day. Each row's label has its own line over a
+   full-width track. Colour says the source, shape says what a look found. No amber: the decision
+   owns it. */
 .record-timeline {
+  --emit-seen: #f89540;
+  --ice: #79bdd0;
   margin: 10px 0 2px;
   animation: stage-rise 360ms var(--ease-out) both;
 }
 .record-timeline__row + .record-timeline__row {
   margin-top: 4px;
 }
-.record-timeline__label,
-.record-timeline__foot {
+.record-timeline__label {
   margin: 0;
   font-size: 15px;
   line-height: 1.3;
+  color: var(--fog);
 }
-.record-timeline__label {
+/* TROPOMI's line: its name and anomaly, and the fortnight's dates over the band at the right end
+   (on their own line, still right-aligned, when the column is too narrow for both). */
+.record-timeline__label--split {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
+}
+.record-timeline__fortnight {
+  margin-left: auto;
   color: var(--fog);
 }
 .record-timeline__note {
@@ -465,6 +558,13 @@
   gap: 5px;
   white-space: nowrap;
 }
+/* An empty row says so, where its marks would be. */
+.record-timeline__empty {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--label);
+}
 /* The track: a hairline through the middle, the marks centred on it. */
 .record-timeline__track {
   position: relative;
@@ -477,6 +577,15 @@
   inset: 7.5px 0 auto;
   height: 1px;
   background: var(--hairline-strong);
+}
+/* The fortnight's first day on the lower rows: a faint ice rule, the bracket's end. */
+.record-timeline__now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ice);
+  opacity: 0.55;
 }
 .record-timeline__mark,
 .record-timeline__key {
@@ -494,14 +603,18 @@
   display: inline-block;
   flex: none;
 }
-/* EMIT: plasma orange, the bright end of the EMIT ramp (its dark end dies on the plate). */
+/* EMIT: plasma orange, the bright end of the EMIT ramp (its dark end dies on the plate). A look that
+   saw methane is drawn over the rings of the looks days either side of it. */
 .record-timeline__mark--seen,
 .record-timeline__key--seen {
-  background: #f89540;
+  background: var(--emit-seen);
+}
+.record-timeline__mark--seen {
+  z-index: 1;
 }
 .record-timeline__mark--faint,
 .record-timeline__key--faint {
-  border: 2px solid #f89540;
+  border: 2px solid var(--emit-seen);
   background: var(--plate);
 }
 .record-timeline__mark--clouded,
@@ -515,7 +628,8 @@
   height: 12px;
 }
 /* Carbon Mapper: the map's detection ring, smaller. */
-.record-timeline__mark--plume {
+.record-timeline__mark--plume,
+.record-timeline__key--plume {
   border: 2px solid #6fe0b8;
   background: rgba(111, 224, 184, 0.2);
 }
@@ -526,20 +640,63 @@
   right: 0;
   height: 12px;
   box-sizing: border-box;
-  border: 1px solid #79bdd0;
+  border: 1px solid var(--ice);
   border-radius: 2px;
   background: rgba(121, 189, 208, 0.35);
 }
-/* The gap: a fog bracket with ticks at both ends, drawn once as the beat lands. */
-.record-timeline__gap {
+/* The axis: a hairline under the EMIT row with a tick per month hanging from it (January's taller),
+   a fog tick at the latest close look and an ice tick at the fortnight's first day. */
+.record-timeline__axis {
+  position: relative;
+  margin-top: 6px;
+}
+.record-timeline__ticks {
   position: relative;
   height: 9px;
-  margin-top: 4px;
+  border-top: 1px solid var(--hairline-strong);
 }
-.record-timeline__bracket {
+.record-timeline__tick {
   position: absolute;
   top: 0;
-  height: 7px;
+  width: 1px;
+  height: 3px;
+  background: var(--label);
+  opacity: 0.5;
+}
+.record-timeline__tick--year {
+  height: 8px;
+  opacity: 1;
+}
+.record-timeline__tick--latest {
+  height: 8px;
+  background: var(--fog);
+  opacity: 1;
+}
+.record-timeline__tick--now {
+  height: 8px;
+  background: var(--ice);
+  opacity: 1;
+}
+/* The labels under the ticks, each placed by axisLayout (a line of its own when it would collide). */
+.record-timeline__labels {
+  position: relative;
+  font-size: 15px;
+  line-height: 20px;
+}
+.record-timeline__labels > span {
+  position: absolute;
+  white-space: nowrap;
+}
+.record-timeline__year {
+  color: var(--label);
+}
+.record-timeline__latest,
+.record-timeline__gap-words {
+  color: var(--fog);
+}
+/* The gap: a fog bracket from the latest close look to the fortnight's first day, drawn once. */
+.record-timeline__bracket {
+  height: 10px;
   box-sizing: border-box;
   border: 1px solid var(--fog);
   border-top: none;
@@ -550,30 +707,10 @@
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
 }
-.record-timeline__foot {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  column-gap: 12px;
-  margin-top: 2px;
-}
-.record-timeline__start {
-  color: var(--label);
-}
-.record-timeline__gap-words {
-  margin-left: auto;
-  text-align: right;
-  color: var(--fog);
-}
-/* Without a bracket the words take their own line, from the left, so nothing is left hanging. */
-.record-timeline__gap-words--open {
-  flex-basis: 100%;
-  margin-left: 0;
-  text-align: left;
-}
 @media (prefers-reduced-motion: reduce) {
   .record-timeline,
-  .record-timeline__bracket {
+  .record-timeline__bracket,
+  .pass-film__cell {
     animation: none;
   }
 }

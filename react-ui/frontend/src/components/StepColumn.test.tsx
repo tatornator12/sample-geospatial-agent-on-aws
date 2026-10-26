@@ -106,3 +106,23 @@ describe('the live region (B3, S15)', () => {
     expect(document.querySelector('.stage-step-column')?.hasAttribute('aria-live')).toBe(false);
   });
 });
+
+describe('the follow decision line (Methane Watch, approved 2026-10-26)', () => {
+  it('says the gap and the rule under the follow step, its figures in mono', async () => {
+    const { parseFollow } = await import('../utils/follow.ts');
+    const follow = parseFollow({
+      reason: 'newest_confirmation', basis: 'newest_confirmation', gap_days: 90, tip: { start: '2026-10-11', end: '2026-10-24' },
+      step1: { area: 'shanxi coal basin', rank: 1, lat: 37.8927, lon: 113.5628, anomaly_ppb: 112.8,
+        latest: { date: '2026-07-25', by: 'emit' }, days_before_tip: 78 },
+      followed: { area: 'shanxi coal basin', rank: 1, lat: 37.8927, lon: 113.5628, anomaly_ppb: 112.8,
+        latest: { date: '2026-07-25', by: 'emit' }, days_before_tip: 78 },
+      checked: 0, tip_bars: null, record_bars: null,
+    })!;
+    render(<StepColumn steps={[{ id: 'f1', name: 'follow_site', params: { lat: 37.8927, lon: 113.5628 }, status: 'completed' }]}
+      live={false} follow={follow} />);
+    const line = document.querySelector('.step-detail');
+    expect(line?.textContent).toBe('Methane was last seen up close at the top spot in Shanxi 78 days before this fortnight, '
+      + 'within 90 days, so the agent stays with it and checks no more spots.');
+    expect([...line!.querySelectorAll('.step-detail__num')].map((n) => n.textContent)).toEqual(['78 days', '90 days']);
+  });
+});
