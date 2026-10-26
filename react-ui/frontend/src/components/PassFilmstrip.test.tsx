@@ -37,6 +37,40 @@ describe('PassFilmstrip', () => {
     await waitFor(() => expect(getPresignedUrl).toHaveBeenCalledTimes(2));
   });
 
+  it('reads oldest first like the axis above it, each frame with its date, methane seen in the record\'s orange', () => {
+    const { container } = render(<PassFilmstrip toolId="t1" frames={frames} />);
+    const cells = [...container.querySelectorAll('.pass-film__cell')];
+    expect(cells.map((c) => c.querySelector('.pass-film__date')?.textContent)).toEqual(['18 Jun 2025', '1 Feb 2026', '25 Apr']);
+    // The year where it starts: under the first frame and the first of each new year.
+    expect([...container.querySelectorAll('.pass-film__year')].map((y) => y.textContent)).toEqual(['2025', '2026']);
+    expect(cells.map((c) => c.querySelector('button')?.getAttribute('aria-label'))).toEqual([
+      '18 Jun 2025, clouded out', '1 Feb 2026, within noise', '25 Apr 2026, methane seen']);
+    expect(cells.map((c) => c.querySelector('button')?.className)).toEqual([
+      'pass-film__frame pass-film__frame--rejected pass-film__frame--clouded',
+      'pass-film__frame pass-film__frame--rejected',
+      'pass-film__frame pass-film__frame--candidate']);
+    // The date is the frame's sibling (a dimmed frame never dims its date); a seen pass's date is fog.
+    expect(cells[2].querySelector('.pass-film__date--seen')).not.toBeNull();
+    expect(cells[2].querySelector('button .pass-film__date')).toBeNull();
+    expect(container.querySelector('.pass-film__caption')?.textContent).toBe('The 3 EMIT passes read');
+    expect(container.querySelector('.pass-film__frames')?.getAttribute('aria-label')).toBe('The 3 EMIT passes read, oldest first');
+  });
+
+  it('shows the newest eight of more, oldest of them first, and opens a frame in the stage\'s words', async () => {
+    const many: PassFrame[] = Array.from({ length: 11 }, (_, i): PassFrame => ({
+      date: `2026-0${Math.floor(i / 2) + 1}-1${i % 2}`, verdict: i === 10 ? 'candidate' : 'rejected', short: i === 10 ? 'candidate' : 'too weak',
+      reason: 'the tool\'s reason', peak: 900, chipUrl: `${dir}passchip_${i}.png`,
+    })).reverse();   // the manifest's order: newest first
+    const onOpen = vi.fn();
+    const { container } = render(<PassFilmstrip toolId="t1" frames={many} onOpen={onOpen} />);
+    const dates = [...container.querySelectorAll('.pass-film__date')].map((d) => d.textContent);
+    expect(dates).toEqual(['11 Feb 2026', '10 Mar', '11 Mar', '10 Apr', '11 Apr', '10 May', '11 May', '10 Jun']);
+    expect(container.querySelector('.pass-film__caption')?.textContent).toBe('Newest 8 of 11 EMIT passes');
+    await waitFor(() => expect(container.querySelectorAll('.pass-film__frame:not(:disabled)')).toHaveLength(8));
+    (container.querySelectorAll('.pass-film__frame')[7] as HTMLButtonElement).click();
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ title: 'EMIT pass, 10 Jun 2026: methane seen' }), expect.any(String));
+  });
+
   it('two chipless passes on one date (two granules of one orbit) are two frames with their own keys', () => {
     // The Oct 22 watch recording reads 2026-06-17 twice over the south Caspian, both cloud or gap.
     const sameDay: PassFrame[] = [
