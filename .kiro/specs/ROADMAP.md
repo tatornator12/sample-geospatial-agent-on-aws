@@ -156,3 +156,13 @@ Oct 12 when Dark Vessels was chosen for Act 3.)
   `no_new_look_needed`). Live: bundle has the bars, follow and AIS-key strings; worker 200;
   `/api/agents` 401; 49 KB POSTs 401 (brief and tasking approve) and 403 (invoke). Not yet seen: a
   signed-in approve on the live site posting to Slack. Way back: `deployed-2026-10-23` (`a6e882f`).
+- Oct 26 afternoon (Methane Watch + frontend): `develop` promoted to `demo-stable` = `98ea670`, tag
+  `deployed-2026-10-26-1606` (pushed to `fork`). Brings: the Methane Watch record timeline with a
+  date axis, EMIT's frames under the EMIT row (oldest first, dated, orange edge for methane seen),
+  the empty Carbon Mapper row in words, the stay follow line with its gap and rule, replaced bar
+  layers kept unticked in the layers list (one bar layer at a time when ticked back), the record
+  bars' line saying its date only (merge 98ea670). Frontend and docs only; no agent code changed.
+  Gates: vitest 682; build clean; detector 0. Dev eval methane 13/13. Stable `methane_hunter` v9
+  READY, smoke `strongest-plume` PASS. Live: bundle has "checks no more spots" and "none since
+  January 2025"; worker 200; `/api/agents` 401; 49 KB POSTs 401 (brief approve) and 403 (invoke).
+  Way back: `deployed-2026-10-26` (`c03af74`).
