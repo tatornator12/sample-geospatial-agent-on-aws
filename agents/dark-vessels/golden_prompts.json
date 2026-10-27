@@ -1,8 +1,9 @@
 {
-  "_comment": "Golden prompts for scripts/eval.py --agent vessels: Act 3's one open question (redesign-open-question.md section 3.10). expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear anywhere in the stream (the agent's words and its tool inputs); forbidden_prose is checked on the words only, since the coverage files a display carries are named unproven_<pass>. expected_inputs, forbidden_inputs, expected_before and expected_after check the calls' inputs ({pass_id} filled from the call they pair with); required_text_by_ending holds the words for a draft and for decide(stop). setup_prompt runs first in the same session and is not checked; every setup is the question, so a follow-up runs after a question closed (review M1). Every pass is on file (scripts/build_vessel_cache.py); nothing here reads radar or AIS live. Gate A runs every case plus --only open-question --repeat 3. The four-turn cases (unseen-in-the-reserve, where-next, draft-tasking) stay on develop and in the act3-four-turn-fallback tag.",
+  "_comment": "Golden prompts for scripts/eval.py --agent vessels: Act 3's one open question (redesign-open-question.md section 3.10). expected_tools is a SUBSEQUENCE of the streamed tool calls; forbidden_text must not appear anywhere in the stream (the agent's words and its tool inputs); forbidden_prose is checked on the words only, since the coverage files a display carries are named unproven_<pass>. expected_inputs, forbidden_inputs, expected_before and expected_after check the calls' inputs ({pass_id} filled from the call they pair with); required_text_by_ending holds the words for a draft and for decide(stop). setup_prompt runs first in the same session and is not checked; candidate_count_check holds a draft's first line and its passing note to the session's match record (the passing rule, Oct 27); every setup is the question, so a follow-up runs after a question closed (review M1). Every pass is on file (scripts/build_vessel_cache.py); nothing here reads radar or AIS live. Gate A runs every case plus --only open-question --repeat 3. The four-turn cases (unseen-in-the-reserve, where-next, draft-tasking) stay on develop and in the act3-four-turn-fallback tag.",
   "prompts": [
     {
       "name": "open-question",
+      "candidate_count_check": true,
       "prompt": "Is anyone in the reserve without broadcasting, and where should the patrol look next?",
       "expected_tools": [
         "list_passes",
@@ -82,10 +83,11 @@
         "°N"
       ],
       "max_seconds": 120,
-      "report_max_words": 120
+      "report_max_words": 130
     },
     {
       "name": "thin-pass",
+      "candidate_count_check": true,
       "prompt": "Is anyone in the reserve without broadcasting at the end of August, and where should the patrol look next?",
       "required_tools": [
         "list_passes",
@@ -164,6 +166,7 @@
     },
     {
       "name": "named-pass",
+      "candidate_count_check": true,
       "prompt": "Is anyone in the reserve without broadcasting on the Sep 7 pass, and where should the patrol look next?",
       "expected_inputs": [
         {"name": "find_pass", "match": {"when": ["s1d-20260907t1141", "2026-09-07"]}},
@@ -211,6 +214,7 @@
     },
     {
       "name": "second-question",
+      "candidate_count_check": true,
       "setup_prompt": "Is anyone in the reserve without broadcasting, and where should the patrol look next?",
       "prompt": "Same question for the Sep 18 pass",
       "expected_inputs": [

@@ -1,0 +1,140 @@
+{
+ "_comment": "Real numbers from vessels/cache/v1/s1d-20261012t0018_replay.json (read-only, Oct 27 2026): the four targets match_ais called candidates before the passing rule (west to east, the old T01 to T04) and every replay track whose straight path between hourly fixes came within 3 km of one of them within 60 minutes of the radar minute, fixes from 21:00 to 03:00 UTC only. Track numbers are the build's in-process numbers; no identities.",
+ "sensed": "2026-10-12T00:18:02Z",
+ "targets": [
+  {
+   "old_label": "T01",
+   "lon": -90.54824,
+   "lat": -0.50931
+  },
+  {
+   "old_label": "T02",
+   "lon": -90.06025,
+   "lat": -0.60214
+  },
+  {
+   "old_label": "T03",
+   "lon": -89.56969,
+   "lat": -0.65975
+  },
+  {
+   "old_label": "T04",
+   "lon": -89.55098,
+   "lat": -0.6879
+  }
+ ],
+ "tracks": [
+  {
+   "n": 11,
+   "type": "cargo",
+   "t": [
+    "2026-10-11T22:00Z",
+    "2026-10-11T23:00Z",
+    "2026-10-12T00:00Z",
+    "2026-10-12T01:00Z"
+   ],
+   "c": [
+    [
+     -90.58,
+     -0.37
+    ],
+    [
+     -90.57,
+     -0.42
+    ],
+    [
+     -90.53,
+     -0.56
+    ],
+    [
+     -90.53,
+     -0.56
+    ]
+   ]
+  },
+  {
+   "n": 29,
+   "type": "passenger",
+   "t": [
+    "2026-10-11T22:00Z",
+    "2026-10-11T23:00Z",
+    "2026-10-12T00:00Z",
+    "2026-10-12T01:00Z"
+   ],
+   "c": [
+    [
+     -89.61,
+     -0.9
+    ],
+    [
+     -89.52,
+     -0.78
+    ],
+    [
+     -89.54,
+     -0.7
+    ],
+    [
+     -89.64,
+     -0.47
+    ]
+   ]
+  },
+  {
+   "n": 92,
+   "type": "passenger",
+   "t": [
+    "2026-10-11T22:00Z",
+    "2026-10-11T23:00Z",
+    "2026-10-12T00:00Z",
+    "2026-10-12T01:00Z"
+   ],
+   "c": [
+    [
+     -89.58,
+     -0.84
+    ],
+    [
+     -89.53,
+     -0.76
+    ],
+    [
+     -89.56,
+     -0.68
+    ],
+    [
+     -89.65,
+     -0.45
+    ]
+   ]
+  },
+  {
+   "n": 116,
+   "type": "other",
+   "t": [
+    "2026-10-11T22:00Z",
+    "2026-10-11T23:00Z",
+    "2026-10-12T00:00Z",
+    "2026-10-12T01:00Z"
+   ],
+   "c": [
+    [
+     -90.25,
+     -0.48
+    ],
+    [
+     -90.14,
+     -0.55
+    ],
+    [
+     -90.01,
+     -0.63
+    ],
+    [
+     -89.92,
+     -0.7
+    ]
+   ]
+  }
+ ]
+}

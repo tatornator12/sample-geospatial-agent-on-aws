@@ -95,7 +95,8 @@ async def draft_tasking(pass_id: str, box: int, candidate_ids: list = None, look
             return json.dumps({"error": f"notes: {why}"})
     now = datetime.now(timezone.utc)
     tid = f"tasking-{now:%Y%m%dT%H%M%S}-{secrets.token_hex(3)}"
-    counts = {s: sum(t["status"] == s for t in match["targets"]) for s in ("broadcasting", "port", "unproven", "seen_once", "candidate")}
+    counts = {s: sum(t["status"] == s for t in match["targets"])
+              for s in ("broadcasting", "port", "unproven", "seen_once", "passed_close", "candidate")}
     draft = {
         "tasking_id": tid, "status": "draft", "drafted_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "pass_id": pass_id,
         "pass_sensed": vs.pass_entry(pass_id)["sensed"], "counts": counts, "heard_share": coverage["heard_share"],

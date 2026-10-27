@@ -40,7 +40,7 @@ def test_the_prompt_has_no_workflow_no_arrows_no_em_dash_and_no_retired_words(pr
 def test_the_prompt_quotes_the_standard_and_the_cap_from_the_store(prompt):
     import vessel_store as vs
     import vessels_config as c
-    assert c.FLOOR == 15 == round(100 * vs.CHECKABLE_FLOOR) and c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 120
+    assert c.FLOOR == 15 == round(100 * vs.CHECKABLE_FLOOR) and c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 130
     text = flat(prompt)
     assert f"Under {c.FLOOR}% of the reserve it is too thin" in text
     assert f"ANSWER (at most {c.ANSWER_MAX_WORDS} words in all;" in text
@@ -125,7 +125,7 @@ def test_the_answer_block_has_three_endings(prompt):
     for kind in ("candidates", "none"):
         assert "Then the candidate sentence." in e[kind]["text"]
     assert "the forecast's say, word for word" in e["stop"]["text"] and "Global Fishing Watch" in e["stop"]["text"]
-    assert vs.ANSWER_MAX_WORDS == 120
+    assert vs.ANSWER_MAX_WORDS == 130
 
 
 def test_the_answer_begins_with_its_first_line_and_dates_have_no_year(prompt):
@@ -183,6 +183,46 @@ def test_the_longest_legal_answer_is_within_the_cap(prompt):
     lines = [first, "", f"- {read}", f"- {cands}", f"- {vs.SAY_ELSE}", f"- {say}", "", c.CANDIDATE_SENTENCE, "", e["end"]]
     assert [len(x.split()) for x in (first, read, cands, vs.SAY_ELSE, say, c.CANDIDATE_SENTENCE, e["end"])] == [
         15, 19, 14, 15, 22, 15, 16]
-    assert len("\n".join(lines).split()) == 120 <= c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 120
+    assert len("\n".join(lines).split()) == 120
+    # The passing rule's note (Oct 27) after the candidates, in the same bullet: ten words more, the cap.
+    lines[3] = f"- {cands} {vs.passed_say(12, 7)}"
+    assert len(vs.passed_say(12, 7).split()) == 10
+    assert len("\n".join(lines).split()) == 130 <= c.ANSWER_MAX_WORDS == vs.ANSWER_MAX_WORDS == 130
     assert len(fill(t["pass"], "Sep 30", "22").split()) == 10                # a single pass read is shorter still
     assert vs.CHECKABLE_FLOOR == 0.15
+
+
+# --- the passing rule (approved 2026-10-27) ----------------------------------------------------------------
+
+def test_the_prompt_says_a_target_a_ship_passed_close_by_is_not_a_candidate(prompt):
+    import vessel_store as vs
+    text = flat(prompt)
+    assert "A target match_ais calls passed_close is not a candidate either" in text
+    assert "Never count it with the candidates, never draft it, never call it dark." in text
+    e = endings(prompt)
+    for kind in ("candidates", "none"):
+        assert "match_ais' passed_say word for word" in e[kind]["text"]
+    assert "passed_say" not in e["stop"]["text"].split("<n> is")[0]
+    assert "<n> is match_ais' candidate count alone; the targets in passed_say are never added to it." in text
+    # The answer's words never say "aside" (the named-pass case forbids it in prose: it is the set-aside pass's word).
+    assert "aside" not in vs.passed_say(2, 2) + vs.passed_say(2, 0)
+    assert vs.passed_say(2, 2) == "2 more not counted: a broadcasting ship passed close by."
+
+
+def test_the_oct_12_answer_with_the_note_is_within_the_cap(prompt):
+    """The show's answer on the passes on file: Oct 12, two candidates, two not counted, the say as
+    measured on Oct 21 ("July", 45%, 9 times): 116 words, as the dev run before the rule gave 108 with
+    four candidates."""
+    import forecast_tools as ft
+    import vessel_store as vs
+    import vessels_config as c
+    e = endings(prompt)["candidates"]
+    t = templates(prompt)
+    first = e["first"].replace("<n>", "2").replace("<date>", "Oct 12").replace("<k>", "1")
+    read = fill(t["pass"], "Oct 12", "19")
+    cands = f'{fill(t["candidates"], "T01, T02", "24.6", "31.0")} {vs.passed_say(2, 2)}'
+    say = ft.rolling_say(date(2026, 7, 1), 45, "9")
+    lines = [first, "", f"- {read}", f"- {cands}", f"- {vs.SAY_ELSE}", f"- {say}", "", c.CANDIDATE_SENTENCE, "", e["end"]]
+    assert cands == ("Candidates T01, T02: 24.6 to 31.0 km from port. "
+                     "2 more not counted: a broadcasting ship passed close by.")
+    assert len("\n".join(lines).split()) <= 117 < c.ANSWER_MAX_WORDS

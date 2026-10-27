@@ -63,6 +63,14 @@ CANDIDATE_ID_RE = re.compile(r"^T\d{2}$")
 ATTRIBUTION = "Powered by Global Fishing Watch."
 CLAIM_KM = 5.0              # a broadcasting target's hairline to its AIS position at the pass minute
 OURS_MATCH_KM = 1.0         # one of our targets with an AIS position this close is broadcasting
+# The passing rule (approved 2026-10-27; the thresholds were chosen after seeing the Oct 12 pass): a
+# target that would be a candidate is set aside (passed_close) when a broadcasting ship's straight
+# path between two consecutive hourly fixes, at most PASSING_GAP_H apart, came within PASSING_KM of
+# it at a time within PASSING_MIN minutes of the radar minute. GFW keeps one position per vessel-hour
+# from any minute of that hour, so the radar may have seen the ship between its dots.
+PASSING_KM = 1.0
+PASSING_MIN = 30
+PASSING_GAP_H = 3.0
 
 # Fixed sentences (the eval checks them word for word).
 ON_FILE_ONLY = "I only investigate passes on file."
@@ -77,7 +85,9 @@ OFFICERS_DECISION = "The decision is the officer's; I only draft."
 
 # The open question (design §3.5). The prompt, the tools and the eval read these, so they cannot drift.
 CHECKABLE_FLOOR = 0.15      # the standard: a pass speaks only for reserve water it imaged where AIS was received
-ANSWER_MAX_WORDS = 120      # the answer's cap, as the eval's report_max_words counts it
+# The answer's cap, as the eval's report_max_words counts it: 120 until the passing rule (Oct 27),
+# whose ten-word note (passed_say) takes the longest legal answer to 130.
+ANSWER_MAX_WORDS = 130
 PASS_BUDGET = 2             # passes read in one question
 MAX_LISTED = 12             # the board's rows
 PROMPT_MAX_CHARS = 2000     # the presenter's words kept for `asked`
@@ -300,6 +310,60 @@ def heads_at(replay: dict, when: datetime, max_gap_h: float = 3.0) -> list[dict]
 def nearest_head(target: dict, heads: list[dict]) -> tuple[dict | None, float]:
     near = min(heads, key=lambda h: km((target["lon"], target["lat"]), (h["lon"], h["lat"])), default=None)
     return near, (km((target["lon"], target["lat"]), (near["lon"], near["lat"])) if near else math.inf)
+
+
+KM_PER_DEG = 12742.0176 / 2 * math.pi / 180   # the same sphere as km()
+KNOT_KMH = 1.852
+
+
+def closest_passing(target: dict, replay: dict, when: datetime, km_limit: float = PASSING_KM,
+                    minutes: float = PASSING_MIN, max_gap_h: float = PASSING_GAP_H) -> dict | None:
+    """The passing rule's evidence: the broadcasting ship whose straight path between two consecutive
+    hourly fixes (at most `max_gap_h` apart) came closest to the target at a time within `minutes` of
+    `when`, if that is within `km_limit`; else None. Each fix is taken at its stamped hour, and the ship
+    moves at a steady speed between two fixes. Returns km (the closest approach), minutes (from the
+    radar minute to that moment: negative before), type (the track's, never an identity) and knots."""
+    lon0, lat0 = target["lon"], target["lat"]
+    kx, ky = KM_PER_DEG * math.cos(math.radians(lat0)), KM_PER_DEG
+    lo, hi = when - timedelta(minutes=minutes), when + timedelta(minutes=minutes)
+    best = None
+    for tr in replay.get("tracks", []):
+        ts = [parse_t(x) for x in tr["t"]]
+        for i in range(len(ts) - 1):
+            t0, t1 = ts[i], ts[i + 1]
+            if t1 <= t0 or t1 - t0 > timedelta(hours=max_gap_h) or t1 < lo or t0 > hi:
+                continue
+            span = (t1 - t0).total_seconds()
+            s_lo, s_hi = max(0.0, (lo - t0).total_seconds() / span), min(1.0, (hi - t0).total_seconds() / span)
+            if s_lo > s_hi:
+                continue
+            (a_lon, a_lat), (b_lon, b_lat) = tr["c"][i], tr["c"][i + 1]
+            ax, ay = (a_lon - lon0) * kx, (a_lat - lat0) * ky
+            dx, dy = (b_lon - a_lon) * kx, (b_lat - a_lat) * ky
+            s_when = min(s_hi, max(s_lo, (when - t0).total_seconds() / span))
+            d2 = dx * dx + dy * dy
+            # A ship at anchor is a point: its nearest moment is the one nearest the radar minute.
+            s = s_when if d2 < 1e-12 else min(s_hi, max(s_lo, -(ax * dx + ay * dy) / d2))
+            dist = math.hypot(ax + s * dx, ay + s * dy)
+            at = t0 + timedelta(seconds=s * span)
+            off = (at - when).total_seconds() / 60
+            if best is None or dist < best["km_raw"] - 1e-9 or (abs(dist - best["km_raw"]) <= 1e-9 and abs(off) < abs(best["min_raw"])):
+                best = {"km_raw": dist, "min_raw": off, "type": tr.get("type", "unknown"),
+                        "knots": math.sqrt(d2) / (span / 3600) / KNOT_KMH}
+    if best is None or best["km_raw"] > km_limit:
+        return None
+    return {"km": round(best["km_raw"], 2), "minutes": round(best["min_raw"]), "type": best["type"],
+            "knots": round(best["knots"], 1)}
+
+
+PASSED_WORDS = "not counted: a broadcasting ship passed close by."
+
+
+def passed_say(passed: int, candidates: int) -> str:
+    """The answer's words for the targets the passing rule set aside, said after the candidates
+    ("2 more not counted: ...", or with no candidates "2 not counted: ..."). Never "aside": that word
+    is the answer's for a pass under the standard."""
+    return f"{passed} {'more ' if candidates else ''}{PASSED_WORDS}"
 
 
 def broadcasts(target: dict, near_km: float) -> bool:
