@@ -10,6 +10,7 @@ target_fingerprint: "sha256:2ca209d24672c0f4959187f3a298305e2c8918e6117621ad5c61
 target_path: /Users/tsteske/Documents/repos/sample-geospatial-agent-on-aws-main/.worktrees/vessels-passing/react-ui/frontend/src/components/seaStage.ts
 timestamp: 2026-10-27T18-51-15Z
 slug: react-ui-frontend-src-components-seastage-ts
+closed: true
 ---
 Method: dual-agent (A: context-gatherer design review · B: kirocrew-worker detector run)
 

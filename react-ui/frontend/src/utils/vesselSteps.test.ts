@@ -209,6 +209,8 @@ describe('the lines: every template, from the files only', () => {
     expect(say('draft', 'most_past_targets', 1, { box: 1, share_pct: 9 })).toBe('Decided: Drafting box 1: it held the most past dark targets, 9%.');
     expect(say('draft', 'soonest_look', 1, { box: 1, look: 'S1-D Oct 24 00:17 UTC' })).toBe('Decided: Drafting box 1: its radar look comes first, S1-D Oct 24 00:17 UTC.');
     expect(say('draft', 'near_candidates', 3, { box: 3, candidates_near: 2 })).toBe('Decided: Drafting box 3: 2 of the candidates lie in or near it.');
+    // Oct 12 after the passing rule: one of the two candidates by box 1.
+    expect(say('draft', 'near_candidates', 1, { box: 1, candidates_near: 1 })).toBe('Decided: Drafting box 1: 1 of the candidates lies in or near it.');
     expect(say('draft', 'only_planned_look', 2, { box: 2 })).toBe('Decided: Drafting box 2: the only box with a radar look planned.');
     expect(say('stop', 'no_checked_pass', 'none', { passes: [{ pass_id: AUG30, checkable_pct: 10 }], standard_pct: 15 }))
       .toBe('Checked: Aug 30 can check only 10%, under the 15% standard. No tasking can be drafted.');

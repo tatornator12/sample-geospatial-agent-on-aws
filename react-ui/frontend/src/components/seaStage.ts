@@ -583,7 +583,11 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
         'icon-pitch-alignment': 'map', 'icon-rotation-alignment': 'map',
         'text-field': ['concat', ['get', 'label'], PASSED_LABEL_SUFFIX],
         'text-font': MONO, 'text-size': 15, 'text-max-width': 30,
-        'text-variable-anchor': ['left', 'right', 'top', 'bottom'], 'text-radial-offset': 1.1, 'text-justify': 'auto', 'text-padding': 3, 'text-optional': true,
+        // Two set aside side by side (Oct 12's T03 and T04 are 3 km apart, about 10 px at the
+        // candidates' zoom): the corners too, so the second finds a side before it gives way.
+        'text-variable-anchor': ['left', 'right', 'top', 'bottom', 'bottom-left', 'top-left', 'bottom-right', 'top-right'],
+        'text-radial-offset': 1.1, 'text-justify': 'auto', 'text-padding': 3, 'text-optional': true,
+        'symbol-sort-key': ['to-number', ['slice', ['get', 'label'], 1]],
       },
       paint: {
         'icon-opacity': 0, 'icon-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 400 },

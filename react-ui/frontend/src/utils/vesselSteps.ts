@@ -275,7 +275,7 @@ export function decisionLine(d: Decision): StepLine | null {
     case 'forecast/no_candidates': return decided(`No candidates on ${from} in the ${f.checkable}% it could check. Going to where to look next.`);
     case 'draft/most_past_targets': return decided(`Drafting box ${k}: it held the most past dark targets, ${f.share}%.`);
     case 'draft/soonest_look': return decided(`Drafting box ${k}: its radar look comes first, ${f.look}.`);
-    case 'draft/near_candidates': return decided(`Drafting box ${k}: ${f.near} of the candidates lie in or near it.`);
+    case 'draft/near_candidates': return decided(`Drafting box ${k}: ${f.near} of the candidates ${f.near === 1 ? 'lies' : 'lie'} in or near it.`);
     case 'draft/only_planned_look': return decided(`Drafting box ${k}: the only box with a radar look planned.`);
     case 'stop/no_checked_pass': {
       const [a, b] = f.passes ?? [];
