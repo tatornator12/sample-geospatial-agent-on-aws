@@ -118,6 +118,14 @@ def test_the_watch_reads_its_dates_from_the_tools_and_says_when_emit_last_looked
     # The checks' own lines reach the record once, as the tool's "- Check:" lines (dev v42 eval run 1:
     # a model that copied them into observations dropped the "Check:" lines from the pasted record).
     assert "never copy a check's line" in p and "\"- Check:\" and \"- Independent detections:\" lines included" in p
+    # The brief's wording (the presenter's filed brief, 27 Oct): the tool writes the plume product's gap
+    # and, with no_new_look_needed, the next line; the model never says passes were "not checked".
+    assert "always the plume product's gap" not in p
+    assert ("never NASA's plume product or its date: the tool writes that gap itself, first, with the date and "
+            "that the agent read EMIT's passes itself; never write that passes were \"not checked\"") in p
+    assert "next_collection only with recommend_new_look" in p
+    assert ("with no_new_look_needed leave next_collection out: the tool writes the next line itself in fixed "
+            "words") in p and "never that none is needed" in p
     # The agent's decision (approved 2026-10-23): two enums in draft_brief, the brief's own lines pasted.
     assert '"Recommendation:", "- Check:"' in p and '"Record:",' in p and "YOUR decision on whether this site needs a new fine-scale" in p
     assert "within 7 km, one TROPOMI footprint" in p and "within 5 km" not in p

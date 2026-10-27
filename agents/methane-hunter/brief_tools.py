@@ -46,7 +46,24 @@ TEXT_MAX = 220
 TITLE_MAX = 90
 PLACE_MAX = 64          # "Recurring methane near " + the place stays inside TITLE_MAX
 MAX_OBSERVATIONS = 6
-MAX_GAPS = 4
+MAX_GAPS = 4            # what the model may send ...
+MODEL_GAPS = 3          # ... and keep, besides the plume product's line the tool writes (4 on the card)
+
+# The brief's "Next" line when the agent's own call is no_new_look_needed: fixed words, so a model-written
+# "A new EMIT pass or Tanager-1 overpass ..." can never sit under "No new close look is needed yet."
+# (the presenter's filed brief of 27 Oct). The backend card uses the same words (react-ui brief.ts).
+NO_NEW_LOOK_NEXT = "EMIT's next routine pass over this site, to extend the record."
+# A next_collection that says no look is needed, refused under recommend_new_look.
+_NO_LOOK = re.compile(
+    r"\bno (?:new |further |other |more |fresh )?(?:close |closer |fine-scale )?"
+    r"(?:look|pass|collection|overpass|survey|tasking|check|inspection)s? (?:is |are )?(?:yet )?"
+    r"(?:needed|required|necessary|warranted)\b"
+    r"|\b(?:is|are) not (?:yet )?(?:needed|required|necessary|warranted)\b|\bnone (?:is )?needed\b|\bno need\b",
+    re.IGNORECASE)
+# A model gap about NASA's plume product: the tool writes that line itself, with its date, so the model's
+# (in any wording: "covers only through", "nearly empty after", "not covered by the product") is dropped.
+_PLUME_GAP = re.compile(r"\bplume product\b|\boutlined[- ]plume|\boutlined (?:no |any )?(?:methane )?plumes?\b"
+                        r"|\bNASA(?:'s)? (?:has )?outlined\b", re.IGNORECASE)
 _NEAR = re.compile(r"^(near|close to|around|by)\s+", re.IGNORECASE)
 _COORDS = re.compile(r"\d+\.\d+|°")
 
@@ -65,6 +82,10 @@ FORBIDDEN_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"\b(Inc|LLC|Ltd|PLC|Corp|Corporation|PJSC|OJSC|JSC|GmbH|S\.A\.)\b\.?", "names a company outside the registry's words"),
     (r"\bstate[- ]owned\b|\bministry\b|\bregime\b|\bgovernment\b", "names a government"),
     (r"\b(sabotage|attack|deliberate(ly)?|intentional(ly)?|covert|military|weapon)\b", "asserts intent"),
+    # "Passes after that date have not been checked for outlined plumes" read to the room as "nothing was
+    # checked" (27 Oct), though the agent read every pass itself: say what the data cannot show instead.
+    (r"\bnot (yet )?(been )?(checked|reviewed)\b|\bun(checked|reviewed)\b",
+     "reads as if no pass was checked (the agent read EMIT's passes itself); say what the data cannot show"),
 )
 _COMPILED = tuple((re.compile(p, re.IGNORECASE), why) for p, why in FORBIDDEN_PATTERNS)
 _CONTROL = re.compile(r"[\x00-\x1f\x7f<>`|]")
@@ -160,9 +181,18 @@ def compose_title(place: str, confidence: str, candidates: int) -> str:
 
 
 def validate_brief(place, lat, lon, watch_area, observations, looks, candidates, passes_read,
-                   explanations, confidence, gaps, next_collection) -> dict:
-    """The brief as data, or MethaneError naming what to fix."""
+                   explanations, confidence, gaps, next_collection, recommendation) -> dict:
+    """The brief as data, or MethaneError naming what to fix. `recommendation` is the validated enum:
+    with no_new_look_needed the "Next" line is the tool's fixed words and the model's (if any) is not
+    used; with recommend_new_look the model's next_collection is required and may not say none is needed.
+    Model gaps about NASA's plume product are dropped: draft_brief writes that line itself."""
     place = _NEAR.sub("", _clean(place, "place", PLACE_MAX + 10)).strip(" ,")
+    kept_gaps = [(i, g) for i, g in enumerate(_list(gaps, "gaps", MAX_GAPS)) if not _PLUME_GAP.search(g)]
+    if len(kept_gaps) > MODEL_GAPS:
+        raise MethaneError(f"gaps has more than {MODEL_GAPS} items besides NASA's plume product (the tool writes "
+                           f"that line itself); give at most {MODEL_GAPS}")
+    model_next = (None if recommendation == "no_new_look_needed"
+                  else _clean(next_collection, "next_collection (the new look you recommend)"))
     brief = {
         "place": _clean(place, "place", PLACE_MAX),
         "lat": round(_finite(lat, "lat", -90, 90), 4),
@@ -172,8 +202,8 @@ def validate_brief(place, lat, lon, watch_area, observations, looks, candidates,
         "looks": _int(looks, "looks", 0, 10000),
         "candidates": _int(candidates, "candidates", 0, 1000),
         "passes_read": _int(passes_read, "passes_read", 0, 1000),
-        "gaps": _list(gaps, "gaps", MAX_GAPS),
-        "next_collection": _clean(next_collection, "next_collection"),
+        "gaps": [g for _, g in kept_gaps],
+        "next_collection": model_next or NO_NEW_LOOK_NEXT,
     }
     if brief["candidates"] > brief["passes_read"]:
         raise MethaneError("candidates cannot exceed passes_read")
@@ -200,12 +230,19 @@ def validate_brief(place, lat, lon, watch_area, observations, looks, candidates,
                      "next_check": _clean(e.get("next_check"), f"explanations[{i}].next_check")})
     brief["explanations"] = rows
     problems = [f"place: {p}" for p in check_place(brief["place"])]
-    for field in ("place", "watch_area", "next_collection"):
+    for field in ("place", "watch_area"):
         if brief[field]:
             problems += [f"{field}: {p}" for p in check_text(brief[field])]
-    for field in ("observations", "gaps"):
-        for i, text in enumerate(brief[field]):
-            problems += [f"{field}[{i}]: {p}" for p in check_text(text)]
+    if model_next:
+        problems += [f"next_collection: {p}" for p in check_text(model_next)]
+        if _NO_LOOK.search(model_next):
+            problems.append("next_collection: says no new look is needed, but your recommendation is "
+                            "recommend_new_look; name the new look you recommend (a new EMIT pass, Tanager-1, "
+                            "an aircraft survey or a ground inspection)")
+    for i, text in enumerate(brief["observations"]):
+        problems += [f"observations[{i}]: {p}" for p in check_text(text)]
+    for i, text in kept_gaps:   # numbered as the model sent them
+        problems += [f"gaps[{i}]: {p}" for p in check_text(text)]
     for i, row in enumerate(rows):
         problems += [f"explanations[{i}].next_check: {p}" for p in check_text(row["next_check"])]
     if problems:
@@ -249,10 +286,62 @@ def find_passes(lat: float, lon: float) -> dict | None:
         last = max(dated, key=lambda p: p["date"], default=None)
         return {"since": since, "read": len(passes), "candidates": len(cands),
                 "candidate_dates": len(days), "candidate_days": days,
-                "last_look": last and {"date": last["date"], "result": look_result(last)}}
+                "last_look": last and {"date": last["date"], "result": look_result(last)},
+                "plume_product_latest": _day_or_none(body.get("plume_product_latest"))}
     except Exception as e:  # an addition to the brief, never a reason to fail it
         logger.warning("passes lookup failed: %s", type(e).__name__)
         return None
+
+
+def _day_or_none(value: Any) -> str | None:
+    if not isinstance(value, str) or not _DAY.fullmatch(value):
+        return None
+    try:
+        return date.fromisoformat(value).isoformat()
+    except ValueError:
+        return None
+
+
+_HISTORY_KEY = re.compile(r"^history_(-?\d+\.\d{4})_(-?\d+\.\d{4})\.json$")
+
+
+def find_history(lat: float, lon: float) -> dict | None:
+    """site_history's record for this site this session (nearest within 2 km): EMIT's looks since it began,
+    the first look's day and the plume product's latest date. None when site_history did not run here."""
+    s3 = mt._s3()
+    best = None
+    try:
+        listing = s3.list_objects_v2(Bucket=config.S3_BUCKET_NAME, Prefix=f"{mt.session_prefix()}history_")
+        for obj in listing.get("Contents", []):
+            m = _HISTORY_KEY.fullmatch(obj["Key"].rsplit("/", 1)[-1])
+            if not m:
+                continue
+            d = math.hypot((float(m[1]) - lat) * 110.574, (float(m[2]) - lon) * 111.320 * math.cos(math.radians(lat)))
+            if d <= CHECK_RADIUS_KM and (best is None or d < best[0]):
+                best = (d, obj["Key"])
+        if best is None:
+            return None
+        body = json.loads(s3.get_object(Bucket=config.S3_BUCKET_NAME, Key=best[1])["Body"].read(50_000))
+        looks = body.get("looks") if isinstance(body, dict) else None
+        if isinstance(looks, bool) or not isinstance(looks, int) or not 0 <= looks <= 10_000:
+            return None
+        return {"looks": looks, "first_look": _day_or_none(body.get("first_look")),
+                "plume_product_latest": _day_or_none(body.get("plume_product_latest"))}
+    except Exception as e:  # an addition to the brief, never a reason to fail it
+        logger.warning("history lookup failed: %s", type(e).__name__)
+        return None
+
+
+def looks_line(brief: dict) -> str:
+    """The brief's "Looks:" line: the passes read in their window, then EMIT's looks since its first one
+    here (the year from site_history's record; EMIT began in 2022). "30 times in all" read as 30 of the
+    20 passes since 2025 (27 Oct)."""
+    import watch_tools   # deferred: watch_tools is the heavier module
+    since = f" since {brief['passes_since']}" if brief.get("passes_since") else ""
+    year = (brief.get("looks_since") or "")[:4] or str(watch_tools.EMIT_FIRST_YEAR)
+    n = brief["looks"]
+    return (f"Looks: {brief['candidates']} of {brief['passes_read']} passes read{since} are candidates; "
+            f"EMIT looked {n} time{'' if n == 1 else 's'} since {year}.")
 
 
 # EMIT's verdict on a look, as a code the brief and the stage word themselves.
@@ -505,8 +594,11 @@ def decision_problem(recommendation: str, reason: str, facts: dict) -> str | Non
         last = facts["last_look"]
         fact = (f"EMIT's last look here, on {last['date']}, was {LOOK_WORDS[last['result']]}, not clouded out" if last
                 else "EMIT's passes were not read for this site")
+    # With no_new_look_needed the model leaves next_collection out; a switch to recommend_new_look needs one.
+    needs_next = (" (with recommend_new_look, also give next_collection: the new look you recommend)"
+                  if recommendation == "no_new_look_needed" else "")
     return (f"recommendation_reason '{reason}' does not fit the record: {fact}. The record supports: {supported}. "
-            "Choose one of these and call draft_brief again with everything else unchanged.")
+            f"Choose one of these and call draft_brief again with everything else unchanged{needs_next}.")
 
 
 def validate_decision(recommendation: Any, reason: Any) -> tuple[str, str]:
@@ -618,7 +710,6 @@ def check_only_oil_gas(brief: dict, checks: dict) -> list[str]:
 
 def render_markdown(brief: dict, brief_id: str) -> str:
     area = f"; tipped by the {brief['watch_area']} watch area" if brief["watch_area"] else ""
-    since = f" since {brief['passes_since']}" if brief.get("passes_since") else ""
     checks = brief.get("checks") or {}
     check_lines = [f"- Check: {c['line']}" for c in (checks.get("thermal"), checks.get("infrastructure"))
                    if c and c.get("line")]
@@ -631,8 +722,7 @@ def render_markdown(brief: dict, brief_id: str) -> str:
         f"**Methane Watch brief: {brief['title']}** (draft `{brief_id}`, not filed)",
         "",
         f"Site: near {brief['place']} ({brief['lat']:.4f}, {brief['lon']:.4f}){area}.",
-        f"Looks: {brief['candidates']} of {brief['passes_read']} passes read{since} are candidates; "
-        f"EMIT looked {brief['looks']} times in all.",
+        looks_line(brief),
         *([record_line(brief["record"]),
            recommendation_line(brief["recommendation"], brief["recommendation_reason"], brief["record"])]
           if brief.get("record") else []),
@@ -646,7 +736,7 @@ def render_markdown(brief: dict, brief_id: str) -> str:
         "",
         f"Confidence that methane recurs at this site: {brief['confidence']}. "
         f"Confidence in any single explanation: {SINGLE_EXPLANATION_CONFIDENCE}.",
-        f"Gaps: {'; '.join(brief['gaps'])}.",
+        f"Gaps: {'; '.join(g.rstrip('.') for g in brief['gaps'])}.",
         f"Next collection: {brief['next_collection']}",
         "",
         "Status: DRAFT, awaiting the analyst's decision.",
@@ -662,8 +752,8 @@ def new_brief_id(now: datetime | None = None) -> str:
 @tool
 async def draft_brief(place: str, lat: float, lon: float, observations: list,
                       looks: int, candidates: int, passes_read: int, explanations: list,
-                      confidence: str, gaps: list, next_collection: str, recommendation: str,
-                      recommendation_reason: str, watch_area: str = None) -> str:
+                      confidence: str, gaps: list, recommendation: str, recommendation_reason: str,
+                      next_collection: str = None, watch_area: str = None) -> str:
     """Draft the Methane Watch brief for one site. A DRAFT only: nothing is filed until the analyst decides.
 
     Every text field is ONE short sentence of at most 220 characters (place 64); no markdown, pipes
@@ -678,7 +768,8 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
         observations: 2-6 short sentences, every number from a tool result (ppm·m, ppb, dates, counts).
             No operator, owner or parent in any field: the tool adds the registry's own sentences
             (with the names of record) to the brief, and rejects a field that repeats a name.
-        looks: How many times EMIT looked (site_history.looks).
+        looks: How many times EMIT looked (site_history.looks). The tool takes the count and its first
+            year from site_history's own record when it has one.
         candidates: Candidate passes (check_recent_passes.summary.candidates).
         passes_read: Passes read (check_recent_passes.summary.read).
         explanations: 2-6 objects {"id", "assessment", "next_check"}; id from: routine_venting,
@@ -686,9 +777,10 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
             infrastructure_damage; assessment one of "possible", "less likely", "cannot assess";
             next_check: the evidence that would confirm or rule it out.
         confidence: "low" | "moderate" | "high": confidence that methane RECURS at this site.
-        gaps: 1-4 things the data cannot show (coverage, the plume product's gap after its latest
-            plume date, ...).
-        next_collection: The recommended next look (another EMIT pass, aircraft, ground inspection).
+        gaps: 1-3 things the data cannot show (e.g. that EMIT only sees the site on its passes). Never
+            NASA's plume product or its date: the tool writes that gap itself, first, with the date and
+            that the agent read EMIT's passes itself (a gap about the plume product is dropped). Never
+            write that passes were "not checked" or "not reviewed": that is refused.
         recommendation: YOUR decision for this site: "recommend_new_look" (a new fine-scale look: a
             new EMIT pass, Tanager or aircraft) or "no_new_look_needed".
         recommendation_reason: Why, one of: "confirmation_older_than_90_days" (the latest confirmed
@@ -698,16 +790,21 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
             your choice against the session's records (the tip's window, the latest confirmation, EMIT's
             last look) and refuses one they contradict, naming the fact; when more than one reason
             holds, give the one you lead with.
+        next_collection: ONLY with recommend_new_look (required there): the new look you recommend
+            (a new EMIT pass, Tanager-1, an aircraft survey or a ground inspection), never that none
+            is needed (refused). With no_new_look_needed leave it out: the tool writes the next line
+            itself ("EMIT's next routine pass over this site, to extend the record.") and ignores any.
         watch_area: The watch area whose scan tipped this site (its key, e.g. "shanxi coal basin").
 
     Returns: JSON with brief_id, status "draft", markdown (paste it as the record, verbatim),
     draft_s3_url, next_steps. If the text breaks the brief's rules, or the recommendation does not
     fit the record, an error naming what to fix: fix exactly that and call again.
     """
+    import watch_tools   # deferred: watch_tools is the heavier module
     try:
-        brief = validate_brief(place, lat, lon, watch_area, observations, looks, candidates, passes_read,
-                               explanations, confidence, gaps, next_collection)
         recommendation, recommendation_reason = validate_decision(recommendation, recommendation_reason)
+        brief = validate_brief(place, lat, lon, watch_area, observations, looks, candidates, passes_read,
+                               explanations, confidence, gaps, next_collection, recommendation)
     except MethaneError as e:
         return json.dumps({"error": str(e)})
     brief_id = new_brief_id()
@@ -715,6 +812,11 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
     if passes:   # the pass counts and their window come from the tool's own record, not the model
         brief.update(candidates=passes["candidates"], passes_read=passes["read"], passes_since=passes["since"])
         brief["title"] = compose_title(brief["place"], brief["confidence"], brief["candidates"])
+    history = find_history(brief["lat"], brief["lon"])
+    if history:  # EMIT's looks and the year of its first one, from site_history's own record
+        brief["looks"] = history["looks"]
+        if history["first_look"]:
+            brief["looks_since"] = history["first_look"]
     brief["checks"] = find_checks(brief["lat"], brief["lon"])
     cm = find_carbon_mapper(brief["lat"], brief["lon"])
     if cm:   # Carbon Mapper's independent detections, in the tool's own sentence (with its attribution)
@@ -728,6 +830,11 @@ async def draft_brief(place: str, lat: float, lon: float, observations: list,
     if problem:
         return json.dumps({"error": problem})
     brief.update(recommendation=recommendation, recommendation_reason=recommendation_reason, record=facts)
+    # The plume product's gap, first, in the tool's words with its date (from the tools' own records):
+    # what the agent did about it, never "not checked".
+    latest = (passes or {}).get("plume_product_latest") or (history or {}).get("plume_product_latest")
+    brief["gaps"] = [watch_tools.plume_gap_line(date.fromisoformat(latest) if latest else None,
+                                                (passes or {}).get("read", 0))] + brief["gaps"]
     markdown = render_markdown(brief, brief_id)
     record = {"brief_id": brief_id, "status": "draft", "created": datetime.now(timezone.utc).isoformat(),
               "session_id": mt._session_id(), "brief": brief, "markdown": markdown}

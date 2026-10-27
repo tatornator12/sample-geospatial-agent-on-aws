@@ -104,6 +104,31 @@ SITE_KM = 3.0
 # NASA's plume product is dense through 2024 (600 plumes) and nearly empty after (1 in 2025,
 # 0 in 2026); recent passes are read from here on unless the caller says otherwise.
 PLUME_PRODUCT_DENSE_END = date(2024, 12, 31)
+EMIT_FIRST_YEAR = 2022               # EMIT's first looks (site_history counts every look from 2022-07-01)
+_MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
+           "October", "November", "December")
+
+
+def day_words(day: date) -> str:
+    """2025-09-22 as the room reads it: "22 September 2025" (no locale: the runtime's may not be English)."""
+    return f"{day.day} {_MONTHS[day.month - 1]} {day.year}"
+
+
+def plume_product_words(latest: date | None) -> str:
+    """NASA's plume product and where it stops, from its latest plume date (None: CMR could not say)."""
+    head = "NASA's outlined-plume product"
+    return f"{head} has none after {day_words(latest)}" if latest else f"{head} is nearly empty after 2024"
+
+
+def plume_gap_line(latest: date | None, passes_read: int) -> str:
+    """The brief's gap line about NASA's plume product, written by code with its date. The presenter's
+    filed brief of 27 Oct carried the model's "passes after that date have not been checked for outlined
+    plumes", which the room read as "nothing was checked", though the agent had read 20 raw EMIT passes."""
+    if passes_read > 0:
+        return f"{plume_product_words(latest)}, so the agent read EMIT's passes itself."
+    return f"{plume_product_words(latest)}, and EMIT's passes here were not read."
+
+
 SITES_CACHE_KEY = "methane/cache/sites_v002.geojson"
 WATCH_SITES_CACHE_KEY = "methane/cache/watch_sites_v002.geojson"   # sites + area outlines, for the idle globe
 SITES_TTL_S = 7 * 24 * 3600
@@ -419,9 +444,17 @@ async def site_history(lat: float, lon: float, radius_km: float = 2.0) -> str:
     say = (f"EMIT looked {looks} times ({f_look} to {l_look}) and NASA outlined methane here on {len(dates)} "
            f"separate dates" + (f", most recently {dates[-1]}" if dates else "") + ".")
     if l_look and l_look > PLUME_PRODUCT_DENSE_END.isoformat():
-        say += (" NASA's plume product is nearly empty after 2024" +
-                (f" (its last plume is {latest.isoformat()})" if latest else "") +
-                ", so later passes have not been checked for plumes; no detection is not evidence of no emissions.")
+        # Said as what the agent does about it, never "not checked": the agent reads the passes itself.
+        say += (f" {plume_product_words(latest)}, so the agent reads EMIT's later passes itself; "
+                "no detection is not evidence of no emissions.")
+    # The site's record for the brief: draft_brief takes EMIT's looks and their first year from here,
+    # not from the model, so the card can say "EMIT looked 30 times since 2022".
+    try:
+        mt._put_json(f"{mt.session_prefix()}history_{lat:.4f}_{lon:.4f}.json", {
+            "lat": round(lat, 4), "lon": round(lon, 4), "looks": looks, "first_look": f_look, "last_look": l_look,
+            "plume_dates": len(dates), "plume_product_latest": latest.isoformat() if latest else None})
+    except Exception as e:  # the record is an addition to the brief, never a reason to fail the tool
+        logger.warning("history record failed: %s", type(e).__name__)
     return json.dumps({"lat": lat, "lon": lon, "radius_km": radius_km,
                        "looks": looks, "first_look": f_look, "last_look": l_look,
                        "plume_dates": dates, "plumes": plumes,
@@ -1101,7 +1134,9 @@ async def check_recent_passes(lat: float, lon: float, since: str = None, max_sce
     # The filmstrip's manifest: the UI derives its key from this call's lat/lon (4 decimals) and reads
     # it through the backend; chips are named relative to it (a replay case copies them flat).
     # Every look read, newest first, with its product: the record timeline draws one mark per look.
+    # plume_product_latest: where NASA's outlined plumes stop; the brief's gap line says it with its date.
     manifest = {"lat": round(lat, 4), "lon": round(lon, 4), "since": since_d.isoformat(), "looks": looks,
+                "plume_product_latest": latest.isoformat() if latest else None,
                 "passes": [{"date": p.get("date"), "product": p.get("product"), "verdict": p["verdict"],
                             "scene_id": p.get("scene_id"),
                             "short": p.get("short", "error"), "reason": p.get("reason"), "peak_ppm_m": p.get("peak_ppm_m"),
