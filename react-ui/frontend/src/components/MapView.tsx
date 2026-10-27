@@ -247,8 +247,11 @@ interface MapViewProps {
   vesselRest?: VesselRest | null;
   /** Dark Vessels' tasking: how many drafts this session (0 is none yet), for the session or the case. */
   tasking?: { sessionId: string; caseId?: string; key: number };
-  /** Dark Vessels: the map revealed a pass's candidates (the count it revealed); the step column's counts wait for it. */
-  onCandidatesRevealed?: (passId: string, count: number) => void;
+  /**
+   * Dark Vessels: the map revealed a pass's candidates (the count it revealed, and the targets it showed
+   * set aside because a broadcasting ship passed close by); the step column's counts wait for it.
+   */
+  onCandidatesRevealed?: (passId: string, count: number, passedClose: number) => void;
   /** A raster is on the map (its URL): a replay's held layer waits for the scene before it. */
   onRasterLanded?: (url: string) => void;
   /** Methane Watch: the followed site's decision (follow.json); it dates the bar layers' legend rows. */
@@ -696,7 +699,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
         if (next) setSeaBeat(next);
         // The column's candidate count (and any "no candidates" line) waits for this moment (R4.2).
         const shown = seaFiles.current.get(id);
-        if (f.pass && shown?.data) onRevealRef.current?.(f.pass, targetCounts(shown.data.features).candidate);
+        if (f.pass && shown?.data) {
+          const counts = targetCounts(shown.data.features);
+          onRevealRef.current?.(f.pass, counts.candidate, counts.passedClose);
+        }
       }, prefersReducedMotion() ? 0 : 1400);
     });
   };
@@ -3808,7 +3814,10 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       // draws (vesselLayers.targetKeyRows). The ships' dots lead it while they are on the map.
       // "Candidate" joins the key only once the stage has called one: nothing is called dark before
       // the coverage check.
-      const rows = targetKeyRows({ revealed: candidatesShown, seenOnce: (seaFacts.counts?.seenOnce ?? 0) > 0, tied: (seaFacts.counts?.tied ?? 0) > 0 });
+      const rows = targetKeyRows({
+        revealed: candidatesShown, seenOnce: (seaFacts.counts?.seenOnce ?? 0) > 0, tied: (seaFacts.counts?.tied ?? 0) > 0,
+        passedClose: (seaFacts.counts?.passedClose ?? 0) > 0,
+      });
       return seaKeyList(lg.key, aisRow ? 'Ships and radar targets key' : 'Radar targets key', aisRow ? [aisRow, ...rows] : rows);
     }
     if (lg.kind === 'coverage') {

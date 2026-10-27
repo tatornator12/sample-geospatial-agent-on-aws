@@ -196,3 +196,11 @@ def test_with_no_candidate_left_the_words_drop_more(vessels):
     vs = vessels.vs
     assert vs.passed_say(2, 0) == "2 not counted: a broadcasting ship passed close by."
     assert vs.passed_say(1, 3) == "1 more not counted: a broadcasting ship passed close by."
+
+
+def test_the_stage_says_the_rules_numbers(vessels):
+    """The step column's set-aside line states the limits (vesselSteps.ts PASSING_WORDS); they are these."""
+    vs = vessels.vs
+    ts = (Path(__file__).resolve().parents[3] / "react-ui" / "frontend" / "src" / "utils" / "vesselSteps.ts").read_text()
+    words = ts.split("export const PASSING_WORDS = '", 1)[1].split("'", 1)[0]
+    assert words == f"passed within {vs.PASSING_KM:g} km, {vs.PASSING_MIN} minutes or less from the pass"

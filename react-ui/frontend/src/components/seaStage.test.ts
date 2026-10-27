@@ -9,6 +9,8 @@ import {
   SEA_TIER_KEY,
   addSeaLayers,
   furnitureOff,
+  greyFilter,
+  revealCandidates,
   furnitureOn,
   paintCoverage,
   quietCoverageLabels,
@@ -269,7 +271,7 @@ function expectShipsBetween(t: ReturnType<typeof styleMap>) {
 }
 
 /** Every layer the targets file draws, by its suffix. */
-const TARGET_MARKS = ['-halo', '-fill', '-outline', '-ports', '-ties', '-heads', '-cand', '-labels', '-notes'];
+const TARGET_MARKS = ['-halo', '-fill', '-outline', '-ports', '-ties', '-heads', '-passed', '-cand', '-labels', '-notes'];
 
 describe('the ships under the targets (the stack restacks; the ships settle back)', () => {
   it('sits the ships under every target mark and over every area, the furniture first and the files after, one by one', () => {
@@ -310,9 +312,9 @@ describe('the ships under the targets (the stack restacks; the ships settle back
     const s = stage(t);
     s.argument();
     furnitureOn(t.map, REST, []);
-    // Settled at once, before any frame. Every mark checked: the targets' 9, the coverage's 2
+    // Settled at once, before any frame. Every mark checked: the targets' 10, the coverage's 2
     // words, the boxes' 2 lines and words, the look's line and words.
-    expect(expectShipsBetween(t)).toBe(16);
+    expect(expectShipsBetween(t)).toBe(17);
     t.frame();
     expectShipsBetween(t);
   });
@@ -371,5 +373,56 @@ describe('the ships under the targets (the stack restacks; the ships settle back
     });
     expect(t.layer('sea-wakes')?.paint).toMatchObject({ 'line-width': 1, 'line-opacity': 0.13 });
     expect(t.layer('sea-trail')?.paint).toMatchObject({ 'line-width': 2.2, 'line-opacity': 1 });
+  });
+});
+
+
+// --- the passing rule (approved 2026-10-27): set aside because a broadcasting ship passed close by -------
+
+describe('a target a broadcasting ship passed close by', () => {
+  const oct12 = fc(
+    point(-90.548, -0.509, { label: 'T01', status: 'candidate', source: 'both' }),
+    point(-90.060, -0.602, { label: 'T02', status: 'candidate', source: 'both' }),
+    point(-89.570, -0.660, { label: 'T03', status: 'passed_close', source: 'both', passed_km: 0.18, passed_min: -13 }),
+    point(-89.551, -0.688, { label: 'T04', status: 'passed_close', source: 'both', passed_km: 0.58, passed_min: -14 }),
+  );
+  const draw = () => {
+    const t = styleMap();
+    addSeaLayers(t.map, 'targets', { source: 'g', points: 'g-points', fill: 'g-fill' }, oct12, { view: VIEW, avoid: [], reduced: true, url: 's3://b/targets.geojson' });
+    return t;
+  };
+
+  it('keeps its grey ring before and after the reveal, and is never an orchid candidate', () => {
+    const grey = (revealed: boolean) => (greyFilter(revealed, []) as unknown[])[2] as [string, string[]];
+    expect(grey(false)[1]).toContain('passed_close');
+    expect(grey(true)[1]).toContain('passed_close');
+    expect(grey(true)[1]).not.toContain('candidate');
+    const t = draw();
+    expect(t.layer('g-cand') && JSON.stringify((t.layer('g-cand') as unknown as { filter: unknown }).filter)).toBe('["==",["get","status"],"candidate"]');
+  });
+
+  it('draws the ship\'s path under the ring and its id with why, under the candidates\' layers, waiting for the reveal', () => {
+    const t = draw();
+    const layer = t.layer('g-passed') as unknown as { type: string; filter: unknown; layout: Record<string, unknown>; paint: Record<string, unknown> };
+    expect(layer.type).toBe('symbol');
+    expect(layer.filter).toEqual(['==', ['get', 'status'], 'passed_close']);
+    expect(layer.layout['icon-image']).toBe('sea-passed');
+    expect(layer.layout['text-field']).toEqual(['concat', ['get', 'label'], '  ship passed close']);
+    expect(layer.layout['text-size']).toBeGreaterThanOrEqual(15);
+    expect(layer.layout['text-optional']).toBe(true);
+    expect([layer.paint['icon-opacity'], layer.paint['text-opacity']]).toEqual([0, 0]);
+    // Placed after the candidates' words (a layer lower in the style is placed later), so it gives way to them.
+    expect(t.order().indexOf('g-passed')).toBeLessThan(t.order().indexOf('g-labels'));
+    expect(t.order().indexOf('g-passed')).toBeLessThan(t.order().indexOf('g-cand'));
+    expect(SEA_COMPANION_SUFFIXES).toContain('-passed');
+  });
+
+  it('shows with the candidates at the reveal', () => {
+    const paint = new Map<string, unknown>();
+    const map = { getLayer: () => ({}), setPaintProperty: (id: string, prop: string, v: unknown) => paint.set(`${id} ${prop}`, v), setFilter: () => {} };
+    revealCandidates(map as unknown as maplibregl.Map, 'g-fill', [], true)();
+    expect(paint.get('g-passed icon-opacity')).toBe(1);
+    expect(paint.get('g-passed text-opacity')).toBe(1);
+    expect(paint.get('g-labels text-opacity')).toBe(1);
   });
 });

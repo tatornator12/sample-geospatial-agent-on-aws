@@ -20,6 +20,7 @@ import {
   HALO,
   LABEL,
   LEFT_OUT_SUFFIX,
+  PASSED_LABEL_SUFFIX,
   ORCHID,
   SEABED_COLOURS,
   SEABED_SHADE,
@@ -63,7 +64,7 @@ const BOX_LABEL_FIELD: Expr = ['format', ['get', 'label'], { 'font-scale': 1 }, 
 const NEAR = 6;
 
 /** The companions a sea file's main layer carries (MapView's geometryCompanionIds adds these). */
-export const SEA_COMPANION_SUFFIXES = ['-cand', '-halo', '-ports', '-ties', '-heads', '-hit', '-notes', '-wash'];
+export const SEA_COMPANION_SUFFIXES = ['-cand', '-halo', '-passed', '-ports', '-ties', '-heads', '-hit', '-notes', '-wash'];
 
 /** A companion's id from the main layer's. */
 export const cid = (fillId: string, suffix: string) => fillId.replace(/-fill$/, suffix);
@@ -139,6 +140,21 @@ export function seaImages(map: M): void {
       x.stroke();
     });
     if (img) map.addImage('sea-hatch', img);
+  }
+  // A target the passing rule set aside: a ship's straight path passing just under its grey ring
+  // (r 8, 1.5 px). Level, so it reads as neither the hatch (45 degrees) nor the tie (a line to a dot);
+  // cased in the dome's colour so the grey line holds on the radar's speckle. Drawn at twice the size.
+  if (!map.hasImage('sea-passed')) {
+    const img = canvasImage(64, 64, (x) => {
+      x.lineCap = 'round';
+      x.strokeStyle = 'rgba(15, 20, 27, 0.8)';
+      x.lineWidth = 7;
+      x.beginPath(); x.moveTo(6, 56); x.lineTo(58, 56); x.stroke();
+      x.strokeStyle = 'rgba(143, 163, 184, 0.95)';
+      x.lineWidth = 3;
+      x.beginPath(); x.moveTo(6, 56); x.lineTo(58, 56); x.stroke();
+    });
+    if (img) map.addImage('sea-passed', img, { pixelRatio: 2 });
   }
   if (!map.hasImage('sea-port')) {
     const img = canvasImage(12, 12, (x) => {
@@ -463,9 +479,12 @@ function labelPoint(label: string, at: [number, number] | null, kind = 'label'):
   return at ? [{ type: 'Feature', properties: { label, kind }, geometry: { type: 'Point', coordinates: at } }] : [];
 }
 
-/** The grey rings: everything the radar saw that nothing explains yet (and, after the reveal, the left-out candidates). */
+/**
+ * The grey rings: everything the radar saw that nothing explains yet, the targets set aside (a ship
+ * passed close by keeps its ring and gains its path, -passed), and after the reveal the left-out candidates.
+ */
 export function greyFilter(revealed: boolean, excluded: readonly string[]): Filter {
-  const plain: Filter = ['in', shown, ['literal', revealed ? ['detected', 'unproven', 'seen_once'] : ['detected', 'unproven', 'seen_once', 'candidate']]];
+  const plain: Filter = ['in', shown, ['literal', revealed ? ['detected', 'unproven', 'seen_once', 'passed_close'] : ['detected', 'unproven', 'seen_once', 'passed_close', 'candidate']]];
   if (!revealed || excluded.length === 0) return plain;
   return ['any', plain, ['all', ['==', ['get', 'status'], 'candidate'], ['in', ['get', 'label'], ['literal', [...excluded]]]]];
 }
@@ -551,6 +570,25 @@ export function addSeaLayers(map: M, kind: Exclude<VesselKind, 'radar'>, ids: Se
         'circle-radius': 3.6, 'circle-color': FOG, 'circle-stroke-color': AIS, 'circle-stroke-width': 1.4,
         'circle-opacity': 0, 'circle-stroke-opacity': 0,
         'circle-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 700 }, 'circle-stroke-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 700 },
+      },
+    });
+    // Set aside because a broadcasting ship passed close by: the ship's path under the grey ring and
+    // the target's id with why, both waiting for the reveal. Under the candidates' layers, so their
+    // orchid labels are placed first and this one gives way (text-optional: the path stays).
+    add({
+      id: c('-passed'), type: 'symbol', minzoom: NEAR, source, filter: ['==', ['get', 'status'], 'passed_close'],
+      layout: {
+        ...vis,
+        'icon-image': 'sea-passed', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+        'icon-pitch-alignment': 'map', 'icon-rotation-alignment': 'map',
+        'text-field': ['concat', ['get', 'label'], PASSED_LABEL_SUFFIX],
+        'text-font': MONO, 'text-size': 15, 'text-max-width': 30,
+        'text-variable-anchor': ['left', 'right', 'top', 'bottom'], 'text-radial-offset': 1.1, 'text-justify': 'auto', 'text-padding': 3, 'text-optional': true,
+      },
+      paint: {
+        'icon-opacity': 0, 'icon-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 400 },
+        'text-color': LABEL, 'text-halo-color': HALO, 'text-halo-width': 2.5,
+        'text-opacity': 0, 'text-opacity-transition': { ...fade, delay: ctx.reduced ? 0 : 400 },
       },
     });
     // The candidates: hidden rings until the reveal turns them orchid and grows them.
@@ -855,6 +893,8 @@ export function revealCandidates(map: M, fill: string, excluded: readonly string
   setPaint(map, c('-cand'), 'circle-radius', 10);
   setPaint(map, c('-halo'), 'circle-opacity', 0.55);
   setPaint(map, c('-labels'), 'text-opacity', 1);
+  setPaint(map, c('-passed'), 'icon-opacity', 1);
+  setPaint(map, c('-passed'), 'text-opacity', 1);
   setPaint(map, c('-ties'), 'line-opacity', 0.25);
   setPaint(map, c('-heads'), 'circle-opacity', 0.35);
   setPaint(map, c('-heads'), 'circle-stroke-opacity', 0.35);

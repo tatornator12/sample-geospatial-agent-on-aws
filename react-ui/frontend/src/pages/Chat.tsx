@@ -127,10 +127,16 @@ export function Chat() {
   // Dark Vessels: the passes whose candidates the map has revealed, with the count it revealed, so
   // the step column shows no count before the map does (R4.2, review M2). Held for one session
   // only: a new session id reads as nothing revealed.
-  const [reveals, setReveals] = useState<{ sessionId: string; passes: Record<string, number> }>({ sessionId: '', passes: {} });
+  // With each pass's count, the targets it set aside because a broadcasting ship passed close by.
+  const [reveals, setReveals] = useState<{ sessionId: string; passes: Record<string, number>; passed: Record<string, number> }>(
+    { sessionId: '', passes: {}, passed: {} });
   const revealedPasses = reveals.sessionId === sessionId ? reveals.passes : NO_REVEALS;
-  const onCandidatesRevealed = useCallback((passId: string, count: number) => {
-    setReveals((r) => ({ sessionId, passes: { ...(r.sessionId === sessionId ? r.passes : {}), [passId]: count } }));
+  const passedClosePasses = reveals.sessionId === sessionId ? reveals.passed : NO_REVEALS;
+  const onCandidatesRevealed = useCallback((passId: string, count: number, passedClose: number) => {
+    setReveals((r) => {
+      const same = r.sessionId === sessionId;
+      return { sessionId, passes: { ...(same ? r.passes : {}), [passId]: count }, passed: { ...(same ? r.passed : {}), [passId]: passedClose } };
+    });
   }, [sessionId]);
 
   // Track if this is the first run of the scenario effect
@@ -533,6 +539,7 @@ export function Chat() {
           onTaskingDrafted={setTaskingKey}
           vesselBucket={selectedAgentId === 'vessels' ? vesselRest?.bucket ?? null : null}
           revealedPasses={revealedPasses}
+          passedClosePasses={passedClosePasses}
         />
       </div>
     </div>
