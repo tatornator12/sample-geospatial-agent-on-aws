@@ -270,7 +270,7 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 - **Do:** click "Approve the tasking" (not "Not now"). The plate shows "Filed by the officer at … UTC. The agent did not file it.", and the clock "Patrol tasking filed", "box 1 · 4 of 4 candidates · next radar look not planned yet" (with a planned look, "next radar look in" and a countdown). No follow-up turn. Don't read the filed line out.
 
 **14. The Slack post (second screen)**
-- **Do:** turn to the second screen; the new post lands in "Patrol taskings" (not yet timed from the live site; allow about 10 s).
+- **Do:** turn to the second screen; the new post lands in "Patrol taskings" (works on the live site, seen 26 October; allow about 10 s).
 - **Point at:** the post. Let it sit; don't read it out.
 - **Say:** "And there's the tasking, in the channel the patrol team reads."
 - If nothing has landed after about 10 s: "The filed line on the plate is the record; Slack is only the notice."
