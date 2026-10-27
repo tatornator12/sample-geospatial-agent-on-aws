@@ -155,7 +155,8 @@ const scenarios: Scenario[] = [
   {
     // The one open question (redesign §3.8.5, U11: the id stays across re-records). The metrics are
     // worded to stay true on any take. Recorded on dev by agents/dark-vessels/build_replay_case.py.
-    id: 'vessels-open-question',
+    // v2 (Oct 27): recorded after the passing rule; the stable stage plays vessels-open-question until promoted.
+    id: 'vessels-open-question-v2',
     name: 'Dark Vessels, Galápagos: one open question',
     description: 'One question about the Galápagos Marine Reserve: the agent weighs the radar passes on file, checks whether AIS reception there is good enough, chooses what to check next, and drafts a patrol tasking for the officer. Candidates, never accusations.',
     icon: '/dark_vessels.png',

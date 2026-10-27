@@ -71,7 +71,7 @@ describe('UseCaseGallery', () => {
   });
 
   it('opens the Dark Vessels case on Act 3, available, in the words that stay true across re-records (task 9, §3.8.5)', () => {
-    expect(open('Dark Vessels, Galápagos: one open question')).toBe('/?scenario=vessels-open-question&agent=vessels');
+    expect(open('Dark Vessels, Galápagos: one open question')).toBe('/?scenario=vessels-open-question-v2&agent=vessels');
     cleanup();
     renderGallery();
     const vessels = card('Dark Vessels, Galápagos: one open question');

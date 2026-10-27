@@ -167,7 +167,7 @@ def test_config_keeps_the_tool_use_ids_and_decides_inputs_and_lists_the_map_in_o
         {"step": "read_pass", "because": "newest_wide", "pass_id": P},
         {"step": "draft", "because": "most_past_targets", "box": 1}]
     assert decides[0]["result"] == "Refused by the tool" and decides[1]["result"] == "Decision recorded"
-    place = "s3://bucket/use-cases/vessels-open-question/"
+    place = f"s3://bucket/use-cases/{rc.CASE_ID}/"
     chip = next(c for c in tool_calls if c["id"] == "t_chip")
     assert chip["params"]["s3_url"] == f"{place}chips/{P}_T04.tif"
     assert all(not v.startswith(f"s3://{BUCKET}") for c in tool_calls for v in c["params"].values() if isinstance(v, str))
