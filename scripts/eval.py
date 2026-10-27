@@ -28,7 +28,10 @@ And on the words and the clock:
   * report_first_line_regex: the final report's first line (markdown emphasis and heading marks
     removed) matches this regular expression (the archaeologist's survey opens on its counts);
   * min_accepted {tool: n}: at least n of the tool's calls were not refused (counted from the
-    session transcript, so only for an agent with "refusals" set).
+    session transcript, so only for an agent with "refusals" set);
+  * candidate_count_check (Dark Vessels): on a draft, the answer's first line counts the candidates
+    match_ais recorded for the drafted pass (the session's match_<pass>.json), and its passing note
+    counts the targets set aside because a broadcasting ship passed close by (or is absent).
 
 The closing paragraph (closer_*) is the last paragraph of the prose, a tool call counting as a
 paragraph break, so a closer streamed right after a tool call is read alone.
@@ -307,6 +310,75 @@ def follow_problems(calls: list[dict], files: dict | None) -> list[str]:
     return problems
 
 
+# --- Dark Vessels: the answer's candidate count against the tool's record --------------------------------
+
+MATCH_FILE = re.compile(r"^match_s1[a-d]-\d{8}t\d{4}\.json$")
+# The answer's first line on a draft: "<n> candidates on the <date> pass; ..." or "No candidates on ...".
+FIRST_COUNT = re.compile(r"^(No|\d+) candidates? on the\b", re.I)
+# The passing rule's note (agents/dark-vessels/vessel_store.py passed_say): "<m> [more ]not counted: ...".
+PASSED_WORDS = "not counted: a broadcasting ship passed close by."
+PASSED_NOTE = re.compile(r"\b(\d+) (more )?" + re.escape(PASSED_WORDS))
+
+
+def vessel_match_files(s3, bucket: str, session_id: str) -> dict | None:
+    """The session's match_<pass>.json records (match_ais), by pass id; None when they cannot be
+    read (the check then fails, it never passes on a failed read)."""
+    prefix = f"session_data/{session_id}/vessels/"
+    files: dict = {}
+    try:
+        token = None
+        while True:
+            kwargs = {"Bucket": bucket, "Prefix": prefix}
+            if token:
+                kwargs["ContinuationToken"] = token
+            page = s3.list_objects_v2(**kwargs)
+            for obj in page.get("Contents", []):
+                name = obj["Key"].rsplit("/", 1)[-1]
+                if MATCH_FILE.fullmatch(name) and len(files) < 20:
+                    files[name[len("match_"):-len(".json")]] = json.loads(
+                        s3.get_object(Bucket=bucket, Key=obj["Key"])["Body"].read(2_000_000))
+            token = page.get("NextContinuationToken") if page.get("IsTruncated") else None
+            if not token:
+                return files
+    except Exception as e:
+        print(f"         (match records unavailable: {type(e).__name__})", flush=True)
+        return None
+
+
+def candidate_count_problems(calls: list[dict], text: str, files: dict | None) -> list[str]:
+    """candidate_count_check: on a draft, the answer's first line counts the candidates match_ais
+    recorded for the drafted pass (passed_close targets never added), and the passing note says the
+    count it set aside, or is absent when it set none aside. Pure: the records are passed in."""
+    drafts = [c for c in calls if c.get("name") == "draft_tasking"]
+    if not drafts:
+        return []                      # no draft: the stop ending names no candidate count
+    pid = tool_input(drafts[-1]).get("pass_id")
+    if files is None:
+        return ["candidate_count_check: the session's match records could not be read"]
+    record = files.get(pid) if isinstance(pid, str) else None
+    targets = record.get("targets") if isinstance(record, dict) else None
+    if not isinstance(targets, list):
+        return [f"candidate_count_check: no match record for the drafted pass {pid!r}"]
+    n = sum(1 for t in targets if isinstance(t, dict) and t.get("status") == "candidate")
+    m = sum(1 for t in targets if isinstance(t, dict) and t.get("status") == "passed_close")
+    problems = []
+    first = report_first_line(text)
+    said = FIRST_COUNT.match(first)
+    if not said:
+        problems.append(f"candidate_count_check: the first line {first[:100]!r} gives no candidate count")
+    elif (0 if said.group(1).lower() == "no" else int(said.group(1))) != n:
+        problems.append(f"candidate_count_check: the answer says {said.group(1)} candidates, match_ais recorded {n}")
+    notes = PASSED_NOTE.findall(report_text(text))
+    if m and [int(k) for k, _ in notes] != [m]:
+        problems.append(f"candidate_count_check: match_ais set {m} aside (a ship passed close by), the answer says "
+                        f"{[int(k) for k, _ in notes] or 'none'}")
+    elif not m and notes:
+        problems.append("candidate_count_check: the answer has the passing note, but match_ais set none aside")
+    elif m and bool(notes[0][1]) != bool(n):
+        problems.append("candidate_count_check: the passing note says \"more\" only after candidates")
+    return problems
+
+
 def scrub(text: str, lines: list[str]) -> str:
     for line in sorted(lines, key=len, reverse=True):
         text = text.replace(line, " [registry line] ")
@@ -565,8 +637,9 @@ def case_problems(case: dict) -> list[str]:
     if by_ending is not None and (not isinstance(by_ending, dict) or set(by_ending) - {"draft", "stop"}
                                   or not all(isinstance(v, list) for v in by_ending.values())):
         out.append(f"{case.get('name')}: required_text_by_ending is not {{draft: [...], stop: [...]}}")
-    if "follow_check" in case and not isinstance(case["follow_check"], bool):
-        out.append(f"{case.get('name')}: follow_check is not true or false")
+    for flag in ("follow_check", "candidate_count_check"):
+        if flag in case and not isinstance(case[flag], bool):
+            out.append(f"{case.get('name')}: {flag} is not true or false")
     for key in ("max_seconds", "report_max_words"):
         if key in case and (not isinstance(case[key], (int, float)) or isinstance(case[key], bool) or case[key] <= 0):
             out.append(f"{case.get('name')}: {key} is not a positive number")
@@ -835,6 +908,9 @@ def run_prompt(client, arn: str, case: dict, timeout: int, s3=None, bucket: str 
     problems += accepted_problems(case, tool_names, refused)
     if case.get("follow_check"):
         problems += follow_problems(calls, follow_files(s3, bucket, session_id) if (s3 is not None and bucket) else None)
+    if case.get("candidate_count_check"):
+        problems += candidate_count_problems(
+            calls, text, vessel_match_files(s3, bucket, session_id) if (s3 is not None and bucket) else None)
 
     # Characters of prose (everything that is not a tool-call object): a proxy for how much
     # the model wrote, which is what the room waits on at the end of a turn.

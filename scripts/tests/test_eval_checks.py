@@ -311,6 +311,7 @@ class FakeRuntime:
 
 def test_repeat_runs_each_case_n_times_in_fresh_sessions_and_reports_runs(tmp_path, monkeypatch, capsys):
     case = dict(golden("open-question"))
+    case.pop("candidate_count_check")              # the fake transcript holds no match records (tested above)
     prompts = tmp_path / "golden.json"
     prompts.write_text(json.dumps({"prompts": [case]}))
     runtime = FakeRuntime(clean_path())
@@ -584,3 +585,82 @@ def test_min_accepted_must_be_tool_counts():
         assert ev.case_problems({"name": "x", "min_accepted": bad})
     assert ev.case_problems({"name": "x", "min_accepted": {"record_condition": 2}}) == []
     assert arch_golden("like-this")["min_accepted"] == {"record_condition": 2}
+
+
+# --- the answer's candidate count against match_ais' record (the passing rule, Oct 27) ----------------
+
+PASSED = "not counted: a broadcasting ship passed close by."
+
+
+def match_record(candidates: int, passed: int) -> dict:
+    targets = ([{"status": "candidate", "label": f"T{i:02d}"} for i in range(1, candidates + 1)]
+               + [{"status": "passed_close", "label": f"T{i:02d}"} for i in range(candidates + 1, candidates + passed + 1)]
+               + [{"status": "broadcasting"}, {"status": "port"}])
+    return {"pass_id": OCT12, "targets": targets}
+
+
+def oct12_report(first: str = "2 candidates on the Oct 12 pass; I drafted box 3 for the next look.",
+                 note: str = f"2 more {PASSED}") -> str:
+    return clean_path(report=(
+        f"{first}\n\n- Read Oct 12 (19% checkable); data from Global Fishing Watch.\n"
+        f"- Candidates T01, T02: 24.6 to 31.0 km from port.{' ' + note if note else ''}\n\n"
+        f"The decision is the officer's; I only draft. {CLOSER}"))
+
+
+def count_problems(text: str, files) -> list[str]:
+    return ev.candidate_count_problems(ev.extract_tool_calls(text), text, files)
+
+
+def test_the_answer_counts_the_candidates_and_the_passed_close_as_recorded():
+    files = {OCT12: match_record(2, 2)}
+    assert count_problems(oct12_report(), files) == []
+    # The four of before the rule: the count is the tool's candidates, never with the passed close added.
+    four = oct12_report(first="4 candidates on the Oct 12 pass; I drafted box 3 for the next look.")
+    assert count_problems(four, files) == ["candidate_count_check: the answer says 4 candidates, match_ais recorded 2"]
+    assert count_problems(oct12_report(note=""), files) == [
+        "candidate_count_check: match_ais set 2 aside (a ship passed close by), the answer says none"]
+    assert count_problems(oct12_report(note=f"3 more {PASSED}"), files)
+    # No ship passed close: no note.
+    assert count_problems(oct12_report(), {OCT12: match_record(2, 0)}) == [
+        "candidate_count_check: the answer has the passing note, but match_ais set none aside"]
+    assert count_problems(oct12_report(note=""), {OCT12: match_record(2, 0)}) == []
+
+
+def test_no_candidates_left_reads_as_no_and_the_note_drops_more():
+    files = {OCT12: match_record(0, 2)}
+    first = "No candidates on the Oct 12 pass; I drafted box 3 for the next look."
+    assert count_problems(oct12_report(first=first, note=f"2 {PASSED}"), files) == []
+    assert count_problems(oct12_report(first=first, note=f"2 more {PASSED}"), files) == [
+        "candidate_count_check: the passing note says \"more\" only after candidates"]
+
+
+def test_the_count_check_fails_on_unreadable_or_missing_records_and_skips_a_stop():
+    assert count_problems(oct12_report(), None) == ["candidate_count_check: the session's match records could not be read"]
+    assert count_problems(oct12_report(), {}) == [f"candidate_count_check: no match record for the drafted pass '{OCT12}'"]
+    stop = clean_path(report="No pass I read could be checked, so there is no tasking.").replace('"draft_tasking"', '"next_step"')
+    assert count_problems(stop, None) == []
+
+
+def test_vessel_match_files_reads_the_sessions_match_records_only():
+    class S3:
+        def list_objects_v2(self, **kw):
+            pre = kw["Prefix"]
+            return {"Contents": [{"Key": f"{pre}match_{OCT12}.json"}, {"Key": f"{pre}coverage_{OCT12}.json"},
+                                 {"Key": f"{pre}match_../x.json"}]}
+
+        def get_object(self, Bucket, Key):
+            return {"Body": io.BytesIO(json.dumps(match_record(2, 2)).encode())}
+    files = ev.vessel_match_files(S3(), "bucket", "eval-x")
+    assert list(files) == [OCT12] and len(files[OCT12]["targets"]) == 6
+
+    class Broken:
+        def list_objects_v2(self, **kw):
+            raise RuntimeError("denied")
+    assert ev.vessel_match_files(Broken(), "bucket", "eval-x") is None
+
+
+def test_the_golden_cases_that_draft_check_the_candidate_count():
+    for name in ("open-question", "thin-pass", "named-pass", "second-question"):
+        assert golden(name).get("candidate_count_check") is True, name
+    assert ev.case_problems({"name": "x", "candidate_count_check": "yes"}) == ["x: candidate_count_check is not true or false"]
+    assert ev.PASSED_WORDS == PASSED
