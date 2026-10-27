@@ -15,7 +15,7 @@
  * and when it is absent or malformed the feature is simply off: filing never waits on Slack and
  * never fails because of it.
  */
-import type { BriefCard } from './brief';
+import { looksLine, type BriefCard } from './brief';
 import { taskingMessage, taskingWorkflowPayload, type FiledTasking } from './tasking';
 
 /**
@@ -57,9 +57,10 @@ function plain(value: string): string {
   return value.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string);
 }
 
-/** "6 of 8 recent passes are candidates; EMIT looked 12 times." */
+/** The card's count line: "6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30 times since
+ *  2022." (looksLine), so the post never reads the looks as a count of the passes read. */
 function evidenceLine(card: BriefCard): string {
-  return `${card.candidates} of ${card.passesRead} recent passes are candidates; EMIT looked ${card.looks} times.`;
+  return looksLine(card);
 }
 
 /** One hypothesis per line, its assessment, then (indented) what would confirm or rule it out. */

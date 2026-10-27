@@ -1,8 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  EMIT_FIRST_YEAR,
+  NO_NEW_LOOK_NEXT,
   SNAPSHOT_MAX_BYTES,
   briefCard,
+  looksLine,
   caseBriefDraftKey,
   decodeSnapshot,
   fileRefusal,
@@ -198,6 +201,42 @@ describe('briefCard decision (approved 2026-10-23)', () => {
       assert.ok(card, 'the card itself still shows');
       assert.equal(card?.decision, undefined);
     }
+  });
+});
+
+describe("the card's wording (the presenter's filed brief, 27 Oct)", () => {
+  const record = {
+    tip_start: '2026-10-11', tip_end: '2026-10-24', reference: 'tip',
+    latest_confirmed: { date: '2026-07-25', by: 'emit' }, days_between: 78,
+    last_look: { date: '2026-10-17', result: 'within_noise' }, confirmed_dates: 6,
+  };
+  const presenters = 'A new EMIT pass or Tanager-1 overpass over this site to confirm recurrence and resolve the spatial pattern.';
+
+  it('says the next look in the tool\'s words when the agent\'s own call is no new look, whatever the draft says', () => {
+    const card = briefCard(draft({}, { recommendation: 'no_new_look_needed', recommendation_reason: 'confirmed_within_90_days',
+      record, next_collection: presenters }), BID, SID)!;
+    assert.equal(card.decision?.recommendation, 'no_new_look_needed');
+    assert.equal(card.nextCollection, NO_NEW_LOOK_NEXT);
+    assert.equal(NO_NEW_LOOK_NEXT, "EMIT's next routine pass over this site, to extend the record.");
+    // A new look recommended: the model's line, as drafted.
+    const newLook = briefCard(draft({}, { recommendation: 'recommend_new_look', recommendation_reason: 'confirmation_older_than_90_days',
+      record: { ...record, days_between: 118 }, next_collection: presenters }), BID, SID)!;
+    assert.equal(newLook.nextCollection, presenters);
+  });
+
+  it('says the span of EMIT\'s looks: the first look\'s year, else since 2022, never "in all"', () => {
+    const b = { candidates: 6, passes_read: 20, passes_since: '2025-01-01', looks: 30 };
+    const withYear = briefCard(draft({}, { ...b, looks_since: '2022-08-15' }), BID, SID)!;
+    assert.equal(withYear.looksSince, '2022-08-15');
+    assert.equal(looksLine(withYear), '6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30 times since 2022.');
+    assert.equal(looksLine(briefCard(draft({}, { ...b, looks_since: '2023-03-02' }), BID, SID)!),
+      '6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30 times since 2023.');
+    const older = briefCard(draft({}, b), BID, SID)!;                      // a draft made before the record
+    assert.equal(older.looksSince, undefined);
+    assert.equal(looksLine(older), '6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30 times since 2022.');
+    assert.equal(briefCard(draft({}, { ...b, looks_since: '2022-13-40' }), BID, SID)!.looksSince, undefined);
+    assert.equal(looksLine({ ...older, looks: 1, passesSince: undefined }), '6 of 20 passes read are candidates; EMIT looked 1 time since 2022.');
+    assert.equal(EMIT_FIRST_YEAR, '2022');
   });
 });
 

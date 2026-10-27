@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Message, ToolCall } from '../types.ts';
-import { anotherLookMessage, approvedMessage, currentBriefId, draftBriefId, groundChecks, missionChain, siteCue, siteTip } from './brief.ts';
+import {
+  EMIT_FIRST_YEAR, anotherLookMessage, approvedMessage, currentBriefId, draftBriefId, groundChecks, looksSinceYear, missionChain, siteCue, siteTip,
+} from './brief.ts';
 import { parseManifest, parseTip } from './steps.ts';
 
 const ID = 'brief-20260925T201500-a1b2c3';
@@ -8,6 +10,16 @@ const ID2 = 'brief-20260925T203000-ffffff';
 const draftText = (id: string) => `**Methane Watch brief: Recurring methane** (draft \`${id}\`, not filed)\n\nDecision: analyst's.`;
 const user = (content: string): Message => ({ role: 'user', content }) as Message;
 const agent = (content: string): Message => ({ role: 'assistant', content }) as Message;
+
+describe('looksSinceYear (the presenter\'s filed brief, 27 Oct: "EMIT looked 30 times in all")', () => {
+  it("is the first look's year, else 2022, the year EMIT's looks are counted from", () => {
+    expect(looksSinceYear('2023-03-02')).toBe('2023');
+    expect(looksSinceYear('2022-08-15')).toBe('2022');
+    expect(looksSinceYear(undefined)).toBe('2022');
+    expect(looksSinceYear('last year')).toBe('2022');
+    expect(EMIT_FIRST_YEAR).toBe('2022');
+  });
+});
 
 describe('draftBriefId', () => {
   it('reads the id the brief names as a draft, the last one when there are two', () => {

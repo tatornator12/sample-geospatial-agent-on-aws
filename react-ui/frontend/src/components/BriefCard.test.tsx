@@ -93,7 +93,7 @@ describe('BriefCard decision line', () => {
     expect(line.className).toContain('brief-card__decision');
     expect(Array.from(line.querySelectorAll('.brief-card__gap')).map((s) => s.textContent)).toEqual(['118 days']);
     // It runs on in the count's paragraph, which keeps the decision on the column's first screen at 720p.
-    expect(lineText()[0]).toBe('2 of 4 passes read since 2025-01-01 are candidates; EMIT looked 23 times in all. ' +
+    expect(lineText()[0]).toBe('2 of 4 passes read since 2025-01-01 are candidates; EMIT looked 23 times since 2022. ' +
       'Methane was last seen up close here 118 days before this fortnight. The agent recommends a new close look.');
     expect(screen.queryByText(/Last EMIT look/)).toBeNull();
     expect(line.compareDocumentPosition(document.querySelector('.brief-card__verdict')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -153,5 +153,38 @@ describe('BriefCard independent detections', () => {
     card();
     await screen.findByText(/Recurring methane near Krasnovodsk/);
     expect(screen.queryByText('Independent detections')).toBeNull();
+  });
+});
+
+// The presenter's filed brief (27 Oct): "6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30
+// times in all." The 30 is every look since EMIT began here, the 20 the passes read since 2025: say both spans.
+describe('BriefCard count line', () => {
+  const withCard = (over: Partial<BriefState['card']>) =>
+    vi.mocked(getBrief).mockResolvedValue({ ...STATE, card: { ...STATE.card, ...over } });
+
+  it("says EMIT's looks since the first look's year, from the record", async () => {
+    withCard({ looks: 30, candidates: 6, passesRead: 20, looksSince: '2023-03-02' });
+    card();
+    await screen.findByText(/Recurring methane near Krasnovodsk/);
+    expect(lineText()[0]).toBe('6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30 times since 2023.');
+    expect([...document.querySelectorAll('.brief-card__line .brief-card__num')].map((n) => n.textContent))
+      .toEqual(['6', '20', '2025-01-01', '30', '2023']);
+  });
+
+  it('says since 2022 on a draft without the first look, and one look as one time, never "in all"', async () => {
+    withCard({ looks: 1, candidates: 0, passesRead: 1 });
+    card();
+    await screen.findByText(/Recurring methane near Krasnovodsk/);
+    expect(lineText()[0]).toBe('0 of 1 passes read since 2025-01-01 are candidates; EMIT looked 1 time since 2022.');
+    expect(document.querySelector('.brief-card')?.textContent).not.toMatch(/in all/);
+  });
+
+  it("shows the next look the backend gives, the tool's fixed words under no new look", async () => {
+    const next = "EMIT's next routine pass over this site, to extend the record.";
+    withCard({ nextCollection: next, gaps: ["NASA's outlined-plume product has none after 22 September 2025, so the agent read EMIT's passes itself."] });
+    card();
+    await screen.findByText(/Recurring methane near Krasnovodsk/);
+    expect(screen.getByText(`Next: ${next}`).className).toContain('brief-card__next');
+    expect(screen.getByText(/so the agent read EMIT's passes itself/).tagName).toBe('LI');
   });
 });

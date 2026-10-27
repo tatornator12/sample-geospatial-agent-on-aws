@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { approveBrief, getBrief, type BriefState } from '../services/api.ts';
 import type { ToolCall } from '../types.ts';
 import { SNAPSHOT_MAX_CHARS, mapSnapshot } from '../utils/snapshot.ts';
-import { anotherLookMessage, approvedMessage, missionChain, siteCue, siteTip, type MissionChain } from '../utils/brief.ts';
+import { anotherLookMessage, approvedMessage, looksSinceYear, missionChain, siteCue, siteTip, type MissionChain } from '../utils/brief.ts';
 import { decisionLine, type BriefDecision } from '../utils/record.ts';
 import { parseManifest, passManifestUrl, type PassFrame, type Tip } from '../utils/steps.ts';
 import { samePoint, type Follow } from '../utils/follow.ts';
@@ -250,10 +250,13 @@ export function BriefCard({ briefId, sessionId, caseId, busy, onDecision, methan
         <span className="brief-card__coords">{card.lat.toFixed(2)}, {card.lon.toFixed(2)}</span>
         {card.watchArea && <span> · tipped by the {card.watchArea} watch area</span>}
       </p>
+      {/* Both counts with their span: the passes read since the window's start, and every look since
+          EMIT's first here (site_history's record, else 2022). "30 times in all" read as 30 of the 20. */}
       <p className="brief-card__line">
         <span className="brief-card__num">{card.candidates}</span> of <span className="brief-card__num">{card.passesRead}</span>{' '}
         passes read{card.passesSince ? <> since <span className="brief-card__num">{card.passesSince}</span></> : null} are candidates;
-        EMIT looked <span className="brief-card__num">{card.looks}</span> times in all.
+        EMIT looked <span className="brief-card__num">{card.looks}</span> {card.looks === 1 ? 'time' : 'times'} since{' '}
+        <span className="brief-card__num">{looksSinceYear(card.looksSince)}</span>.
         {/* The gap, said once: the latest fine-scale confirmation, how long before the tip, and what the
             agent recommends. Worded here from the draft's validated enums and dates, never model text.
             It runs on in the count's paragraph, which keeps the decision on the column's first screen

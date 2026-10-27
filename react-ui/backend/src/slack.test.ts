@@ -33,6 +33,7 @@ function card(over: Partial<BriefCard> = {}): BriefCard {
     looks: 12,
     candidates: 6,
     passesRead: 7,
+    passesSince: '2025-01-01',
     confidence: 'high',
     singleExplanation: 'low without a ground or aircraft check',
     hypotheses: [
@@ -85,7 +86,7 @@ describe('filedMessage', () => {
       'Recurring methane, Shanxi coal basin site near Shahe City',
       'near Shahe City, Xingtai, Hebei',
       '36.9782, 114.2629',
-      '6 of 7 recent passes are candidates; EMIT looked 12 times.',
+      '6 of 7 passes read since 2025-01-01 are candidates; EMIT looked 12 times since 2022.',
       'high',
       'low without a ground or aircraft check',
       '• Routine venting: possible\\n    Operating logs for the dates would confirm it.',
@@ -120,7 +121,10 @@ describe('workflowPayload', () => {
     for (const value of Object.values(payload)) assert.equal(typeof value, 'string');
     assert.equal(payload.title, 'Recurring methane, Shanxi coal basin site near Shahe City');
     assert.equal(payload.coordinates, '36.9782, 114.2629');
-    assert.equal(payload.evidence, '6 of 7 recent passes are candidates; EMIT looked 12 times.');
+    // The card's count line, with both spans (27 Oct: "30 times in all" read as 30 of the 20 passes).
+    assert.equal(payload.evidence, '6 of 7 passes read since 2025-01-01 are candidates; EMIT looked 12 times since 2022.');
+    assert.equal(workflowPayload(filed({ card: card({ looksSince: '2023-03-02' }) })).evidence,
+      '6 of 7 passes read since 2025-01-01 are candidates; EMIT looked 12 times since 2023.');
     assert.equal(payload.confidence, 'high');
     assert.equal(payload.hypotheses, '• Routine venting: possible\n    Operating logs for the dates would confirm it.\n• Maintenance blowdown: less likely');
     assert.equal(payload.ground_record.split('\n').length, 5);                     // 2 checks, "Gaps:", 1 gap, the next look

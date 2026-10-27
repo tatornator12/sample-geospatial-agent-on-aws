@@ -16,6 +16,17 @@ export function draftBriefId(text: string): string | null {
   return last;
 }
 
+/** EMIT's first year: site_history counts every look from 2022, so a card without the first look's day
+ *  still says the span (the backend's EMIT_FIRST_YEAR). */
+export const EMIT_FIRST_YEAR = '2022';
+
+/** The year EMIT's looks at the site are counted from: the first look's (site_history's record), else
+ *  2022. The card says "EMIT looked 30 times since 2022", never "in all", which the room read as 30 of
+ *  the 20 passes read since 2025 (the presenter's filed brief, 27 Oct). */
+export function looksSinceYear(looksSince?: string): string {
+  return looksSince && /^\d{4}-\d{2}-\d{2}$/.test(looksSince) ? looksSince.slice(0, 4) : EMIT_FIRST_YEAR;
+}
+
 /** The two things the analyst can say, as the agent's prompt expects them (methane_config.py). */
 export const approvedMessage = (briefId: string) => `The analyst approved and filed brief ${briefId}`;
 export const anotherLookMessage = (briefId: string) => `Request another look at brief ${briefId}`;
