@@ -32,7 +32,7 @@ third. Clock times, cuts and fallbacks: `docs/demo/rehearsal-notes.md`.
 | 4 | `methane-hunter` | Oct 6–17 | G3: Release 2; two agents in switcher; Acts 1–2 rehearsed | **Release 2 promoted Oct 12** (`deployed-2026-10-12`: Earth stable v72, Methane stable v3, CloudFront UI); user signed in and sees both agents; Turkmenistan cleared for the stage (13.1, Oct 12); Acts 1–2 rehearsal pending |
 | 5 | `ai-archaeologist` | Oct 20–24 (started early) | Act 4 works on a public site; **Act 3 decision written down** | spec **approved Oct 12** (all 8 decisions); Act 3 decided Oct 12: Dark Vessels |
 | 6 | `act3-dark-vessels` | Oct 16–30 (started early; Act 4 landed early) | G4: Release 3; full 30-minute run-through | spec second version Oct 15: **the Galápagos Marine Reserve** (GFW licence cleared Oct 16), **approved Oct 16** (all decisions; the silent-vessel beat in the run; orchid candidates); G4 moves to Friday Oct 30 (Oct 31 is a Saturday in 2026); spikes `docs/spikes/dark-vessels.md`, `docs/spikes/galapagos.md`; detector, plan, prediction and coverage modules built; day 1 records on file; the cache built (six passes, 110 files) and the agent package written (71 tests), star pass `s1d-20261012t0018` with 4 candidates on both detectors; the `taskings/*` grant written, live at G4; **on its dev runtime Oct 19** (`dark_vessels_dev`, eval 7/7); next the stage (tasks 4 and 5) |
-| 7 | `demo-readiness` | Nov 3–7 | freeze Nov 3; runbook, backup videos, prewarm, 2 timed rehearsals | not started |
+| 7 | `demo-readiness` | Nov 3–7 | freeze Nov 3; runbook, backup videos, prewarm, 2 timed rehearsals | freeze release `deployed-2026-11-03` done Nov 3; backup clips of the gallery replays recorded Nov 3; the Oct 29 and 30 timing runs not held, so the one timed rehearsal is Nov 6 |
 
 Act 3 carries a prediction component (the user, Oct 13), about one minute of its eight, written
 into the `act3-dark-vessels` spec as a requirement: (1) "where could it have gone": the area a
@@ -166,3 +166,19 @@ Oct 12 when Dark Vessels was chosen for Act 3.)
   READY, smoke `strongest-plume` PASS. Live: bundle has "checks no more spots" and "none since
   January 2025"; worker 200; `/api/agents` 401; 49 KB POSTs 401 (brief approve) and 403 (invoke).
   Way back: `deployed-2026-10-26` (`c03af74`).
+- Nov 3, the freeze (Methane Watch + Dark Vessels + frontend): `develop` promoted to `demo-stable` =
+  `7a32308`, tag `deployed-2026-11-03` (pushed to `fork`). Brings: the Methane Watch brief's fixed
+  Next line under `no_new_look_needed`, the tool-written NASA gap line and the looks line's span
+  (merge 6d6ef02); Dark Vessels' passing rule, `passed_close` (decision 13, approved Oct 27), its
+  stage, eval and the replay `vessels-open-question-v2` (merge 7a32308). Gates: pytest geo_agent
+  140, methane 267, archaeologist 90, dark-vessels 275, scripts 41; vitest 695; backend 86; tsc and
+  build clean; detector 0. Dev evals in `promote.sh` run 1: methane 13/13, vessels 11/11. Stable:
+  `methane_hunter` v10, `dark_vessels` v5 (5 env keys, no GFW token or cache prefix), both READY;
+  smokes `strongest-plume` and `open-question` PASS; stable `watch-mission` PASS 77 s (Changzhi City,
+  Shanxi, `newest_confirmation`, `no_new_look_needed`, the new Next and gap lines);
+  `open-question` PASS 61 s ("2 candidates on the Oct 12 pass"); `warm_watch.py` 173 reads ok.
+  Live: bundle has "ship passed close", "passed within" and `vessels-open-question-v2`; worker 200;
+  `/api/agents` 401; 49 KB POSTs 401 (brief and tasking approve) and 403 (invoke). The 29 and 30
+  October checks were not held (the presenter was out of office); their timings move to Nov 6.
+  Backup clips of the eight gallery replays recorded the same day from a local build of this
+  release. Way back: `deployed-2026-10-26-1606` (`98ea670`).

@@ -217,7 +217,7 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
 
 ## Oct 27 to Nov 3: the passing rule (decision 13, branch `vessels-passing`)
 
-- [ ] 8. A candidate a broadcasting ship passed close by is set aside
+- [x] 8. A candidate a broadcasting ship passed close by is set aside
   - [x] 8.1 `closest_passing` and `passed_close` in `match_ais` (1 km, 30 min, fixes at most 3 h
     apart), its numbers on the GeoJSON, `passed_say`, labels candidates first; pytest with the Oct
     12 fixture (`7092b9b`)
@@ -229,8 +229,9 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   - [x] 8.4 The replay `vessels-open-question-v2` recorded on dev and staged to its new prefix
     (17 keys); the gallery card plays it (`4e110e0`)
   - [x] 8.5 Speaker notes, rehearsal notes section 9 and this spec (decision 13, requirement 4.3)
-  - [ ] 8.6 The promotion (the user's yes): merge into `develop`, gates, `promote.sh` with vessels
-    and the frontend, a stable `open-question` eval, the live bundle's new strings
+  - [x] 8.6 The promotion (the user's yes, Nov 3): merged into `develop`, gates, `promote.sh` with
+    methane, vessels and the frontend, a stable `open-question` eval, the live bundle's new strings
+    (`deployed-2026-11-03`, gate log)
   - _Requirements: 4.3, 4.4, 11, 13.1, 14.1_
 
 ## Gate log
@@ -405,5 +406,15 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   dark-vessels 275, geo_agent 140, scripts 38; vitest 691; backend 84; tsc and `npm run build`
   clean; detector `[]`. The staged replay matches the repo's files (`aws s3 sync --dryrun`, 0
   differences). Nothing deployed
-- (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
-  the 30-minute run-through)
+- Nov 3 (the freeze release, Methane Watch + Dark Vessels + frontend): `develop` promoted to
+  `demo-stable` = `7a32308`, tag `deployed-2026-11-03` (pushed to `fork`). Gates on the merge:
+  pytest dark-vessels 275, geo_agent 140, methane 267, archaeologist 90, scripts 41; vitest 695;
+  backend 86; tsc and build clean; detector `[]`. Dev eval vessels 11/11 in `promote.sh` run 1.
+  Stable `dark_vessels` **v5** READY, 5 env keys (no GFW token, no cache prefix, so `vessels/cache/v1`);
+  smoke `open-question` PASS 82 s; stable `open-question` PASS 61 s, the answer "2 candidates on the
+  Oct 12 pass; I drafted box 1 for the next look." with "2 more not counted: a broadcasting ship
+  passed close by." Live bundle: "ship passed close", "passed within" and the gallery's
+  `vessels-open-question-v2`. Way back: `deployed-2026-10-26-1606`
+- Oct 29 (7.1) and Oct 30 (7.2's timings and the 30-minute run-through): not held, the presenter
+  was out of office. 7.2's gates and stable evals ran at the Nov 3 release; Act 3's hand timings
+  (twice) and the 30-minute run move to the Nov 6 rehearsal (task 14)
