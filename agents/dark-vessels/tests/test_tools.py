@@ -80,7 +80,9 @@ def test_coverage_then_match_gives_every_status_in_order(vessels):
     # The stage quotes the tool's shares, never its own measure.
     assert heard_props == {"kind": "heard", "share": 0.351, "imaged": 0.527, "checkable": 0.246, "standard": 0.15}
     out = run(vessels.ais.match_ais(STAR))
-    assert out["counts"] == {"broadcasting": 1, "port": 1, "unproven": 1, "seen_once": 2, "candidate": 1}
+    assert out["counts"] == {"broadcasting": 1, "port": 1, "unproven": 1, "seen_once": 2, "passed_close": 0, "candidate": 1}
+    # No ship passed close to the synthetic candidate: no passing evidence or words.
+    assert not {"passed_close", "passed_rule", "passed_say"} & set(out)
     assert out["say_in_order"][0] == "broadcasting" and out["fixed_sentence"] == vessels.vs.CANDIDATE_SENTENCE
     assert set(out["say_as"]) == set(out["say_in_order"]) and out["say_as"]["unproven"] == "reception unknown"
     (cand,) = out["candidates"]

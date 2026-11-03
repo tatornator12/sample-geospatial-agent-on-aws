@@ -2248,6 +2248,29 @@
   background: var(--fog);
   box-shadow: 0 0 0 1.4px color-mix(in srgb, var(--ais) 90%, transparent);
 }
+/* Set aside because a broadcasting ship passed close by: the grey ring with the ship's straight path
+   passing under it, level (seaStage's sea-passed: 1.5 px at 0.95, 2.5 px clear of the ring), drawn
+   smaller than the map's so the ring and the line share the row's slot. */
+.sea-key--passed {
+  place-items: start center;
+}
+.sea-key--passed::before {
+  box-sizing: content-box;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--label) 95%, transparent);
+}
+.sea-key--passed::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 2px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--label) 95%, transparent);
+}
 /* At or near a port: the fog square (8 px). */
 .sea-key--port::before {
   width: 8px;

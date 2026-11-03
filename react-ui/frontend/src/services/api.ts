@@ -353,7 +353,8 @@ export interface TaskingCardData {
   draftedAt: string;
   passId: string;
   passSensed: string;
-  counts: { broadcasting: number; port: number; unproven: number; seen_once: number; candidate: number };
+  /** passed_close: set aside because a broadcasting ship passed close by (a draft from before Oct 27 has none). */
+  counts: { broadcasting: number; port: number; unproven: number; seen_once: number; passed_close?: number; candidate: number };
   heardShare: number;
   box: TaskingBox;
   candidates: TaskingCandidate[];

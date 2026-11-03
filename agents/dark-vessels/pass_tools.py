@@ -189,6 +189,10 @@ def target_features(targets: list[dict]) -> dict:
         for k in ("label", "claimed", "claim", "pair_km", "peak_db", "heard"):
             if t.get(k) is not None:
                 props[k] = t[k]
+        # The passing rule's numbers only (match_ais): the closest approach and when; no words.
+        if isinstance(t.get("passed"), dict):
+            props["passed_km"] = t["passed"]["km"]
+            props["passed_min"] = t["passed"]["minutes"]
         feats.append(vs.point(t["lon"], t["lat"], **props))
     return vs.fc(feats)
 

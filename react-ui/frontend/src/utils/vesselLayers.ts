@@ -177,8 +177,11 @@ export function passDay(passId: string): string | null {
 
 // --- the targets ---------------------------------------------------------------------------------------
 
+/** The key's words for a target the passing rule set aside (the map labels it PASSED_LABEL_SUFFIX). */
+export const PASSED_KEY_WORDS = 'set aside: a broadcasting ship passed close by';
+
 /** How a target reads, by what the tools said about it (detect_vessels, then match_ais). */
-export type ShownStatus = 'detected' | 'claimed' | 'port' | 'unproven' | 'seen_once' | 'candidate';
+export type ShownStatus = 'detected' | 'claimed' | 'port' | 'unproven' | 'seen_once' | 'passed_close' | 'candidate';
 
 /**
  * Every status by shape and words as well as hue (never colour alone), and never red or amber.
@@ -190,6 +193,9 @@ export const STATUS_KEY: Record<ShownStatus, { shape: string; colour: string; wo
   port: { shape: 'fog square', colour: FOG, words: 'at or near a port' },
   unproven: { shape: 'grey ring, labelled', colour: LABEL, words: 'reception unknown: no AIS there proves nothing' },
   seen_once: { shape: 'small faint ring', colour: LABEL, words: 'seen by one detector only, set aside' },
+  // The passing rule (approved 2026-10-27): a broadcasting ship's path passed within 1 km of it within
+  // 30 minutes of the radar minute, so the radar may have seen that ship. Grey, with the path drawn by it.
+  passed_close: { shape: 'grey ring with a straight line passing under it, labelled', colour: LABEL, words: PASSED_KEY_WORDS },
   candidate: { shape: 'orchid ring, labelled', colour: ORCHID, words: 'candidate: no AIS where AIS was received, both detectors' },
 };
 
@@ -207,6 +213,8 @@ export interface TargetCounts {
   port: number;
   unproven: number;
   seenOnce: number;
+  /** Set aside because a broadcasting ship passed close by (match_ais' passing rule). */
+  passedClose: number;
   candidate: number;
   /** Matched targets the map ties by a hairline to their AIS dot (claimParts: our detector's alone). */
   tied: number;
@@ -217,7 +225,7 @@ export interface TargetCounts {
 type Feature = { type?: string; properties?: Record<string, unknown> | null; geometry?: { type: string; coordinates: unknown } | null };
 
 export function targetCounts(features: readonly Feature[]): TargetCounts {
-  const c: TargetCounts = { targets: 0, claimed: 0, port: 0, unproven: 0, seenOnce: 0, candidate: 0, tied: 0, matched: false };
+  const c: TargetCounts = { targets: 0, claimed: 0, port: 0, unproven: 0, seenOnce: 0, passedClose: 0, candidate: 0, tied: 0, matched: false };
   for (const f of features) {
     if (f?.geometry?.type !== 'Point') continue;
     const s = f.properties?.status;
@@ -226,8 +234,9 @@ export function targetCounts(features: readonly Feature[]): TargetCounts {
     else if (s === 'broadcasting' || f.properties?.claimed === true) c.claimed++;
     else if (s === 'unproven') c.unproven++;
     else if (s === 'seen_once') c.seenOnce++;
+    else if (s === 'passed_close') c.passedClose++;
     else if (s === 'candidate') c.candidate++;
-    if (s === 'broadcasting' || s === 'unproven' || s === 'seen_once' || s === 'candidate') c.matched = true;
+    if (s === 'broadcasting' || s === 'unproven' || s === 'seen_once' || s === 'passed_close' || s === 'candidate') c.matched = true;
   }
   c.tied = claimParts(features).features.filter((f) => f.properties?.part === 'tie').length;
   return c;
@@ -262,13 +271,16 @@ export function aisKeyRow(beat: SeaBeat, earlierPass = false): SeaKeyRow | null 
  * - the plain fog ring (15 px): matched to a ship's AIS (no dot: on most matches Global Fishing
  *   Watch's own match decided, and the map draws no line);
  * - the fog ring tied to its dot, only on a pass where our own detector's match drew a hairline;
+ * - after the reveal, only on a pass with one, the grey ring with a ship's straight path passing under
+ *   it: set aside because a broadcasting ship passed close by (the passing rule);
  * - the fog square at port, and the orchid ring once the candidates are revealed.
  */
-export function targetKeyRows(o: { revealed: boolean; seenOnce?: boolean; tied?: boolean }): SeaKeyRow[] {
+export function targetKeyRows(o: { revealed: boolean; seenOnce?: boolean; tied?: boolean; passedClose?: boolean }): SeaKeyRow[] {
   const rows: SeaKeyRow[] = [
     { icon: 'sea-key--ring', words: o.revealed ? 'set aside: reception unknown' : 'radar target, not yet explained' },
   ];
   if (o.seenOnce) rows.push({ icon: 'sea-key--once', words: o.revealed ? 'set aside: seen by one detector only' : 'seen by one detector only' });
+  if (o.revealed && o.passedClose) rows.push({ icon: 'sea-key--passed', words: PASSED_KEY_WORDS });
   rows.push({ icon: 'sea-key--claimed', words: 'matched to a ship\'s AIS' });
   if (o.tied) rows.push({ icon: 'sea-key--tied', words: 'matched to the ship at the end of its line' });
   rows.push({ icon: 'sea-key--port', words: 'at or near a port' });
@@ -1110,6 +1122,8 @@ export function forecastPass(files: Iterable<{ kind: VesselKind; pass: string | 
 /** The candidates' labels on the map (the radar target's id and why it is one, in mono). */
 export const CANDIDATE_LABEL_SUFFIX = '  no AIS';
 export const LEFT_OUT_SUFFIX = '  left out';
+/** A target the passing rule set aside, on the map: its id and why ("T03  ship passed close"). */
+export const PASSED_LABEL_SUFFIX = '  ship passed close';
 
 /**
  * What a presenter may ask once the officer has filed. The stage no longer sends it by itself: the

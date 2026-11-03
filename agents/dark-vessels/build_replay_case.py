@@ -5,7 +5,8 @@
 
 Invokes the runtime once (a fresh session) with the stage's prepared question, word for word, and
 refuses a take the design refuses (record it again). A usable take is copied into
-`use-cases/vessels-open-question/` at the repo root (U11: the id stays across re-records), laid out
+`use-cases/vessels-open-question-v2/` at the repo root (a new id for the passing rule, Oct 27: the
+stable stage still plays `vessels-open-question` until a promotion; re-records keep this id), laid out
 as the session's own vessels folder, so the stage reads it the way it reads a live session:
 
     config.json                  name, question, agent, tool_calls (each with its tool-use id and its
@@ -45,7 +46,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from eval import ending, extract_tool_calls, report_text, tool_input  # noqa: E402
 from vessels_gfw import scan_identity  # noqa: E402
 
-CASE_ID = "vessels-open-question"
+CASE_ID = "vessels-open-question-v2"
 # The stage's prepared plate (react-ui/frontend/src/utils/stageCopy.ts), word for word (U1).
 PROMPT = "Is anyone in the reserve without broadcasting, and where should the patrol look next?"
 # The gallery card's words (redesign §3.8.5), so the case and its card agree.
@@ -298,7 +299,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--target", choices=["dev", "stable"], default="dev")
     parser.add_argument("--region", default="us-east-1")
-    parser.add_argument("--out", help="Output folder; defaults to use-cases/vessels-open-question")
+    parser.add_argument("--out", help=f"Output folder; defaults to use-cases/{CASE_ID}")
     args = parser.parse_args()
     out = Path(args.out or REPO_ROOT / "use-cases" / CASE_ID)
 

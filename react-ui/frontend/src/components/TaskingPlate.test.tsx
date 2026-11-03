@@ -154,6 +154,23 @@ describe('the tasking on stage (clock and plate together)', () => {
     }
   });
 
+  it('lists only the candidates left after the passing rule (Oct 12: T01, T02; T03, T04 set aside)', async () => {
+    const card = {
+      ...DRAFT.card,
+      counts: { broadcasting: 4, port: 3, unproven: 2, seen_once: 9, passed_close: 2, candidate: 2 },
+      candidates: DRAFT.card.candidates.slice(0, 2),
+    };
+    state.current = { ...DRAFT, card };
+    const { container } = render(<Stage beat="tasking" />);
+    await screen.findByText('Approve the tasking');
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('Patrol box 1 · check 2 of 2 candidates on the way');
+    expect(container.querySelectorAll('.tasking-plate input[type="checkbox"]')).toHaveLength(2);
+    for (const id of ['T01', 'T02']) expect(text).toContain(id);
+    for (const id of ['T03', 'T04']) expect(text).not.toContain(id);
+    expect(count(text, /31 km from Baltra/)).toBe(2);
+  });
+
   it('names a replay case\'s tasking recorded on the clock, and asks for no approval there', async () => {
     state.current = { ...DRAFT, status: 'replay' };
     render(<Stage beat="tasking" facts={{ taskingRecorded: true }} />);

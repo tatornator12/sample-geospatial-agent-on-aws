@@ -52,6 +52,8 @@ export interface VesselStage {
   turnSentAt: number;
   /** The passes whose candidates the map has revealed, with the count it revealed. */
   revealed: Readonly<Record<string, number>>;
+  /** Of those passes, the targets the map revealed as set aside because a broadcasting ship passed close by. */
+  passedClose?: Readonly<Record<string, number>>;
 }
 
 interface VesselStepExtrasProps {
@@ -86,7 +88,7 @@ function lineRuns(text: string): Array<{ text: string; num: boolean }> {
   return out;
 }
 
-/** One line under a step: "Decided:" in fog, "Checked:" in label grey, 15 px, numbers in mono. */
+/** One line under a step: "Decided:" in fog, "Checked:" and "Set aside:" in label grey, 15 px, numbers in mono. */
 function LineText({ line }: { line: StepLine }) {
   const decided = line.label === 'Decided:';
   return (
@@ -146,7 +148,7 @@ export function VesselStepExtras({ steps, live, evidence = [], onOpenEvidence, s
     }
   }
 
-  const column = vesselColumn(steps, { board, decisions, heard, revealed });
+  const column = vesselColumn(steps, { board, decisions, heard, revealed, passedClose: stage?.passedClose });
 
   // While working: the lit row and its line in view whenever the lit step changes or a line lands
   // under it (unless the presenter has an earlier turn's record open). Instant under reduced motion.

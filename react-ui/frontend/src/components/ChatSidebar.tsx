@@ -141,6 +141,8 @@ interface ChatSidebarProps {
   vesselBucket?: string | null;
   /** Dark Vessels: the passes whose candidates the map has revealed this session, with its count. */
   revealedPasses?: Readonly<Record<string, number>>;
+  /** Dark Vessels: of those passes, the targets set aside because a broadcasting ship passed close by. */
+  passedClosePasses?: Readonly<Record<string, number>>;
 }
 
 export function ChatSidebar({
@@ -165,6 +167,7 @@ export function ChatSidebar({
   geometry = null,
   vesselBucket = null,
   revealedPasses = NO_REVEALS,
+  passedClosePasses = NO_REVEALS,
 }: ChatSidebarProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   // When the presenter sent the turn on the stage (ms): Dark Vessels' column remounts on it, so each
@@ -912,7 +915,7 @@ export function ChatSidebar({
                   compact={showBrief && draftedBrief}
                   profiles={profiles}
                   vessel={agentId === 'vessels'
-                    ? { sessionId, bucket: vesselBucket, caseId: scenarioId ?? null, turnSentAt, revealed: revealedPasses }
+                    ? { sessionId, bucket: vesselBucket, caseId: scenarioId ?? null, turnSentAt, revealed: revealedPasses, passedClose: passedClosePasses }
                     : undefined}
                   // One column per turn: a new turn starts with its earlier steps folded again.
                   key={`steps-${briefId ?? lastUserIndex}`}

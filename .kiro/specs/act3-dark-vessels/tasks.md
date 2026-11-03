@@ -215,6 +215,24 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
     twice against stable; the 30-minute show once; the tag; ROADMAP rows 5 and 6
   - _Requirements: 14.2_
 
+## Oct 27 to Nov 3: the passing rule (decision 13, branch `vessels-passing`)
+
+- [ ] 8. A candidate a broadcasting ship passed close by is set aside
+  - [x] 8.1 `closest_passing` and `passed_close` in `match_ais` (1 km, 30 min, fixes at most 3 h
+    apart), its numbers on the GeoJSON, `passed_say`, labels candidates first; pytest with the Oct
+    12 fixture (`7092b9b`)
+  - [x] 8.2 The eval: the answer's candidate count must match `match_ais`' record;
+    `scripts/vessel_passing_counts.py`, read-only, every pass before and after (`af88b92`)
+  - [x] 8.3 The stage: the grey ring with its level line and "ship passed close" label, the key
+    row, the "Set aside:" line, the tasking's count; `critique` first, `polish` after, detector
+    `[]` (`5f6ad55`, `4526e0e`)
+  - [x] 8.4 The replay `vessels-open-question-v2` recorded on dev and staged to its new prefix
+    (17 keys); the gallery card plays it (`4e110e0`)
+  - [x] 8.5 Speaker notes, rehearsal notes section 9 and this spec (decision 13, requirement 4.3)
+  - [ ] 8.6 The promotion (the user's yes): merge into `develop`, gates, `promote.sh` with vessels
+    and the frontend, a stable `open-question` eval, the live bundle's new strings
+  - _Requirements: 4.3, 4.4, 11, 13.1, 14.1_
+
 ## Gate log
 
 - Oct 15 (day 0): pytest dark-vessels 24 (cfar 10, plan 8, predict 6); nothing deployed
@@ -376,5 +394,16 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   `no_new_look_needed`). Live: bundle has the bars, follow and AIS-key strings; worker 200;
   `/api/agents` 401; 49 KB POSTs 401 (brief and tasking approve) and 403 (invoke). Not yet seen: a
   signed-in approve on the live site posting to Slack. Way back: `deployed-2026-10-23` (`a6e882f`).
+- Oct 27 (the passing rule, dev only, branch `vessels-passing`): `dark_vessels_dev` v18 on
+  `vessels/cache/v1r`; eval vessels dev 11/11, `open-question` x3 3/3 (60.2, 63.0 and 67.5 s, 0
+  refusals, each "2 candidates on the Oct 12 pass", box 1 drafted on `near_candidates`); pass
+  counts before and after (`.agents/tasks/vessels-passing/pass-counts.json`, v1 and v1r agree):
+  Oct 12 4 to 2, Sep 30 3 to 2, Sep 18 4 to 1, Sep 7 2 to 0, Aug 30 0 to 0, Apr 1 2 to 1, Oct 17
+  0 to 0. Replay `vessels-open-question-v2` staged (17 keys, new prefix only). Headless stage shots
+  at 1920 and 1280 (`shots/01` to `10`). Stable, `demo-stable` and Slack untouched
+- Nov 3 (the passing rule's gates, branch `vessels-passing` at `f0a0f68` plus these docs): pytest
+  dark-vessels 275, geo_agent 140, scripts 38; vitest 691; backend 84; tsc and `npm run build`
+  clean; detector `[]`. The staged replay matches the repo's files (`aws s3 sync --dryrun`, 0
+  differences). Nothing deployed
 - (Oct 30 G4: commands with counts, the tag, the four stable smokes and evals, both Act 3 timings,
   the 30-minute run-through)

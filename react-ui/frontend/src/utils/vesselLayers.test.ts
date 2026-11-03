@@ -14,6 +14,8 @@ import {
   coverageKeyRows,
   monthDayTime,
   targetKeyRows,
+  PASSED_KEY_WORDS,
+  PASSED_LABEL_SUFFIX,
   LABEL,
   ORCHID,
   RADAR_ALPHA,
@@ -215,8 +217,8 @@ describe('the targets and the claim', () => {
   ];
 
   it('counts the claim at detect, and knows when match_ais has run', () => {
-    expect(targetCounts(detected)).toEqual({ targets: 3, claimed: 1, port: 1, unproven: 0, seenOnce: 0, candidate: 0, tied: 0, matched: false });
-    expect(targetCounts(matched)).toEqual({ targets: 5, claimed: 1, port: 1, unproven: 1, seenOnce: 1, candidate: 1, tied: 0, matched: true });
+    expect(targetCounts(detected)).toEqual({ targets: 3, claimed: 1, port: 1, unproven: 0, seenOnce: 0, passedClose: 0, candidate: 0, tied: 0, matched: false });
+    expect(targetCounts(matched)).toEqual({ targets: 5, claimed: 1, port: 1, unproven: 1, seenOnce: 1, passedClose: 0, candidate: 1, tied: 0, matched: true });
     // A hairline only where our own detector's match drew one (claimParts).
     expect(targetCounts([...matched, point(-90.6, -0.4, { status: 'broadcasting', source: 'ours', claimed: true, claim: [-90.601, -0.401] })]).tied).toBe(1);
   });
@@ -371,7 +373,7 @@ describe('the clock plate', () => {
       sub: 'other ships\' AIS was received there in the three hours either side of the pass',
     });
     expect(clockLines('coverage', {}).lead).toBe('Where AIS was received');
-    expect(clockLines('candidates', { counts: { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, tied: 0, matched: true } }).lead).toBe('4 candidates');
+    expect(clockLines('candidates', { counts: { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, passedClose: 0, candidate: 4, tied: 0, matched: true } }).lead).toBe('4 candidates');
     // "A reason to look, not an accusation" is the answer's sentence alone.
     expect(clockLines('candidates', {}).sub).toBe('no AIS where AIS was being received, seen by both detectors');
     expect(clockLines('fleet', { fleetMonth: 'October 2026' }).sub).toContain(ATTRIBUTION);
@@ -442,7 +444,7 @@ describe('the clock plate', () => {
   });
 
   it('keeps every changed sub at 110 characters or fewer, with the longest values', () => {
-    const counts = { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, candidate: 4, tied: 0, matched: true };
+    const counts = { targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, passedClose: 2, candidate: 2, tied: 0, matched: true };
     const now = Date.parse('2026-10-20T14:37:00Z');
     const subs = [
       clockLines('forward', {}).sub,
@@ -895,7 +897,7 @@ describe('the map key (every icon the mark the map draws)', () => {
 
   it('has a drawn icon in the stylesheet for every row, in plain words with no dashes', () => {
     const rows = [
-      ...targetKeyRows({ revealed: true, seenOnce: true, tied: true }),
+      ...targetKeyRows({ revealed: true, seenOnce: true, tied: true, passedClose: true }),
       ...targetKeyRows({ revealed: false, seenOnce: true }),
       ...coverageKeyRows({ outside: true }),
       aisKeyRow('radar')!,
@@ -920,5 +922,52 @@ describe('the tasking plate\'s look line', () => {
     expect(monthDayTime('2026-01-03T11:40:00Z')).toBe('Jan 3 11:40 UTC');
     expect(monthDayTime('not a time')).toBeNull();
     expect(monthDayTime(undefined)).toBeNull();
+  });
+});
+
+
+// --- the passing rule (approved 2026-10-27) ------------------------------------------------------------------
+
+describe('the targets a broadcasting ship passed close by', () => {
+  const pt = (props: Record<string, unknown>) => ({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [-89.5, -0.6] } });
+  // Oct 12 after the rule: 22 targets, 4 broadcasting, 3 at port, 2 reception unknown, 9 seen once, 2 passed close, 2 candidates.
+  const oct12 = [
+    ...Array.from({ length: 4 }, () => pt({ status: 'broadcasting', source: 'both', claimed: true })),
+    ...Array.from({ length: 3 }, () => pt({ status: 'port', source: 'both' })),
+    ...Array.from({ length: 2 }, () => pt({ status: 'unproven', source: 'both' })),
+    ...Array.from({ length: 9 }, () => pt({ status: 'seen_once', source: 'ours' })),
+    pt({ status: 'passed_close', source: 'both', label: 'T03', passed_km: 0.18, passed_min: -13 }),
+    pt({ status: 'passed_close', source: 'both', label: 'T04', passed_km: 0.58, passed_min: -14 }),
+    pt({ status: 'candidate', source: 'both', label: 'T01' }),
+    pt({ status: 'candidate', source: 'both', label: 'T02' }),
+  ];
+
+  it('counts them apart from the candidates, and a pass of them alone is matched', () => {
+    const c = targetCounts(oct12);
+    expect(c).toMatchObject({ targets: 22, claimed: 4, port: 3, unproven: 2, seenOnce: 9, passedClose: 2, candidate: 2, matched: true });
+    expect(targetCounts([pt({ status: 'passed_close', label: 'T01' })]).matched).toBe(true);
+    // The clock's candidates beat counts the candidates alone.
+    expect(clockLines('candidates', { counts: c }).lead).toBe('2 candidates');
+  });
+
+  it('keys them once revealed, by their own grey icon, in plain words', () => {
+    expect(PASSED_KEY_WORDS).toBe('set aside: a broadcasting ship passed close by');
+    const rows = targetKeyRows({ revealed: true, seenOnce: true, passedClose: true });
+    expect(rows.map((r) => r.icon)).toEqual(['sea-key--ring', 'sea-key--once', 'sea-key--passed', 'sea-key--claimed', 'sea-key--port', 'sea-key--candidate']);
+    expect(rows.find((r) => r.icon === 'sea-key--passed')?.words).toBe(PASSED_KEY_WORDS);
+    // Before the reveal they are plain grey rings, and a pass without one has no row.
+    expect(targetKeyRows({ revealed: false, passedClose: true }).map((r) => r.icon)).not.toContain('sea-key--passed');
+    expect(targetKeyRows({ revealed: true, passedClose: false }).map((r) => r.icon)).not.toContain('sea-key--passed');
+    expect(STATUS_KEY.passed_close).toEqual({ shape: 'grey ring with a straight line passing under it, labelled', colour: LABEL, words: PASSED_KEY_WORDS });
+    // The icon is the ring and the line, in the grey family, distinct from the other set-aside rings.
+    const css: string = readFileSync('src/stage.css', 'utf8');
+    expect(css).toMatch(/\.sea-key--passed::before \{[^}]*border: 1\.5px solid color-mix\(in srgb, var\(--label\) 95%, transparent\)/);
+    expect(css).toMatch(/\.sea-key--passed::after \{[^}]*background: color-mix\(in srgb, var\(--label\) 95%, transparent\)/);
+  });
+
+  it('labels them on the map with their id and why', () => {
+    expect(PASSED_LABEL_SUFFIX).toBe('  ship passed close');
+    expect(`T03${PASSED_LABEL_SUFFIX}`).toBe('T03  ship passed close');
+    for (const words of [PASSED_KEY_WORDS, PASSED_LABEL_SUFFIX]) expect(words).not.toMatch(/[\u2013\u2014]/);
   });
 });

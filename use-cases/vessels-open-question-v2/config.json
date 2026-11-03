@@ -1,0 +1,336 @@
+{
+  "name": "Dark Vessels, Galápagos: one open question",
+  "description": "One question about the Galápagos Marine Reserve: the agent weighs the radar passes on file, checks whether AIS reception there is good enough, chooses what to check next, and drafts a patrol tasking for the officer. Candidates, never accusations.",
+  "location": "Galápagos Marine Reserve",
+  "user_question": "Is anyone in the reserve without broadcasting, and where should the patrol look next?",
+  "agent": "vessels",
+  "dates": {},
+  "scenario_version": "1.1",
+  "recorded_from": "dark_vessels_dev",
+  "recorded_at": "2026-10-27T19:08:05Z",
+  "tool_calls": [
+    {
+      "id": "tooluse_EJnrTFtBUhUytnVKCcAHx5",
+      "name": "list_passes",
+      "params": {},
+      "result": "The passes on file listed"
+    },
+    {
+      "id": "tooluse_zKq86A7K1JnV2QYC3anNGg",
+      "name": "decide",
+      "params": {
+        "step": "read_pass",
+        "because": "newest_wide",
+        "pass_id": "s1d-20261012t0018"
+      },
+      "result": "Decision recorded"
+    },
+    {
+      "id": "tooluse_y5jdL2ZLsrYrMbHvOyPhWA",
+      "name": "find_pass",
+      "params": {
+        "when": "s1d-20261012t0018"
+      },
+      "result": "Radar pass found"
+    },
+    {
+      "id": "tooluse_selGWRBlNC1U0HsW1K5Ybi",
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/radar_s1d-20261012t0018.tif",
+        "title": "Radar, Oct 12",
+        "question": "What does the radar swath show over the reserve?"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "id": "tooluse_9D3dvQnEIiXqfCGovhJk4D",
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/radar_s1d-20261012t0018.tif",
+        "title": "Radar, Oct 12",
+        "render": {
+          "kind": "raster",
+          "colormap": "gray",
+          "rescale": [
+            1,
+            255
+          ],
+          "group": "maritime",
+          "legend": "Radar backscatter",
+          "bounds": [
+            -91.3304,
+            -2.3476,
+            -88.384,
+            1.5952
+          ]
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_FpVenfbkBmxlI1IDKaJbbZ",
+      "name": "detect_vessels",
+      "params": {
+        "pass_id": "s1d-20261012t0018"
+      },
+      "result": "Targets found on the water"
+    },
+    {
+      "id": "tooluse_YUp2oKRfVhK7kKwln4VtGz",
+      "name": "display_visual",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/targets_s1d-20261012t0018.geojson",
+        "title": "Radar targets",
+        "render": {
+          "kind": "points",
+          "group": "maritime",
+          "legend": "Radar targets"
+        }
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_jpKcDhC1WVyYEcD1ygxYJf",
+      "name": "check_ais_coverage",
+      "params": {
+        "pass_id": "s1d-20261012t0018"
+      },
+      "result": "Checked where AIS was received"
+    },
+    {
+      "id": "tooluse_rnfq7ozy29OiElJBw9gdpr",
+      "name": "display_visual",
+      "params": {
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "legend": "AIS received"
+        },
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/heard_s1d-20261012t0018.geojson",
+        "title": "AIS received"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_03CXjrNNrCCqi2R5iE6jII",
+      "name": "display_visual",
+      "params": {
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "legend": "AIS reception unknown"
+        },
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/unproven_s1d-20261012t0018.geojson",
+        "title": "AIS reception unknown"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_x12DDvwiwsaMkJDUsS6tah",
+      "name": "match_ais",
+      "params": {
+        "pass_id": "s1d-20261012t0018"
+      },
+      "result": "Targets matched to broadcasts"
+    },
+    {
+      "id": "tooluse_fR45l2vcfjTgta2f1MWvud",
+      "name": "display_visual",
+      "params": {
+        "render": {
+          "group": "maritime",
+          "kind": "points",
+          "legend": "Radar targets"
+        },
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/targets_s1d-20261012t0018.geojson",
+        "title": "Radar targets"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_qqqeZ7WkX6sJtknffMY1gR",
+      "name": "gather_evidence",
+      "params": {
+        "pass_id": "s1d-20261012t0018"
+      },
+      "result": "Evidence chips cut"
+    },
+    {
+      "id": "tooluse_Ab2QqjxPBYTQ4VlNa4EO8O",
+      "name": "inspect_image",
+      "params": {
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/chips/s1d-20261012t0018_T01.tif",
+        "title": "Candidate T01 chip, Oct 12",
+        "question": "What does the radar chip show?"
+      },
+      "result": "Looked at the image"
+    },
+    {
+      "id": "tooluse_G1uL2RNBRpifefabL82PPQ",
+      "name": "predict_hotspots",
+      "params": {
+        "pass_id": "s1d-20261012t0018"
+      },
+      "result": "Where to look next, predicted"
+    },
+    {
+      "id": "tooluse_Q3IKOgbdAU3cWN8cfx5KL3",
+      "name": "display_visual",
+      "params": {
+        "render": {
+          "group": "maritime",
+          "kind": "points",
+          "legend": "Dark targets seen before",
+          "property": "v"
+        },
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/hotspots.geojson",
+        "title": "Dark targets seen before"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_3Q6TMYQUOahs8dSFZ3EM5M",
+      "name": "display_visual",
+      "params": {
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "label": "label",
+          "legend": "Patrol boxes"
+        },
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/boxes.geojson",
+        "title": "Patrol boxes"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_K3K2eWOQ60EDQx9CMrK8H0",
+      "name": "decide",
+      "params": {
+        "step": "draft",
+        "because": "near_candidates",
+        "box": 1
+      },
+      "result": "Decision recorded"
+    },
+    {
+      "id": "tooluse_3iqCgikD1cJOZfvyqUAYxJ",
+      "name": "next_look",
+      "params": {
+        "box": 1
+      },
+      "result": "The next radar look found"
+    },
+    {
+      "id": "tooluse_MkuutP45PfwC1foTMW9Xj8",
+      "name": "display_visual",
+      "params": {
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "label": "label",
+          "legend": "Next radar look"
+        },
+        "s3_url": "s3://bucket/use-cases/vessels-open-question-v2/look_1_2026-11-05T00.geojson",
+        "title": "Next radar look"
+      },
+      "result": "Shown on the map"
+    },
+    {
+      "id": "tooluse_YcmykJgUweKrQFzm5TMTdo",
+      "name": "draft_tasking",
+      "params": {
+        "pass_id": "s1d-20261012t0018",
+        "box": 1,
+        "notes": [
+          "Two targets seen by both detectors with no AIS in water where AIS was being received.",
+          "Both are roughly 30 km from Baltra port.",
+          "Next radar look over this box is S1-D Nov 5 00:17 UTC."
+        ]
+      },
+      "result": "Tasking drafted (not filed)"
+    }
+  ],
+  "assets": {
+    "layers": [
+      {
+        "file": "radar_s1d-20261012t0018.tif",
+        "title": "Radar, Oct 12",
+        "render": {
+          "kind": "raster",
+          "colormap": "gray",
+          "rescale": [
+            1,
+            255
+          ],
+          "group": "maritime",
+          "legend": "Radar backscatter",
+          "bounds": [
+            -91.3304,
+            -2.3476,
+            -88.384,
+            1.5952
+          ]
+        }
+      },
+      {
+        "file": "targets_s1d-20261012t0018.geojson",
+        "title": "Radar targets",
+        "render": {
+          "kind": "points",
+          "group": "maritime",
+          "legend": "Radar targets"
+        }
+      },
+      {
+        "file": "heard_s1d-20261012t0018.geojson",
+        "title": "AIS received",
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "legend": "AIS received"
+        }
+      },
+      {
+        "file": "unproven_s1d-20261012t0018.geojson",
+        "title": "AIS reception unknown",
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "legend": "AIS reception unknown"
+        }
+      },
+      {
+        "file": "hotspots.geojson",
+        "title": "Dark targets seen before",
+        "render": {
+          "group": "maritime",
+          "kind": "points",
+          "legend": "Dark targets seen before",
+          "property": "v"
+        }
+      },
+      {
+        "file": "boxes.geojson",
+        "title": "Patrol boxes",
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "label": "label",
+          "legend": "Patrol boxes"
+        }
+      },
+      {
+        "file": "look_1_2026-11-05T00.geojson",
+        "title": "Next radar look",
+        "render": {
+          "group": "maritime",
+          "kind": "vector",
+          "label": "label",
+          "legend": "Next radar look"
+        }
+      }
+    ]
+  }
+}

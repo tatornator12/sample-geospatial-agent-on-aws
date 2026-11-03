@@ -76,7 +76,8 @@ export interface TaskingCard {
   draftedAt: string;
   passId: string;
   passSensed: string;
-  counts: { broadcasting: number; port: number; unproven: number; seen_once: number; candidate: number };
+  /** passed_close: set aside because a broadcasting ship passed close by (0 for a draft from before Oct 27, which has none). */
+  counts: { broadcasting: number; port: number; unproven: number; seen_once: number; passed_close: number; candidate: number };
   heardShare: number;
   /**
    * The share of the reserve the pass could check (imaged, with AIS received), when the draft carries
@@ -155,7 +156,10 @@ export function taskingCard(record: unknown, taskingId: string): TaskingCard | n
   const c = (r.counts ?? {}) as Record<string, unknown>;
   const counts = {
     broadcasting: count(c.broadcasting), port: count(c.port), unproven: count(c.unproven),
-    seen_once: count(c.seen_once), candidate: count(c.candidate),
+    seen_once: count(c.seen_once),
+    // Optional: a draft from before the passing rule (Oct 27) has none; a malformed one is refused.
+    passed_close: c.passed_close === undefined ? 0 : count(c.passed_close),
+    candidate: count(c.candidate),
   };
   const heardShare = num(r.heard_share, 0, 1);
   // Optional: a draft without it (or with a value outside 0 to 1) is filed, and the lines leave it out.
@@ -257,7 +261,8 @@ export function taskingMarkdown(card: TaskingCard, choice: TaskingChoice, by: st
     `- Radar pass: ${satelliteName(card.passId)}, ${utcMinute(card.passSensed)} (\`${card.passId}\`)`,
     `- AIS was heard over ${pct(card.heardShare)} of the reserve at the pass`,
     `- Targets: ${k.broadcasting} broadcasting, ${k.port} at port, ${k.unproven} in unproven water (not evidence), ` +
-      `${k.seen_once} seen by one detector only, ${k.candidate} candidates`,
+      `${k.seen_once} seen by one detector only, ` +
+      `${k.passed_close ? `${k.passed_close} set aside because a broadcasting ship passed close by, ` : ''}${k.candidate} candidates`,
     `- Box ${choice.box.box}: ${pct(choice.box.share)} of past dark targets; ${w.toFixed(2)}, ${s.toFixed(2)} to ${e.toFixed(2)}, ${n.toFixed(2)}`,
     `- Next radar look over the box: ${choice.box.look ? choice.box.look.text : 'none planned yet in ESA\'s published plan'}`,
     ...(card.check
@@ -347,7 +352,7 @@ export function taskingWorkflowPayload(f: FiledTasking): TaskingWorkflowVariable
   const dropped = card.candidates.filter((c) => !choice.candidateIds.includes(c.id));
   const [w, s, e, n] = choice.box.bounds;
   const k = card.counts;
-  const targets = k.broadcasting + k.port + k.unproven + k.seen_once + k.candidate;
+  const targets = k.broadcasting + k.port + k.unproven + k.seen_once + k.passed_close + k.candidate;
   const look = choice.box.look;
   return {
     title: `Box ${choice.box.box}, Galápagos Marine Reserve, ${kept.length} of ${card.candidates.length} candidates`,

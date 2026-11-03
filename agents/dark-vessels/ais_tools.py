@@ -35,7 +35,9 @@ INNOCENT = [
 
 # The words the room hears for each status (the ids stay the tools' and the stage's).
 SAY_AS = {"broadcasting": "broadcasting", "port": "at or near a port", "unproven": "reception unknown",
-          "seen_once": "seen by one detector only", "candidate": "candidates"}
+          "seen_once": "seen by one detector only",
+          "passed_close": "where a broadcasting ship passed close by", "candidate": "candidates"}
+STATUSES = ("broadcasting", "port", "unproven", "seen_once", "passed_close", "candidate")
 
 STALE_RECORDS = "Those records are from an earlier question: read the pass again."
 # match_ais' next steps, word for word (design §3.5, review M2): showing the matched targets is what
@@ -217,9 +219,9 @@ async def match_ais(pass_id: str) -> str:
     for r, c in record["cells"]:
         heard[r, c] = True
     replay = vs.cached(built["products"]["replay"]["key"])
-    heads = heads_at(replay, _t(entry["sensed"]))
+    when = _t(entry["sensed"])
+    heads = heads_at(replay, when)
     targets = targets_for(pass_id)
-    n = 0
     for t in targets:
         t["heard"] = cv.is_heard(heard, grid, t["lon"], t["lat"])
         near, near_km = vs.nearest_head(t, heads)
@@ -235,25 +237,54 @@ async def match_ais(pass_id: str) -> str:
         elif t["source"] != "both":
             t["status"] = "seen_once"
         else:
-            t["status"] = "candidate"
+            passing = vs.closest_passing(t, replay, when)
+            if passing:
+                t["status"] = "passed_close"
+                t["passed"] = passing
+            else:
+                t["status"] = "candidate"
         t["nearest_ais_km"] = round(near_km, 1) if near else None
         t["nearest_ais_type"] = near["type"] if near else None
-    for t in targets:
-        if t["status"] == "candidate":
-            n += 1
-            t["label"] = f"T{n:02d}"
+    label_targets(targets)
     url = vs.put_json(f"{vs.vessels_prefix()}targets_{pass_id}.geojson", target_features(targets))
     vs.put_json(_match_key(pass_id), {"pass_id": pass_id, "targets": targets, "question_id": stamp})
-    counts = {s: sum(t["status"] == s for t in targets) for s in ("broadcasting", "port", "unproven", "seen_once", "candidate")}
+    counts = {s: sum(t["status"] == s for t in targets) for s in STATUSES}
     candidates = [{"id": t["label"], "port": t["port"], "port_km": t["port_km"], "nearest_ais_km": t["nearest_ais_km"]}
                   for t in targets if t["status"] == "candidate"]
-    return json.dumps({
-        "pass_id": pass_id, "counts": counts, "say_in_order": ["broadcasting", "port", "unproven", "seen_once", "candidate"],
+    passed = [{"id": t["label"], "km": t["passed"]["km"], "minutes": t["passed"]["minutes"],
+               "ship_type": t["passed"]["type"], "knots": t["passed"]["knots"]}
+              for t in targets if t["status"] == "passed_close"]
+    n = counts["candidate"]
+    out = {
+        "pass_id": pass_id, "counts": counts, "say_in_order": list(STATUSES),
         "say_as": SAY_AS, "checkable_share": checkable, "candidates": candidates, "targets_s3_url": url,
         "render": {"kind": "points", "group": "maritime", "legend": "Radar targets"},
         "fixed_sentence": vs.CANDIDATE_SENTENCE,
         "next_steps": NEXT_WITH_CANDIDATES if n else NEXT_NO_CANDIDATES,
-    })
+    }
+    if passed:
+        # Not candidates: a broadcasting ship's path between its hourly fixes came this close, this
+        # many minutes from the radar minute (negative: before), so the radar may have seen that ship.
+        out["passed_close"] = passed
+        out["passed_rule"] = PASSED_RULE
+        out["passed_say"] = vs.passed_say(len(passed), n)
+    return json.dumps(out)
+
+
+PASSED_RULE = (f"a broadcasting ship's straight path between two hourly fixes (at most {vs.PASSING_GAP_H:g} h apart) came "
+               f"within {vs.PASSING_KM:g} km of the target within {vs.PASSING_MIN} minutes of the radar minute")
+
+
+def label_targets(targets: list[dict]) -> None:
+    """The ids, in place: the candidates T01 onwards west to east (the plate and the tasking list
+    them without a gap), then the targets set aside because a broadcasting ship passed close by,
+    numbered on from there, west to east (the map labels them, so the room can point at one)."""
+    n = 0
+    for status in ("candidate", "passed_close"):
+        for t in targets:
+            if t["status"] == status:
+                n += 1
+                t["label"] = f"T{n:02d}"
 
 
 @tool

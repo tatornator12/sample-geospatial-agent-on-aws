@@ -93,6 +93,35 @@ describe('taskingCard', () => {
   });
 });
 
+describe('a draft after the passing rule (approved 2026-10-27)', () => {
+  // Oct 12: T03 and T04 set aside because a broadcasting ship passed close by; T01 and T02 the candidates.
+  const after = () => draft({
+    counts: { broadcasting: 4, port: 3, unproven: 2, seen_once: 9, passed_close: 2, candidate: 2 },
+    candidates: draft().candidates.slice(0, 2),
+  });
+
+  it('reads passed_close beside the other counts, 0 for an earlier draft, and refuses a malformed one', () => {
+    assert.equal(taskingCard(after(), TID)!.counts.passed_close, 2);
+    assert.equal(taskingCard(draft(), TID)!.counts.passed_close, 0);
+    for (const bad of [-1, 1.5, 'x', null]) {
+      assert.equal(taskingCard(draft({ counts: { ...draft().counts, passed_close: bad } }), TID), null, String(bad));
+    }
+  });
+
+  it('files the set-aside count in the markdown and counts every target in Slack\'s pass line', () => {
+    const card = taskingCard(after(), TID)!;
+    const choice: TaskingChoice = { box: card.box, candidateIds: ['T01', 'T02'] };
+    const md = taskingMarkdown(card, choice, 'officer', '2026-10-27T15:31:00.000Z');
+    assert.match(md, /9 seen by one detector only, 2 set aside because a broadcasting ship passed close by, 2 candidates/);
+    assert.match(md, /Candidates in this tasking \(2 of 2\)/);
+    assert.doesNotMatch(md, /T03|T04/);
+    // A draft without any set aside keeps the line as it was.
+    assert.doesNotMatch(taskingMarkdown(taskingCard(draft(), TID)!, choice, 'officer', '2026-10-27T15:31:00.000Z'), /passed close/);
+    const vars = taskingWorkflowPayload({ card, choice, filedBy: 'officer', filedAt: '2026-10-27T15:31:00Z', markdownKey: 'k', bucket: 'b' });
+    assert.equal(vars.pass, 'Sentinel-1D, 2026-10-12 00:18 UTC. AIS was received over 30% of the reserve. 22 radar targets, 2 candidates.');
+  });
+});
+
 describe('taskingChoice', () => {
   const card = taskingCard(draft(), TID)!;
   const boxes = sessionBoxes(HOTSPOTS);

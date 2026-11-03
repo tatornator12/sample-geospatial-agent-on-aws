@@ -250,7 +250,7 @@ export function parseDecision(raw: unknown): Decision | null {
 
 /** "Decided:" for a choice (fog), "Checked:" for a rule outcome (label grey). */
 export interface StepLine {
-  label: 'Decided:' | 'Checked:';
+  label: 'Decided:' | 'Checked:' | 'Set aside:';
   text: string;
 }
 
@@ -275,7 +275,7 @@ export function decisionLine(d: Decision): StepLine | null {
     case 'forecast/no_candidates': return decided(`No candidates on ${from} in the ${f.checkable}% it could check. Going to where to look next.`);
     case 'draft/most_past_targets': return decided(`Drafting box ${k}: it held the most past dark targets, ${f.share}%.`);
     case 'draft/soonest_look': return decided(`Drafting box ${k}: its radar look comes first, ${f.look}.`);
-    case 'draft/near_candidates': return decided(`Drafting box ${k}: ${f.near} of the candidates lie in or near it.`);
+    case 'draft/near_candidates': return decided(`Drafting box ${k}: ${f.near} of the candidates ${f.near === 1 ? 'lies' : 'lie'} in or near it.`);
     case 'draft/only_planned_look': return decided(`Drafting box ${k}: the only box with a radar look planned.`);
     case 'stop/no_checked_pass': {
       const [a, b] = f.passes ?? [];
@@ -337,6 +337,21 @@ export function coverageLine(c: CoverageCheck): StepLine {
 export function candidatesLine(n: number): StepLine {
   if (n === 0) return { label: 'Checked:', text: 'No candidates where AIS was received.' };
   return { label: 'Checked:', text: `${n} ${n === 1 ? 'candidate' : 'candidates'} where AIS was received, seen by both detectors.` };
+}
+
+/**
+ * The passing rule's limits as the room hears them: match_ais' PASSING_KM and PASSING_MIN
+ * (agents/dark-vessels/vessel_store.py, approved 2026-10-27; a pytest holds the two to these words).
+ */
+export const PASSING_WORDS = 'passed within 1 km, 30 minutes or less from the pass';
+
+/**
+ * The targets the passing rule set aside (the map revealed them with the candidates), under the
+ * candidates line: the count and the rule's numbers, so it is not the key row's sentence again.
+ */
+export function passedLine(m: number): StepLine | null {
+  if (!Number.isInteger(m) || m <= 0) return null;
+  return { label: 'Set aside:', text: `${m} where a broadcasting ship ${PASSING_WORDS}.` };
 }
 
 // --- the board -------------------------------------------------------------------------------------
@@ -484,6 +499,8 @@ export interface VesselColumnFiles {
   heard: Readonly<Record<string, CoverageCheck>>;
   /** The passes whose candidates the map has revealed, with the count it revealed (Chat.tsx). */
   revealed: Readonly<Record<string, number>>;
+  /** Of those passes, the targets set aside at the reveal because a broadcasting ship passed close by. */
+  passedClose?: Readonly<Record<string, number>>;
 }
 
 export interface VesselColumn {
@@ -598,7 +615,12 @@ export function vesselColumn(tools: readonly ToolCall[], files: VesselColumnFile
     if (!Number.isInteger(n) || n < 0) continue;
     const match = [...groups].reverse().find((g) => g.name === 'match_ais' && g.calls.some((c) => c.params?.pass_id === pass));
     const shown = match?.folded.find((c) => vesselKind(urlOf(c)) === 'targets' && passOf(urlOf(c)) === pass);
-    if (match) put(match, candidatesLine(n), shown ? atOf.get(shown) ?? match.first - 1 : match.first - 1);
+    if (!match) continue;
+    const at = shown ? atOf.get(shown) ?? match.first - 1 : match.first - 1;
+    put(match, candidatesLine(n), at);
+    // The set-aside line right under it (a stable sort keeps the two in this order).
+    const passed = files.passedClose && Object.prototype.hasOwnProperty.call(files.passedClose, pass) ? files.passedClose[pass] : 0;
+    put(match, passedLine(passed), at);
   }
 
   const lines: Record<string, StepLine[]> = {};

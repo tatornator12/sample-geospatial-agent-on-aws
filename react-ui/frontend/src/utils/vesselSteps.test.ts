@@ -16,6 +16,8 @@ import {
   boardUrl,
   candidatesLine,
   coverageLine,
+  passedLine,
+  PASSING_WORDS,
   decisionLine,
   decisionUrl,
   decisionWaits,
@@ -207,6 +209,8 @@ describe('the lines: every template, from the files only', () => {
     expect(say('draft', 'most_past_targets', 1, { box: 1, share_pct: 9 })).toBe('Decided: Drafting box 1: it held the most past dark targets, 9%.');
     expect(say('draft', 'soonest_look', 1, { box: 1, look: 'S1-D Oct 24 00:17 UTC' })).toBe('Decided: Drafting box 1: its radar look comes first, S1-D Oct 24 00:17 UTC.');
     expect(say('draft', 'near_candidates', 3, { box: 3, candidates_near: 2 })).toBe('Decided: Drafting box 3: 2 of the candidates lie in or near it.');
+    // Oct 12 after the passing rule: one of the two candidates by box 1.
+    expect(say('draft', 'near_candidates', 1, { box: 1, candidates_near: 1 })).toBe('Decided: Drafting box 1: 1 of the candidates lies in or near it.');
     expect(say('draft', 'only_planned_look', 2, { box: 2 })).toBe('Decided: Drafting box 2: the only box with a radar look planned.');
     expect(say('stop', 'no_checked_pass', 'none', { passes: [{ pass_id: AUG30, checkable_pct: 10 }], standard_pct: 15 }))
       .toBe('Checked: Aug 30 can check only 10%, under the 15% standard. No tasking can be drafted.');
@@ -550,5 +554,42 @@ describe('the height rules', () => {
     expect(answerScrollBlock(470, 416)).toBe('start');
     expect(answerScrollBlock(330, 797)).toBe('nearest');
     expect(answerScrollBlock(416, 416)).toBe('nearest');
+  });
+});
+
+
+// --- the passing rule (approved 2026-10-27) ------------------------------------------------------------------
+
+describe('the targets set aside because a broadcasting ship passed close by', () => {
+  it('says the count and the rule\'s numbers under the candidates line, within the line cap', () => {
+    expect(PASSING_WORDS).toBe('passed within 1 km, 30 minutes or less from the pass');
+    expect(passedLine(2)).toEqual({ label: 'Set aside:', text: '2 where a broadcasting ship passed within 1 km, 30 minutes or less from the pass.' });
+    expect(passedLine(0)).toBeNull();
+    expect(passedLine(-1)).toBeNull();
+    expect(passedLine(1.5)).toBeNull();
+    for (const line of [passedLine(2)!, passedLine(120)!]) {
+      expect(`${line.label} ${line.text}`.length).toBeLessThanOrEqual(MAX_LINE_CHARS);
+      expect(line.text).not.toMatch(/[\u2013\u2014]/);
+    }
+    // Not the key row's sentence again ("set aside: a broadcasting ship passed close by").
+    expect(`${passedLine(2)!.label} ${passedLine(2)!.text}`).not.toContain('passed close by');
+  });
+
+  it('puts it right under the candidates line once the map has revealed the pass, and nothing when none was set aside', () => {
+    const { tools } = cleanPath();
+    const match = (c: ReturnType<typeof vesselColumn>) => c.lines[c.groups.find((g) => g.name === 'match_ais')!.id];
+    expect(match(vesselColumn(tools, files({ revealed: { [OCT12]: 2 }, passedClose: { [OCT12]: 2 } })))).toEqual([
+      { label: 'Checked:', text: '2 candidates where AIS was received, seen by both detectors.' },
+      { label: 'Set aside:', text: '2 where a broadcasting ship passed within 1 km, 30 minutes or less from the pass.' },
+    ]);
+    expect(match(vesselColumn(tools, files({ revealed: { [OCT12]: 2 }, passedClose: { [OCT12]: 0 } })))).toEqual([candidatesLine(2)]);
+    expect(match(vesselColumn(tools, files({ revealed: { [OCT12]: 2 } })))).toEqual([candidatesLine(2)]);
+    // Before the reveal, neither (the set-aside count waits with the candidates).
+    expect(match(vesselColumn(tools, files({ passedClose: { [OCT12]: 2 } })))).toBeUndefined();
+    // A pass whose candidates all went: no candidates, and why.
+    expect(match(vesselColumn(tools, files({ revealed: { [OCT12]: 0 }, passedClose: { [OCT12]: 2 } })))).toEqual([
+      { label: 'Checked:', text: 'No candidates where AIS was received.' },
+      { label: 'Set aside:', text: '2 where a broadcasting ship passed within 1 km, 30 minutes or less from the pass.' },
+    ]);
   });
 });

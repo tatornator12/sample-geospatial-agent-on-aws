@@ -121,7 +121,12 @@ target was seen, so that poor reception is never mistaken for a vessel hiding.
    refuse and name the coverage check.
 3. WHEN `match_ais` runs THEN each target SHALL get one status: `broadcasting` (GFW matched it to
    AIS), `port`, `unproven` (no match, reception unproven: "not evidence"), or `candidate` (no match,
-   in heard water, seen by both detectors); `seen_once` for one detector only.
+   in heard water, seen by both detectors); `seen_once` for one detector only; `passed_close` for a
+   target that would be a candidate but a broadcasting ship's straight path between two hourly
+   fixes (at most 3 h apart) came within 1 km of it within 30 minutes of the radar minute (added
+   Oct 27, decision 13). A `passed_close` target SHALL never be counted, drafted or called dark;
+   `match_ais` SHALL return its closest approach (km, minutes, the track's type and knots, never an
+   identity) and a fixed `passed_say` sentence the agent repeats word for word.
 4. WHEN the agent reports THEN it SHALL give the counts in that order and use the fixed sentence "A
    candidate is a radar target with no broadcast nearby; it is not an accusation."
 
