@@ -53,7 +53,10 @@ export interface BriefCard {
   lon: number;
   /** The watch area whose scan tipped the site, as the stage names it (provenance, not location). */
   watchArea?: string;
+  /** How many times EMIT looked at the site since its first look there (site_history's count). */
   looks: number;
+  /** The day of EMIT's first look at the site (YYYY-MM-DD, site_history's record); absent on older drafts. */
+  looksSince?: string;
   candidates: number;
   passesRead: number;
   /** The first day of the window the passes were read in (YYYY-MM-DD), from the tool's record. */
@@ -138,6 +141,25 @@ export function briefDecision(b: Record<string, unknown>): BriefDecision | null 
   };
 }
 
+/** The "Next" line when the agent's own call is no_new_look_needed: the draft_brief tool's fixed words
+ *  (agents/methane-hunter/brief_tools.py NO_NEW_LOOK_NEXT). The card uses them whatever the draft says,
+ *  so an older draft's "A new EMIT pass or Tanager-1 overpass ..." never sits under "No new close look is
+ *  needed yet." (the presenter's filed brief, 27 Oct). */
+export const NO_NEW_LOOK_NEXT = "EMIT's next routine pass over this site, to extend the record.";
+
+/** EMIT's first year: site_history counts every look from 2022, so a draft without the first look's day
+ *  still says the span ("EMIT looked 30 times since 2022", never "in all"). */
+export const EMIT_FIRST_YEAR = '2022';
+
+/** "6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30 times since 2022." The card's
+ *  count line, as the brief's record says it; Slack posts the same words. */
+export function looksLine(card: Pick<BriefCard, 'candidates' | 'passesRead' | 'passesSince' | 'looks' | 'looksSince'>): string {
+  const since = card.passesSince ? ` since ${card.passesSince}` : '';
+  const year = card.looksSince ? card.looksSince.slice(0, 4) : EMIT_FIRST_YEAR;
+  return `${card.candidates} of ${card.passesRead} passes read${since} are candidates; ` +
+    `EMIT looked ${card.looks} ${card.looks === 1 ? 'time' : 'times'} since ${year}.`;
+}
+
 /** Carbon Mapper's licence asks for its source wherever its data shows: a line without it is not shown. */
 const CARBON_MAPPER_SOURCE = 'Source: Carbon Mapper (data.carbonmapper.org)';
 
@@ -197,13 +219,15 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     .sort((a, c) => ASSESSMENT_ORDER.indexOf(a.assessment) - ASSESSMENT_ORDER.indexOf(c.assessment))
     .slice(0, 6);
   const gaps = (Array.isArray(b.gaps) ? b.gaps : []).map(checkLine).filter((l): l is string => l !== null).slice(0, 4);
-  const nextCollection = checkLine(b.next_collection);
   const watchArea = text(b.watch_area, 60);
   const passesSince = typeof b.passes_since === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.passes_since) ? b.passes_since : null;
+  const looksSince = isoDay(b.looks_since);
   const cm = ((b.checks ?? {}) as Record<string, unknown>).carbon_mapper as { line?: unknown } | undefined;
   const cmLine = checkLine(cm?.line);
   const independent = cmLine && cmLine.startsWith('Carbon Mapper ') && cmLine.endsWith(`${CARBON_MAPPER_SOURCE}.`) ? cmLine : null;
   const decision = briefDecision(b as Record<string, unknown>);
+  // The next line agrees with the agent's own call: with no_new_look_needed it is the tool's fixed words.
+  const nextCollection = decision?.recommendation === 'no_new_look_needed' ? NO_NEW_LOOK_NEXT : checkLine(b.next_collection);
   return {
     briefId,
     title,
@@ -212,6 +236,7 @@ export function briefCard(record: unknown, briefId: string, sessionId: string | 
     lon,
     ...(watchArea && checkLine(watchArea) ? { watchArea } : {}),
     looks,
+    ...(looksSince ? { looksSince } : {}),
     candidates,
     passesRead,
     ...(passesSince ? { passesSince } : {}),

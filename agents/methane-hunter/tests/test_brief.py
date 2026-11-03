@@ -1,6 +1,7 @@
 """draft_brief (requirement 10): fixed explanations, bounded text, no stated causes, draft only."""
 import asyncio
 import json
+import re
 
 import pytest
 
@@ -216,7 +217,9 @@ def test_pass_counts_and_their_window_come_from_the_tools_own_record(brief, fake
                                                     recommendation_reason="confirmation_older_than_90_days"))))
     rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/briefs/{out['brief_id']}.draft.json"])["brief"]
     assert (rec["candidates"], rec["passes_read"], rec["passes_since"]) == (2, 3, "2025-01-01")
-    assert "Looks: 2 of 3 passes read since 2025-01-01 are candidates; EMIT looked 11 times in all." in out["markdown"]
+    # No site_history record here: the model's looks, since EMIT began (2022), never "in all".
+    assert "Looks: 2 of 3 passes read since 2025-01-01 are candidates; EMIT looked 11 times since 2022." in out["markdown"]
+    assert "in all" not in out["markdown"]
 
 
 def test_the_registry_field_line_is_its_own_check_in_the_brief(brief, fake_s3):
@@ -484,3 +487,177 @@ def test_the_code_written_lines_never_say_now_still_active_or_leaking(brief):
         assert not re.search(r"\b(now|still|active|leaking)\b", line, re.IGNORECASE), line
         assert "\u2014" not in line and "\u2013" not in line, line
         assert brief.check_text(line) == [], line
+
+
+# --- the brief's wording (the presenter's filed brief, 27 Oct) ---------------------------------------
+#
+# 1. "No new close look is needed yet." sat above "Next: A new EMIT pass or Tanager-1 overpass over this
+#    site to confirm recurrence and resolve the spatial pattern." (the model's next_collection).
+# 2. The gaps said "NASA's plume product is nearly empty after 2025-09-22; passes after that date have not
+#    been checked for outlined plumes.", read as "nothing was checked" though the agent read 20 passes.
+# 3. "6 of 20 passes read since 2025-01-01 are candidates; EMIT looked 30 times in all.": the 30 is every
+#    look since 2022, the 20 the passes since 2025.
+
+PRESENTERS_NEXT = ("A new EMIT pass or Tanager-1 overpass over this site to confirm recurrence and resolve "
+                   "the spatial pattern.")
+PRESENTERS_GAP = ("NASA's plume product is nearly empty after 2025-09-22; passes after that date have not been "
+                  "checked for outlined plumes.")
+
+
+def _draft(fake_s3, out):
+    return json.loads(fake_s3.objects[f"session_data/{SESSION}/briefs/{out['brief_id']}.draft.json"])["brief"]
+
+
+def _within_90(**over):
+    """A no_new_look_needed brief the record supports (Carbon Mapper 90 days before the tip)."""
+    return shanxi(recommendation="no_new_look_needed", recommendation_reason="confirmed_within_90_days", **over)
+
+
+@pytest.mark.parametrize("given", [PRESENTERS_NEXT, None, "Assess possible sabotage."])
+def test_no_new_look_needed_writes_the_next_line_itself_whatever_the_model_sent(brief, fake_s3, given):
+    put_record(fake_s3, cm_days=("2026-07-08",))
+    over = {} if given is None else {"next_collection": given}
+    args = _within_90(**over)
+    if given is None:
+        args.pop("next_collection")
+    out = json.loads(_run(brief.draft_brief(**args)))
+    assert "error" not in out, out                                # ignored, never refused or rewritten
+    md = out["markdown"]
+    assert "Recommendation: no new fine-scale look needed" in md
+    assert "Next collection: EMIT's next routine pass over this site, to extend the record." in md
+    assert "Tanager-1 overpass" not in md and "sabotage" not in md
+    assert _draft(fake_s3, out)["next_collection"] == brief.NO_NEW_LOOK_NEXT
+
+
+def test_recommend_new_look_keeps_the_models_next_line(brief, fake_s3):
+    out = json.loads(_run(brief.draft_brief(**good(next_collection=PRESENTERS_NEXT))))
+    assert "error" not in out, out
+    assert f"Next collection: {PRESENTERS_NEXT}" in out["markdown"]
+    assert _draft(fake_s3, out)["next_collection"] == PRESENTERS_NEXT
+
+
+@pytest.mark.parametrize("text", [
+    "No new close look is needed yet.",
+    "No further pass is required; EMIT's routine passes will extend the record.",
+    "A new look is not needed while the record is recent.",
+    "None needed until the next fortnight.",
+    "There is no need for a new pass.",
+])
+def test_recommend_new_look_refuses_a_next_line_that_says_none_is_needed(brief, fake_s3, text):
+    out = json.loads(_run(brief.draft_brief(**good(next_collection=text))))
+    assert "next_collection: says no new look is needed, but your recommendation is recommend_new_look" in out["error"]
+    assert not [k for k in fake_s3.objects if "/briefs/" in k]
+
+
+def test_recommend_new_look_needs_its_next_line(brief):
+    args = good()
+    args.pop("next_collection")
+    err = json.loads(_run(brief.draft_brief(**args)))["error"]
+    assert "next_collection (the new look you recommend) must be a non-empty string" in err
+
+
+def test_a_refused_no_new_look_call_is_told_to_add_the_next_line(brief, fake_s3):
+    put_record(fake_s3)                        # 118 days: the record supports a new look only
+    args = shanxi(recommendation="no_new_look_needed", recommendation_reason="confirmed_within_90_days")
+    args.pop("next_collection")
+    err = json.loads(_run(brief.draft_brief(**args)))["error"]
+    assert "does not fit the record" in err and "also give next_collection: the new look you recommend" in err
+
+
+def test_the_fixed_next_line_reads_as_no_new_look(brief):
+    assert brief._NO_LOOK.search(brief.NO_NEW_LOOK_NEXT) is None
+    assert brief.check_text(brief.NO_NEW_LOOK_NEXT) == []
+    assert not re.search(r"\b(new|now|still|active|leaking)\b", brief.NO_NEW_LOOK_NEXT, re.IGNORECASE)
+
+
+def _passes(fake_s3, lat=39.4741, lon=53.6435, latest="2025-09-22", n=3):
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/methane/passes_{lat:.4f}_{lon:.4f}.json", Body=json.dumps({
+        "lat": lat, "lon": lon, "since": "2025-01-01", "looks": n, "plume_product_latest": latest,
+        "passes": [{"date": f"2025-0{i + 1}-10", "verdict": "rejected", "short": "too weak"} for i in range(n)]}).encode())
+
+
+def _history(fake_s3, lat=39.4741, lon=53.6435, looks=30, first="2022-08-15", latest="2025-09-22"):
+    fake_s3.put_object(Bucket=BUCKET, Key=f"session_data/{SESSION}/methane/history_{lat:.4f}_{lon:.4f}.json", Body=json.dumps({
+        "lat": lat, "lon": lon, "looks": looks, "first_look": first, "last_look": "2026-10-17",
+        "plume_dates": 0, "plume_product_latest": latest}).encode())
+
+
+def test_the_plume_product_gap_is_the_tools_line_with_its_date_and_the_models_is_dropped(brief, fake_s3):
+    _passes(fake_s3)
+    out = json.loads(_run(brief.draft_brief(**good(gaps=[PRESENTERS_GAP, "EMIT only sees this site on its passes."]))))
+    assert "error" not in out, out                                # dropped, not refused
+    line = "NASA's outlined-plume product has none after 22 September 2025, so the agent read EMIT's passes itself."
+    assert _draft(fake_s3, out)["gaps"] == [line, "EMIT only sees this site on its passes."]
+    assert ("Gaps: NASA's outlined-plume product has none after 22 September 2025, so the agent read EMIT's passes "
+            "itself; EMIT only sees this site on its passes.") in out["markdown"]
+    assert "have not been checked" not in out["markdown"] and "2025-09-22" not in out["markdown"]
+
+
+@pytest.mark.parametrize("gap", [
+    "NASA's plume product covers only through 2025-09-22; passes after that date have not been reviewed.",
+    "NASA's plume product has outlined no plumes here through 2025-09-22; passes after that date are not covered.",
+    "NASA has outlined no methane plumes here since 2025-09-22.",
+    "The outlined-plume record ends on 2025-09-22.",
+])
+def test_every_wording_of_the_plume_product_gap_gives_way_to_the_tools(brief, fake_s3, gap):
+    _passes(fake_s3)
+    out = json.loads(_run(brief.draft_brief(**good(gaps=[gap, "EMIT only sees this site on its passes."]))))
+    gaps = _draft(fake_s3, out)["gaps"]
+    assert gaps[0].startswith("NASA's outlined-plume product has none after 22 September 2025") and len(gaps) == 2
+
+
+def test_the_plume_gap_without_a_pass_record_or_a_date(brief, fake_s3):
+    out = json.loads(_run(brief.draft_brief(**good())))                    # no records at all
+    assert _draft(fake_s3, out)["gaps"][0] == ("NASA's outlined-plume product is nearly empty after 2024, and EMIT's "
+                                                "passes here were not read.")
+    _history(fake_s3)                                                      # site_history knows the date
+    out = json.loads(_run(brief.draft_brief(**good())))
+    assert _draft(fake_s3, out)["gaps"][0] == ("NASA's outlined-plume product has none after 22 September 2025, and "
+                                                "EMIT's passes here were not read.")
+
+
+@pytest.mark.parametrize("field,text", [
+    ("gaps", ["Passes after 2025-09-22 have not been checked for methane."]),
+    ("gaps", ["Later passes are unchecked."]),
+    ("observations", ["EMIT's later passes were not reviewed for plumes.", "VIIRS saw no heat."]),
+])
+def test_passes_said_to_be_not_checked_are_refused(brief, fake_s3, field, text):
+    err = json.loads(_run(brief.draft_brief(**good(**{field: text}))))["error"]
+    assert "reads as if no pass was checked (the agent read EMIT's passes itself)" in err
+    assert not [k for k in fake_s3.objects if "/briefs/" in k]
+
+
+def test_the_model_keeps_three_gaps_besides_the_plume_products(brief, fake_s3):
+    four = ["EMIT only sees this site on its passes.", "VIIRS can miss small flares.",
+            "The registry may be incomplete.", "TROPOMI had 3 valid days."]
+    assert "gaps has more than 3 items besides NASA's plume product" in json.loads(_run(brief.draft_brief(**good(gaps=four))))["error"]
+    out = json.loads(_run(brief.draft_brief(**good(gaps=[PRESENTERS_GAP] + four[:3]))))
+    assert len(_draft(fake_s3, out)["gaps"]) == 4                          # the tool's line and the model's three
+
+
+@pytest.mark.parametrize("first,expect", [("2022-08-15", "since 2022"), ("2023-03-02", "since 2023"), (None, "since 2022")])
+def test_emits_looks_and_their_first_year_come_from_site_historys_record(brief, fake_s3, first, expect):
+    _passes(fake_s3, n=3)
+    _history(fake_s3, looks=30, first=first)
+    out = json.loads(_run(brief.draft_brief(**good(looks=11))))           # the model's count differs
+    assert f"Looks: 0 of 3 passes read since 2025-01-01 are candidates; EMIT looked 30 times {expect}." in out["markdown"]
+    rec = _draft(fake_s3, out)
+    assert rec["looks"] == 30 and rec.get("looks_since") == first
+
+
+def test_one_look_is_one_time_and_a_far_history_record_is_not_this_sites(brief, fake_s3):
+    _history(fake_s3, lat=39.8, lon=53.6435, looks=99)                    # ~36 km away
+    out = json.loads(_run(brief.draft_brief(**good(looks=1))))
+    assert "EMIT looked 1 time since 2022." in out["markdown"]
+
+
+def test_the_code_written_gap_lines_pass_the_briefs_own_checks(brief, tools):
+    import watch_tools as wt
+    from datetime import date as d
+    lines = [wt.plume_gap_line(day, n) for day in (d(2025, 9, 22), d(2026, 1, 1), None) for n in (0, 20)]
+    assert wt.day_words(d(2025, 9, 22)) == "22 September 2025" and wt.day_words(d(2026, 1, 1)) == "1 January 2026"
+    for line in lines:
+        assert brief.check_text(line) == [], line
+        assert brief._PLUME_GAP.search(line)                              # a model copy of it would be dropped
+        assert not re.search(r"\b(now|still|active|leaking|checked)\b", line, re.IGNORECASE), line
+        assert "\u2014" not in line and "\u2013" not in line and len(line) <= brief.TEXT_MAX, line

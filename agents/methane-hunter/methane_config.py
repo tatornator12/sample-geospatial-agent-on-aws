@@ -273,8 +273,10 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     W5b hints: "less likely" only when a check argued against it, "possible" when a check supports it
     or none spoke, "cannot assess" when the check could not see), confidence that methane RECURS here
     (high: >= 3 candidate passes on separate dates plus NASA plumes in site_history; moderate: >= 2
-    candidates; low otherwise or TROPOMI only), gaps (always the plume product's gap after its latest
-    plume date, with that date, and that EMIT only sees on its passes), next collection. The tool
+    candidates; low otherwise or TROPOMI only), gaps (1 to 3, e.g. that EMIT only sees the site on
+    its passes; never NASA's plume product or its date: the tool writes that gap itself, first, with
+    the date and that the agent read EMIT's passes itself; never write that passes were "not
+    checked"), next_collection only with recommend_new_look (below). The tool
     appends the checks' lines itself (they print as "Check:" lines) and Carbon Mapper's with its
     source (it prints as "Independent detections:"): never copy a check's line or Carbon Mapper's,
     or a paraphrase of either, into observations or gaps (no observation about Carbon Mapper at
@@ -294,6 +296,10 @@ W6. BRIEF. draft_brief(...) with every number from the tools: place = the site's
     "Record:" and "Recommendation:" lines itself; if it refuses, pick one of the reasons it says the
     record supports and call again with everything else unchanged. Never restate the recommendation
     in observations, gaps or next_collection.
+    next_collection: with recommend_new_look, the new look you recommend (a new EMIT pass, Tanager-1,
+    an aircraft survey or a ground inspection), never that none is needed; with no_new_look_needed
+    leave next_collection out: the tool writes the next line itself in fixed words, so the brief
+    never asks for a look its own call says is not needed.
     ONLY when the user's own words include "super-emitter" (no other prompt gets this line), one
     observation gives the record's rate, from the site_history plume with the highest rate_kg_h:
     "NASA's highest published emission rate at this site is <rate_kg_h> ± <rate_uncertainty_kg_h>

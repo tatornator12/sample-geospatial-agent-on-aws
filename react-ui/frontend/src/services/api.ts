@@ -456,7 +456,10 @@ export interface BriefCardData {
   lon: number;
   /** The watch area whose scan tipped the site (provenance, not location). */
   watchArea?: string;
+  /** How many times EMIT looked at the site since its first look there. */
   looks: number;
+  /** The day of EMIT's first look at the site (YYYY-MM-DD); absent on older drafts. */
+  looksSince?: string;
   candidates: number;
   passesRead: number;
   /** First day of the window the passes were read in (YYYY-MM-DD). */

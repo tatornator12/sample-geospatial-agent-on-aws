@@ -451,6 +451,37 @@ def test_the_mission_must_carry_the_agents_decision_as_validated_enums():
     assert any("expected inputs: no follow_site" in p for p in ev.input_problems(mission, [sideways] + pre[1:] + [ok]))
 
 
+@pytest.mark.parametrize("name", ["watch-mission", "watch-named-area", "watch-super-emitters"])
+def test_the_watch_cases_forbid_the_old_gap_wording_and_a_next_line_under_no_new_look(name):
+    """The presenter's filed brief (27 Oct): "passes after that date have not been checked" read as "nothing
+    was checked"; and "No new close look is needed yet." sat over a model next line asking for a new EMIT
+    pass. The tool writes both lines now, so the model's own wording is a regression the gate catches."""
+    import json as _json
+    cases = _json.loads((ev.REPO_ROOT / "agents" / "methane-hunter" / "golden_prompts.json").read_text())["prompts"]
+    case = next(c for c in cases if c["name"] == name)
+    assert {"have not been checked", "have not been reviewed"} <= set(case["forbidden_text"])
+
+    def brief(**inp):
+        return {"name": "draft_brief", "input": _json.dumps({"place": "Yangquan, Shanxi, China", **inp})}
+    no_look = dict(recommendation="no_new_look_needed", recommendation_reason="confirmed_within_90_days")
+    new_look = dict(recommendation="recommend_new_look", recommendation_reason="confirmation_older_than_90_days")
+    nxt = "A new EMIT pass or Tanager-1 overpass over this site to confirm recurrence and resolve the spatial pattern."
+    bad = ev.input_problems(case, [brief(**no_look, next_collection=nxt)])
+    assert any("forbidden input draft_brief(recommendation=no_new_look_needed" in p for p in bad)
+    # A next_check that mentions a new pass is not the next line; with no next_collection the call is fine.
+    fine = brief(**no_look, explanations=[{"id": "routine_venting", "next_check": "A new EMIT pass with no heat would support it."}])
+    assert not any("forbidden input" in p for p in ev.input_problems(case, [fine]))
+    assert not any("forbidden input" in p for p in ev.input_problems(case, [brief(**new_look, next_collection=nxt)]))
+    # The old gap wording anywhere in the stream (a tool input included) fails; the tool's own line passes.
+    old = ("NASA's plume product is nearly empty after 2025-09-22; passes after that date have not been checked for "
+           "outlined plumes.")
+    new = "Gaps: NASA's outlined-plume product has none after 22 September 2025, so the agent read EMIT's passes itself."
+    stream = json.dumps({"toolUseId": "t1", "name": "draft_brief", "input": _json.dumps({"gaps": [old]})})
+    assert any("have not been checked" in p for p in ev.evaluate(case, stream, 1.0)[0])
+    assert not any("forbidden text" in p for p in ev.evaluate(case, new, 1.0)[0])
+    assert ev.case_problems(case) == []
+
+
 # --- the follow decision against the mission's own records (the 90-day switch rule, Oct 23) -------------
 
 def follow_mission(record_shown=True, reason="top_spot_stale_switched", followed=("south caspian", 3), tip_shown=True,

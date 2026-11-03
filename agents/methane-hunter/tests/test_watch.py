@@ -471,6 +471,7 @@ def test_check_recent_passes_reads_scenes_and_stages_windows(watch, fake_s3, mon
         ("2026-10-17", "V003", "rejected", "within noise"), ("2026-08-12", "V002", "candidate", "candidate"),
         ("2026-01-01", "V002", "rejected", "too weak")]
     assert manifest["passes"][1]["chip"] == f"passchip_{SCENE}.png"
+    assert manifest["plume_product_latest"] == "2025-09-22"      # the brief's gap line says it with its date
     # Verdicts go to the shared cache under the rule's version only.
     cached = [p["Key"] for p in fake_s3.puts if p["Key"].startswith("methane/cache/")]
     assert cached and all(k.startswith("methane/cache/passwin_rule2_") for k in cached)
@@ -539,6 +540,32 @@ def test_the_baseline_rewrites_the_shared_globe_only_when_it_changed(watch, fake
     fc["features"][0]["properties"]["repeat_dates"] = 7
     _run(watch.watch_baseline())
     assert len([p for p in fake_s3.puts if p["Key"] == watch.WATCH_SITES_CACHE_KEY]) == 2
+
+
+@pytest.mark.parametrize("latest,words", [
+    (date(2025, 9, 22), "NASA's outlined-plume product has none after 22 September 2025"),
+    (None, "NASA's outlined-plume product is nearly empty after 2024"),
+])
+def test_site_history_records_the_looks_and_says_the_agent_reads_the_passes(watch, fake_s3, monkeypatch, latest, words):
+    """The presenter's filed brief (27 Oct) said later passes "have not been checked"; the room heard
+    "nothing was checked". site_history now says the agent reads them itself, and records EMIT's looks
+    with the first one's day for the brief's "EMIT looked 30 times since 2022"."""
+    import methane_tools as mt
+    monkeypatch.setattr(mt, "archive_latest", lambda client: latest)
+    monkeypatch.setattr(watch, "_cmr_entries", lambda client, params, limit: ([], 0))   # no NASA plume near it
+
+    def looks(client, lat, lon, start, end, limit, sort_key="-start_date"):
+        day = "2022-08-15" if sort_key == "start_date" else "2026-10-17"
+        return [{"time_start": f"{day}T06:05:20Z"}], 30
+    monkeypatch.setattr(watch, "emit_looks", looks)
+    out = json.loads(_run(watch.site_history(LAT, LON)))
+    assert (out["looks"], out["first_look"], out["last_look"]) == (30, "2022-08-15", "2026-10-17")
+    assert f"{words}, so the agent reads EMIT's later passes itself; no detection is not evidence" in out["say"]
+    assert "not been checked" not in out["say"] and "checked" not in out["say"]
+    rec = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/history_{LAT:.4f}_{LON:.4f}.json"])
+    assert rec == {"lat": round(LAT, 4), "lon": round(LON, 4), "looks": 30, "first_look": "2022-08-15",
+                   "last_look": "2026-10-17", "plume_dates": 0,
+                   "plume_product_latest": latest.isoformat() if latest else None}
 
 
 def test_check_recent_passes_says_when_emit_cannot_look(watch, monkeypatch):
