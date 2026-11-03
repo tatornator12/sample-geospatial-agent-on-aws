@@ -169,6 +169,24 @@ gives each target one status: `broadcasting` (GFW matched it), `port`, `unproven
 match, heard water, both detectors), `seen_once` (one detector only; never a candidate). It
 rewrites the targets GeoJSON so the map's marks change in place.
 
+The passing rule (decision 13, added Oct 27): a target that would be a candidate becomes
+`passed_close` when `vessel_store.closest_passing` finds a broadcasting ship whose straight path
+between two consecutive hourly fixes (at most `PASSING_GAP_H` = 3 h apart, each fix at its stamped
+hour, steady speed between them) came within `PASSING_KM` = 1.0 km of it at a moment within
+`PASSING_MIN` = 30 minutes of the radar minute. The radar may have seen that ship. `match_ais`
+labels the candidates T01 onwards west to east, then the set-aside targets numbered on from there;
+it returns `passed_close` (id, km, minutes from the radar minute, the track's type, knots),
+`passed_rule` and the fixed `passed_say` ("2 more not counted: a broadcasting ship passed close
+by."). The GeoJSON carries `passed_km` and `passed_min` only. The stage draws a grey ring with a
+short level line, labelled "T03 ship passed close", a key row "set aside: a broadcasting ship
+passed close by", and the line "Set aside: 2 where a broadcasting ship passed within 1 km, 30
+minutes or less from the pass." The backend's tasking count reads `passed_close` beside the other
+counts (0 for a draft written before the rule). The limits were set after seeing the Oct 12 pass,
+where a passenger boat passed 0.18 km and 0.58 km from two of its four candidates 13 and 14
+minutes before the pass, while the other two had a ship 0.29 to 0.40 km away about 40 minutes
+earlier: a judgement, not a measured rate. `scripts/vessel_passing_counts.py` reads every pass's
+counts before and after (read-only).
+
 ### 4. `gather_evidence`
 
 Per candidate (at most six): a 1.2 km chip from the 40 m crop (a COG in the session, so
@@ -387,12 +405,12 @@ The answer lands about 9 to 15 s later than gate B. The boxes beat held 3.2 to 5
 | 0:45 | 13.2 to 19.2 | The pass | | The radar sweeps in along its track, then a chip and one sentence |
 | 0:48 | 16.1 to 22.0 | The claim | | Grey rings; the broadcasts claim theirs |
 | 0:51 | 19.2 to 25.1 | Coverage | Say that 15% is a policy line set from the passes on file | The AIS-received wash inside the radar and the reception-unknown hatch; clock "This pass can check 19% of the reserve"; "Checked: This pass can check 19% of the reserve, over the 15% standard." |
-| 0:57 | 24.1 to 31.5 | Candidates | "Candidates, not accusations" | The rings in received water turn orchid; then "Checked: 4 candidates where AIS was received, seen by both detectors." |
+| 0:57 | 24.1 to 31.5 | Candidates | "Candidates, not accusations" | The rings in received water turn orchid; then "Checked: 2 candidates where AIS was received, seen by both detectors." and "Set aside: 2 where a broadcasting ship passed within 1 km, 30 minutes or less from the pass."; T03 and T04 grey, "ship passed close" (decision 13; before it, "Checked: 4 candidates …") |
 | 1:01 | 28.5 to 35.4 | Evidence | | One evidence chip |
 | 1:06 | 33.1 to 39.9 | Where to look | Read the figure beside its layer | The heat; clock "Where to look on the next pass" with the top 5% figure |
 | 1:11 | 37.8 to 44.5 | The boxes | | 5 s after the heat, the three patrol boxes with the boxes' own figure, held 3 s |
-| 1:14 | 37.2 to 44.0 (line), 38.2 to 45.0 (look at gate B; about 2.5 s later since W1) | The box | | "Decided: Drafting box 1: it held the most past dark targets, 9%."; the swath over the box with its countdown, or "no look planned yet" |
-| 1:20 | 45.9 to 52.0 | The draft | Let the answer land | The answer, its first line in view: "4 candidates on the Oct 12 pass; I drafted box 1 for the next look."; the tasking plate opens on the agent's box |
+| 1:14 | 37.2 to 44.0 (line), 38.2 to 45.0 (look at gate B; about 2.5 s later since W1) | The box | | "Decided: Drafting box 1: 1 of the candidates lies in or near it." (every dev run on Oct 27, with decision 13; before it, "Decided: Drafting box 1: it held the most past dark targets, 9%."); the swath over the box with its countdown, or "no look planned yet" |
+| 1:20 | 45.9 to 52.0 | The draft | Let the answer land | The answer, its first line in view: "2 candidates on the Oct 12 pass; I drafted box 1 for the next look." (before decision 13, "4 candidates …"), its candidates line ending "2 more not counted: a broadcasting ship passed close by."; the tasking plate opens on the agent's box, "Patrol box 1 · check 2 of 2 candidates on the way" |
 | 1:25 to 4:30 | | The officer's decision | Change the box or leave out a candidate, then Approve the tasking | The plate's filed line, "Filed by the officer at … UTC. The agent did not file it.", once, on the plate; no follow-up turn |
 | 4:30 | | Slack, the close | Turn to the second screen | The tasking's Slack post, "From the pass": "AIS was received over {heard}% of the reserve; this pass could check {checkable}%." with the targets and candidates counts |
 
@@ -419,7 +437,10 @@ from gate A to task 9a).
   is on `develop`. Status Oct 21: the fix (`6cf71ce`) is on `develop` and in this branch; task 9
   saw `/?agent=vessels` return to live at 1920 and 1280.
 - The replay case is `vessels-open-question` (U11): the question recorded once on dev on the task
-  9a data (Oct 12 read as the newest wide pass, 4 candidates, box 1 drafted, 0 refusals). Its plate
+  9a data (Oct 12 read as the newest wide pass, 4 candidates, box 1 drafted, 0 refusals). With
+  decision 13 the gallery card plays `vessels-open-question-v2`, recorded on dev on Oct 27 on the
+  same data (2 candidates, T03 and T04 set aside, box 1 drafted, next look Nov 5 00:17 UTC); the
+  first case stays in the bucket. Its plate
   is inert ("Recorded case: the decision is made live, not replayed."), so a replay has no approval
   and no Slack post: the act then closes on the replay's answer, with the presenter saying the
   decision is the officer's. Its look (Oct 24 00:17 UTC) is in the past after Oct 24; task 14
@@ -491,3 +512,15 @@ decision or the Slack post. If the runtime fails mid-question: refresh, then the
     above has it at 3:20. **Superseded Oct 21** (`redesign-open-question.md` U5): the beat leaves the
     run and is an asked-only spare; task 15 moved it to Case 8 (Sentinel-1A, Apr 1 2026), and the
     run sheet above lists it with the other spares.
+13. **The passing rule** (approved Oct 27, option 1 of three; the user had asked on Oct 27 whether
+    two Oct 12 candidates could be the passenger boats broadcasting nearby): a target that would be
+    a candidate is set aside as `passed_close` when a broadcasting ship's straight path between two
+    hourly fixes (at most 3 h apart) came within 1 km of it within 30 minutes of the radar minute
+    (component 3). The limits were chosen after seeing the Oct 12 case, so they are a judgement,
+    not a measured rate; the stage and the notes say so. Rejected: a note on the plate only (option
+    2) and narration only (option 3), which would have left the agent counting and drafting targets
+    the radar may have seen as ships. Counts before and after, the same on v1 and v1r: Oct 12
+    4 to 2, Sep 30 3 to 2, Sep 18 4 to 1, Sep 7 2 to 0 (it meets the standard at 17.1%), Aug 30
+    0 to 0, Apr 1 2 to 1, Oct 17 (v1r only) 0 to 0. A named pass left with no candidates goes to
+    the forecast. The replay `vessels-open-question-v2` was recorded with the rule; the gallery
+    card plays it from the rule's promotion.
