@@ -112,7 +112,8 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 - **Point at:** the board's top row, then the row marked "following".
 - **Say:** "Let me take you back through it. First the wide view: TROPOMI, on a European satellite, scanned all nine areas over the last two weeks, and these are the strongest tips. A tip only says 'somewhere around here'."
 - If the "following" row is not the top row (3 November: "South Caspian, Turkmenistan +115.1 ppb" on top, "Shanxi and Ordos coal basins, China following +73.6 ppb" second): "Notice it didn't follow the strongest tip. I'll come back to why."
-- If the board's last line reads "1 more area scanning" after the card has landed, don't read it out: the agent scanned all nine, and one area's numbers didn't reach the stage (rehearsal notes, section 2).
+- With "Show all N steps" pressed, the full board lists every area. West Siberia reads "no clear view" in November: "Up there the satellite has neither sunlight nor a clear view this time of year." "No hotspot" means it could see and nothing stood out.
+- 4 November (live and dev): it followed the south Caspian, the strongest tip, by its newest confirmation (Carbon Mapper, 5 October, on the dev run's board), so it stayed on the top row. The followed area can change from day to day; read the "following" row.
 
 **4. The sharp look: it judges every pass (about 40 s)**
 - **Do:** scroll down to "Cue EMIT on 2 sites". Each site has a verdict line ("2 candidates · 1 within noise · 1 cloud or gap" for the south Caspian on 3 November); the site it followed has its record and a row of dated frames under it ("The 8 EMIT passes read").

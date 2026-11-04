@@ -182,3 +182,14 @@ Oct 12 when Dark Vessels was chosen for Act 3.)
   October checks were not held (the presenter was out of office); their timings move to Nov 6.
   Backup clips of the eight gallery replays recorded the same day from a local build of this
   release. Way back: `deployed-2026-10-26-1606` (`98ea670`).
+- Nov 4, a fix (Methane Watch + frontend): `develop` promoted to `demo-stable` = `88774a3`, tag
+  `deployed-2026-11-04` (pushed to `fork`). Brings: a TROPOMI window with no usable retrieval (West
+  Siberia from late October) still writes its tip row, `no_view`, and the board and globe say "no
+  clear view"; "N more areas scanning" shows only while the agent works (the Nov 3 board ended "1
+  more area scanning" after the card). Gates: pytest methane 268; vitest 698; build clean;
+  detector 0. Dev: `methane_hunter_dev` v57, a live mission through a local stage wrote all 9 tip
+  files (West Siberia `no_view`, 27 orbits) and the board ended "+6 more areas". Dev eval methane
+  13/13 in `promote.sh` run 1. Stable `methane_hunter` v11 READY, 9 env keys; smoke
+  `strongest-plume` PASS; stable `watch-mission` PASS 83 s (9 scans, followed the south Caspian,
+  `newest_confirmation`). Live: bundle has "no clear view"; worker 200; `/api/agents` 401; 49 KB
+  POSTs 401, 401, 403. Way back: `deployed-2026-11-03` (`7a32308`).

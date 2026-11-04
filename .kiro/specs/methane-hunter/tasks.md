@@ -304,3 +304,15 @@ approval path, then replay and evals.
   `no_new_look_needed`, the new Next and gap lines in the draft; `warm_watch.py` 173 reads ok. The
   replay `methane-watch-bars` keeps the older gap wording (a rebuild would rewrite its case files;
   left as is). Way back: `deployed-2026-10-26-1606` (`98ea670`).
+- Nov 4, a fix (Methane Watch + frontend): `develop` promoted to `demo-stable` = `88774a3`, tag
+  `deployed-2026-11-04` (pushed to `fork`). Found on the Nov 3 live run: West Siberia's window (19
+  October to 1 November) had 27 orbits and no usable pixel (low sun, snow), and `scan_tropomi`
+  returned before `write_tip`, so the board waited for that row and ended "1 more area scanning"
+  after the card. Now the empty window writes its row with `no_view: true` (no top, no hotspots;
+  the follow rule never cues it), the board and globe say "no clear view" (apart from "no hotspot"),
+  and the pending line shows only while the turn runs. Tests: pytest methane 268 (a new end-to-end
+  scan with an all-NaN window); vitest 698 (parseTip's noView, the board's two words, no pending
+  line after the turn). Dev v57: a live mission on a local stage wrote all 9 tip files and the
+  board ended "+6 more areas". Dev eval 13/13 in `promote.sh`. Stable `methane_hunter` v11 READY;
+  smoke `strongest-plume` PASS; stable `watch-mission` PASS 83 s (9 scans; followed the south
+  Caspian, `newest_confirmation`). Way back: `deployed-2026-11-03` (`7a32308`).
