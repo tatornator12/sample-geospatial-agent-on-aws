@@ -254,6 +254,36 @@ def test_scan_tropomi_end_to_end_on_synthetic_orbits(watch, fake_s3, monkeypatch
     assert restyled["render"]["bounds"] == out["render"]["bounds"]
 
 
+def test_a_scan_with_no_usable_retrieval_still_writes_the_boards_row(watch, fake_s3, monkeypatch):
+    """Nov 3 (live): West Siberia's late-October window had orbits but no usable pixel (low sun,
+    snow), so the scan returned without its tip manifest and the stage's board waited for it,
+    "1 more area scanning", after the brief had landed. The row is written, marked no_view."""
+    listing = {"Contents": [{"Key": f"COGT/OFFL/L2__CH4___/2026/09/10/{STEM}_PRODUCT_methane_mixing_ratio_4326.tif"}]}
+
+    class FakeS5P:
+        def list_objects_v2(self, Bucket, Prefix):
+            return listing if Prefix.endswith("2026/09/10/") else {}
+    monkeypatch.setattr(watch, "tropomi_s3", lambda: FakeS5P())
+    monkeypatch.setattr(watch, "read_tropomi_window",
+                        lambda stem, box: (np.full((20, 30), np.nan), from_origin(52, 41.5, 0.35, 0.25)))
+    out = json.loads(_run(watch.scan_tropomi(area="west siberia and yamal", days=1, end_date="2026-09-10")))
+    assert out["hotspots"] == [] and out["summary"]["valid_pixels"] == 0 and "no cloud-free" in out["say"]
+    tip = json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_west_siberia_and_yamal.json"])
+    assert tip["area"] == "west siberia and yamal" and tip["no_view"] is True
+    assert tip["top"] is None and tip["hotspots"] == []
+    assert (tip["start"], tip["end"]) == ("2026-09-10", "2026-09-10") and tip["orbits"] == 1
+    # The follow rule reads it as an area with no spot to follow (never cued).
+    from follow_rule import cued_areas, parse_tip
+    parsed = parse_tip("west siberia and yamal", tip)
+    assert parsed["points"] == [] and cued_areas([parsed]) == []
+    # A scan that saw something carries no_view false.
+    a = np.full((20, 30), 1940.0)
+    a[10, 15] = 1990.0
+    monkeypatch.setattr(watch, "read_tropomi_window", lambda stem, box: (a.copy(), from_origin(52, 41.5, 0.35, 0.25)))
+    _run(watch.scan_tropomi(area="south caspian", days=1, end_date="2026-09-10"))
+    assert json.loads(fake_s3.objects[f"session_data/{SESSION}/methane/tip_south_caspian.json"])["no_view"] is False
+
+
 def test_scan_tropomi_reads_an_unversioned_composite_and_never_writes_one(watch, fake_s3, monkeypatch):
     """A composite the stable runtime cached (unversioned key) is read as it is, when TROPOMI itself
     cannot be read (it has no days band, so no tip bars); nothing is written there."""

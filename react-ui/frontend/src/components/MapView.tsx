@@ -154,7 +154,7 @@ import { createTileHealth } from '../utils/tileHealth.ts';
 import { getSectionCursor, setSectionCursor, useSectionCursor } from '../utils/sectionCursor.ts';
 import { Starfield } from './Starfield.tsx';
 import { LightPlate } from './LightPlate.tsx';
-import type { Tip } from '../utils/steps.ts';
+import { noTipWords, type Tip } from '../utils/steps.ts';
 import { CompareView } from './CompareView';
 import { Icon } from './Icons.tsx';
 import { LayerStack, type StackRow } from './LayerStack.tsx';
@@ -1427,7 +1427,7 @@ export function MapView({ geometry, rasters, onDrawnGeometry, drawRail = true, w
       properties: {
         short: t.area.short,
         anomaly: t.anomalyPpb ?? 0,
-        label: t.anomalyPpb === null ? 'no hotspot' : `${t.anomalyPpb >= 0 ? '+' : ''}${t.anomalyPpb.toFixed(0)} ppb`,
+        label: t.anomalyPpb === null ? noTipWords(t) : `${t.anomalyPpb >= 0 ? '+' : ''}${t.anomalyPpb.toFixed(0)} ppb`,
         emit: t.emit ? 1 : 0,
       },
       geometry: { type: 'Point' as const, coordinates: t.point ?? t.area.centre },

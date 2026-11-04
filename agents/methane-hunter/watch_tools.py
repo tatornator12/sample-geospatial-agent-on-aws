@@ -627,9 +627,15 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
                 return hit
         return json.dumps({"error": computed})
     med, valid_days, transform, stems, days_read = computed
+    read_days = sorted({s.split('/')[3] + '-' + s.split('/')[4] + '-' + s.split('/')[5] for s in stems})
     if not np.isfinite(med).any():
-        return json.dumps({"summary": {"area": label, "orbits": len(stems), "valid_pixels": 0},
-                           "hotspots": [], "say": f"TROPOMI saw no cloud-free methane retrievals over {label} in that window."})
+        # No usable retrieval in the window (West Siberia from late October: low sun and snow). The
+        # board still gets its row, saying there was no clear view, so it never waits for this area.
+        summary = {"area": label, "start": read_days[0], "end": read_days[-1], "days_requested": days,
+                   "orbits": len(stems), "valid_pixels": 0, "emit_can_look": emit}
+        write_tip(area_key, summary, [], no_view=True)
+        return json.dumps({"summary": summary, "hotspots": [],
+                           "say": f"TROPOMI saw no cloud-free methane retrievals over {label} in that window."})
     background = float(np.nanmedian(med))
     anomaly = med - background
     # A hotspot must persist: seen on HOTSPOT_MIN_DAYS days, or on every day of a shorter scan.
@@ -638,7 +644,6 @@ async def scan_tropomi(area: str = None, bbox: list = None, days: int = 7, end_d
     cog = _cog_bytes(anomaly, transform.c, transform.f, transform.a, -transform.e)
     days_cog = _days_cog_bytes(valid_days, transform)
     url = _put_bytes(session_key, cog, "image/tiff")
-    read_days = sorted({s.split('/')[3] + '-' + s.split('/')[4] + '-' + s.split('/')[5] for s in stems})
     # The window is the days TROPOMI was read on: its last day can be before the day asked for, when
     # that day's orbits are not published yet (the stage says the window's own dates).
     summary = {"area": label, "bbox": list(box), "start": read_days[0], "end": read_days[-1],
@@ -793,12 +798,13 @@ def clean_tip_columns(fc: dict, cap: int = 2000) -> dict:
     return {"type": "FeatureCollection", "features": out}
 
 
-def write_tip(area_key: str | None, summary: dict, hotspots: list) -> None:
+def write_tip(area_key: str | None, summary: dict, hotspots: list, no_view: bool = False) -> None:
     """The tip board's manifest for one watch area: numbers only, keyed by the area's own name.
 
     Tool outputs never reach the UI, so the stage reads this file (session_data/<sid>/methane/
     tip_<area_key>.json, the key derived from the scan call's `area`) to draw every area's anomaly
-    on the globe and list the tips before the agent commits to a site.
+    on the globe and list the tips before the agent commits to a site. Every scanned area gets one:
+    `no_view` marks a window with no usable retrieval at all (the board says so, not "no hotspot").
     """
     if not area_key:
         return
@@ -813,6 +819,7 @@ def write_tip(area_key: str | None, summary: dict, hotspots: list) -> None:
         "background_ppb": summary.get("background_ppb"),
         "emit_can_look": bool(summary.get("emit_can_look")),
         "orbits": summary.get("orbits"),
+        "no_view": bool(no_view),
         "top": top and {k: top.get(k) for k in ("lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look")},
         # The scan's top three hotspots: the follow rule's step 2 may check (and follow) any of them.
         "hotspots": [{k: h.get(k) for k in ("rank", "lat", "lon", "anomaly_ppb", "valid_days", "emit_can_look")}

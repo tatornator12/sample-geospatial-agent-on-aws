@@ -17,6 +17,7 @@ import {
   excludedDays,
   isoDay,
   methaneDirFrom,
+  noTipWords,
   parseManifest,
   parseTip,
   passManifestUrl,
@@ -264,6 +265,17 @@ describe('tips', () => {
     expect(JSON.stringify(tip)).not.toContain('Acme');
     expect(parseTip({ area: 'shanxi coal basin' }, 'south caspian')).toBeNull();
     expect(parseTip({ area: 'west siberia and yamal', emit_can_look: false, top: null }, 'west siberia and yamal')?.anomalyPpb).toBeNull();
+  });
+
+  it('tells a window with no clear view from a clear one with no hotspot (Nov 3, West Siberia)', () => {
+    const blind = parseTip({ area: 'west siberia and yamal', emit_can_look: false, no_view: true, top: null, hotspots: [] }, 'west siberia and yamal')!;
+    const quiet = parseTip({ area: 'hassi messaoud', emit_can_look: true, no_view: false, top: null }, 'hassi messaoud')!;
+    const older = parseTip({ area: 'amman', emit_can_look: true, top: null }, 'amman')!;     // a manifest written before no_view
+    expect([blind.noView, quiet.noView, older.noView]).toEqual([true, false, false]);
+    expect([noTipWords(blind), noTipWords(quiet), noTipWords(older)]).toEqual(['no clear view', 'no hotspot', 'no hotspot']);
+    // A manifest with a hotspot is never "no clear view", whatever the flag says.
+    const seen = parseTip({ area: 'amman', no_view: true, top: { lat: 31.9, lon: 36.1, anomaly_ppb: 20 } }, 'amman')!;
+    expect(seen.noView).toBe(false);
   });
 
   it('ranks strongest first and knows which tips were cued', () => {

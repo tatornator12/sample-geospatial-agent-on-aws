@@ -380,6 +380,7 @@ export function StepColumn({
                     cued={cuedAreas}
                     chosen={chosenArea}
                     expected={group.calls.length}
+                    live={live}
                     tallies={tallies}
                     cm={cm}
                     limit={collapsed ? 3 : undefined}

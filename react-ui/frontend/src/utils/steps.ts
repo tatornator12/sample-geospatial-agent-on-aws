@@ -105,6 +105,8 @@ export interface Tip {
   area: WatchArea;
   /** The top hotspot's anomaly above the area's background, ppb; null when the scan found none. */
   anomalyPpb: number | null;
+  /** The window had no usable retrieval at all (no_view: low sun, snow, cloud), so no hotspot could be looked for. */
+  noView: boolean;
   validDays: number | null;
   emit: boolean;
   /** The top hotspot, where EMIT is cued. */
@@ -131,6 +133,7 @@ export function parseTip(raw: unknown, areaName: string): Tip | null {
   return {
     area,
     anomalyPpb: top ? num(top.anomaly_ppb, -1000, 1000) : null,
+    noView: r.no_view === true && !top,
     validDays: top ? num(top.valid_days, 0, 60) : null,
     emit: r.emit_can_look === true,
     point: lat !== null && lon !== null ? [lon, lat] : null,
@@ -138,6 +141,11 @@ export function parseTip(raw: unknown, areaName: string): Tip | null {
     end: typeof r.end === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.end) ? r.end : null,
     days: num(r.days, 1, 60),
   };
+}
+
+/** What the board and the globe say for a tip with no anomaly: no clear view, or a clear view with no hotspot. */
+export function noTipWords(tip: Tip): string {
+  return tip.noView ? 'no clear view' : 'no hotspot';
 }
 
 /** Tips strongest first; areas EMIT cannot look at keep their place (the board says so). */

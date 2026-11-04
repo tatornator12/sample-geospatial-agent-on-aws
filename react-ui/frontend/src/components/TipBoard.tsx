@@ -8,7 +8,7 @@
  */
 import { rampGradient } from '../utils/render.ts';
 import { CARBON_MAPPER_SOURCE, TROPOMI_RAMP, aboutKgH } from '../utils/methaneLayers.ts';
-import type { CmPlumes, CueTally, Tip } from '../utils/steps.ts';
+import { noTipWords, type CmPlumes, type CueTally, type Tip } from '../utils/steps.ts';
 
 const BAR_MAX_PPB = 60;
 
@@ -18,8 +18,13 @@ interface TipBoardProps {
   cued: string[];
   /** The area the agent followed into the dive, once it has committed. */
   chosen?: string | null;
-  /** How many areas the scans covered (rows still loading show as pending). */
+  /** How many areas the scans covered (rows still loading show as pending, while the agent works). */
   expected: number;
+  /**
+   * The turn is still running. Once it has ended nothing is scanning, so the board drops the
+   * "N more areas scanning" line even if an area's file never reached the stage.
+   */
+  live?: boolean;
   /**
    * The reason for the choice, by area name: each cued site's candidate passes out of those read and
    * its newest candidate (from the cue manifests' numbers), printed under its row.
@@ -91,10 +96,10 @@ function CmLine({ cm }: { cm: CmPlumes }) {
   );
 }
 
-export function TipBoard({ tips, cued, chosen = null, expected, tallies = {}, cm = {}, limit }: TipBoardProps) {
+export function TipBoard({ tips, cued, chosen = null, expected, live = true, tallies = {}, cm = {}, limit }: TipBoardProps) {
   if (tips.length === 0) return null;
   const gradient = rampGradient(TROPOMI_RAMP) ?? undefined;
-  const pending = Math.max(0, expected - tips.length);
+  const pending = live ? Math.max(0, expected - tips.length) : 0;
   const shown = limit === undefined ? tips : tips.filter((tip, i) => i < limit || cued.includes(tip.area.name));
   const more = tips.length - shown.length;
   const cmFor = (name: string) => (cued.includes(name) && Object.prototype.hasOwnProperty.call(cm, name) ? cm[name] : undefined);
@@ -121,7 +126,7 @@ export function TipBoard({ tips, cued, chosen = null, expected, tallies = {}, cm
               {isChosen && <span className="tip-row__flag tip-row__flag--chosen"> following</span>}
             </span>
             <span role="cell" className="tip-row__value">
-              {ppb === null ? 'no hotspot' : `${ppb >= 0 ? '+' : ''}${ppb.toFixed(1)} ppb`}
+              {ppb === null ? noTipWords(tip) : `${ppb >= 0 ? '+' : ''}${ppb.toFixed(1)} ppb`}
             </span>
             <span className="tip-row__bar" aria-hidden="true">
               {/* The full ramp is laid across the bar; the fill reveals as much of it as the anomaly earns. */}

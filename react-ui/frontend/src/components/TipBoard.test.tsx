@@ -62,6 +62,22 @@ describe('TipBoard in the end frame (B15, A2 P1-2)', () => {
     const labels = [...container.querySelectorAll('.tip-row__label')].map((el) => el.textContent?.trim());
     expect(labels).toEqual(['South Caspian, Turkmenistan', 'Shanxi and Ordos coal basins, China', 'Zagros foreland, Iran', 'Amman, Jordan', '+5 more areas']);
   });
+  it('says an area is still scanning only while the agent works (Nov 3: 8 of 9 files, the turn over)', () => {
+    const eight = nine.slice(0, 8);
+    const working = render(<TipBoard tips={eight} cued={['south caspian']} expected={9} live />);
+    expect(working.container.querySelector('.tip-row--pending')?.textContent).toBe('1 more area scanning');
+    cleanup();
+    const done = render(<TipBoard tips={eight} cued={['south caspian']} expected={9} live={false} limit={3} />);
+    expect(done.container.querySelector('.tip-row--pending')).toBeNull();
+    expect(done.container.textContent).not.toMatch(/scanning/);
+  });
+  it('words an area with no clear view apart from one with no hotspot', () => {
+    const blind = parseTip({ area: 'west siberia and yamal', emit_can_look: false, no_view: true, top: null, hotspots: [] }, 'west siberia and yamal')!;
+    const quiet = parseTip({ area: 'hassi messaoud', emit_can_look: true, top: null }, 'hassi messaoud')!;
+    const { container } = render(<TipBoard tips={[...tips, blind, quiet]} cued={cued} expected={5} live={false} />);
+    expect(rowOf(container, 'West Siberia').querySelector('.tip-row__value')?.textContent).toBe('no clear view');
+    expect(rowOf(container, 'Hassi Messaoud').querySelector('.tip-row__value')?.textContent).toBe('no hotspot');
+  });
   it('shows every row without a limit', () => {
     const { container } = render(<TipBoard tips={nine} cued={['south caspian']} expected={9} />);
     expect(container.querySelectorAll('.tip-row')).toHaveLength(9);
