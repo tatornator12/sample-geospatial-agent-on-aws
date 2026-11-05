@@ -415,6 +415,18 @@ Licence gate: cleared Oct 16 (the user: "GFW license is good"); the Galápagos s
   Oct 12 pass; I drafted box 1 for the next look." with "2 more not counted: a broadcasting ship
   passed close by." Live bundle: "ship passed close", "passed within" and the gallery's
   `vessels-open-question-v2`. Way back: `deployed-2026-10-26-1606`
+- Nov 5 (the data rerun, task 13): **not run**. Step 1 `build_vessel_cache.py --backup 2026-11-05`
+  (4 files; the live files byte-identical to it afterwards). Step 3 `list_vessel_passes.py --until
+  2026-11-05 --newest 6 --min-share 0.2 --append` stopped on GFW's 4Wings 404 ("temporarily
+  unavailable because of infrastructure constraints and an upstream data dependency issue"):
+  per-vessel AIS presence (`group-by=VESSEL_ID`, unaggregated) is disabled from Nov 3 by GFW's
+  notice, and presence by cell answered the same 404; radar detections (the build's GEARTYPE query)
+  and gap events still answered 200. `passes_v1.json` unchanged. `warm_vessels.py`: S1D plan to Nov
+  25, 7 looks over the reserve (after the show: box 2 Nov 10 00:25 UTC, boxes 1 and 3 Nov 17 00:17
+  UTC); `--check` all clear. Also noted: GFW's `latest` alias is pipeline v5 since Oct 21, and v1 was
+  built on v4. The user's decision: stay on the Oct 12 data, no reply to GFW; task 14's go/no-go and
+  the replay re-record drop (design decision 12, amended Nov 5). Record:
+  `.agents/tasks/vessels-refresh-2026-11-05/report.md`
 - Oct 29 (7.1) and Oct 30 (7.2's timings and the 30-minute run-through): not held, the presenter
   was out of office. 7.2's gates and stable evals ran at the Nov 3 release; Act 3's hand timings
   (twice) and the 30-minute run move to the Nov 6 rehearsal (task 14)

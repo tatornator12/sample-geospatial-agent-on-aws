@@ -501,6 +501,13 @@ decision or the Slack post. If the runtime fails mid-question: refresh, then the
     go/no-go (U14). If either gate fails, G4 promotes the four-turn version tagged
     `act3-four-turn-fallback` (task 1's copy fixes and nothing else from the redesign), there is no
     Nov 5 rerun, the Oct 16 data stands, and the rest file is not republished with `--newest`.
+    **Amended Nov 5** (the user's decision): the rerun could not run. Global Fishing Watch disabled
+    per-vessel AIS presence in its 4Wings report from Nov 3 (its notice to the user), and the build
+    needs it for every new pass (the coverage rule counts distinct vessels per hour; the replay is
+    tracks). The backup `backup-2026-11-05` was made and nothing else in `vessels/cache/v1` changed;
+    ESA's plans were refreshed. The show stays on the Oct 12 data (the passes on file, as tested on
+    Nov 3 and 4), the replay `vessels-open-question-v2` is not re-recorded, and there is no Nov 6
+    go/no-go. No reply to Global Fishing Watch.
 8. **Names** (approved Oct 16): agent id `vessels`, label "Dark Vessels", directory
    `agents/dark-vessels/`, runtimes `dark_vessels` / `dark_vessels_dev`, cache `vessels/cache/v1/`,
    replay case `vessels-<pass>`.

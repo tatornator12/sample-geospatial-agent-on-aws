@@ -187,14 +187,14 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 
 **Point to land:** The agent picks its own radar pass, checks that a missing broadcast can mean anything before it reads one, predicts where to look with a measured record, and drafts a patrol that only the officer can send.
 
-*Quoted lines are from a live run on the stable runtime on 3 November. After the 5 November data refresh the passes, the counts and the figures can change, and ESA's plan changes the next looks, so read them off the screen.*
+*Quoted lines are from a live run on the stable runtime on 3 November, on the data the show uses: Oct 12 is the newest pass on file (the 5 November refresh could not run, so the data stays as tested). Only the next looks change, with ESA's plan, so read those off the screen.*
 
 *What stays on screen once it stops: every step, with its "Decided:", "Checked:" and "Set aside:" lines, in the left column; the two pictures it looked at, which open large when clicked; and every layer on the map. The clock at the top centre keeps only its last line ("Patrol tasking draft"), so its earlier figures (the 142 ships, the 22 radar targets) are said while the run shows them, or not at all. During the walk-back, keep off the layers list (at 1920×1080 opening it moves the tasking plate over the left column and hides the steps; folding it again brings them back), "Not now" (the plate can't be brought back), "Clear" and New session.*
 
 **1. The reserve at night, before the click (about 45 s)**
 - **Do:** switch to "Dark Vessels" and wait for the top-centre clock "AIS replay" with a date and time, and moving lights inside a dashed outline.
 - **Point at:** a moving light, then the dashed line.
-- **Say:** "This is the Galápagos Marine Reserve at night; the dashed line is its edge. Each moving light is a ship's own position broadcast, called AIS, replayed from the 36 hours before a radar pass. It's a replay, not live: Global Fishing Watch runs a few days behind. A ship that switches its broadcast off drops out of this picture, but radar still sees it, through cloud and in the dark. Patrol boats are few and the reserve is large, so the officer's question is: is anyone in the reserve without broadcasting, and where should the patrol look next? It takes the agent about a minute and a lot happens fast, so I'll let it run, then walk you back through every step. Watch the left column: each step lights as the agent takes it."
+- **Say:** "This is the Galápagos Marine Reserve at night; the dashed line is its edge. Each moving light is a ship's own position broadcast, called AIS, replayed from the 36 hours before the 12 October radar pass. It's a replay from our prepared data, not live. A ship that switches its broadcast off drops out of this picture, but radar still sees it, through cloud and in the dark. Patrol boats are few and the reserve is large, so the officer's question is: is anyone in the reserve without broadcasting, and where should the patrol look next? It takes the agent about a minute and a lot happens fast, so I'll let it run, then walk you back through every step. Watch the left column: each step lights as the agent takes it."
 
 **2. The click, and the run (about 60 s)**
 - **Do:** click "Who is there without broadcasting, and where next?". The steps light one after another down the left column and the clock names each beat (3 November: the pass chosen at 8 s, the radar at 14 s, the coverage at 22 s, the candidates at 30 s, the forecast at 42 s, the boxes at 48 s, the plate at 58 s).
@@ -241,7 +241,7 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 - **Say:** "The glow is where unexplained targets turned up before, and it's tested: before each radar day since July it was rebuilt from earlier data and checked against that day. Its hottest 5% of the water held 45% of the dark targets, about 9 times chance. It's a record of the method, not a promise about the next pass."
 
 **9. The boxes, and the draft (about 30 s)**
-- **Point at:** the three white squares, "Box 1" to "Box 3"; the swath's label on the map ("next look S1-D Nov 5 00:17 UTC" on 3 November); then the line under "When the radar looks again": "Decided: Drafting box 1: 1 of the candidates lies in or near it."
+- **Point at:** the three white squares, "Box 1" to "Box 3"; the swath's label on the map ("next look S1-D Nov 5 00:17 UTC" on 3 November; on 9 November, by ESA's plan of 5 November, boxes 1 and 3 next "Nov 17 00:17 UTC" and box 2 "Nov 10 00:25 UTC"); then the line under "When the radar looks again": "Decided: Drafting box 1: 1 of the candidates lies in or near it."
 - **Say:** "From that map come three patrol boxes, each with the radar's next planned look, from ESA's published plan. It drafted box 1, because one of today's candidates lies in or near it, and that line says so."
 - If it says "it held the most past dark targets": "It drafted box 1: the most dark targets before."
 - If the step reads "When the radar looks again ×2" and "Draft the tasking" adds "Decided: Drafting box 2: its radar look comes first,": "Then it read the radar plan and switched to box 2: the radar looks there first."
@@ -251,12 +251,12 @@ Before the first click, in Act 1, point at the screen: "On the left, the agent's
 - **Say:** "That's its answer in one line. The radar and the broadcasts were read ahead of time; every choice you've just seen was made live."
 
 **10. The officer's choice**
-- **Point at:** the box rows on the plate ("Box 1  9% of past dark targets" and its next look, "Nov 5 00:17 UTC, in 1 d 2 h" on 3 November), the candidates ("T01 31 km from Baltra", "T02 31 km from Baltra"), then the line above the buttons ("Patrol box 1 · check 2 of 2 candidates on the way"). T03 and T04 are not on the plate: they were set aside.
+- **Point at:** the box rows on the plate ("Box 1  9% of past dark targets" and its next look, "Nov 5 00:17 UTC, in 1 d 2 h" on 3 November, "Nov 17 00:17 UTC" on 9 November), the candidates ("T01 31 km from Baltra", "T02 31 km from Baltra"), then the line above the buttons ("Patrol box 1 · check 2 of 2 candidates on the way"). T03 and T04 are not on the plate: they were set aside.
 - **Say:** "I'm the officer. Each box shows its share of past dark targets and when the radar looks next. Below are the two candidates, by distance from port, to check on the way. The line at the bottom is the whole tasking."
 - **Do:** leave the agent's box selected and every candidate ticked. To show the choice is yours, click another box first (the line above the buttons changes with it, and a box not chosen steps back), or untick a candidate (its ring is then labelled "left out").
 - **Say:** "Box 1 held the most dark targets before, so I'll take the agent's draft and check both on the way."
 - If the plate has box 2 selected because its look comes first: "The radar looks at box 2 first, so we can check what the patrol finds. I'll take the agent's draft and check both on the way."
-- By 9 November the Nov 5 look has passed; if ESA has planned no newer one, a box reads "no look planned yet": "ESA hasn't planned a radar look there yet."
+- On 9 November box 2's look (Nov 10 00:25 UTC) comes before boxes 1 and 3's (Nov 17 00:17 UTC), by ESA's plan fetched on 5 November. So the agent may draft box 1 (a candidate lies in or near it) or switch to box 2 ("its radar look comes first"); both lines are in cue 9. If a box ever reads "no look planned yet": "ESA hasn't planned a radar look there yet."
 
 **11. The decision (you, as the officer)**
 - **Say:** "The agent drafted it. I'm approving it."
